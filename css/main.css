@@ -1,0 +1,2669 @@
+/* 全局样式 */
+:root {
+    /* 颜色系统 - 浅色模式 */
+    --bg-primary: #f3f3f3;
+    --bg-secondary: rgba(255, 255, 255, 0.7);
+    --bg-tertiary: rgba(255, 255, 255, 0.5);
+    --text-primary: #1f1f1f;
+    --text-secondary: #666666;
+    --text-tertiary: #999999;
+    --accent: #0078d4;
+    --accent-hover: #106ebe;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.18);
+    
+    /* 圆角 */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    
+    /* 模糊 */
+    --blur-sm: 8px;
+    --blur-md: 12px;
+    --blur-lg: 16px;
+    
+    /* 过渡 */
+    --transition-fast: 0.15s ease-out;
+    --transition-normal: 0.2s ease-out;
+    --transition-slow: 0.3s ease-out;
+    --transition-spring: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 深色模式 */
+.dark-mode {
+    --bg-primary: #202020;
+    --bg-secondary: rgba(32, 32, 32, 0.7);
+    --bg-tertiary: rgba(32, 32, 32, 0.5);
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-tertiary: #808080;
+    --accent: #60cdff;
+    --accent-hover: #4db8e8;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.45);
+}
+
+/* 深色模式下所有Symbol图标变白色 */
+.dark-mode img[src*="Symbol_icon/stroke/"],
+.dark-mode img[src*="Symbol_icon/fill/"] {
+    filter: brightness(0) invert(1);
+}
+
+/* 深色模式下已经激活的控制中心瓷贴图标不重复应用 */
+.dark-mode .control-tile[data-active="true"] .tile-icon {
+    filter: brightness(0) invert(1);
+}
+
+/* 基础重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 全局禁用右键菜单 */
+body {
+    -webkit-touch-callout: none;
+}
+
+button {
+    font-family: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+    outline: none;
+}
+
+input {
+    font-family: inherit;
+    outline: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* 壁纸容器 */
+.boot-content,
+.lock-wallpaper,
+.login-wallpaper,
+.desktop-wallpaper {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* ============ 开机屏幕 ============ */
+#boot-screen {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.boot-content {
+    text-align: center;
+    background: none;
+}
+
+.boot-logo {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 24px;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+}
+
+.boot-text {
+    font-size: 32px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 48px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.boot-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    margin: 0 auto;
+}
+
+/* ============ 锁屏 ============ */
+#lock-screen {
+    z-index: 900;
+}
+
+.lock-wallpaper {
+    background-image: url('../Theme/Picture/Fluent-1.png');
+    /* 正常锁屏状态下不模糊 */
+    filter: none;
+    transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1), 
+                filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform, filter;
+}
+
+.lock-time-container {
+    position: absolute;
+    top: 80px;
+    left: 60px;
+    color: white;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform, opacity, filter;
+}
+
+.lock-time {
+    font-size: 96px;
+    font-weight: 300;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.lock-date {
+    font-size: 24px;
+    font-weight: 400;
+    opacity: 0.95;
+}
+
+.lock-hint {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 18px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform, opacity, filter;
+}
+
+/* ============ 登录屏幕 ============ */
+#login-screen {
+    z-index: 950; /* 高于锁屏，但只用于显示密码卡片 */
+    /* 登录界面透明，让锁屏壁纸透过来 */
+    background: transparent;
+    pointer-events: auto; /* 接收点击事件，点击空白区域返回锁屏 */
+}
+
+.login-wallpaper {
+    /* 不显示自己的壁纸，让锁屏壁纸透过来 */
+    background-image: none !important;
+    pointer-events: none; /* 让点击穿透到 login-screen */
+    transition: filter 520ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: filter, opacity;
+}
+
+.login-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-xl);
+    padding: 48px 40px;
+    min-width: 360px;
+    box-shadow: var(--shadow-xl);
+    text-align: center;
+    border: 1px solid var(--border-color);
+    pointer-events: auto; /* 恢复密码卡片的点击事件 */
+}
+
+/* 登录卡片弹入动画（与壁纸模糊同步：600ms） */
+body.animations-enabled .login-card.show {
+    animation: loginCardShow 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes loginCardShow {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 40px)) scale(0.92);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* 登录卡片退出动画 */
+.login-card.exit {
+    animation: loginCardExit 0.35s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+@keyframes loginCardExit {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 60px)) scale(0.88);
+    }
+}
+
+.login-avatar {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+}
+
+.login-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.login-username {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.login-email {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.login-pin-container {
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.login-pin-input {
+    width: 100%;
+    padding: 12px 40px 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    font-size: 16px;
+    text-align: center;
+    letter-spacing: 4px;
+    color: var(--text-primary);
+    transition: border-color var(--transition-fast);
+}
+
+.dark-mode .login-pin-input {
+    color: #ffffff;
+}
+
+.login-pin-input::placeholder {
+    color: var(--text-secondary);
+}
+
+.login-pin-input:focus {
+    border-color: var(--accent);
+}
+
+.login-pin-input.error {
+    border-color: #d13438;
+}
+
+.pin-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.pin-toggle img {
+    width: 100%;
+    height: 100%;
+}
+
+.login-error {
+    color: #d13438;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.login-security-link {
+    color: var(--accent);
+    font-size: 13px;
+    margin-bottom: 24px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.login-submit {
+    width: 100%;
+    padding: 12px 24px;
+    background: var(--accent);
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: 15px;
+    font-weight: 600;
+    transition: background var(--transition-fast);
+}
+
+.login-submit:hover {
+    background: var(--accent-hover);
+}
+
+/* ============ 桌面 ============ */
+#desktop-screen {
+    z-index: 100;
+}
+
+.desktop-wallpaper {
+    background-image: url('../Theme/Picture/Fluent-2.png');
+    transform: scale(1);
+    filter: none;
+    transition: filter 500ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: filter, transform;
+}
+
+.desktop-icons {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    bottom: 80px;
+    display: grid;
+    grid-template-rows: repeat(6, 90px); /* 固定6行 */
+    grid-auto-columns: 90px; /* 自动列宽 */
+    grid-auto-flow: column; /* 垂直排列，先填充列，满6个后自动创建新列 */
+    gap: 12px;
+    align-content: start;
+    padding: 10px;
+    overflow-x: auto; /* 当列数过多时可以横向滚动 */
+    overflow-y: hidden;
+}
+
+.desktop-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 90px; /* 固定宽度 */
+    height: 90px; /* 固定高度，保持正方形 */
+    padding: 8px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    position: relative;
+}
+
+.desktop-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.desktop-icon.selected {
+    background: rgba(255, 255, 255, 0.15);
+    outline: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.desktop-icon img {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 6px;
+    pointer-events: none;
+    flex-shrink: 0; /* 防止图标被压缩 */
+}
+
+.desktop-icon span {
+    font-size: 12px;
+    color: white;
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.2;
+    max-height: 28px; /* 限制文字高度，最多显示2行 */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* 最多显示2行 */
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    transition: text-shadow 0.3s ease;
+}
+
+/* 亮色壁纸时添加阴影效果 */
+.desktop-icons.light-wallpaper .desktop-icon img {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.desktop-icons.light-wallpaper .desktop-icon span {
+    color: #333;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 16px rgba(255, 255, 255, 0.7), 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* 暗色壁纸时的样式 */
+.desktop-icons.dark-wallpaper .desktop-icon span {
+    color: white;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.desktop-icons.dark-wallpaper .desktop-icon img {
+    filter: none;
+}
+
+/* ============ 右键菜单 ============ */
+.context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-md);
+    padding: 6px;
+    min-width: 200px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+    z-index: 10000;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.context-menu-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .context-menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.context-menu-item img {
+    width: 16px;
+    height: 16px;
+}
+
+.context-menu-item.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+    background: transparent;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: var(--border-color);
+    margin: 6px 0;
+}
+
+/* ============ 任务栏 ============ */
+.taskbar {
+    position: fixed;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    padding: 8px 12px;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    z-index: 9000;
+}
+
+/* 任务栏显示动画 - 从下方弹入（非线性平滑） */
+body.animations-enabled .taskbar {
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                opacity 0.35s ease-out;
+}
+
+/* 任务栏隐藏动画 - 向下滑出（非线性平滑） */
+body.animations-enabled .taskbar.hiding {
+    transition: transform 0.45s cubic-bezier(0.55, 0.055, 0.675, 0.19), 
+                opacity 0.3s ease-in;
+}
+
+.taskbar.hidden {
+    transform: translateX(-50%) translateY(calc(100% + 30px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+.taskbar-left,
+.taskbar-center,
+.taskbar-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 任务栏扩充弹簧动画 */
+body.animations-enabled .taskbar-center {
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.taskbar-btn {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), transform var(--transition-fast);
+    position: relative;
+}
+
+.taskbar-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: scale(1.05);
+}
+
+.dark-mode .taskbar-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.taskbar-btn:active {
+    transform: scale(0.95);
+}
+
+.taskbar-btn img {
+    width: 24px;
+    height: 24px;
+}
+
+.taskbar-btn .icon-stroke {
+    display: block;
+}
+
+.taskbar-btn .icon-fill {
+    display: none;
+}
+
+.taskbar-btn.active .icon-stroke {
+    display: none;
+}
+
+.taskbar-btn.active .icon-fill {
+    display: block;
+}
+
+.taskbar-app {
+    position: relative;
+}
+
+.taskbar-app::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.taskbar-app.running::after {
+    opacity: 1;
+}
+
+.taskbar-notification {
+    width: auto !important;
+    padding: 0 12px !important;
+}
+
+.notification-time-container {
+    text-align: center;
+}
+
+.notification-time {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text-primary);
+}
+
+.notification-date {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.2;
+}
+
+/* ============ 开始菜单 ============ */
+.start-menu {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translate(-50%, 0);
+    width: 600px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    z-index: 9500;
+    transform-origin: center bottom;
+}
+
+.start-search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: 24px;
+    border: 2px solid transparent;
+    transition: border-color var(--transition-fast);
+}
+
+.start-search:focus-within {
+    border-color: var(--accent);
+}
+
+.start-search img {
+    width: 20px;
+    height: 20px;
+}
+
+.start-search input {
+    flex: 1;
+    border: none;
+    background: none;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.start-search input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.start-apps-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+/* 开始菜单分区 */
+.start-section {
+    margin-bottom: 20px;
+}
+
+.start-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 4px;
+}
+
+.start-section-header span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.start-section-link {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background var(--transition-fast);
+}
+
+.start-section-link:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .start-section-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-section-link img {
+    width: 12px;
+    height: 12px;
+}
+
+.start-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+
+.start-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.start-app:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .start-app:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-app img {
+    width: 36px;
+    height: 36px;
+}
+
+.start-app span {
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.start-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.start-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.start-user:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .start-user:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-user img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+
+.start-user span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.start-power-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+}
+
+.start-power-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .start-power-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-power-btn img {
+    width: 20px;
+    height: 20px;
+}
+
+/* ============ 电源菜单 ============ */
+.power-menu {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-md);
+    padding: 6px;
+    min-width: 180px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+    z-index: 9600;
+}
+
+.power-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.power-menu-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .power-menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.power-menu-item img {
+    width: 18px;
+    height: 18px;
+}
+
+/* ============ 控制中心 ============ */
+.control-center {
+    position: fixed;
+    /* 不设置默认bottom，由JS动态计算 */
+    width: 380px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    z-index: 9500;
+}
+
+.control-center-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.control-tile {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.control-tile:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: scale(1.02);
+}
+
+.dark-mode .control-tile:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.control-tile[data-active="true"] {
+    background: var(--accent);
+    color: white;
+}
+
+.control-tile[data-active="true"] .tile-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.control-tile-large {
+    display: flex;
+    gap: 12px;
+}
+
+.control-tile .tile-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 8px;
+}
+
+.control-tile-large .tile-icon {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.control-tile .tile-icon.icon-stroke {
+    display: block;
+}
+
+.control-tile .tile-icon.icon-fill {
+    display: none;
+}
+
+.control-tile[data-active="true"] .tile-icon.icon-stroke {
+    display: none !important;
+}
+
+.control-tile[data-active="true"] .tile-icon.icon-fill {
+    display: block !important;
+}
+
+/* 激活状态的图标使用白色 */
+.control-tile[data-active="true"] .tile-icon {
+    filter: brightness(0) invert(1);
+}
+
+/* 蓝牙图标容器 */
+.tile-icon-container {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    margin-right: 0; /* Flex gap 处理间距 */
+}
+
+.tile-icon-container img {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.3s ease;
+}
+
+/* 蓝牙状态切换 */
+#bluetooth-tile .bluetooth-icon-off {
+    opacity: 1;
+}
+
+#bluetooth-tile .bluetooth-icon-on {
+    opacity: 0;
+}
+
+#bluetooth-tile[data-active="true"] .bluetooth-icon-off {
+    opacity: 0 !important;
+}
+
+#bluetooth-tile[data-active="true"] .bluetooth-icon-on {
+    opacity: 1 !important;
+    filter: brightness(0) invert(1);
+}
+
+
+/* 隐藏类优先级 */
+.tile-icon.hidden {
+    display: none !important;
+}
+
+.tile-label {
+    flex: 1;
+}
+
+.tile-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.tile-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.control-slider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+}
+
+.control-slider:last-child {
+    margin-bottom: 0;
+}
+
+.control-slider img {
+    width: 20px;
+    height: 20px;
+}
+
+.control-slider input[type="range"] {
+    flex: 1;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.control-slider input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
+
+.control-slider input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.control-slider span {
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: right;
+}
+
+/* ============ 通知中心 ============ */
+.notification-center {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100%;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    box-shadow: var(--shadow-xl);
+    border-left: 1px solid var(--border-color);
+    z-index: 9500;
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 24px 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.notification-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.notification-clear {
+    font-size: 13px;
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.notification-clear:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .notification-clear:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.notification-item {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 12px;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.notification-item-header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.notification-item-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.notification-item-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.notification-item-close {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.notification-item-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.dark-mode .notification-item-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-item-close img {
+    width: 12px;
+    height: 12px;
+}
+
+.notification-item-content {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.notification-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+}
+
+.notification-empty img {
+    width: 64px;
+    height: 64px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+.notification-empty p {
+    font-size: 14px;
+}
+
+/* ============ 窗口系统 ============ */
+.window {
+    position: absolute;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 400px;
+    min-height: 300px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center center;
+    will-change: transform, opacity;
+}
+
+/* 窗口调整大小的手柄 */
+.window-resize-handle {
+    position: absolute;
+    z-index: 10;
+}
+
+.window-resize-handle.resize-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+}
+
+.window-resize-handle.resize-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+}
+
+.window-resize-handle.resize-left {
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: ew-resize;
+}
+
+.window-resize-handle.resize-right {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: ew-resize;
+}
+
+.window-resize-handle.resize-top-left {
+    top: 0;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nwse-resize;
+}
+
+.window-resize-handle.resize-top-right {
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nesw-resize;
+}
+
+.window-resize-handle.resize-bottom-left {
+    bottom: 0;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nesw-resize;
+}
+
+.window-resize-handle.resize-bottom-right {
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    cursor: nwse-resize;
+}
+
+/* 窗口调整时禁用过渡 */
+.window.resizing {
+    transition: none;
+}
+
+/* 窗口背景 - 模糊模式 */
+.window-blur-enabled .window {
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    /* 修复色块渲染问题 */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* 窗口背景 - 纯色模式 */
+.window-blur-disabled .window {
+    background: var(--bg-primary);
+}
+
+.window-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: move;
+    user-select: none;
+}
+
+.window-title-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.window-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.window-title {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.window-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.window-control-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.window-control-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .window-control-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.window-control-btn.close:hover {
+    background: #d13438;
+    color: white;
+}
+
+.window-control-btn img {
+    width: 16px;
+    height: 16px;
+}
+
+.window-content {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-primary);
+    position: relative;
+}
+
+/* 统一窗口内容区滚动条为通知中心风格 */
+.window-content::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.window-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+.window-content::-webkit-scrollbar-thumb {
+    background: var(--text-tertiary);
+    border-radius: 3px;
+}
+.window-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+.window-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-tertiary) transparent;
+}
+
+.window.maximized {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+}
+
+.window.minimizing,
+.window.restoring {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.window.closing {
+    animation: windowClose 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* 全局窗口模式切换 */
+body.window-blur-enabled .window {
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    /* 修复色块渲染问题 - 强制 GPU 加速 */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    isolation: isolate;
+}
+
+body.window-blur-disabled .window {
+    background: var(--bg-primary);
+    backdrop-filter: none;
+}
+
+body.window-blur-disabled .window-content {
+    background: var(--bg-primary);
+}
+
+body.window-blur-disabled .window-titlebar {
+    background: var(--bg-secondary);
+}
+
+/* ============ 模糊禁用时的半透明替代方案 ============ */
+.blur-disabled .taskbar {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.dark-mode.blur-disabled .taskbar {
+    background: rgba(32, 32, 32, 0.9);
+}
+
+.blur-disabled .start-menu {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .start-menu {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+.blur-disabled .power-menu {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .power-menu {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+.blur-disabled .control-center {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .control-center {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+.blur-disabled .notification-center {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .notification-center {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+.blur-disabled .context-menu {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .context-menu {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+.blur-disabled .login-card {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .login-card {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+/* ============ 右键菜单 ============ */
+.context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    z-index: 10000;
+    min-width: 200px;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    font-size: 14px;
+}
+
+.context-menu-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .context-menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.context-menu-item img {
+    width: 16px;
+    height: 16px;
+}
+
+.blur-disabled .context-menu {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .context-menu {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+/* ============ 任务视图 ============ */
+.taskview {
+    position: fixed;
+    inset: 0;
+    z-index: 9000; /* 低于窗口(9100)和任务栏(9000) */
+    pointer-events: auto;
+}
+.taskview.hidden { display: none !important; }
+
+/* 背景壁纸过渡效果已在基础样式中定义 */
+
+/* 仅虚化桌面背景壁纸+放大效果，不虚化窗口和任务栏 */
+body.in-taskview .desktop-wallpaper {
+    filter: blur(20px) brightness(0.8);
+    transform: scale(1.08);
+}
+
+/* 多任务视图下淡化隐藏桌面图标，退出时平滑出现 */
+body.in-taskview .desktop-icons {
+    filter: blur(14px) saturate(120%);
+    opacity: .35;
+    transition: filter 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    pointer-events: none;
+}
+
+/* 恢复时的过渡 */
+body:not(.in-taskview) .desktop-icons {
+    filter: none;
+    opacity: 1;
+    transition: filter 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 任务栏保持清晰可见 */
+body.in-taskview .taskbar {
+    opacity: 1;
+    pointer-events: auto;
+    filter: none !important;
+}
+
+/* 窗口在任务视图中保持清晰，仅位置和大小变化 */
+.taskview-window-active {
+    cursor: pointer;
+    box-shadow: var(--shadow-xl) !important;
+    filter: none !important;
+}
+
+/* ============ 锁屏 → 登录过渡动画 ============ */
+/* 锁屏壁纸放大+模糊（同时进行，双向过渡） */
+body.lock-to-login .lock-wallpaper {
+    transform: scale(1.08);
+    filter: blur(18px) brightness(0.82);
+}
+
+/* 时间容器缩小+模糊+淡出（双向过渡） */
+body.lock-to-login .lock-time-container {
+    transform: scale(0.85) translateY(-20px);
+    opacity: 0;
+    filter: blur(8px);
+}
+
+/* 底部提示文字缩小+模糊+淡出（双向过渡） */
+body.lock-to-login .lock-hint {
+    transform: translateX(-50%) scale(0.85) translateY(20px);
+    opacity: 0;
+    filter: blur(8px);
+}
+
+/* 注意：移除 body.lock-to-login 后，所有元素会自动反向过渡回初始状态 */
+
+/* ============ 登录 → 锁屏过渡动画（点击空白返回） ============ */
+/* 返回锁屏时的平滑过渡（无弹跳，避免白边） */
+body.login-to-lock .lock-wallpaper {
+    transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+                filter 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.login-to-lock .lock-time-container {
+    transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.4s ease-out,
+                filter 0.4s ease-out;
+}
+
+body.login-to-lock .lock-hint {
+    transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.4s ease-out,
+                filter 0.4s ease-out;
+}
+
+/* 密码卡片返回锁屏的退出动画 */
+.login-card.exit-to-lock {
+    animation: loginCardExitToLock 0.45s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+}
+
+@keyframes loginCardExitToLock {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 50px)) scale(0.9);
+    }
+}
+
+/* ============ 登录 → 桌面过渡动画 ============ */
+/* 密码卡片退出时，锁屏背景加深模糊（全屏实时动态模糊） */
+body.login-to-desktop-blur .lock-wallpaper {
+    filter: blur(35px) brightness(0.65);
+    transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.login-to-desktop-blur .lock-time-container,
+body.login-to-desktop-blur .lock-hint {
+    filter: blur(20px);
+    opacity: 0.2;
+    transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 350ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 密码卡片也参与实时模糊 */
+body.login-to-desktop-blur .login-card {
+    filter: blur(12px);
+    transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 桌面初始模糊状态（与深度模糊一致，实现无缝淡化切换） + 景深放大 */
+body.desktop-blur-in .desktop-wallpaper {
+    filter: blur(35px) brightness(0.65);
+    transform: scale(1.1);
+}
+
+body.desktop-blur-in .desktop-icons {
+    filter: blur(18px);
+    opacity: 0.3;
+}
+
+/* 桌面模糊渐变清晰 + 景深缩放（平滑过渡600ms） */
+body.desktop-unblur .desktop-wallpaper {
+    filter: none;
+    transform: scale(1);
+    transition: filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.desktop-unblur .desktop-icons {
+    filter: none;
+    opacity: 1;
+    transition: filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.desktop-unblur #desktop-screen {
+    transition: opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ============ 窗口全屏时壁纸景深放大+非线性模糊效果 ============ */
+/* 仅在开启模糊效果时生效 */
+body:not(.blur-disabled).has-maximized-window .desktop-wallpaper {
+    filter: blur(25px) brightness(0.85) saturate(1.2);
+    transform: scale(1.1);
+    transition: filter 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 深色模式下的效果 */
+body.dark-mode:not(.blur-disabled).has-maximized-window .desktop-wallpaper {
+    filter: blur(25px) brightness(0.7) saturate(1.1);
+}
+
+/* 还原时的平滑过渡 */
+body:not(.blur-disabled):not(.has-maximized-window) .desktop-wallpaper {
+    transition: filter 400ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ============ 响应式设计 ============ */
+@media (max-width: 1024px) {
+    .start-menu {
+        width: 90%;
+    }
+    
+    .control-center {
+        width: 90%;
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+    }
+    
+    .notification-center {
+        width: 100%;
+    }
+}
+
+/* 仅背景虚化：任务视图时窗口与任务栏保持清晰 */
+.in-taskview .window { filter: none !important; }
+.in-taskview .taskbar { filter: none !important; }
+
+/* ============================================================
+   App Shop 应用商店样式
+============================================================ */
+.appshop {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+/* 顶部搜索栏 */
+.appshop-header {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: center;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.appshop-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 8px 16px;
+    width: 100%;
+    max-width: 500px;
+    transition: all var(--transition-fast);
+}
+
+.appshop-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.15);
+}
+
+.appshop-search-icon {
+    width: 18px;
+    height: 18px;
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
+.appshop-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    color: var(--text-primary);
+    outline: none;
+}
+
+.appshop-search-input::placeholder {
+    color: var(--text-secondary);
+}
+
+/* 主内容区 */
+.appshop-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* 精选区域 */
+.appshop-featured {
+    margin-bottom: 32px;
+}
+
+.appshop-featured-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 16px;
+    min-height: 280px;
+}
+
+/* 主横幅 */
+.appshop-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.appshop-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.appshop-banner-content {
+    color: white;
+    z-index: 1;
+}
+
+.appshop-banner-tag {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-bottom: 16px;
+}
+
+.appshop-banner-title {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+}
+
+.appshop-banner-desc {
+    font-size: 14px;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.appshop-banner-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.appshop-banner-icon img {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+}
+
+/* 右侧精选卡片 */
+.appshop-featured-cards {
+    display: grid;
+    grid-template-rows: 1fr auto auto;
+    gap: 12px;
+}
+
+.appshop-featured-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.appshop-featured-card:hover {
+    background: var(--bg-tertiary);
+    transform: translateY(-1px);
+}
+
+.appshop-featured-card.large {
+    grid-row: span 1;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    min-height: 120px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border: none;
+    color: white;
+}
+
+.appshop-featured-card.large .appshop-featured-card-icon {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.appshop-featured-card.large .appshop-featured-card-icon img {
+    border-radius: 10px;
+}
+
+.appshop-featured-card.large .appshop-featured-card-info h4,
+.appshop-featured-card.large .appshop-featured-card-info span {
+    color: white;
+}
+
+.appshop-featured-card-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.appshop-featured-card-icon img {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+
+.appshop-featured-card-info h4 {
+    margin: 0 0 2px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.appshop-featured-card-info span {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* 轮播指示器 */
+.appshop-carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 16px;
+}
+
+.appshop-carousel-dots .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-color);
+    transition: all var(--transition-fast);
+}
+
+.appshop-carousel-dots .dot.active {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--accent);
+}
+
+/* 分类标签 */
+.appshop-categories {
+    margin-bottom: 24px;
+}
+
+.appshop-category-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.appshop-category-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+
+.appshop-category-tabs::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+.appshop-category-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: var(--bg-secondary);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.appshop-category-tab img {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+}
+
+.appshop-category-tab:hover {
+    background: var(--bg-tertiary);
+}
+
+.appshop-category-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.appshop-category-tab.active img {
+    filter: brightness(0) invert(1);
+    opacity: 1;
+}
+
+/* 应用网格 */
+.appshop-apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.appshop-app-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.appshop-app-card:hover {
+    background: var(--bg-tertiary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.appshop-app-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--accent) 0%, #106ebe 100%);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.appshop-app-icon img {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+}
+
+.appshop-app-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.appshop-app-name {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.appshop-app-developer {
+    margin: 0 0 6px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.appshop-app-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.appshop-app-rating {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.appshop-app-rating img {
+    width: 12px;
+    height: 12px;
+    filter: invert(70%) sepia(80%) saturate(600%) hue-rotate(5deg);
+}
+
+/* 旧版按钮样式（不含 fluent-btn 类时） */
+.appshop-app-install:not(.fluent-btn) {
+    padding: 8px 18px;
+    background: var(--accent);
+    border: none;
+    border-radius: 16px;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.appshop-app-install:not(.fluent-btn):hover {
+    background: var(--accent-hover);
+    transform: scale(1.02);
+}
+
+.appshop-app-install:not(.fluent-btn).installed {
+    background: #107c10;
+}
+
+.appshop-app-install:not(.fluent-btn).installed:hover {
+    background: #0e6b0e;
+}
+
+/* FluentUI 按钮样式保留 flex-shrink */
+.appshop-app-install.fluent-btn {
+    flex-shrink: 0;
+}
+
+/* 空状态 */
+.appshop-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    color: var(--text-secondary);
+}
+
+.appshop-empty img {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 16px;
+}
+
+/* 深色模式适配 */
+.dark-mode .appshop {
+    background: var(--bg-primary);
+}
+
+.dark-mode .appshop-app-icon {
+    background: linear-gradient(135deg, #3a8fd9 0%, #0078d4 100%);
+}
+
+/* V2 模式适配 */
+body.fluent-v2 .appshop-search,
+body.fluent-v2 .appshop-app-card,
+body.fluent-v2 .appshop-featured-card:not(.large) {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(20px);
+}
+
+body.fluent-v2.dark-mode .appshop-search,
+body.fluent-v2.dark-mode .appshop-app-card,
+body.fluent-v2.dark-mode .appshop-featured-card:not(.large) {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.fluent-v2 .appshop-category-tab {
+    backdrop-filter: blur(10px);
+}
+
+
+/* ==================== PWA 应用样式 ==================== */
+
+.pwa-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.pwa-iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: white;
+}
+
+/* ==================== App Shop 详情弹窗 ==================== */
+
+.appshop-detail-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    border-radius: inherit;
+}
+
+.appshop-detail-overlay.show {
+    opacity: 1;
+}
+
+.appshop-detail-modal {
+    width: 420px;
+    max-width: 90vw;
+    max-height: 85vh;
+    background: #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+    transform: scale(0.9) translateY(20px);
+    transition: transform 0.3s ease;
+    position: relative;
+}
+
+/* 详情卡片信息区域固定背景 - 不受外观切换影响 */
+.appshop-detail-info {
+    background: #1a1a1a !important;
+}
+
+/* 浅色模式下的详情卡片 */
+body:not(.dark-mode) .appshop-detail-modal {
+    background: #ffffff;
+}
+
+body:not(.dark-mode) .appshop-detail-info {
+    background: #ffffff !important;
+}
+
+body:not(.dark-mode) .appshop-detail-app-info h3,
+body:not(.dark-mode) .appshop-detail-desc p,
+body:not(.dark-mode) .appshop-detail-meta-item .meta-value {
+    color: #1a1a1a;
+}
+
+body:not(.dark-mode) .appshop-detail-app-info span,
+body:not(.dark-mode) .appshop-detail-meta-item .meta-label {
+    color: #666666;
+}
+
+.appshop-detail-overlay.show .appshop-detail-modal {
+    transform: scale(1) translateY(0);
+}
+
+.appshop-detail-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: background 0.2s;
+}
+
+.appshop-detail-close:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.appshop-detail-close img {
+    width: 16px;
+    height: 16px;
+    filter: brightness(0) invert(1);
+}
+
+.appshop-detail-header {
+    height: 200px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.appshop-detail-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 30% 40%, var(--theme-color) 0%, transparent 50%),
+        radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--theme-color) 70%, #ff6b6b) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, color-mix(in srgb, var(--theme-color) 50%, #4ecdc4) 0%, transparent 40%),
+        linear-gradient(135deg, var(--theme-color) 0%, color-mix(in srgb, var(--theme-color) 60%, #000) 100%);
+    animation: gradientShift 8s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+    }
+    25% {
+        transform: scale(1.1) rotate(2deg);
+    }
+    50% {
+        transform: scale(1.05) rotate(-1deg);
+    }
+    75% {
+        transform: scale(1.15) rotate(1deg);
+    }
+}
+
+.appshop-detail-icon-wrapper {
+    position: relative;
+    z-index: 2;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.appshop-detail-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+}
+
+.appshop-detail-info {
+    padding: 20px;
+}
+
+.appshop-detail-app-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.appshop-detail-small-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+}
+
+.appshop-detail-app-info {
+    flex: 1;
+}
+
+.appshop-detail-app-info h3 {
+    margin: 0 0 4px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.appshop-detail-app-info span {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* 旧版详情按钮样式（不含 fluent-btn 类时） */
+.appshop-detail-btn:not(.fluent-btn) {
+    padding: 10px 28px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.appshop-detail-btn:not(.fluent-btn):hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.appshop-detail-btn:not(.fluent-btn).installed {
+    color: #4cc764;
+}
+
+.appshop-detail-btn:not(.fluent-btn).installed:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* 浅色模式下的旧版按钮样式 */
+body:not(.dark-mode) .appshop-detail-btn:not(.fluent-btn) {
+    border-color: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+body:not(.dark-mode) .appshop-detail-btn:not(.fluent-btn):hover {
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+.appshop-detail-desc {
+    padding: 16px 0;
+}
+
+.appshop-detail-desc p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.appshop-detail-meta {
+    display: flex;
+    gap: 24px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.appshop-detail-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.appshop-detail-meta-item .meta-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.appshop-detail-meta-item .meta-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.appshop-detail-uninstall {
+    width: 100%;
+    padding: 10px;
+    margin-top: 12px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: #d13438;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.appshop-detail-uninstall:hover {
+    background: rgba(209, 52, 56, 0.1);
+    border-color: #d13438;
+}
+
+/* Fluent V2 模式 - 增加背景模糊度 */
+body.fluent-v2 .appshop-detail-overlay {
+    backdrop-filter: blur(20px);
+}
+
+/* Fluent V2 胶囊按钮样式 - 与设置里的按钮一致 */
+body.fluent-v2 .appshop-detail-btn {
+    border-radius: 20px;
+    padding: 10px 28px;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+}
+
+body.fluent-v2 .appshop-detail-btn.installed {
+    background: #107c10;
+}
+
+body.fluent-v2 .appshop-detail-uninstall {
+    border-radius: 20px;
+    padding: 10px 0;
+    font-weight: 500;
+}
+
+/* Fluent V2 应用列表卡片按钮 */
+body.fluent-v2 .appshop-app-install {
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+/* Fluent V2 应用卡片圆角 */
+body.fluent-v2 .appshop-app-card {
+    border-radius: 12px;
+}
+
+body.fluent-v2 .appshop-app-icon {
+    border-radius: 12px;
+}
+
+body.fluent-v2 .appshop-featured-card {
+    border-radius: 12px;
+}
+
+body.fluent-v2 .appshop-category-tab {
+    border-radius: 20px;
+}
+
+body.fluent-v2 .appshop-category-tab.active {
+    border-radius: 20px;
+}
+
+/* Fluent V2 搜索框圆角 */
+body.fluent-v2 .appshop-search {
+    border-radius: 20px;
+}
+
+body.fluent-v2 .appshop-search-input {
+    border-radius: 20px;
+}
+
+/* Fluent V2 详情弹窗高斯模糊（与旧版一致） */
+body.fluent-v2 .appshop-detail-overlay {
+    backdrop-filter: blur(10px);
+}
+
+/* App Shop 按钮使用 FluentUI 样式 */
+.appshop-app-install.fluent-btn,
+.appshop-detail-btn.fluent-btn {
+    padding: 8px 20px;
+}
+
+/* 新版外观浅色模式按钮颜色 */
+body.fluent-v2:not(.dark-mode) .appshop-app-install.fluent-btn,
+body.fluent-v2:not(.dark-mode) .appshop-detail-btn.fluent-btn {
+    color: #0056b3;
+}
+
+body.fluent-v2:not(.dark-mode) .appshop-app-install.fluent-btn.installed,
+body.fluent-v2:not(.dark-mode) .appshop-detail-btn.fluent-btn.installed {
+    color: #1a8a3e;
+}
+
+/* 深色模式按钮颜色 */
+.dark-mode .appshop-app-install.fluent-btn,
+.dark-mode .appshop-detail-btn.fluent-btn {
+    color: var(--accent);
+}
+
+.dark-mode .appshop-app-install.fluent-btn.installed,
+.dark-mode .appshop-detail-btn.fluent-btn.installed {
+    color: #4cc764;
+}
+
+/* 旧版外观按钮背景色 */
+body:not(.fluent-v2) .appshop-app-install.fluent-btn,
+body:not(.fluent-v2) .appshop-detail-btn.fluent-btn {
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 20px;
+    color: #0056b3;
+}
+
+body:not(.fluent-v2) .appshop-app-install.fluent-btn:hover,
+body:not(.fluent-v2) .appshop-detail-btn.fluent-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+body:not(.fluent-v2) .appshop-app-install.fluent-btn.installed,
+body:not(.fluent-v2) .appshop-detail-btn.fluent-btn.installed {
+    color: #1a8a3e;
+}
+
+body:not(.fluent-v2).dark-mode .appshop-app-install.fluent-btn,
+body:not(.fluent-v2).dark-mode .appshop-detail-btn.fluent-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent);
+}
+
+body:not(.fluent-v2).dark-mode .appshop-app-install.fluent-btn:hover,
+body:not(.fluent-v2).dark-mode .appshop-detail-btn.fluent-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+body:not(.fluent-v2).dark-mode .appshop-app-install.fluent-btn.installed,
+body:not(.fluent-v2).dark-mode .appshop-detail-btn.fluent-btn.installed {
+    color: #4cc764;
+}
+
+/* 新版外观浅色模式分类标签选中状态 */
+body.fluent-v2:not(.dark-mode) .appshop-category-tab.active {
+    color: #1a1a1a;
+}
+
+body.fluent-v2:not(.dark-mode) .appshop-category-tab.active img {
+    filter: none;
+    opacity: 0.9;
+}
+

@@ -1,0 +1,1655 @@
+/**
+ * Fluent UI 组件库样式
+ * 与 js/core/fluent-ui.js 配套使用
+ * 
+ * 版本说明:
+ * - 默认样式: 经典 Fluent 风格
+ * - .fluent-v2: 新版实验性 UI (动态高斯模糊 + 毛玻璃按钮)
+ */
+
+/* ============ 按钮组件 ============ */
+.fluent-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: none; border-radius: var(--radius-sm); font-family: inherit; font-weight: 500;
+    cursor: pointer; transition: all var(--transition-fast); white-space: nowrap;
+}
+.fluent-btn-small { padding: 6px 12px; font-size: 12px; }
+.fluent-btn-medium { padding: 8px 16px; font-size: 13px; }
+.fluent-btn-large { padding: 12px 24px; font-size: 14px; }
+.fluent-btn-primary { background: var(--accent); color: #ffffff !important; }
+.fluent-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+/* 旧版 UI 确保 Primary 按钮文字为白色 */
+body:not(.fluent-v2) .fluent-btn-primary { color: #ffffff !important; background-clip: padding-box !important; -webkit-background-clip: padding-box !important; }
+body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !important; }
+.fluent-btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+.fluent-btn-secondary:hover:not(:disabled) { background: rgba(0, 0, 0, 0.08); }
+.dark-mode .fluent-btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.fluent-btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
+.fluent-btn-outline:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); }
+.fluent-btn-text { background: transparent; color: var(--accent); }
+.fluent-btn-text:hover:not(:disabled) { background: rgba(0, 120, 212, 0.1); }
+.fluent-btn-danger { background: #d13438; color: white; }
+.fluent-btn-danger:hover:not(:disabled) { background: #a4262c; }
+.fluent-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.fluent-btn-icon { width: 16px; height: 16px; }
+.fluent-btn-spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: fluent-spin 0.8s linear infinite; }
+
+/* 图标按钮 */
+.fluent-icon-btn { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
+.fluent-icon-btn-small { width: 28px; height: 28px; }
+.fluent-icon-btn-small img { width: 14px; height: 14px; }
+.fluent-icon-btn-medium { width: 32px; height: 32px; }
+.fluent-icon-btn-medium img { width: 16px; height: 16px; }
+.fluent-icon-btn-large { width: 40px; height: 40px; }
+.fluent-icon-btn-large img { width: 20px; height: 20px; }
+.fluent-icon-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-icon-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.fluent-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ============ 标签栏组件 ============ */
+.fluent-tabbar { display: flex; align-items: center; gap: 4px; }
+.fluent-tabbar-tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.fluent-tabbar-tabs::-webkit-scrollbar { display: none; }
+.fluent-tab { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(0, 0, 0, 0.05); border-radius: var(--radius-sm) var(--radius-sm) 0 0; min-width: 120px; max-width: 200px; cursor: pointer; transition: background var(--transition-fast); }
+.dark-mode .fluent-tab { background: rgba(255, 255, 255, 0.05); }
+.fluent-tab:hover { background: rgba(0, 0, 0, 0.08); }
+.dark-mode .fluent-tab:hover { background: rgba(255, 255, 255, 0.08); }
+.fluent-tab.active { background: var(--bg-primary); }
+.fluent-tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.fluent-tab-label { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fluent-tab-close { width: 18px; height: 18px; border-radius: 4px; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all var(--transition-fast); flex-shrink: 0; }
+.fluent-tab-close img { width: 12px; height: 12px; }
+.fluent-tab:hover .fluent-tab-close { opacity: 1; }
+.fluent-tab-close:hover { background: rgba(0, 0, 0, 0.1); }
+.fluent-tabbar-pills .fluent-tab { border-radius: var(--radius-md); background: transparent; }
+.fluent-tabbar-pills .fluent-tab.active { background: var(--accent); color: white; }
+.fluent-tabbar-pills .fluent-tab.active img { filter: brightness(0) invert(1); }
+.fluent-tabbar-underline { border-bottom: 1px solid var(--border-color); }
+.fluent-tabbar-underline .fluent-tab { background: transparent; border-radius: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.fluent-tabbar-underline .fluent-tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+
+/* ============ 侧边栏组件 ============ */
+.fluent-sidebar {
+    border-right: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 16px 8px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(60px) saturate(180%);
+    -webkit-backdrop-filter: blur(60px) saturate(180%);
+    overflow-y: auto;
+}
+.dark-mode .fluent-sidebar {
+    background: rgba(45, 45, 45, 0.5);
+    border-right-color: rgba(255, 255, 255, 0.06);
+}
+.blur-disabled .fluent-sidebar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(245, 245, 245, 0.85);
+}
+.dark-mode.blur-disabled .fluent-sidebar {
+    background: rgba(32, 32, 32, 0.85);
+}
+.fluent-sidebar-header { padding: 12px 16px; font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.fluent-sidebar-section { margin-bottom: 16px; }
+.fluent-sidebar-section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 8px 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+.fluent-sidebar-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); font-size: 13px; }
+.fluent-sidebar-item:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-sidebar-item:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-sidebar-item.active { background: var(--accent); color: white; }
+.fluent-sidebar-item.active img { filter: brightness(0) invert(1); }
+.fluent-sidebar-item-icon { width: 16px; height: 16px; }
+.fluent-sidebar-item-label { flex: 1; }
+
+/* ============ 导航栏/工具栏 ============ */
+.fluent-navbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); }
+.fluent-navbar-left { display: flex; gap: 4px; }
+.fluent-navbar-center { flex: 1; }
+.fluent-navbar-right { display: flex; gap: 8px; }
+.fluent-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px 12px; }
+.fluent-toolbar-left { justify-content: flex-start; }
+.fluent-toolbar-center { justify-content: center; }
+.fluent-toolbar-right { justify-content: flex-end; }
+.fluent-toolbar-space-between { justify-content: space-between; }
+.fluent-toolbar-divider { width: 1px; height: 20px; background: var(--border-color); margin: 0 8px; }
+.fluent-toolbar-btn-labeled { width: auto !important; padding: 6px 12px !important; flex-direction: column; gap: 2px; }
+.fluent-toolbar-label { font-size: 11px; color: var(--text-secondary); }
+
+/* ============ 面包屑/分段控制 ============ */
+.fluent-breadcrumb { display: flex; align-items: center; gap: 8px; flex: 1; }
+.fluent-breadcrumb-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); font-size: 13px; }
+.fluent-breadcrumb-item:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-breadcrumb-item:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-breadcrumb-icon { width: 14px; height: 14px; }
+.fluent-breadcrumb-separator { color: var(--text-tertiary); font-size: 14px; }
+.fluent-segmented { display: inline-flex; background: var(--bg-tertiary); border-radius: var(--radius-md); padding: 4px; position: relative; }
+.fluent-segmented-slider { position: absolute; top: 4px; left: 4px; height: calc(100% - 8px); background: var(--bg-primary); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); transition: transform var(--transition-normal), width var(--transition-normal); z-index: 0; }
+.fluent-segmented-item { display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; position: relative; z-index: 1; transition: color var(--transition-fast); }
+.fluent-segmented-small .fluent-segmented-item { padding: 6px 12px; font-size: 12px; }
+.fluent-segmented-medium .fluent-segmented-item { padding: 8px 16px; font-size: 13px; }
+.fluent-segmented-large .fluent-segmented-item { padding: 10px 20px; font-size: 14px; }
+.fluent-segmented-item.active { color: var(--text-primary); font-weight: 500; }
+.fluent-segmented-icon { width: 14px; height: 14px; }
+
+/* ============ 输入框/搜索框 ============ */
+.fluent-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0 12px; transition: all var(--transition-fast); }
+.fluent-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2); }
+.fluent-input-disabled { opacity: 0.5; pointer-events: none; }
+.fluent-input-icon { width: 16px; height: 16px; opacity: 0.5; flex-shrink: 0; }
+.fluent-input { flex: 1; border: none; background: transparent; padding: 10px 0; font-size: 14px; font-family: inherit; color: var(--text-primary); outline: none; min-width: 0; }
+.fluent-input::placeholder { color: var(--text-tertiary); }
+.fluent-input-clear { width: 20px; height: 20px; border: none; background: transparent; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.5; transition: opacity var(--transition-fast); }
+.fluent-input-clear:hover { opacity: 1; }
+.fluent-input-clear img { width: 12px; height: 12px; }
+.fluent-searchbox { border-radius: 20px; }
+
+/* ============ 下拉选择 (自定义) ============ */
+.fluent-select-wrapper { position: relative; display: inline-flex; min-width: 120px; z-index: 10; }
+
+/* 触发器 (模拟按钮) */
+.fluent-select-trigger {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm); cursor: pointer; transition: all var(--transition-fast);
+    font-size: 14px; color: var(--text-primary); user-select: none;
+}
+.fluent-select-trigger:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-select-trigger:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-select-wrapper.active .fluent-select-trigger { border-color: var(--accent); }
+
+.fluent-select-value { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px; }
+.fluent-select-arrow { width: 12px; height: 12px; opacity: 0.5; transition: transform var(--transition-fast); }
+.fluent-select-wrapper.active .fluent-select-arrow { transform: rotate(180deg); }
+
+/* 下拉菜单 (挂载到 body，使用 fixed 定位) */
+.fluent-select-dropdown {
+    position: fixed;
+    background: var(--bg-secondary); backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg); padding: 4px; z-index: 10001;
+    max-height: 300px; overflow-y: auto;
+    /* 关闭状态 - 向上收起 */
+    opacity: 0; 
+    transform: translateY(-8px);
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.2s ease-out, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s 0.2s;
+}
+.fluent-select-dropdown.open {
+    /* 展开状态 - 向下淡出 */
+    opacity: 1; 
+    transform: translateY(0);
+    pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.25s ease-out, transform 0.25s cubic-bezier(0.1, 0.9, 0.2, 1), visibility 0s 0s;
+}
+
+/* 选项 */
+.fluent-select-option {
+    padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 14px; color: var(--text-primary); transition: background var(--transition-fast);
+}
+.fluent-select-option:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-select-option:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-select-option.selected { background: var(--accent); color: white; }
+.fluent-select-option.disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fluent-select-disabled { opacity: 0.5; pointer-events: none; }
+
+/* ============ 开关/滑块 ============ */
+.fluent-toggle-wrapper { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.fluent-toggle-disabled { opacity: 0.5; pointer-events: none; }
+.fluent-toggle { width: 44px; height: 24px; }
+.fluent-toggle-track { width: 100%; height: 100%; background: var(--text-tertiary); border-radius: 12px; position: relative; transition: background var(--transition-fast); }
+.fluent-toggle.active .fluent-toggle-track { background: var(--accent); }
+.fluent-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; box-shadow: var(--shadow-sm); transition: transform var(--transition-fast); }
+.fluent-toggle.active .fluent-toggle-thumb { transform: translateX(20px); }
+.fluent-toggle-label { font-size: 14px; color: var(--text-primary); }
+.fluent-slider-wrapper { display: flex; align-items: center; gap: 12px; }
+.fluent-slider-disabled { opacity: 0.5; pointer-events: none; }
+.fluent-slider { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; background: var(--text-tertiary); border-radius: 2px; outline: none; }
+.fluent-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: var(--shadow-sm); }
+.fluent-slider::-moz-range-thumb { width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: none; box-shadow: var(--shadow-sm); }
+.fluent-slider-value { min-width: 32px; text-align: right; font-size: 13px; color: var(--text-secondary); }
+
+/* ============ 右键菜单 ============ */
+.fluent-context-menu { position: fixed; min-width: 180px; background: var(--bg-secondary); backdrop-filter: blur(20px) saturate(180%); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 6px; z-index: 10000; }
+.blur-disabled .fluent-context-menu { backdrop-filter: none; background: var(--bg-primary); }
+.fluent-context-menu.hidden { display: none; }
+.fluent-context-menu-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; transition: background var(--transition-fast); }
+.fluent-context-menu-item:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-context-menu-item:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-context-menu-item.disabled { opacity: 0.5; pointer-events: none; }
+.fluent-context-menu-item img { width: 16px; height: 16px; }
+.fluent-context-menu-separator { height: 1px; background: var(--border-color); margin: 6px 0; }
+
+/* ============ 模态对话框 ============ */
+.fluent-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 10000; animation: fluent-fade-in 0.2s ease-out; }
+.fluent-modal-overlay.closing { animation: fluent-fade-out 0.2s ease-out forwards; }
+.fluent-modal { background: var(--bg-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; animation: fluent-scale-in 0.2s ease-out; }
+.fluent-modal-overlay.closing .fluent-modal { animation: fluent-scale-out 0.2s ease-out forwards; }
+.fluent-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-color); }
+.fluent-modal-title { font-size: 16px; font-weight: 600; }
+.fluent-modal-close { width: 32px; height: 32px; border: none; background: transparent; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--transition-fast); }
+.fluent-modal-close:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-modal-close:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-modal-close img { width: 16px; height: 16px; }
+.fluent-modal-content { padding: 20px; overflow-y: auto; flex: 1; }
+.fluent-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border-color); }
+
+/* ============ 卡片/列表/进度/空状态/加载 ============ */
+.fluent-card { background: var(--bg-tertiary); border-radius: var(--radius-md); overflow: hidden; }
+.fluent-card-hoverable { transition: box-shadow var(--transition-fast), transform var(--transition-fast); cursor: pointer; }
+.fluent-card-hoverable:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.fluent-card-header { padding: 16px; border-bottom: 1px solid var(--border-color); }
+.fluent-card-title { font-size: 16px; font-weight: 600; }
+.fluent-card-body { padding: 16px; }
+.fluent-card-footer { padding: 12px 16px; border-top: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.02); }
+.dark-mode .fluent-card-footer { background: rgba(255, 255, 255, 0.02); }
+.fluent-list { display: flex; flex-direction: column; gap: 2px; }
+.fluent-list-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); transition: background var(--transition-fast); }
+.fluent-list-selectable .fluent-list-item { cursor: pointer; }
+.fluent-list-selectable .fluent-list-item:hover { background: rgba(0, 0, 0, 0.05); }
+.dark-mode .fluent-list-selectable .fluent-list-item:hover { background: rgba(255, 255, 255, 0.1); }
+.fluent-list-item.active { background: var(--accent); color: white; }
+.fluent-list-item.active img { filter: brightness(0) invert(1); }
+.fluent-list-item-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.fluent-list-item-content { flex: 1; min-width: 0; }
+.fluent-list-item-title { font-size: 14px; font-weight: 500; }
+.fluent-list-item-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fluent-list-item.active .fluent-list-item-desc { color: rgba(255, 255, 255, 0.8); }
+.fluent-list-item-extra { font-size: 12px; color: var(--text-tertiary); }
+.fluent-progress { display: flex; align-items: center; gap: 12px; }
+.fluent-progress-track { flex: 1; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; }
+.fluent-progress-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width var(--transition-normal); }
+.fluent-progress-success .fluent-progress-bar { background: #107c10; }
+.fluent-progress-warning .fluent-progress-bar { background: #ffb900; }
+.fluent-progress-error .fluent-progress-bar { background: #d13438; }
+.fluent-progress-label { font-size: 12px; color: var(--text-secondary); min-width: 40px; text-align: right; }
+.fluent-spinner { border: 3px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: fluent-spin 0.8s linear infinite; }
+.fluent-spinner-small { width: 16px; height: 16px; border-width: 2px; }
+.fluent-spinner-medium { width: 24px; height: 24px; border-width: 3px; }
+.fluent-spinner-large { width: 40px; height: 40px; border-width: 4px; }
+.fluent-setting-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: 8px; }
+.fluent-setting-item-info { flex: 1; min-width: 0; margin-right: 16px; }
+.fluent-setting-item-label { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.fluent-setting-item-desc { font-size: 12px; color: var(--text-secondary); }
+.fluent-setting-item-control { flex-shrink: 0; }
+.fluent-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; }
+.fluent-empty-icon { width: 64px; height: 64px; opacity: 0.3; margin-bottom: 16px; }
+.fluent-empty-title { font-size: 16px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; }
+.fluent-empty-desc { font-size: 13px; color: var(--text-tertiary); max-width: 300px; }
+
+/* ============ 动画 ============ */
+@keyframes fluent-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fluent-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fluent-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes fluent-scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fluent-scale-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+
+/* ============================================================
+   Fluent V2 - 新版实验性 UI
+   启用方式: body.fluent-v2
+   特性: 动态高斯模糊 + 毛玻璃按钮
+============================================================ */
+
+/* V2 全局基础 - 增强模糊效果 */
+body.fluent-v2 {
+    --v2-blur: 40px;
+    --v2-blur-light: 20px;
+    --v2-glass-bg: rgba(255, 255, 255, 0.2);
+    --v2-glass-bg-dark: rgba(40, 40, 40, 0.5);
+    --v2-glass-border: rgba(255, 255, 255, 0.25);
+    --v2-glass-border-dark: rgba(255, 255, 255, 0.08);
+    --v2-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    --v2-shadow-dark: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* V2 隐藏旧版下拉选择的高亮 */
+body.fluent-v2 .fluent-select:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+body.fluent-v2 .fluent-select-wrapper:focus-within {
+    outline: none !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+    box-shadow: none !important;
+}
+
+/* V2 按钮底色调整 - 浅色模式适配浅色主题色 */
+body.fluent-v2 .fluent-btn {
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.9); /* 更纯净的白色 */
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    font-weight: 400;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* 渐变透明文字 */
+    color: transparent;
+    background-image: linear-gradient(180deg, 
+        rgba(0, 80, 160, 0.8) 0%, 
+        rgba(0, 120, 212, 0.6) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+/* 按钮背景层 - 基础层 */
+body.fluent-v2 .fluent-btn::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: rgba(245, 250, 255, 0.6);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    z-index: -2;
+    transition: background 0.3s;
+}
+
+/* 45度角高亮层 */
+body.fluent-v2 .fluent-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.15) 30%,
+        transparent 50%,
+        transparent 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* 隐藏旧版高亮效果 */
+body.fluent-v2 .fluent-btn:focus {
+    outline: none;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+body.fluent-v2 .fluent-select-wrapper:focus-within,
+body.fluent-v2 .fluent-select:focus,
+body.fluent-v2 .fluent-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+body.fluent-v2 .fluent-btn:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    transform: translateY(-1px);
+}
+
+body.fluent-v2 .fluent-btn:hover::before {
+    background: rgba(250, 250, 252, 0.7);
+}
+
+body.fluent-v2 .fluent-btn:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.fluent-v2 .fluent-btn-primary {
+    background-image: linear-gradient(180deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(240, 245, 255, 0.9) 100%);
+}
+
+body.fluent-v2 .fluent-btn-primary::before {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.8) 0%, 
+        rgba(255, 255, 255, 0.4) 100%);
+}
+
+body.fluent-v2 .fluent-btn-primary:hover::before {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.95) 0%, 
+        rgba(245, 245, 250, 0.85) 100%);
+}
+
+/* V2 深色模式按钮 */
+body.fluent-v2.dark-mode .fluent-btn {
+    background-image: linear-gradient(180deg, 
+        rgba(210, 210, 220, 0.85) 0%, 
+        rgba(180, 180, 190, 0.65) 100%);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.fluent-v2.dark-mode .fluent-btn::before {
+    background: rgba(55, 55, 60, 0.6);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+body.fluent-v2.dark-mode .fluent-btn::after {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.2) 0%,
+        rgba(255, 255, 255, 0.06) 30%,
+        transparent 50%,
+        transparent 100%);
+}
+
+body.fluent-v2.dark-mode .fluent-btn:hover::before {
+    background: rgba(65, 65, 70, 0.7);
+}
+
+/* V2 毛玻璃卡片 */
+body.fluent-v2 .fluent-card {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 24px;
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .fluent-card {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+/* V2 毛玻璃侧边栏 - 圆角悬浮外观 */
+body.fluent-v2 .fluent-sidebar,
+body.fluent-v2 .clock-sidebar,
+body.fluent-v2 .files-sidebar,
+body.fluent-v2 .weather-sidebar,
+body.fluent-v2 .browser-sidebar,
+body.fluent-v2 .notes-sidebar {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border-right: none !important;
+    border-radius: 12px !important;
+    margin: 8px !important;
+    height: auto !important;
+    min-height: calc(100% - 16px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+body.fluent-v2.dark-mode .fluent-sidebar,
+body.fluent-v2.dark-mode .clock-sidebar,
+body.fluent-v2.dark-mode .files-sidebar,
+body.fluent-v2.dark-mode .weather-sidebar,
+body.fluent-v2.dark-mode .browser-sidebar,
+body.fluent-v2.dark-mode .notes-sidebar {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-right: none !important;
+}
+
+/* V2 侧边栏样式 - 间距和圆角 */
+body.fluent-v2 .fluent-sidebar,
+body.fluent-v2 .clock-sidebar,
+body.fluent-v2 .files-sidebar,
+body.fluent-v2 .weather-sidebar,
+body.fluent-v2 .browser-sidebar,
+body.fluent-v2 .notes-sidebar {
+    padding: 12px !important;
+}
+
+body.fluent-v2 .fluent-sidebar-section {
+    flex: 0 0 auto;
+}
+
+body.fluent-v2 .fluent-sidebar-item,
+body.fluent-v2 .sidebar-item,
+body.fluent-v2 .clock-sidebar-item,
+body.fluent-v2 .files-sidebar-item,
+body.fluent-v2 .weather-sidebar-item,
+body.fluent-v2 .browser-sidebar-item,
+body.fluent-v2 .notes-sidebar-item {
+    padding: 12px 16px;
+    margin-bottom: 6px;
+    border-radius: 12px;
+}
+
+/* V2 侧边栏选中项 - 浅蓝色 */
+body.fluent-v2 .fluent-sidebar-item.active,
+body.fluent-v2 .sidebar-item.active,
+body.fluent-v2 .clock-sidebar-item.active,
+body.fluent-v2 .files-sidebar-item.active,
+body.fluent-v2 .weather-sidebar-item.active,
+body.fluent-v2 .browser-sidebar-item.active,
+body.fluent-v2 .notes-sidebar-item.active {
+    background: rgba(0, 120, 212, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 120, 212, 0.25);
+    color: var(--accent);
+}
+
+body.fluent-v2 .fluent-sidebar-item.active img,
+body.fluent-v2 .sidebar-item.active img,
+body.fluent-v2 .clock-sidebar-item.active img,
+body.fluent-v2 .files-sidebar-item.active img,
+body.fluent-v2 .weather-sidebar-item.active img,
+body.fluent-v2 .browser-sidebar-item.active img,
+body.fluent-v2 .notes-sidebar-item.active img {
+    filter: none;
+}
+
+body.fluent-v2.dark-mode .fluent-sidebar-item.active,
+body.fluent-v2.dark-mode .sidebar-item.active,
+body.fluent-v2.dark-mode .clock-sidebar-item.active,
+body.fluent-v2.dark-mode .files-sidebar-item.active,
+body.fluent-v2.dark-mode .weather-sidebar-item.active,
+body.fluent-v2.dark-mode .browser-sidebar-item.active,
+body.fluent-v2.dark-mode .notes-sidebar-item.active {
+    background: rgba(96, 165, 250, 0.2);
+    border-color: rgba(96, 165, 250, 0.3);
+    color: #60a5fa;
+}
+
+body.fluent-v2.dark-mode .fluent-sidebar-item.active img,
+body.fluent-v2.dark-mode .sidebar-item.active img,
+body.fluent-v2.dark-mode .clock-sidebar-item.active img,
+body.fluent-v2.dark-mode .files-sidebar-item.active img,
+body.fluent-v2.dark-mode .weather-sidebar-item.active img,
+body.fluent-v2.dark-mode .browser-sidebar-item.active img,
+body.fluent-v2.dark-mode .notes-sidebar-item.active img {
+    filter: brightness(0) invert(1);
+}
+
+/* V2 毛玻璃设置项 - 统一透明度（在 settings.js 中使用 !important 覆盖） */
+body.fluent-v2 .fluent-setting-item {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+    margin-bottom: 8px;
+}
+
+body.fluent-v2 .fluent-setting-item:hover {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+body.fluent-v2.dark-mode .fluent-setting-item {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.fluent-v2.dark-mode .fluent-setting-item:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* V2 毛玻璃输入框 - 带两层高亮 */
+body.fluent-v2 .fluent-input-wrapper {
+    position: relative;
+    background: rgba(240, 240, 245, 0.5);
+    backdrop-filter: blur(var(--v2-blur-light));
+    -webkit-backdrop-filter: blur(var(--v2-blur-light));
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50px;
+    overflow: hidden;
+}
+
+/* 输入框 45度角高亮 */
+body.fluent-v2 .fluent-input-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.4) 0%,
+        rgba(255, 255, 255, 0.1) 30%,
+        transparent 50%,
+        transparent 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+body.fluent-v2 .fluent-input {
+    background: transparent;
+    border: none;
+    position: relative;
+    z-index: 2;
+}
+
+body.fluent-v2.dark-mode .fluent-input-wrapper {
+    background: rgba(55, 55, 60, 0.6);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.fluent-v2.dark-mode .fluent-input-wrapper::before {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.15) 0%,
+        rgba(255, 255, 255, 0.05) 30%,
+        transparent 50%,
+        transparent 100%);
+}
+
+/* V2 毛玻璃下拉选择 - 带两层高亮 */
+body.fluent-v2 .fluent-select-wrapper {
+    position: relative;
+    /* 移除背景和裁剪，只保留定位 */
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+}
+
+body.fluent-v2 .fluent-select-trigger {
+    position: relative;
+    background: rgba(240, 240, 245, 0.5);
+    backdrop-filter: blur(var(--v2-blur-light));
+    -webkit-backdrop-filter: blur(var(--v2-blur-light));
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50px;
+    overflow: hidden; /* 确保高亮不溢出 */
+    min-width: 120px;
+    padding: 10px 16px;
+}
+
+/* 下拉选择 45度角高亮 (应用在 trigger 上) */
+body.fluent-v2 .fluent-select-trigger::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.4) 0%,
+        rgba(255, 255, 255, 0.1) 30%,
+        transparent 50%,
+        transparent 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+body.fluent-v2 .fluent-select-value,
+body.fluent-v2 .fluent-select-arrow {
+    position: relative;
+    z-index: 2;
+}
+
+/* 深色模式适配 */
+body.fluent-v2.dark-mode .fluent-select-trigger {
+    background: rgba(55, 55, 60, 0.6);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+body.fluent-v2.dark-mode .fluent-select-trigger::before {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.15) 0%,
+        rgba(255, 255, 255, 0.05) 30%,
+        transparent 50%,
+        transparent 100%);
+}
+
+/* V2 下拉菜单样式 */
+body.fluent-v2 .fluent-select-dropdown {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 16px;
+    box-shadow: var(--v2-shadow);
+    padding: 6px;
+}
+
+body.fluent-v2.dark-mode .fluent-select-dropdown {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+body.fluent-v2 .fluent-select-option {
+    border-radius: 8px;
+    margin-bottom: 2px;
+}
+
+body.fluent-v2 .fluent-select-option.selected {
+    background: rgba(0, 120, 212, 0.8);
+    backdrop-filter: blur(10px);
+}
+
+/* V2 毛玻璃开关 - 大圆球通透质感 */
+body.fluent-v2 .fluent-toggle {
+    width: 44px;
+    height: 24px;
+}
+
+body.fluent-v2 .fluent-toggle-track {
+    width: 44px;
+    height: 24px;
+    background: linear-gradient(180deg, 
+        rgba(180, 180, 180, 0.4) 0%, 
+        rgba(160, 160, 160, 0.3) 100%);
+    backdrop-filter: blur(var(--v2-blur)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50px;
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+body.fluent-v2 .fluent-toggle-thumb {
+    position: absolute;
+    left: -1px;
+    top: -3px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: none !important;
+}
+
+/* 圆球顶部高光 - 扁平化设计不需要 */
+body.fluent-v2 .fluent-toggle-thumb::before {
+    display: none;
+}
+
+body.fluent-v2 .fluent-toggle.active .fluent-toggle-track {
+    background: linear-gradient(180deg, 
+        rgba(0, 140, 255, 0.6) 0%, 
+        rgba(0, 100, 200, 0.5) 100%);
+    border-color: rgba(0, 120, 212, 0.5);
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 0 16px rgba(0, 120, 212, 0.3);
+}
+
+body.fluent-v2 .fluent-toggle.active .fluent-toggle-thumb {
+    left: 17px;
+    transform: none !important;
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* V2 深色模式开关 */
+body.fluent-v2.dark-mode .fluent-toggle-track {
+    background: linear-gradient(180deg, 
+        rgba(60, 60, 60, 0.5) 0%, 
+        rgba(40, 40, 40, 0.4) 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.fluent-v2.dark-mode .fluent-toggle-thumb {
+    left: -1px;
+    top: -3px;
+    transform: none !important;
+    background: linear-gradient(145deg, 
+        rgba(120, 120, 120, 0.9) 0%, 
+        rgba(90, 90, 90, 0.7) 50%, 
+        rgba(70, 70, 70, 0.8) 100%);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 
+        0 3px 12px rgba(0, 0, 0, 0.4),
+        0 1px 4px rgba(0, 0, 0, 0.3),
+        inset 0 2px 3px rgba(255, 255, 255, 0.2);
+}
+
+body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-track {
+    background: linear-gradient(180deg, 
+        rgba(0, 100, 180, 0.5) 0%, 
+        rgba(0, 80, 150, 0.4) 100%);
+    box-shadow: 
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 20px rgba(0, 120, 212, 0.2);
+}
+
+body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-thumb {
+    left: 17px;
+    transform: none !important;
+    background: linear-gradient(145deg, 
+        rgba(150, 200, 255, 0.9) 0%, 
+        rgba(100, 170, 240, 0.7) 50%, 
+        rgba(80, 150, 220, 0.8) 100%);
+    box-shadow: 
+        0 3px 16px rgba(0, 120, 212, 0.5),
+        0 1px 4px rgba(0, 0, 0, 0.3),
+        inset 0 2px 3px rgba(255, 255, 255, 0.4);
+}
+
+/* V2 毛玻璃标签栏 */
+body.fluent-v2 .fluent-tabbar {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 16px;
+}
+
+body.fluent-v2 .fluent-tab.active {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+}
+
+body.fluent-v2.dark-mode .fluent-tabbar {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+}
+
+body.fluent-v2.dark-mode .fluent-tab.active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* V2 毛玻璃模态框 */
+body.fluent-v2 .fluent-modal {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 24px;
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .fluent-modal {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+/* V2 毛玻璃列表项 */
+body.fluent-v2 .fluent-list-item {
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+body.fluent-v2 .fluent-list-selectable .fluent-list-item:hover {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+}
+
+body.fluent-v2.dark-mode .fluent-list-selectable .fluent-list-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.fluent-v2 .fluent-list-item.active {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    color: var(--text-primary);
+}
+
+/* V2 毛玻璃导航栏 */
+body.fluent-v2 .fluent-navbar {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: none;
+}
+
+body.fluent-v2.dark-mode .fluent-navbar {
+    background: transparent;
+    border-bottom: none;
+}
+
+/* V2 右键菜单 */
+body.fluent-v2 .fluent-context-menu {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 16px;
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .fluent-context-menu {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+}
+
+/* V2 窗口样式 */
+body.fluent-v2 .window {
+    background: var(--v2-glass-bg);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 16px;
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .window {
+    background: var(--v2-glass-bg-dark);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+body.fluent-v2 .window-titlebar {
+    background: transparent;
+    border-bottom: none;
+}
+
+body.fluent-v2.dark-mode .window-titlebar {
+    border-bottom: none;
+}
+
+body.fluent-v2 .window-content {
+    background: transparent;
+}
+
+/* V2 任务栏样式 */
+body.fluent-v2 .taskbar {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border-top: 1px solid var(--v2-glass-border);
+}
+
+body.fluent-v2.dark-mode .taskbar {
+    background: rgba(40, 40, 40, 0.5);
+    border-color: var(--v2-glass-border-dark);
+}
+
+/* V2 开始菜单样式 */
+body.fluent-v2 .start-menu {
+    background: rgba(255, 255, 255, 0.60);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .start-menu {
+    background: rgba(40, 40, 40, 0.60);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+/* V2 通知中心样式 */
+body.fluent-v2 .notification-center {
+    background: rgba(255, 255, 255, 0.60);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    border-radius: 16px;
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .notification-center {
+    background: rgba(40, 40, 40, 0.60);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+/* V2 控制中心样式 */
+body.fluent-v2 .control-center {
+    background: rgba(255, 255, 255, 0.60);
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
+    border: 1px solid var(--v2-glass-border);
+    box-shadow: var(--v2-shadow);
+}
+
+body.fluent-v2.dark-mode .control-center {
+    background: rgba(40, 40, 40, 0.60);
+    border-color: var(--v2-glass-border-dark);
+    box-shadow: var(--v2-shadow-dark);
+}
+
+/* V2 浏览器应用样式 */
+body.fluent-v2 .browser-app {
+    background: transparent;
+}
+
+body.fluent-v2 .browser-header,
+body.fluent-v2 .browser-tabs-bar {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: none !important;
+}
+
+body.fluent-v2.dark-mode .browser-header,
+body.fluent-v2.dark-mode .browser-tabs-bar {
+    background: transparent !important;
+    border-bottom: none !important;
+}
+
+body.fluent-v2 .browser-address-bar {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(var(--v2-blur-light)) !important;
+    -webkit-backdrop-filter: blur(var(--v2-blur-light)) !important;
+    border: 1px solid var(--v2-glass-border) !important;
+    border-radius: 50px !important;
+}
+
+body.fluent-v2.dark-mode .browser-address-bar {
+    background: var(--v2-glass-bg-dark) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+body.fluent-v2 .browser-tab {
+    background: transparent;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+body.fluent-v2 .browser-tab.active {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(10px);
+}
+
+body.fluent-v2.dark-mode .browser-tab.active {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* V2 记事本应用样式 */
+body.fluent-v2 .notes-app {
+    background: transparent;
+}
+
+body.fluent-v2 .notes-tabs-bar,
+body.fluent-v2 .notes-toolbar {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: none !important;
+}
+
+body.fluent-v2.dark-mode .notes-tabs-bar,
+body.fluent-v2.dark-mode .notes-toolbar {
+    background: transparent !important;
+    border-bottom: none !important;
+}
+
+body.fluent-v2 .notes-editor-container,
+body.fluent-v2 .notes-editor {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
+}
+
+body.fluent-v2.dark-mode .notes-editor-container,
+body.fluent-v2.dark-mode .notes-editor {
+    background: var(--v2-glass-bg-dark) !important;
+}
+
+body.fluent-v2 .notes-statusbar {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
+    border-top: 1px solid var(--v2-glass-border) !important;
+}
+
+body.fluent-v2.dark-mode .notes-statusbar {
+    background: var(--v2-glass-bg-dark) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+body.fluent-v2 .notes-tab {
+    background: transparent;
+    border-radius: 8px;
+}
+
+body.fluent-v2 .notes-tab.active {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(10px);
+}
+
+body.fluent-v2.dark-mode .notes-tab.active {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.fluent-v2 .notes-btn {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid var(--v2-glass-border) !important;
+    border-radius: 8px !important;
+}
+
+body.fluent-v2.dark-mode .notes-btn {
+    background: var(--v2-glass-bg-dark) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+/* V2 文件管理器样式 */
+body.fluent-v2 .files-app {
+    background: transparent;
+}
+
+body.fluent-v2 .files-toolbar {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border-bottom: none !important;
+    border-radius: 12px;
+    margin: 8px !important;
+    height: fit-content !important;
+}
+
+body.fluent-v2.dark-mode .files-toolbar {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-bottom: none !important;
+}
+
+body.fluent-v2 .files-content {
+    background: transparent !important;
+}
+
+body.fluent-v2 .files-statusbar {
+    display: none !important;
+}
+
+body.fluent-v2.dark-mode .files-statusbar {
+    display: none !important;
+}
+
+/* V2 文件App侧边栏项目计数 */
+body.fluent-v2 .files-sidebar-count {
+    margin-top: auto;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+body.fluent-v2.dark-mode .files-sidebar-count {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* V2 设置应用样式 */
+body.fluent-v2 .settings-app {
+    background: transparent;
+}
+
+body.fluent-v2 .settings-content {
+    background: transparent !important;
+}
+
+body.fluent-v2 .settings-section {
+    background: transparent !important;
+}
+
+body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
+    background-color: transparent;
+}
+
+/* 修复V2模式下可能出现的白色色块 */
+body.fluent-v2 .settings-content > div:not(.settings-section):not(.settings-overview-header) {
+    background: transparent !important;
+}
+
+/* 修复V2模式下窗口重叠时的白条问题 */
+body.fluent-v2 .window *:not(.fluent-setting-item):not(.fluent-sidebar-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
+    background-color: transparent;
+}
+
+/* V2 任务栏边框修复 */
+body.fluent-v2 .taskbar {
+    border-bottom: none !important;
+    box-shadow: var(--v2-shadow) !important;
+}
+
+body.fluent-v2.dark-mode .taskbar {
+    border-bottom: none !important;
+    box-shadow: var(--v2-shadow-dark) !important;
+}
+
+body.fluent-v2 .fluent-sidebar {
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+body.fluent-v2.dark-mode .fluent-sidebar {
+    background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* V2 时钟应用样式 */
+body.fluent-v2 .clock-app {
+    background: transparent;
+}
+
+body.fluent-v2 .clock-content {
+    background: transparent !important;
+}
+
+/* V2 天气应用样式 */
+body.fluent-v2 .weather-app {
+    background: transparent;
+}
+
+body.fluent-v2 .weather-content {
+    background: transparent !important;
+}
+
+body.fluent-v2 .weather-hero {
+    background: linear-gradient(135deg, rgba(75, 124, 255, 0.6), rgba(103, 144, 255, 0.7)) !important;
+    backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+body.fluent-v2.dark-mode .weather-hero {
+    background: linear-gradient(135deg, rgba(42, 47, 58, 0.7), rgba(60, 66, 82, 0.8)) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+/* V2 计算器应用样式 */
+body.fluent-v2 .calculator-app {
+    background: transparent !important;
+}
+
+body.fluent-v2 .calculator-display {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
+    border: 1px solid var(--v2-glass-border) !important;
+}
+
+body.fluent-v2.dark-mode .calculator-display {
+    background: var(--v2-glass-bg-dark) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+body.fluent-v2 .calc-btn {
+    background: var(--v2-glass-bg) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid var(--v2-glass-border) !important;
+}
+
+body.fluent-v2.dark-mode .calc-btn {
+    background: var(--v2-glass-bg-dark) !important;
+    border-color: var(--v2-glass-border-dark) !important;
+}
+
+body.fluent-v2 .calc-btn-operator {
+    background: rgba(0, 120, 212, 0.2) !important;
+}
+
+body.fluent-v2 .calc-btn-equals {
+    background: linear-gradient(135deg, rgba(0, 120, 212, 0.6), rgba(0, 90, 180, 0.7)) !important;
+    color: white !important;
+}
+
+/* ============ 警告框/对话框组件 ============ */
+.fluent-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    opacity: 0;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fluent-dialog-overlay.fluent-dialog-visible {
+    opacity: 1;
+}
+
+.fluent-dialog-overlay.fluent-dialog-closing {
+    opacity: 0;
+}
+
+/* 旧版UI对话框样式 - 简洁风格 */
+.fluent-dialog {
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    min-width: 280px;
+    max-width: 400px;
+    transform: scale(0.95);
+    opacity: 0;
+    transition: all 0.2s ease-out;
+}
+
+.fluent-dialog.fluent-dialog-visible {
+    transform: scale(1);
+    opacity: 1;
+}
+
+.fluent-dialog.fluent-dialog-closing {
+    transform: scale(0.95);
+    opacity: 0;
+}
+
+.dark-mode .fluent-dialog {
+    background: rgba(50, 50, 50, 0.98);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 旧版UI隐藏图标 */
+.fluent-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 24px 8px;
+}
+
+.fluent-dialog-icon {
+    display: none;
+}
+
+.fluent-dialog-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.fluent-dialog-content {
+    padding: 8px 24px 20px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.fluent-dialog-footer {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px 20px;
+    border-top: none;
+}
+
+.fluent-dialog-footer .fluent-btn {
+    min-width: 64px;
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+.dark-mode .fluent-dialog-footer {
+    border-top: none;
+}
+
+/* V2 对话框样式 - 毛玻璃风格 */
+body.fluent-v2 .fluent-dialog {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    min-width: 320px;
+    max-width: 480px;
+    transform: scale(0.9) translateY(-20px);
+}
+
+body.fluent-v2 .fluent-dialog.fluent-dialog-visible {
+    transform: scale(1) translateY(0);
+}
+
+body.fluent-v2 .fluent-dialog.fluent-dialog-closing {
+    transform: scale(0.95) translateY(10px);
+}
+
+body.fluent-v2.dark-mode .fluent-dialog {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* V2模式显示图标 */
+body.fluent-v2 .fluent-dialog-icon {
+    display: block;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+body.fluent-v2 .fluent-dialog-header {
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 20px 24px 12px;
+}
+
+body.fluent-v2 .fluent-dialog-title {
+    font-size: 18px;
+    font-weight: 600;
+    text-align: left;
+}
+
+body.fluent-v2 .fluent-dialog-content {
+    text-align: left;
+    padding: 0 24px 20px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+body.fluent-v2 .fluent-dialog-footer {
+    justify-content: flex-end;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+body.fluent-v2.dark-mode .fluent-dialog-footer {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+body.fluent-v2 .fluent-dialog-info .fluent-dialog-icon { filter: invert(35%) sepia(98%) saturate(1500%) hue-rotate(190deg) brightness(95%); }
+body.fluent-v2 .fluent-dialog-warning .fluent-dialog-icon { filter: invert(70%) sepia(80%) saturate(600%) hue-rotate(5deg) brightness(100%); }
+body.fluent-v2 .fluent-dialog-error .fluent-dialog-icon { filter: invert(25%) sepia(95%) saturate(2500%) hue-rotate(350deg) brightness(90%); }
+
+/* ============ 输入对话框 ============ */
+.fluent-input-dialog .fluent-dialog-content {
+    padding: 12px 24px 20px;
+}
+
+/* 对话框内的输入容器 - 移除外层边框 */
+.fluent-input-dialog .fluent-input-wrapper {
+    position: relative;
+    border: none;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+.fluent-input-dialog .fluent-input-wrapper::before {
+    display: none;
+}
+
+.fluent-input-dialog-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-primary);
+    outline: none;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+/* 旧版UI - 单圈高亮 */
+.fluent-input-dialog-input:focus {
+    border-color: #0078d4;
+}
+
+.fluent-input-dialog-input.error {
+    border-color: #d32f2f;
+}
+
+.fluent-input-dialog-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.dark-mode .fluent-input-dialog-input {
+    background: rgba(60, 60, 60, 0.8);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark-mode .fluent-input-dialog-input:focus {
+    border-color: #4aa3e8;
+}
+
+.fluent-input-error {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #d32f2f;
+}
+
+/* V2 输入对话框样式 - 药丸形圆角 */
+body.fluent-v2 .fluent-input-dialog-input {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 10px 18px;
+}
+
+body.fluent-v2 .fluent-input-dialog-input:focus {
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.25);
+}
+
+body.fluent-v2.dark-mode .fluent-input-dialog-input {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.fluent-v2.dark-mode .fluent-input-dialog-input:focus {
+    border-color: #4aa3e8;
+    box-shadow: 0 0 0 2px rgba(74, 163, 232, 0.3);
+}
+
+/* ============ 通知组件 (Toast) ============ */
+.fluent-toast-container {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 12px;
+    z-index: 99998;
+    pointer-events: none;
+}
+
+/* 旧版UI通知样式 */
+.fluent-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(30px) saturate(150%);
+    -webkit-backdrop-filter: blur(30px) saturate(150%);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    min-width: 300px;
+    max-width: 400px;
+    pointer-events: auto;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fluent-toast.fluent-toast-enter {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.fluent-toast.fluent-toast-exit {
+    transform: translateX(120%);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+.dark-mode .fluent-toast {
+    background: rgba(30, 30, 30, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fluent-toast-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fluent-toast-icon img {
+    width: 20px;
+    height: 20px;
+}
+
+.fluent-toast-info .fluent-toast-icon img { filter: invert(35%) sepia(98%) saturate(1500%) hue-rotate(190deg) brightness(95%); }
+.fluent-toast-success .fluent-toast-icon img { filter: invert(50%) sepia(80%) saturate(500%) hue-rotate(90deg) brightness(95%); }
+.fluent-toast-warning .fluent-toast-icon img { filter: invert(70%) sepia(80%) saturate(600%) hue-rotate(5deg) brightness(100%); }
+.fluent-toast-error .fluent-toast-icon img { filter: invert(25%) sepia(95%) saturate(2500%) hue-rotate(350deg) brightness(90%); }
+
+.fluent-toast-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.fluent-toast-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.fluent-toast-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.fluent-toast-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.fluent-toast-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+    opacity: 1;
+}
+
+.dark-mode .fluent-toast-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.fluent-toast-close img {
+    width: 12px;
+    height: 12px;
+}
+
+/* V2 通知样式 */
+body.fluent-v2 .fluent-toast {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 18px;
+}
+
+body.fluent-v2.dark-mode .fluent-toast {
+    background: rgba(0, 0, 0, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.fluent-v2 .fluent-toast-title {
+    font-size: 16px;
+}
+
+body.fluent-v2 .fluent-toast-message {
+    font-size: 14px;
+}

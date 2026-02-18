@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluent OS</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/fluent-ui.css">
+    <link rel="stylesheet" href="css/startmenu-new.css">
+    <link rel="stylesheet" href="css/notification-compact.css">
+    <link rel="stylesheet" href="css/apps-unified.css">
+    <link rel="stylesheet" href="css/lingyi.css">
+</head>
+<body>
+    <!-- 主容器 -->
+    <div id="app">
+        <!-- 开机屏幕 -->
+        <div id="boot-screen" class="screen">
+            <div class="boot-content">
+                <img src="Theme/Icon/Fluent_logo.png" alt="Fluent OS" class="boot-logo">
+                <div class="boot-text">Fluent OS</div>
+                <div class="boot-spinner"></div>
+            </div>
+        </div>
+
+        <!-- 锁屏 -->
+        <div id="lock-screen" class="screen hidden">
+            <div class="lock-wallpaper"></div>
+            <div class="lock-time-container">
+                <div class="lock-time" id="lock-time">23:24</div>
+                <div class="lock-date" id="lock-date">2025/10/21</div>
+            </div>
+            <div class="lock-hint">轻点屏幕以登录</div>
+        </div>
+
+        <!-- 登录屏幕 -->
+        <div id="login-screen" class="screen hidden">
+            <div class="login-wallpaper"></div>
+            <div class="login-card">
+                <div class="login-avatar">
+                    <img src="Theme/Icon/UserAva.png" alt="User">
+                </div>
+                <div class="login-username">Owner</div>
+                <div class="login-email">owner@sample.com</div>
+                <div class="login-pin-container">
+                    <input type="password" id="login-pin" class="login-pin-input" placeholder="输入 PIN" maxlength="10">
+                    <button class="pin-toggle" id="pin-toggle">
+                        <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="显示">
+                        <img class="icon-fill hidden" src="Theme/Icon/Symbol_icon/fill/Eye.svg" alt="隐藏">
+                    </button>
+                </div>
+                <div class="login-error hidden" id="login-error">PIN 不正确，请重试</div>
+                <div class="login-security-link hidden" id="security-link">通过安全问题登录</div>
+                <button class="login-submit" id="login-submit">登录</button>
+            </div>
+        </div>
+
+        <!-- 桌面 -->
+        <div id="desktop-screen" class="screen hidden">
+            <div class="desktop-wallpaper"></div>
+            
+            <!-- 桌面图标 -->
+            <div class="desktop-icons" id="desktop-icons">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 桌面右键菜单 -->
+            <div class="context-menu hidden" id="desktop-context-menu">
+                <div class="context-menu-item" data-action="refresh">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
+                    <span>刷新</span>
+                </div>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item" data-action="personalize">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Color Picker.svg" alt="">
+                    <span>个性化</span>
+                </div>
+            </div>
+
+            <!-- 窗口容器 -->
+            <div id="windows-container"></div>
+
+            <!-- 任务栏 -->
+            <div class="taskbar" id="taskbar">
+                <div class="taskbar-left">
+                    <button class="taskbar-btn taskbar-start" id="start-btn">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="开始">
+                    </button>
+                    <button class="taskbar-btn taskbar-taskview" id="taskview-btn" title="多任务视图 (Ctrl+W)">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="任务视图">
+                    </button>
+                </div>
+                <div class="taskbar-center" id="taskbar-apps">
+                    <!-- 动态生成应用图标 -->
+                </div>
+                <div class="taskbar-right">
+                    <button class="taskbar-btn taskbar-control" id="control-center-btn">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="控制中心" class="icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="控制中心" class="icon-fill">
+                    </button>
+                    <button class="taskbar-btn taskbar-notification" id="notification-btn">
+                        <div class="notification-time-container">
+                            <div class="notification-time" id="taskbar-time">23:24</div>
+                            <div class="notification-date" id="taskbar-date">10/21</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 开始菜单 -->
+            <div class="start-menu hidden" id="start-menu">
+                <!-- 搜索栏 -->
+                <div class="start-search">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="搜索">
+                    <input type="text" id="start-search-input">
+                </div>
+                
+                <!-- 已固定应用 -->
+                <div class="start-section">
+                    <div class="start-section-header">
+                        <span id="start-pinned-title">已固定</span>
+                        <button class="start-section-link" id="all-apps-btn">
+                            <span id="start-all-apps-text">所有应用</span>
+                            <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" alt="">
+                        </button>
+                    </div>
+                    <div class="start-apps-grid" id="start-apps-grid">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+                
+                <!-- 推荐的项目 -->
+                <div class="start-section">
+                    <div class="start-section-header">
+                        <span id="start-recommended-title">推荐的项目</span>
+                        <button class="start-section-link" id="more-recent-btn">
+                            <span id="start-more-text">更多</span>
+                            <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" alt="">
+                        </button>
+                    </div>
+                    <div class="start-recent-items" id="start-recent-items">
+                        <!-- 动态生成最近文件 -->
+                    </div>
+                </div>
+                
+                <!-- 底部栏 -->
+                <div class="start-footer">
+                    <div class="start-footer-shortcuts">
+                        <button class="start-footer-btn" id="pictures-folder-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Image.svg" alt="">
+                            <span id="start-pictures-text">图片</span>
+                        </button>
+                        <button class="start-footer-btn" id="downloads-folder-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Download.svg" alt="">
+                            <span id="start-downloads-text">下载</span>
+                        </button>
+                    </div>
+                    <div class="start-power">
+                        <button class="start-power-btn" id="power-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Shut Down.svg" alt="电源" class="icon-stroke">
+                            <img src="Theme/Icon/Symbol_icon/fill/Shut Down.svg" alt="电源" class="icon-fill hidden">
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 电源菜单 -->
+            <div class="power-menu hidden" id="power-menu">
+                <div class="power-menu-item" data-action="shutdown">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Shut Down.svg" alt="">
+                    <span id="power-shutdown-text">关机</span>
+                </div>
+                <div class="power-menu-item" data-action="restart">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
+                    <span id="power-restart-text">重启</span>
+                </div>
+                <div class="power-menu-item" data-action="logout">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Logout.svg" alt="">
+                    <span id="power-logout-text">注销</span>
+                </div>
+            </div>
+
+            <!-- 控制中心 -->
+            <div class="control-center hidden" id="control-center">
+                <div class="control-center-grid">
+                    <!-- Wi-Fi -->
+                    <div class="control-tile control-tile-large" id="wifi-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Broadcast.svg" alt="Wi-Fi" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Broadcast.svg" alt="Wi-Fi" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="wifi-tile-title">Wi-Fi</div>
+                            <div class="tile-subtitle" id="wifi-tile-subtitle">已连接</div>
+                        </div>
+                    </div>
+                    <!-- 蓝牙 -->
+                    <div class="control-tile control-tile-large" id="bluetooth-tile" data-active="false">
+                        <div class="tile-icon-container">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Bluetooth_close.svg" alt="蓝牙" class="bluetooth-icon-off">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Bluetooth_open.svg" alt="蓝牙" class="bluetooth-icon-on">
+                        </div>
+                        <div class="tile-label">
+                            <div class="tile-title" id="bluetooth-tile-title">蓝牙</div>
+                            <div class="tile-subtitle" id="bluetooth-tile-subtitle">关闭</div>
+                        </div>
+                    </div>
+                    <!-- 深色模式 -->
+                    <div class="control-tile control-tile-large" id="theme-tile" data-active="false">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Moon.svg" alt="深色模式" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Moon.svg" alt="深色模式" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="theme-tile-title">深色</div>
+                        </div>
+                    </div>
+                    <!-- 模糊效果 -->
+                    <div class="control-tile control-tile-large" id="blur-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="模糊" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Eye.svg" alt="模糊" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="blur-tile-title">模糊</div>
+                        </div>
+                    </div>
+                    <!-- 动画 -->
+                    <div class="control-tile control-tile-large" id="animation-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Stars A.svg" alt="动画" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Stars A.svg" alt="动画" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="animation-tile-title">动画</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 音量滑块 -->
+                <div class="control-slider">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Volume Up.svg" alt="音量">
+                    <input type="range" id="volume-slider" min="0" max="100" value="50">
+                    <span id="volume-value">50</span>
+                </div>
+                
+                <!-- 亮度滑块 -->
+                <div class="control-slider">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Sun.svg" alt="亮度">
+                    <input type="range" id="brightness-slider" min="20" max="100" value="100">
+                    <span id="brightness-value">100</span>
+                </div>
+            </div>
+
+            <!-- 通知中心 -->
+            <div class="notification-center hidden" id="notification-center">
+                <!-- 通知瓷贴 -->
+                <div class="notification-tile" id="notification-tile">
+                    <div class="notification-header">
+                        <h3 id="notification-title">通知</h3>
+                        <button class="notification-clear" id="notification-clear">全部清除</button>
+                    </div>
+                    <div class="notification-list" id="notification-list">
+                        <!-- 动态生成 -->
+                    </div>
+                    <div class="notification-empty">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Notification Bell.svg" alt="">
+                        <p id="notification-empty-text">没有新通知</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 模块 -->
+    <script src="js/core/storage.js"></script>
+    <script src="js/core/state.js"></script>
+    <script src="js/core/i18n.js"></script>
+    <script src="js/core/recentfiles.js"></script>
+    <script src="js/core/fluent-ui.js"></script>
+    <script src="js/core/lingyi.js"></script>
+    <script src="js/ui/boot.js"></script>
+    <script src="js/ui/lockscreen.js"></script>
+    <script src="js/ui/login.js"></script>
+    <script src="js/ui/desktop.js"></script>
+    <script src="js/ui/taskbar.js"></script>
+    <script src="js/ui/startmenu.js"></script>
+    <script src="js/ui/startmenu-update.js"></script>
+    <script src="js/ui/controlcenter.js"></script>
+    <script src="js/ui/notification-compact.js"></script>
+    <script src="js/ui/taskview.js"></script>
+    <script src="js/ui/window.js"></script>
+    <script src="js/apps/files.js"></script>
+    <script src="js/apps/settings.js"></script>
+    <script src="js/apps/calculator.js"></script>
+    <script src="js/apps/notes.js"></script>
+    <script src="js/apps/browser.js"></script>
+    <script src="js/apps/clock.js"></script>
+    <script src="js/apps/weather.js"></script>
+    <script src="js/apps/photos.js"></script>
+    <script src="js/third_parts_apps/pwa-loader.js"></script>
+    <script src="js/apps/appshop.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,484 @@
+/* ============ 通知中心完全重写 ============ */
+
+/* 通知中心容器 - 底部固定 */
+.notification-center {
+    position: fixed;
+    /* bottom由JS动态设置 */
+    width: 420px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    z-index: 9500;
+    max-width: calc(100vw - 24px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ============ 通知区域 ============ */
+.notification-section {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.notification-clear {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    transition: background var(--transition-fast);
+}
+
+.notification-clear:hover {
+    background: rgba(0, 120, 212, 0.1);
+}
+
+.notification-list {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.notification-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    transition: all var(--transition-fast);
+}
+
+.notification-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.dark-mode .notification-item:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.notification-item:last-child {
+    margin-bottom: 0;
+}
+
+.notification-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.notification-item-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.notification-item-time {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.notification-item-content {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.notification-item-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    opacity: 0.6;
+    transition: all var(--transition-fast);
+}
+
+.notification-item-close:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .notification-item-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.notification-item-close img {
+    width: 16px;
+    height: 16px;
+}
+
+.notification-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.notification-empty img {
+    width: 48px;
+    height: 48px;
+    opacity: 0.5;
+    margin-bottom: 16px;
+}
+
+.notification-empty p {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* ============ 日历区域 - 完全重写 ============ */
+.calendar-section {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 紧凑模式 */
+.calendar-section.compact {
+    height: 60px;
+}
+
+/* 展开模式 */
+.calendar-section.expanded {
+    height: auto;
+}
+
+/* 紧凑显示 */
+.calendar-compact-display {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    height: 60px;
+    box-sizing: border-box;
+}
+
+.calendar-section.expanded .calendar-compact-display {
+    display: none;
+}
+
+.calendar-compact-display:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .calendar-compact-display:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-current-time {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.calendar-current-date {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.calendar-current-clock {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 展开内容 */
+.calendar-expanded-content {
+    display: none;
+    padding: 16px;
+}
+
+.calendar-section.expanded .calendar-expanded-content {
+    display: block;
+}
+
+.calendar-section.compact .calendar-expanded-content {
+    display: none;
+}
+
+/* 日历头部 */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calendar-nav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.calendar-nav-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .calendar-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.calendar-nav-btn img {
+    width: 16px;
+    height: 16px;
+}
+
+.calendar-title {
+    text-align: center;
+}
+
+.calendar-month-year {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.calendar-lunar {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* 日历星期行 */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.calendar-weekday {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 8px 4px;
+    font-weight: 500;
+}
+
+/* 日历日期网格 */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 16px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    position: relative;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.calendar-day:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .calendar-day:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.calendar-day.today {
+    background: var(--accent);
+    color: white;
+    font-weight: 600;
+}
+
+.calendar-day.selected {
+    background: rgba(0, 120, 212, 0.2);
+    border: 2px solid var(--accent);
+}
+
+.calendar-day.other-month {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+}
+
+.calendar-day-number {
+    font-size: 14px;
+}
+
+.calendar-day-lunar {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.calendar-day.today .calendar-day-lunar {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* 日历底部 */
+.calendar-footer {
+    display: flex;
+    gap: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    align-items: center;
+}
+
+.calendar-time-btn,
+.calendar-focus-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.calendar-time-btn:hover,
+.calendar-focus-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.dark-mode .calendar-time-btn,
+.dark-mode .calendar-focus-btn {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .calendar-time-btn:hover,
+.dark-mode .calendar-focus-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-time-btn img,
+.calendar-focus-btn img {
+    width: 16px;
+    height: 16px;
+}
+
+/* 展开按钮 */
+.calendar-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+}
+
+.calendar-expand-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .calendar-expand-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.calendar-expand-btn img {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 紧凑模式：向上箭头 */
+.calendar-section.compact .calendar-expand-btn img {
+    transform: rotate(0deg);
+}
+
+/* 展开模式：向下箭头 */
+.calendar-section.expanded .calendar-expand-btn img {
+    transform: rotate(180deg);
+}
+
+/* ============ 模糊禁用状态 ============ */
+.blur-disabled .notification-center {
+    backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .notification-center {
+    background: rgba(32, 32, 32, 0.95);
+}
+
+/* ============ 响应式设计 ============ */
+@media (max-width: 768px) {
+    .notification-center {
+        width: calc(100vw - 24px);
+    }
+}
+
+/* ============ 动画支持 ============ */
+body.animations-enabled .notification-center:not(.hidden) {
+    animation: panelFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.animations-enabled .notification-center.closing {
+    animation: panelFadeOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes panelFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes panelFadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+}

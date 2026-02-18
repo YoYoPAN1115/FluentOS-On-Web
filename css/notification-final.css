@@ -1,0 +1,492 @@
+/* ============ 通知中心 + 日历 - 完全模仿图片样式 ============ */
+
+/* 主容器 */
+.notification-center {
+    position: fixed;
+    /* bottom和left由JS动态设置 */
+    width: 420px;
+    background: rgba(45, 45, 45, 0.85);
+    backdrop-filter: blur(60px) saturate(150%);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 9500;
+    overflow: hidden;
+}
+
+/* ============ 通知区域 ============ */
+.notification-section {
+    padding: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.notification-clear {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.notification-clear:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.notification-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.notification-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.notification-item-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.notification-item-time {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 2px;
+}
+
+.notification-item-content {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+}
+
+.notification-item-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    opacity: 0.5;
+    transition: all 0.2s;
+}
+
+.notification-item-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.notification-item-close img {
+    width: 14px;
+    height: 14px;
+    filter: invert(1);
+}
+
+.notification-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.notification-empty img {
+    width: 48px;
+    height: 48px;
+    opacity: 0.3;
+    margin-bottom: 12px;
+    filter: invert(1);
+}
+
+.notification-empty p {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* ============ 日历区域 ============ */
+.calendar-section {
+    padding: 24px;
+}
+
+/* 年份和导航 */
+.calendar-year-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.calendar-nav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.calendar-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.calendar-nav-btn img {
+    width: 18px;
+    height: 18px;
+    filter: invert(1);
+}
+
+.calendar-year {
+    font-size: 22px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    text-align: center;
+    flex: 1;
+}
+
+/* 当前日期信息 */
+.calendar-current-info {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.calendar-current-date-full {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 4px;
+}
+
+.calendar-current-lunar {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* 星期行 */
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.calendar-weekday {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 8px 0;
+    font-weight: 500;
+}
+
+/* 日期网格 */
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-bottom: 20px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    position: relative;
+    padding: 4px;
+    border: 1.5px solid transparent;
+}
+
+.calendar-day:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.calendar-day-number {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 2px;
+    font-weight: 500;
+}
+
+.calendar-day-lunar {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* 今天 */
+.calendar-day.today {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.calendar-day.today .calendar-day-number {
+    color: rgba(255, 255, 255, 1);
+    font-weight: 600;
+}
+
+.calendar-day.today .calendar-day-lunar {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* 选中状态 */
+.calendar-day.selected {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* 其他月份 */
+.calendar-day.other-month .calendar-day-number,
+.calendar-day.other-month .calendar-day-lunar {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* ============ 专注控制栏 ============ */
+.calendar-focus-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+}
+
+.focus-time-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.focus-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.focus-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.focus-btn img {
+    width: 14px;
+    height: 14px;
+    filter: invert(1);
+}
+
+.focus-time-display {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    text-align: center;
+    flex: 1;
+}
+
+.focus-start-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+}
+
+.focus-start-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.focus-start-btn img {
+    width: 16px;
+    height: 16px;
+    filter: invert(1);
+}
+
+/* ============ 浅色主题 ============ */
+.light-mode .notification-center {
+    background: rgba(245, 245, 245, 0.85);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .notification-section {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .notification-header h3,
+.light-mode .calendar-year,
+.light-mode .calendar-current-date-full,
+.light-mode .calendar-day-number,
+.light-mode .focus-time-display,
+.light-mode .focus-start-btn {
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.light-mode .notification-clear,
+.light-mode .calendar-current-lunar,
+.light-mode .calendar-weekday,
+.light-mode .calendar-day-lunar {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.light-mode .notification-item {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .notification-item:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .notification-empty {
+    color: rgba(0, 0, 0, 0.5);
+}
+
+.light-mode .calendar-nav-btn,
+.light-mode .focus-btn {
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.light-mode .calendar-nav-btn:hover,
+.light-mode .focus-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.5);
+}
+
+.light-mode .calendar-day:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .calendar-day.today {
+    border-color: rgba(0, 0, 0, 0.6);
+}
+
+.light-mode .calendar-day.selected {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .calendar-focus-control {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.light-mode .focus-start-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .notification-item-close img,
+.light-mode .notification-empty img,
+.light-mode .calendar-nav-btn img,
+.light-mode .focus-btn img,
+.light-mode .focus-start-btn img {
+    filter: invert(0);
+}
+
+/* ============ 动画 ============ */
+body.animations-enabled .notification-center:not(.hidden) {
+    animation: panelSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.animations-enabled .notification-center.closing {
+    animation: panelSlideOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes panelSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes panelSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+}
+
+/* ============ 滚动条样式 ============ */
+.notification-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.notification-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.notification-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.light-mode .notification-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.notification-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.light-mode .notification-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* ============ 响应式 ============ */
+@media (max-width: 768px) {
+    .notification-center {
+        width: calc(100vw - 24px);
+    }
+}
+

@@ -1,0 +1,316 @@
+/* ============ 统一App UI - Windows 11高斯模糊风格 ============ */
+
+/* 窗口背景模糊 */
+body.window-blur-enabled .window {
+    background: rgba(243, 243, 243, 0.75);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    /* 修复色块渲染问题 */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    isolation: isolate;
+}
+
+body.dark-mode.window-blur-enabled .window {
+    background: rgba(32, 32, 32, 0.8);
+}
+
+/* 修复 backdrop-filter 色块问题 - 强制硬件加速 */
+body.window-blur-enabled .window-content {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* 修复子元素 backdrop-filter 叠加问题 */
+body.window-blur-enabled .window .fluent-sidebar,
+body.window-blur-enabled .window .files-sidebar,
+body.window-blur-enabled .window .settings-sidebar {
+    /* 避免多层 backdrop-filter 叠加导致色块 */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+body.dark-mode.window-blur-enabled .window .fluent-sidebar,
+body.dark-mode.window-blur-enabled .window .files-sidebar,
+body.dark-mode.window-blur-enabled .window .settings-sidebar {
+    background: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* 设置应用 */
+.settings-app {
+    background: transparent !important;
+}
+
+/* 设置侧边栏样式已统一到 fluent-ui.css 的 .fluent-sidebar */
+
+.settings-content {
+    background: transparent !important;
+}
+
+/* 取消设置分区卡片背景，避免图片下方出现额外卡片层 */
+.settings-section {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    border: none !important;
+}
+
+.dark-mode .settings-section {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* 文件管理器 */
+.files-app {
+    background: transparent !important;
+}
+
+.files-sidebar {
+    background: rgba(255, 255, 255, 0.25) !important;
+    /* 避免叠加 backdrop-filter 导致色块 */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.dark-mode .files-sidebar {
+    background: rgba(45, 45, 45, 0.4) !important;
+    border-right-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.files-content {
+    background: transparent !important;
+}
+
+.files-toolbar {
+    background: rgba(255, 255, 255, 0.3) !important;
+    backdrop-filter: blur(30px) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.dark-mode .files-toolbar {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 记事本 */
+.notes-app {
+    background: rgba(249, 249, 249, 0.6) !important;
+    backdrop-filter: blur(60px) saturate(180%) !important;
+}
+
+.dark-mode .notes-app {
+    background: rgba(45, 45, 45, 0.6) !important;
+}
+
+.notes-toolbar {
+    background: rgba(249, 249, 249, 0.7) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dark-mode .notes-toolbar {
+    background: rgba(45, 45, 45, 0.7) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.notes-editor-container {
+    background: transparent !important;
+}
+
+.notes-editor {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(30px) !important;
+}
+
+.dark-mode .notes-editor {
+    background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.notes-statusbar {
+    background: rgba(249, 249, 249, 0.7) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.dark-mode .notes-statusbar {
+    background: rgba(45, 45, 45, 0.7) !important;
+    border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 浏览器 */
+.browser-app {
+    background: transparent !important;
+}
+
+.browser-header {
+    background: rgba(249, 249, 249, 0.8) !important;
+    backdrop-filter: blur(50px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.dark-mode .browser-header {
+    background: rgba(45, 45, 45, 0.8) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.browser-navbar {
+    background: transparent !important;
+}
+
+.browser-address-bar {
+    background: rgba(255, 255, 255, 0.6) !important;
+    backdrop-filter: blur(20px) !important;
+}
+
+.dark-mode .browser-address-bar {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.browser-start-page {
+    background: transparent !important;
+}
+
+/* 计算器 */
+.calculator-app {
+    background: rgba(249, 249, 249, 0.6) !important;
+    backdrop-filter: blur(60px) saturate(180%) !important;
+}
+
+.dark-mode .calculator-app {
+    background: rgba(45, 45, 45, 0.6) !important;
+}
+
+.calculator-display {
+    background: rgba(255, 255, 255, 0.3) !important;
+    backdrop-filter: blur(30px) !important;
+}
+
+.dark-mode .calculator-display {
+    background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.calculator-buttons {
+    background: transparent !important;
+}
+
+.calculator-button {
+    background: rgba(255, 255, 255, 0.5) !important;
+    backdrop-filter: blur(20px) !important;
+}
+
+.dark-mode .calculator-button {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.calculator-button:hover {
+    background: rgba(255, 255, 255, 0.7) !important;
+}
+
+.dark-mode .calculator-button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.calculator-button.operator {
+    background: rgba(0, 120, 212, 0.2) !important;
+}
+
+.calculator-button.operator:hover {
+    background: rgba(0, 120, 212, 0.3) !important;
+}
+
+.calculator-button.equals {
+    background: rgba(0, 120, 212, 0.9) !important;
+    color: white !important;
+}
+
+.calculator-button.equals:hover {
+    background: rgba(0, 120, 212, 1) !important;
+}
+
+/* 模糊禁用时的纯色底 */
+body.window-blur-disabled .window {
+    background: var(--bg-primary) !important;
+    backdrop-filter: none !important;
+}
+
+body.window-blur-disabled .files-sidebar {
+    background: var(--bg-secondary) !important;
+    backdrop-filter: none !important;
+}
+
+body.window-blur-disabled .settings-section,
+body.window-blur-disabled .notes-editor,
+body.window-blur-disabled .browser-address-bar,
+body.window-blur-disabled .calculator-display {
+    background: var(--bg-tertiary) !important;
+    backdrop-filter: none !important;
+}
+
+body.window-blur-disabled .notes-toolbar,
+body.window-blur-disabled .notes-statusbar,
+body.window-blur-disabled .browser-header,
+body.window-blur-disabled .files-toolbar {
+    background: var(--bg-secondary) !important;
+    backdrop-filter: none !important;
+}
+
+/* ============ 设置、文件、App Shop - 自定义滚动条 ============ */
+/* WebKit 滚动条 */
+.settings-app *::-webkit-scrollbar,
+.files-app *::-webkit-scrollbar,
+.appshop *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.settings-app *::-webkit-scrollbar-track,
+.files-app *::-webkit-scrollbar-track,
+.appshop *::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-app *::-webkit-scrollbar-thumb,
+.files-app *::-webkit-scrollbar-thumb,
+.appshop *::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+.dark-mode .settings-app *::-webkit-scrollbar-thumb,
+.dark-mode .files-app *::-webkit-scrollbar-thumb,
+.dark-mode .appshop *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.settings-app *::-webkit-scrollbar-thumb:hover,
+.files-app *::-webkit-scrollbar-thumb:hover,
+.appshop *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .settings-app *::-webkit-scrollbar-thumb:hover,
+.dark-mode .files-app *::-webkit-scrollbar-thumb:hover,
+.dark-mode .appshop *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+/* Firefox 滚动条 */
+.settings-app *,
+.files-app *,
+.appshop * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+
+.dark-mode .settings-app *,
+.dark-mode .files-app *,
+.dark-mode .appshop * {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
