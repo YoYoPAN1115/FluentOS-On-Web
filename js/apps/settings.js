@@ -14,6 +14,7 @@ const SettingsApp = {
             { id: 'applications', label: 'settings.applications', icon: 'Dashboard Check', desc: t('settings.applications-desc') },
             { id: 'time-language', label: 'settings.time-language', icon: 'Clock', desc: t('settings.time-language-desc') },
             { id: 'privacy', label: 'settings.privacy', icon: 'Lock', desc: t('settings.privacy-desc') },
+            { id: 'fingo', label: 'settings.fingo', icon: 'Robot Happy', desc: t('settings.fingo-desc') },
             { id: 'lab', label: 'settings.lab', icon: 'Tube', desc: t('settings.lab-desc') },
             { id: 'about', label: 'settings.about', icon: 'Information Circle', desc: t('settings.about-desc') }
         ];
@@ -824,6 +825,9 @@ const SettingsApp = {
             case 'privacy':
                 this.renderPrivacy(container);
                 break;
+            case 'fingo':
+                this.renderFingo(container);
+                break;
             case 'lab':
                 this.renderLab(container);
                 break;
@@ -1197,6 +1201,91 @@ const SettingsApp = {
             })
         }));
         container.appendChild(privacySection);
+    },
+
+    renderFingo(container) {
+        // 隐私
+        const privSection = this.createSection(t('settings.fingo-privacy'));
+        privSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.fingo-uxplan'),
+            description: t('settings.fingo-uxplan-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.fingoUXPlan || false,
+                onChange: (v) => {
+                    State.updateSettings({ fingoUXPlan: v });
+                    this.addRecentSetting(t('settings.fingo-uxplan'), v ? t('settings.on') : t('settings.off'), 'fingo');
+                }
+            })
+        }));
+        container.appendChild(privSection);
+
+        // 对话模式
+        const modeSection = this.createSection(t('settings.fingo-mode'));
+        const customEnabled = State.settings.fingoCustomMode || false;
+        modeSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.fingo-custom'),
+            description: t('settings.fingo-custom-desc'),
+            control: FluentUI.Toggle({
+                checked: customEnabled,
+                onChange: (v) => {
+                    State.updateSettings({ fingoCustomMode: v });
+                    this.addRecentSetting(t('settings.fingo-custom'), v ? t('settings.on') : t('settings.off'), 'fingo');
+                    this.render();
+                }
+            })
+        }));
+
+        if (customEnabled) {
+            modeSection.appendChild(FluentUI.SettingItem({
+                label: t('settings.fingo-provider'),
+                control: FluentUI.Select({
+                    options: [
+                        { value: 'openai', label: 'OpenAI' },
+                        { value: 'siliconflow', label: '硅基流动 (SiliconFlow)' }
+                    ],
+                    value: State.settings.fingoProvider || 'openai',
+                    onChange: (v) => State.updateSettings({ fingoProvider: v })
+                })
+            }));
+
+            const keyWrapper = document.createElement('div');
+            keyWrapper.className = 'fluent-setting-item';
+            keyWrapper.style.cssText = 'flex-direction:column;align-items:stretch;gap:10px';
+            const keyLabel = document.createElement('div');
+            keyLabel.className = 'fluent-setting-item-label';
+            keyLabel.textContent = t('settings.fingo-apikey');
+            const keyRow = document.createElement('div');
+            keyRow.style.cssText = 'display:flex;gap:8px;align-items:center';
+            const keyInput = FluentUI.Input({
+                type: 'password',
+                placeholder: t('settings.fingo-apikey-placeholder'),
+                value: State.settings.fingoApiKey || ''
+            });
+            keyInput.style.flex = '1';
+            const saveBtn = FluentUI.Button({
+                text: t('settings.fingo-save'),
+                variant: 'primary',
+                onClick: () => {
+                    const val = keyInput.querySelector('input').value.trim();
+                    State.updateSettings({ fingoApiKey: val });
+                    FluentUI.Toast({ title: t('settings.fingo'), message: val ? t('settings.fingo-saved') : t('settings.fingo-cleared'), type: 'success' });
+                }
+            });
+            keyRow.appendChild(keyInput);
+            keyRow.appendChild(saveBtn);
+            keyWrapper.appendChild(keyLabel);
+            keyWrapper.appendChild(keyRow);
+            modeSection.appendChild(keyWrapper);
+        }
+        container.appendChild(modeSection);
+
+        // 关于
+        const aboutSection = this.createSection(t('settings.fingo-about'));
+        const aboutText = document.createElement('div');
+        aboutText.className = 'fluent-setting-item';
+        aboutText.innerHTML = `<div class="fluent-setting-item-info"><div class="fluent-setting-item-desc" style="font-size:13px;line-height:1.6">${t('settings.fingo-about-text')}</div></div>`;
+        aboutSection.appendChild(aboutText);
+        container.appendChild(aboutSection);
     },
 
     renderPersonalization(container) {

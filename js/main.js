@@ -45,6 +45,16 @@ function initModules() {
     NotificationCenter.init();
     WindowManager.init();
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
+    Fingo.init();
+
+    // Fingo 任务栏按钮
+    const fingoBtn = document.getElementById('fingo-btn');
+    if (fingoBtn) {
+        fingoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            Fingo.toggle();
+        });
+    }
 
     // 日历组件在NotificationCenter中初始化
     if (typeof CalendarWidget !== 'undefined') {

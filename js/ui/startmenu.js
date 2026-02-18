@@ -408,6 +408,7 @@ const StartMenu = {
         // 关闭其他面板
         ControlCenter.close();
         NotificationCenter.close();
+        if (typeof Fingo !== 'undefined') Fingo.hide();
     },
 
     close() {

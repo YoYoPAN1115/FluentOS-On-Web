@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/notification-compact.css">
     <link rel="stylesheet" href="css/apps-unified.css">
     <link rel="stylesheet" href="css/lingyi.css">
+    <link rel="stylesheet" href="css/fingo.css">
 </head>
 <body>
     <!-- 主容器 -->
@@ -117,6 +118,10 @@
                     <!-- 动态生成应用图标 -->
                 </div>
                 <div class="taskbar-right">
+                    <button class="taskbar-btn" id="fingo-btn" title="Fingo">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="Fingo" class="icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo" class="icon-fill">
+                    </button>
                     <button class="taskbar-btn taskbar-control" id="control-center-btn">
                         <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="控制中心" class="icon-stroke">
                         <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="控制中心" class="icon-fill">
@@ -127,6 +132,39 @@
                             <div class="notification-date" id="taskbar-date">10/21</div>
                         </div>
                     </button>
+                </div>
+            </div>
+
+            <!-- Fingo 模糊层 - 位于任务栏下方 -->
+            <div id="fingo-blur-layer"></div>
+
+            <!-- Fingo AI 助手面板 -->
+            <div id="fingo-panel" class="hidden">
+                <div class="fingo-content">
+                    <div class="fingo-header">
+                        <div class="fingo-header-left">
+                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo">
+                            <span>Fingo</span>
+                        </div>
+                        <div class="fingo-toolbar">
+                            <button id="fingo-new-chat" title="New Chat">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="+">
+                            </button>
+                            <button id="fingo-history-btn" title="History">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Timer.svg" alt="H">
+                            </button>
+                            <button id="fingo-clear-btn" title="Clear">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Playlist Add.svg" alt="C">
+                            </button>
+                        </div>
+                    </div>
+                    <div class="fingo-history" id="fingo-history"></div>
+                    <div id="fingo-messages"></div>
+                    <div class="fingo-input-wrap">
+                        <div class="fingo-input-glow">
+                            <input type="text" id="fingo-input" placeholder="Ask me anything..." autocomplete="off">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -323,6 +361,8 @@
     <script src="js/apps/photos.js"></script>
     <script src="js/third_parts_apps/pwa-loader.js"></script>
     <script src="js/apps/appshop.js"></script>
+    <script src="js/core/fingo-data.js"></script>
+    <script src="js/core/fingo.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

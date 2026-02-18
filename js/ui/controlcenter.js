@@ -262,6 +262,7 @@ const ControlCenter = {
         // 关闭其他面板
         StartMenu.close();
         NotificationCenter.close();
+        if (typeof Fingo !== 'undefined') Fingo.hide();
     },
 
     close() {
