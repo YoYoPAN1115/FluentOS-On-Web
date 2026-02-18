@@ -16,6 +16,7 @@ const StartMenu = {
         this.searchInput = document.getElementById('start-search-input');
         this.powerBtn = document.getElementById('power-btn');
         this.powerMenu = document.getElementById('power-menu');
+        this.powerLogoutMenu = document.getElementById('power-logout-menu');
         this.recentContainer = document.getElementById('start-recent-items');
 
         this.renderApps();
@@ -86,12 +87,15 @@ const StartMenu = {
         if (downloadsText) downloadsText.textContent = t('start.downloads');
         
         // 更新电源菜单
+        const lockText = document.getElementById('power-lock-text');
+        if (lockText) lockText.textContent = t('start.power.lock');
+
         const shutdownText = document.getElementById('power-shutdown-text');
         if (shutdownText) shutdownText.textContent = t('start.power.shutdown');
-        
+
         const restartText = document.getElementById('power-restart-text');
         if (restartText) restartText.textContent = t('start.power.restart');
-        
+
         const logoutText = document.getElementById('power-logout-text');
         if (logoutText) logoutText.textContent = t('start.power.logout');
 
@@ -154,14 +158,32 @@ const StartMenu = {
             this.filterApps(query);
         });
 
-        // 电源按钮
+        // 电源按钮 - 左键
         this.powerBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            this.closePowerLogoutMenu();
             this.togglePowerMenu();
         });
 
-        // 电源菜单项
+        // 电源按钮 - 右键弹出注销菜单
+        this.powerBtn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.closePowerMenu();
+            this.togglePowerLogoutMenu();
+        });
+
+        // 电源菜单项（左键菜单）
         this.powerMenu.addEventListener('click', (e) => {
+            const item = e.target.closest('.power-menu-item');
+            if (item) {
+                const action = item.dataset.action;
+                this.handlePowerAction(action);
+            }
+        });
+
+        // 注销菜单项（右键菜单）
+        this.powerLogoutMenu.addEventListener('click', (e) => {
             const item = e.target.closest('.power-menu-item');
             if (item) {
                 const action = item.dataset.action;
@@ -182,13 +204,15 @@ const StartMenu = {
 
         // 点击外部关闭
         document.addEventListener('click', (e) => {
-            if (!this.element.contains(e.target) && 
+            if (!this.element.contains(e.target) &&
                 !e.target.closest('#start-btn')) {
                 this.close();
             }
-            if (!this.powerMenu.contains(e.target) && 
+            if (!this.powerMenu.contains(e.target) &&
+                !this.powerLogoutMenu.contains(e.target) &&
                 !e.target.closest('#power-btn')) {
                 this.closePowerMenu();
+                this.closePowerLogoutMenu();
             }
         });
 
@@ -442,15 +466,32 @@ const StartMenu = {
 
     closePowerMenu() {
         this.powerMenu.classList.add('hidden');
-        
+
         const strokeIcon = this.powerBtn.querySelector('.icon-stroke');
         const fillIcon = this.powerBtn.querySelector('.icon-fill');
         strokeIcon.classList.remove('hidden');
         fillIcon.classList.add('hidden');
     },
 
+    togglePowerLogoutMenu() {
+        if (this.powerLogoutMenu.classList.contains('hidden')) {
+            const btnRect = this.powerBtn.getBoundingClientRect();
+            this.powerLogoutMenu.style.bottom = `${window.innerHeight - btnRect.top + 8}px`;
+            this.powerLogoutMenu.style.right = `${window.innerWidth - btnRect.right}px`;
+            this.powerLogoutMenu.style.left = 'auto';
+            this.powerLogoutMenu.classList.remove('hidden');
+        } else {
+            this.closePowerLogoutMenu();
+        }
+    },
+
+    closePowerLogoutMenu() {
+        this.powerLogoutMenu.classList.add('hidden');
+    },
+
     handlePowerAction(action) {
         this.closePowerMenu();
+        this.closePowerLogoutMenu();
         this.close();
 
         switch (action) {
@@ -462,6 +503,9 @@ const StartMenu = {
                 break;
             case 'logout':
                 State.logout();
+                break;
+            case 'lock':
+                State.lock();
                 break;
         }
     },

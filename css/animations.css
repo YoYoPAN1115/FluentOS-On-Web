@@ -110,8 +110,8 @@
 }
 
 /* 应用动画类 */
-body.animations-enabled .boot-spinner {
-    animation: spin 1s linear infinite;
+body.animations-enabled .boot-loading-ring svg {
+    animation: boot-ring-spin 1.2s linear infinite;
 }
 
 body.animations-enabled #boot-screen {

@@ -117,7 +117,6 @@ input {
 }
 
 /* 壁纸容器 */
-.boot-content,
 .lock-wallpaper,
 .login-wallpaper,
 .desktop-wallpaper {
@@ -130,7 +129,7 @@ input {
 
 /* ============ 开机屏幕 ============ */
 #boot-screen {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #1a1a1a;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -140,30 +139,129 @@ input {
 .boot-content {
     text-align: center;
     background: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+}
+
+.boot-logo-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .boot-logo {
     width: 120px;
     height: 120px;
-    margin-bottom: 24px;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
 }
 
-.boot-text {
-    font-size: 32px;
+/* 加载圆环 */
+.boot-loading-ring {
+    width: 45px;
+    height: 45px;
+}
+
+.boot-loading-ring svg {
+    width: 100%;
+    height: 100%;
+    animation: boot-ring-spin 1.2s linear infinite;
+}
+
+.boot-ring-arc {
+    stroke-dasharray: 22 66;
+    stroke-dashoffset: 0;
+    transform-origin: center;
+}
+
+@keyframes boot-ring-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ============ 关机/重启/注销 覆盖层 ============ */
+#power-overlay {
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(0px);
+    transition: backdrop-filter 0.5s ease, background 0.5s ease;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#power-overlay:not(.hidden) {
+    display: flex !important;
+    pointer-events: auto;
+    opacity: 1;
+}
+
+#power-overlay.phase-blur {
+    backdrop-filter: blur(30px);
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.dark-mode #power-overlay.phase-blur {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+#power-overlay.fade-out {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.power-overlay-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(24px) saturate(150%);
+    border-radius: 16px;
+    padding: 28px 40px;
+    min-width: 260px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+    transition: opacity 0.4s ease 0.3s, transform 0.4s ease 0.3s;
+}
+
+#power-overlay.phase-card .power-overlay-card {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.dark-mode .power-overlay-card {
+    background: rgba(40, 40, 40, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.power-overlay-title {
+    font-size: 20px;
     font-weight: 600;
-    color: white;
-    margin-bottom: 48px;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    color: #0078d4;
+    margin-bottom: 16px;
 }
 
-.boot-spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    margin: 0 auto;
+.dark-mode .power-overlay-title {
+    color: #60cdff;
+}
+
+.power-overlay-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.power-loading-ring {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.power-overlay-text {
+    font-size: 14px;
+    color: var(--text-secondary);
 }
 
 /* ============ 锁屏 ============ */

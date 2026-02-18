@@ -79,6 +79,15 @@ const I18n = {
             'start.power.shutdown': '关机',
             'start.power.restart': '重启',
             'start.power.logout': '注销',
+            'start.power.lock': '锁屏',
+
+            // 电源操作覆盖层
+            'power.shutdown.title': '关机',
+            'power.shutdown.status': '正在关机...',
+            'power.restart.title': '重启',
+            'power.restart.status': '正在重启...',
+            'power.logout.title': '注销',
+            'power.logout.status': '正在注销...',
             
             // 控制中心
             'control.wifi': 'Wi-Fi',
@@ -787,6 +796,15 @@ const I18n = {
             'start.power.shutdown': 'Shut down',
             'start.power.restart': 'Restart',
             'start.power.logout': 'Sign out',
+            'start.power.lock': 'Lock',
+
+            // Power action overlays
+            'power.shutdown.title': 'Shut down',
+            'power.shutdown.status': 'Shutting down...',
+            'power.restart.title': 'Restart',
+            'power.restart.status': 'Restarting...',
+            'power.logout.title': 'Sign out',
+            'power.logout.status': 'Signing out...',
             
             // Control Center
             'control.wifi': 'Wi-Fi',

@@ -290,27 +290,33 @@ const State = {
         this.emit('appStop', appId);
     },
 
-    // 重启系统
+    // 重启系统 - 显示重启覆盖层 6s，然后进入开机界面
     restart() {
         this.updateSession({ isLoggedIn: false });
-        this.setView('boot');
-        setTimeout(() => {
-            this.setView('lock');
-        }, 2500);
+        this.windows = [];
+        this.runningApps.clear();
+        this.emit('powerAction', { action: 'restart' });
     },
 
-    // 关机（返回锁屏）
+    // 关机 - 显示关机覆盖层 5s，然后关闭网页
     shutdown() {
         this.updateSession({ isLoggedIn: false });
-        this.setView('lock');
+        this.windows = [];
+        this.runningApps.clear();
+        this.emit('powerAction', { action: 'shutdown' });
     },
 
-    // 注销
+    // 注销 - 显示注销覆盖层 3s，然后进入锁屏
     logout() {
         this.updateSession({ isLoggedIn: false });
         this.windows = [];
         this.runningApps.clear();
-        this.setView('login');
+        this.emit('powerAction', { action: 'logout' });
+    },
+
+    // 锁屏 - 直接进入锁屏
+    lock() {
+        this.setView('lock');
     }
 };
 

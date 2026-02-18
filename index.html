@@ -18,9 +18,31 @@
         <!-- 开机屏幕 -->
         <div id="boot-screen" class="screen">
             <div class="boot-content">
-                <img src="Theme/Icon/Fluent_logo.png" alt="Fluent OS" class="boot-logo">
-                <div class="boot-text">Fluent OS</div>
-                <div class="boot-spinner"></div>
+                <div class="boot-logo-wrapper">
+                    <img src="Theme/Icon/Fluent_logo.png" alt="Fluent OS" class="boot-logo">
+                </div>
+                <div class="boot-loading-ring">
+                    <svg viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"/>
+                        <circle class="boot-ring-arc" cx="18" cy="18" r="14" fill="none" stroke="#0078d4" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关机/重启/注销 覆盖层 -->
+        <div id="power-overlay" class="screen hidden">
+            <div class="power-overlay-card">
+                <div class="power-overlay-title" id="power-overlay-title">关机</div>
+                <div class="power-overlay-status">
+                    <div class="boot-loading-ring power-loading-ring">
+                        <svg viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(0,120,212,0.15)" stroke-width="3"/>
+                            <circle class="boot-ring-arc" cx="18" cy="18" r="14" fill="none" stroke="#0078d4" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <span class="power-overlay-text" id="power-overlay-text">正在关机...</span>
+                </div>
             </div>
         </div>
 
@@ -165,8 +187,12 @@
                 </div>
             </div>
 
-            <!-- 电源菜单 -->
+            <!-- 电源菜单（左键） -->
             <div class="power-menu hidden" id="power-menu">
+                <div class="power-menu-item" data-action="lock">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Lock.svg" alt="">
+                    <span id="power-lock-text">锁屏</span>
+                </div>
                 <div class="power-menu-item" data-action="shutdown">
                     <img src="Theme/Icon/Symbol_icon/stroke/Shut Down.svg" alt="">
                     <span id="power-shutdown-text">关机</span>
@@ -175,6 +201,10 @@
                     <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
                     <span id="power-restart-text">重启</span>
                 </div>
+            </div>
+
+            <!-- 注销菜单（右键电源按钮） -->
+            <div class="power-menu hidden" id="power-logout-menu">
                 <div class="power-menu-item" data-action="logout">
                     <img src="Theme/Icon/Symbol_icon/stroke/Logout.svg" alt="">
                     <span id="power-logout-text">注销</span>

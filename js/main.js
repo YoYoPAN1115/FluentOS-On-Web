@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 监听视图变化（必须在 startSystem 之前注册）
     State.on('viewChange', handleViewChange);
 
+    // 监听电源操作
+    State.on('powerAction', handlePowerAction);
+
     // 初始化所有模块
     initModules();
 
@@ -61,18 +64,11 @@ function initModules() {
 }
 
 /**
- * 启动系统
+ * 启动系统 - 每次加载网页都进入开机界面
  */
 function startSystem() {
-    // 检查是否已登录
-    if (State.session.isLoggedIn) {
-        // 已登录，直接进入桌面
-        State.setView('desktop');
-    } else {
-        // 未登录，显示开机画面
-        State.setView('boot');
-        // handleViewChange 会自动调用 BootScreen.show()
-    }
+    // 无论是否已登录，都先显示开机画面
+    State.setView('boot');
 }
 
 /**
@@ -86,13 +82,13 @@ function handleViewChange({ oldView, newView }) {
         handleLockToLogin();
         return;
     }
-    
+
     // 特殊处理：登录 → 桌面的动画
     if (oldView === 'login' && newView === 'desktop') {
         handleLoginToDesktop();
         return;
     }
-    
+
     // 其他情况：直接切换
     hideAllViews();
     switch (newView) {
@@ -109,6 +105,67 @@ function handleViewChange({ oldView, newView }) {
             Desktop.show();
             break;
     }
+}
+
+/**
+ * 处理电源操作（关机/重启/注销）
+ */
+function handlePowerAction({ action }) {
+    const overlay = document.getElementById('power-overlay');
+    const titleEl = document.getElementById('power-overlay-title');
+    const textEl = document.getElementById('power-overlay-text');
+
+    // 关闭所有打开的窗口
+    if (typeof WindowManager !== 'undefined') {
+        WindowManager.windows.forEach(w => WindowManager.closeWindow(w.id));
+    }
+
+    // 根据操作类型设置文字
+    const texts = {
+        shutdown: { title: t('power.shutdown.title'), status: t('power.shutdown.status') },
+        restart: { title: t('power.restart.title'), status: t('power.restart.status') },
+        logout: { title: t('power.logout.title'), status: t('power.logout.status') }
+    };
+
+    const info = texts[action];
+    titleEl.textContent = info.title;
+    textEl.textContent = info.status;
+
+    // 阶段1: 显示覆盖层，背景模糊
+    overlay.classList.remove('hidden', 'fade-out', 'phase-blur', 'phase-card');
+    overlay.offsetHeight; // force reflow
+    requestAnimationFrame(() => {
+        overlay.classList.add('phase-blur');
+        // 阶段2: 卡片淡入弹出
+        setTimeout(() => overlay.classList.add('phase-card'), 200);
+    });
+
+    const durations = { shutdown: 5000, restart: 6000, logout: 3000 };
+
+    setTimeout(() => {
+        // 先在覆盖层下面准备好目标视图，防止闪现桌面
+        if (action === 'restart') {
+            hideAllViews();
+            BootScreen.show();
+            State.view = 'boot';
+        } else if (action === 'logout') {
+            hideAllViews();
+            LockScreen.show();
+            State.view = 'lock';
+        }
+
+        // 淡出覆盖层
+        overlay.classList.add('fade-out');
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('phase-blur', 'phase-card', 'fade-out');
+            if (action === 'shutdown') {
+                window.close();
+                document.body.innerHTML = '';
+                document.body.style.background = '#000';
+            }
+        }, 700);
+    }, durations[action]);
 }
 
 /**
