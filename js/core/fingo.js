@@ -10,6 +10,8 @@ const Fingo = {
     conversations: [],
     currentId: null,
     STORAGE_KEY: 'fluentos.fingo_history',
+    COPY_ICON_STROKE: 'Theme/Icon/Symbol_icon/stroke/Copy.svg',
+    COPY_ICON_FILL: 'Theme/Icon/Symbol_icon/fill/Copy.svg',
     _pendingAction: null, // { type: 'uninstall'|'repair', app, appName }
 
     init() {
@@ -95,13 +97,85 @@ const Fingo = {
         return (I18n && I18n.currentLang === 'en') ? 'en' : 'zh';
     },
 
-    addMessage(text, type) {
+    _createMessageElement(text, type) {
+        const safeText = typeof text === 'string' ? text : String(text ?? '');
         const div = document.createElement('div');
         div.className = `fingo-msg fingo-msg-${type}`;
-        text.split('\n').forEach((line, i) => {
-            if (i > 0) div.appendChild(document.createElement('br'));
-            div.appendChild(document.createTextNode(line));
+
+        const textEl = document.createElement('div');
+        textEl.className = 'fingo-msg-text';
+        safeText.split('\n').forEach((line, i) => {
+            if (i > 0) textEl.appendChild(document.createElement('br'));
+            textEl.appendChild(document.createTextNode(line));
         });
+        div.appendChild(textEl);
+
+        if (type === 'bot') {
+            div.classList.add('fingo-msg-copyable');
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'fingo-copy-btn';
+            const tip = this.lang() === 'zh' ? '复制内容' : 'Copy message';
+            copyBtn.title = tip;
+            copyBtn.setAttribute('aria-label', tip);
+
+            const icon = document.createElement('img');
+            icon.className = 'fingo-copy-icon';
+            icon.src = this.COPY_ICON_STROKE;
+            icon.alt = 'Copy';
+            copyBtn.appendChild(icon);
+
+            copyBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const copied = await this._copyToClipboard(safeText);
+                clearTimeout(copyBtn._copyResetTimer);
+                copyBtn.classList.remove('copied', 'copy-failed');
+                void copyBtn.offsetWidth; // restart click animation
+                copyBtn.classList.add(copied ? 'copied' : 'copy-failed');
+                icon.src = copied ? this.COPY_ICON_FILL : this.COPY_ICON_STROKE;
+                copyBtn._copyResetTimer = setTimeout(() => {
+                    icon.src = this.COPY_ICON_STROKE;
+                    copyBtn.classList.remove('copied', 'copy-failed');
+                }, 750);
+            });
+
+            div.appendChild(copyBtn);
+        }
+
+        return div;
+    },
+
+    async _copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (_) {}
+        }
+
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        ta.style.pointerEvents = 'none';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        let ok = false;
+        try {
+            ok = document.execCommand('copy');
+        } catch (_) {
+            ok = false;
+        }
+        ta.remove();
+        return ok;
+    },
+
+    addMessage(text, type) {
+        const div = this._createMessageElement(text, type);
         this.messagesEl.appendChild(div);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
         // 保存到当前对话
@@ -187,12 +261,7 @@ const Fingo = {
     _renderMessages(msgs) {
         this.messagesEl.innerHTML = '';
         (msgs || []).forEach(m => {
-            const div = document.createElement('div');
-            div.className = `fingo-msg fingo-msg-${m.type}`;
-            m.text.split('\n').forEach((line, i) => {
-                if (i > 0) div.appendChild(document.createElement('br'));
-                div.appendChild(document.createTextNode(line));
-            });
+            const div = this._createMessageElement(m.text, m.type);
             this.messagesEl.appendChild(div);
         });
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;

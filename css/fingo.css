@@ -83,7 +83,7 @@
    ========================================================== */
 #fingo-panel {
     position: fixed;
-    bottom: 70px;
+    bottom: 73px;
     left: 0;
     right: 0;
     width: 400px;
@@ -444,6 +444,70 @@ body.animations-enabled #fingo-panel.fingo-closing {
     color: #e4e4e4;
 }
 
+.fingo-msg-text {
+    word-break: break-word;
+}
+
+.fingo-msg-copyable {
+    position: relative;
+    padding-right: 40px;
+}
+
+.fingo-copy-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 6px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.fingo-copy-btn img {
+    width: 14px;
+    height: 14px;
+    display: block;
+    pointer-events: none;
+}
+
+.fingo-msg-copyable:hover .fingo-copy-btn,
+.fingo-copy-btn:focus-visible,
+.fingo-copy-btn.copied,
+.fingo-copy-btn.copy-failed {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.fingo-copy-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .fingo-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.fingo-copy-btn:focus-visible {
+    outline: 1px solid rgba(0, 120, 212, 0.55);
+    outline-offset: 1px;
+}
+
+.fingo-copy-btn.copied {
+    animation: fingoCopyTap 0.22s ease;
+}
+
+.fingo-copy-btn.copy-failed {
+    animation: fingoCopyShake 0.22s ease;
+}
+
 /* ==========================================================
    9. Input Area with Rainbow Glow Border
    ========================================================== */
@@ -618,6 +682,33 @@ body.animations-enabled #fingo-panel.fingo-closing {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes fingoCopyTap {
+    0% {
+        transform: scale(0.86);
+    }
+    70% {
+        transform: scale(1.08);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes fingoCopyShake {
+    0% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-2px);
+    }
+    70% {
+        transform: translateX(2px);
+    }
+    100% {
+        transform: translateX(0);
     }
 }
 
