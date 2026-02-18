@@ -1,6 +1,8 @@
 # Fluent OS Web
 
-一个使用纯 HTML + CSS + JavaScript 实现的仿真操作系统界面，采用 Fluent Design 设计语言。
+一个使用纯 HTML + CSS + JavaScript 实现的仿真操作系统界面，采用自制设计语言。
+一个由高中生自主打造的操作系统。
+注意，本操作系统仅利用AI编程技术进行制作，无人工干预调整代码，这里特别鸣谢Claude。
 
 ## ✨ 特性
 
