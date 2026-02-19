@@ -208,7 +208,7 @@ Fluent OS 3.0/
 - `Enter`: 提交登录
 - `Ctrl+S`: 保存记事本（在记事本应用中）
 - `ESC`: 退出大字报模式（在记事本大字报模式中）
-- - Alt+F：打开 Fingo AI
+- Alt+F：打开 Fingo AI
 - Alt+I：快速打开设置
 - Alt+L：快速锁屏
 - Alt+E：打开文件 App
