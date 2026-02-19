@@ -37,6 +37,7 @@ const State = {
         this.fs = Storage.get(Storage.keys.FS);
         this.desktopLayout = Storage.get(Storage.keys.DESKTOP_LAYOUT);
         this.notifications = Storage.get(Storage.keys.NOTIFICATIONS) || [];
+        this.ensureSettingsDefaults();
         
         // 校验并修复文件系统完整性（防止关键目录缺失）
         this.ensureFSIntegrity();
@@ -61,6 +62,7 @@ const State = {
         
         // 应用新版 UI 设置
         this.applyFluentV2Setting();
+        this.applyStrictCspSetting();
         
         // 应用亮度设置
         this.applyBrightness();
@@ -88,6 +90,46 @@ const State = {
         ensureFolder('recycle', '回收站');
         // 保存修复结果
         Storage.set(Storage.keys.FS, this.fs);
+    },
+
+    ensureSettingsDefaults() {
+        this.settings = this.settings || {};
+        let changed = false;
+
+        const defaults = {
+            strictCspEnabled: false,
+            fingoCustomMode: false,
+            fingoProvider: 'openai',
+            fingoApiKey: '',
+            fingoApiEncrypted: null,
+            fingoApiStorageType: 'none',
+            fingoApiSaveMode: 'temporary',
+            windowEdgeSnapEnabled: true,
+            windowHoverSnapEnabled: true,
+            windowBoundsMemory: {}
+        };
+
+        Object.keys(defaults).forEach((key) => {
+            if (this.settings[key] === undefined) {
+                this.settings[key] = defaults[key];
+                changed = true;
+            }
+        });
+
+        if (!this.settings.fingoApiStorageType) {
+            if (this.settings.fingoApiEncrypted && this.settings.fingoApiEncrypted.ciphertext) {
+                this.settings.fingoApiStorageType = 'permanent-encrypted';
+            } else if (this.settings.fingoApiKey) {
+                this.settings.fingoApiStorageType = 'permanent-plain';
+            } else {
+                this.settings.fingoApiStorageType = 'none';
+            }
+            changed = true;
+        }
+
+        if (changed) {
+            Storage.set(Storage.keys.SETTINGS, this.settings);
+        }
     },
 
     // 订阅状态变化
@@ -136,6 +178,9 @@ const State = {
         }
         if (updates.enableFluentV2 !== undefined) {
             this.applyFluentV2Setting();
+        }
+        if (updates.strictCspEnabled !== undefined) {
+            this.applyStrictCspSetting();
         }
     },
 
@@ -209,6 +254,16 @@ const State = {
             document.body.classList.add('fluent-v2');
         } else {
             document.body.classList.remove('fluent-v2');
+        }
+    },
+
+    applyStrictCspSetting() {
+        const enabled = this.settings.strictCspEnabled === true;
+        document.body.classList.toggle('strict-csp-enabled', enabled);
+        if (typeof window !== 'undefined' &&
+            window.StrictScriptGuard &&
+            typeof window.StrictScriptGuard.setEnabled === 'function') {
+            window.StrictScriptGuard.setEnabled(enabled);
         }
     },
 

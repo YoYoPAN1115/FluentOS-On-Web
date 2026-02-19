@@ -69,7 +69,17 @@ const Storage = {
                 pin: '1234',
                 language: 'zh',
                 volume: 50,
-                brightness: 100
+                brightness: 100,
+                strictCspEnabled: false,
+                fingoCustomMode: false,
+                fingoProvider: 'openai',
+                fingoApiKey: '',
+                fingoApiEncrypted: null,
+                fingoApiStorageType: 'none',
+                fingoApiSaveMode: 'temporary',
+                windowEdgeSnapEnabled: true,
+                windowHoverSnapEnabled: true,
+                windowBoundsMemory: {}
             });
         }
 
@@ -156,4 +166,3 @@ const Storage = {
         }
     }
 };
-

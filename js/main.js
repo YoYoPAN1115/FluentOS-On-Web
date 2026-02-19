@@ -4,12 +4,114 @@
  */
 
 // 等待DOM加载完成
+const StrictScriptGuard = {
+    enabled: false,
+    _patched: false,
+
+    init(enabled = false) {
+        if (!this._patched) {
+            this._patch();
+            this._patched = true;
+        }
+        this.setEnabled(enabled);
+    },
+
+    setEnabled(enabled) {
+        this.enabled = enabled === true;
+        if (document.body) {
+            document.body.classList.toggle('strict-csp-enabled', this.enabled);
+        }
+    },
+
+    _isBlockedInlineScript(node) {
+        if (!node || node.nodeType !== 1 || node.tagName !== 'SCRIPT') return false;
+        const src = (node.getAttribute('src') || '').trim();
+        const text = (node.textContent || '').trim();
+        return !src && text.length > 0;
+    },
+
+    _patch() {
+        const guard = this;
+
+        const originalEval = window.eval;
+        window.eval = function(...args) {
+            if (guard.enabled) {
+                throw new Error('Inline script execution is blocked by strict mode.');
+            }
+            return originalEval(...args);
+        };
+
+        const OriginalFunction = window.Function;
+        const GuardedFunction = function(...args) {
+            if (guard.enabled) {
+                throw new Error('Function constructor is blocked by strict mode.');
+            }
+            return OriginalFunction(...args);
+        };
+        GuardedFunction.prototype = OriginalFunction.prototype;
+        window.Function = GuardedFunction;
+
+        const originalSetTimeout = window.setTimeout;
+        window.setTimeout = function(handler, timeout, ...args) {
+            if (guard.enabled && typeof handler === 'string') {
+                throw new Error('String-based setTimeout is blocked by strict mode.');
+            }
+            return originalSetTimeout(handler, timeout, ...args);
+        };
+
+        const originalSetInterval = window.setInterval;
+        window.setInterval = function(handler, timeout, ...args) {
+            if (guard.enabled && typeof handler === 'string') {
+                throw new Error('String-based setInterval is blocked by strict mode.');
+            }
+            return originalSetInterval(handler, timeout, ...args);
+        };
+
+        const originalSetAttribute = Element.prototype.setAttribute;
+        Element.prototype.setAttribute = function(name, value) {
+            if (guard.enabled && typeof name === 'string' && /^on/i.test(name)) {
+                throw new Error('Inline event handlers are blocked by strict mode.');
+            }
+            return originalSetAttribute.call(this, name, value);
+        };
+
+        const originalAppendChild = Node.prototype.appendChild;
+        Node.prototype.appendChild = function(child) {
+            if (guard.enabled && guard._isBlockedInlineScript(child)) {
+                throw new Error('Inline <script> is blocked by strict mode.');
+            }
+            return originalAppendChild.call(this, child);
+        };
+
+        const originalInsertBefore = Node.prototype.insertBefore;
+        Node.prototype.insertBefore = function(newNode, referenceNode) {
+            if (guard.enabled && guard._isBlockedInlineScript(newNode)) {
+                throw new Error('Inline <script> is blocked by strict mode.');
+            }
+            return originalInsertBefore.call(this, newNode, referenceNode);
+        };
+
+        const originalReplaceChild = Node.prototype.replaceChild;
+        Node.prototype.replaceChild = function(newChild, oldChild) {
+            if (guard.enabled && guard._isBlockedInlineScript(newChild)) {
+                throw new Error('Inline <script> is blocked by strict mode.');
+            }
+            return originalReplaceChild.call(this, newChild, oldChild);
+        };
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.StrictScriptGuard = StrictScriptGuard;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('%c Fluent OS ', 'background: #0078d4; color: white; font-size: 16px; padding: 4px 8px; border-radius: 4px;');
     console.log('正在启动系统...');
 
     // 初始化存储
     Storage.initDefaults();
+    StrictScriptGuard.init(false);
 
     // 初始化状态
     State.init();
@@ -455,4 +557,3 @@ window.FluentOS = {
 console.log('%c欢迎使用 Fluent OS！', 'color: #0078d4; font-size: 14px; font-weight: bold;');
 console.log('💡 提示: 使用 FluentOS.debug 访问调试工具');
 console.log('📝 默认 PIN: 1234');
-

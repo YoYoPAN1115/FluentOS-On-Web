@@ -6,6 +6,8 @@ const Fingo = {
     input: null,
     messagesEl: null,
     historyEl: null,
+    contextMenuEl: null,
+    _cardAnimTimer: null,
     isOpen: false,
     conversations: [],
     currentId: null,
@@ -13,6 +15,9 @@ const Fingo = {
     COPY_ICON_STROKE: 'Theme/Icon/Symbol_icon/stroke/Copy.svg',
     COPY_ICON_FILL: 'Theme/Icon/Symbol_icon/fill/Copy.svg',
     _pendingAction: null, // { type: 'uninstall'|'repair', app, appName }
+    _sessionApiKey: '',
+    _pendingDecryptPromise: null,
+    API_KEY_CRYPTO_VERSION: 1,
 
     init() {
         this.element = document.getElementById('fingo-panel');
@@ -21,6 +26,9 @@ const Fingo = {
         this.messagesEl = document.getElementById('fingo-messages');
         this.historyEl = document.getElementById('fingo-history');
         this.contentEl = this.element?.querySelector('.fingo-content');
+        this._updateInputPlaceholder();
+        State.on('languageChange', () => this._updateInputPlaceholder());
+        this._ensureContextMenu();
         this._loadConversations();
         if (!this.currentId) this.newConversation(true);
         this._updateEmptyState();
@@ -31,6 +39,7 @@ const Fingo = {
 
     show() {
         this.isOpen = true;
+        this._updateInputPlaceholder();
         if (typeof StartMenu !== 'undefined') StartMenu.close();
         if (typeof ControlCenter !== 'undefined') ControlCenter.close();
         if (typeof NotificationCenter !== 'undefined') NotificationCenter.close();
@@ -45,6 +54,7 @@ const Fingo = {
     hide() {
         if (!this.isOpen) return;
         this.isOpen = false;
+        this._hideContextMenu();
         if (this.blurLayer) this.blurLayer.classList.remove('fingo-visible');
         const btn = document.getElementById('fingo-btn');
         if (btn) btn.classList.remove('active');
@@ -67,16 +77,90 @@ const Fingo = {
                 this.input.value = '';
             }
         });
+        this.element.addEventListener('contextmenu', (e) => {
+            if (!this.isOpen) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this._showContextMenu(e.clientX, e.clientY);
+        });
         document.addEventListener('click', (e) => {
-            if (this.isOpen && !this.element.contains(e.target) && !e.target.closest('#fingo-btn')) this.hide();
+            if (this.contextMenuEl && !this.contextMenuEl.classList.contains('hidden') && !this.contextMenuEl.contains(e.target)) {
+                this._hideContextMenu();
+            }
+            if (this.isOpen && !this.element.contains(e.target) && !e.target.closest('#fingo-btn') && !e.target.closest('#fingo-context-menu')) {
+                this.hide();
+            }
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isOpen) this.hide();
+            if (e.key !== 'Escape') return;
+            if (this.contextMenuEl && !this.contextMenuEl.classList.contains('hidden')) {
+                this._hideContextMenu();
+                return;
+            }
+            if (this.isOpen) this.hide();
         });
         // 工具栏按钮
         document.getElementById('fingo-new-chat')?.addEventListener('click', () => this.newConversation());
         document.getElementById('fingo-history-btn')?.addEventListener('click', () => this._toggleHistory());
         document.getElementById('fingo-clear-btn')?.addEventListener('click', () => this.clearAll());
+    },
+
+    _ensureContextMenu() {
+        if (this.contextMenuEl || !document.body) return;
+
+        const menu = document.createElement('div');
+        menu.id = 'fingo-context-menu';
+        menu.className = 'context-menu hidden';
+        menu.addEventListener('contextmenu', (e) => e.preventDefault());
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.context-menu-item');
+            if (!item) return;
+            if (item.dataset.action === 'open-fingo-settings') {
+                e.preventDefault();
+                e.stopPropagation();
+                this._hideContextMenu();
+                this._executeAction('openSettings:fingo');
+            }
+        });
+
+        document.body.appendChild(menu);
+        this.contextMenuEl = menu;
+        this._renderContextMenu();
+    },
+
+    _renderContextMenu() {
+        if (!this.contextMenuEl) return;
+        const label = this.lang() === 'zh' ? '打开Fingo AI设置' : 'Open Fingo AI Settings';
+        this.contextMenuEl.innerHTML = `
+            <div class="context-menu-item" data-action="open-fingo-settings">
+                <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="">
+                <span>${label}</span>
+            </div>
+        `;
+    },
+
+    _showContextMenu(x, y) {
+        this._ensureContextMenu();
+        this._renderContextMenu();
+        if (!this.contextMenuEl) return;
+
+        this.contextMenuEl.style.visibility = 'hidden';
+        this.contextMenuEl.classList.remove('hidden');
+
+        const rect = this.contextMenuEl.getBoundingClientRect();
+        const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+        const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+        const left = Math.min(Math.max(8, x), maxLeft);
+        const top = Math.min(Math.max(8, y), maxTop);
+
+        this.contextMenuEl.style.left = `${left}px`;
+        this.contextMenuEl.style.top = `${top}px`;
+        this.contextMenuEl.style.visibility = '';
+    },
+
+    _hideContextMenu() {
+        if (!this.contextMenuEl) return;
+        this.contextMenuEl.classList.add('hidden');
     },
 
 
@@ -85,16 +169,248 @@ const Fingo = {
         if (!this.contentEl) return;
         const conv = this.conversations.find(c => c.id === this.currentId);
         const empty = !conv || !conv.messages.length;
-        this.contentEl.classList.toggle('fingo-empty', empty);
+        this._setEmptyState(empty);
     },
 
     _expandCard() {
-        if (!this.contentEl || !this.contentEl.classList.contains('fingo-empty')) return;
-        this.contentEl.classList.remove('fingo-empty');
+        if (!this.contentEl) return;
+        this._setEmptyState(false);
+    },
+
+    _setEmptyState(empty) {
+        if (!this.contentEl) return;
+        const wasEmpty = this.contentEl.classList.contains('fingo-empty');
+        if (wasEmpty === empty) return;
+
+        clearTimeout(this._cardAnimTimer);
+        this.contentEl.classList.remove('fingo-expanding', 'fingo-collapsing');
+        this.contentEl.classList.toggle('fingo-empty', empty);
+
+        const animClass = empty ? 'fingo-collapsing' : 'fingo-expanding';
+        this.contentEl.classList.add(animClass);
+        if (empty) this._setHistoryExpanded(false);
+
+        this._cardAnimTimer = setTimeout(() => {
+            this.contentEl?.classList.remove('fingo-expanding', 'fingo-collapsing');
+        }, empty ? 360 : 520);
+    },
+
+    _setHistoryExpanded(expanded) {
+        if (!this.historyEl) return;
+        if (expanded) {
+            this._renderHistoryList();
+            requestAnimationFrame(() => this.historyEl?.classList.add('show'));
+            return;
+        }
+        this.historyEl.classList.remove('show');
     },
 
     lang() {
         return (I18n && I18n.currentLang === 'en') ? 'en' : 'zh';
+    },
+
+    _updateInputPlaceholder() {
+        if (!this.input) return;
+        this.input.placeholder = this.lang() === 'zh' ? '问你想问' : 'Ask me anything...';
+    },
+
+    getSessionApiKey() {
+        return this._sessionApiKey || '';
+    },
+
+    getApiKeyStorageType() {
+        if (State.settings.fingoApiStorageType) return State.settings.fingoApiStorageType;
+        if (State.settings.fingoApiEncrypted && State.settings.fingoApiEncrypted.ciphertext) return 'permanent-encrypted';
+        if ((State.settings.fingoApiKey || '').trim()) return 'permanent-plain';
+        return 'none';
+    },
+
+    saveApiKeyTemporary(apiKey) {
+        const clean = (apiKey || '').trim();
+        if (!clean) {
+            this.clearApiKey();
+            return false;
+        }
+        this._sessionApiKey = clean;
+        State.updateSettings({
+            fingoApiKey: '',
+            fingoApiEncrypted: null,
+            fingoApiStorageType: 'session'
+        });
+        State.emit('fingoApiKeyReady', { storageType: 'session', decrypted: true });
+        return true;
+    },
+
+    saveApiKeyPermanentPlain(apiKey) {
+        const clean = (apiKey || '').trim();
+        if (!clean) {
+            this.clearApiKey();
+            return false;
+        }
+        this._sessionApiKey = clean;
+        State.updateSettings({
+            fingoApiKey: clean,
+            fingoApiEncrypted: null,
+            fingoApiStorageType: 'permanent-plain'
+        });
+        State.emit('fingoApiKeyReady', { storageType: 'permanent-plain', decrypted: true });
+        return true;
+    },
+
+    clearApiKey() {
+        this._sessionApiKey = '';
+        State.updateSettings({
+            fingoApiKey: '',
+            fingoApiEncrypted: null,
+            fingoApiStorageType: 'none'
+        });
+        State.emit('fingoApiKeyReady', { storageType: 'none', decrypted: false });
+    },
+
+    _isWebCryptoAvailable() {
+        return !!(window.crypto && window.crypto.subtle && window.TextEncoder && window.TextDecoder);
+    },
+
+    _bufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+    },
+
+    _base64ToBuffer(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes.buffer;
+    },
+
+    async _deriveEncryptionKey(passphrase, salt, usage) {
+        const material = await crypto.subtle.importKey(
+            'raw',
+            new TextEncoder().encode(passphrase),
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
+        return crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' },
+            material,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            usage
+        );
+    },
+
+    async _encryptApiKey(apiKey, passphrase) {
+        if (!this._isWebCryptoAvailable()) throw new Error(this.lang() === 'zh' ? '当前浏览器不支持 WebCrypto。' : 'WebCrypto is not available.');
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const key = await this._deriveEncryptionKey(passphrase, salt, ['encrypt']);
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            new TextEncoder().encode(apiKey)
+        );
+        return {
+            version: this.API_KEY_CRYPTO_VERSION,
+            salt: this._bufferToBase64(salt.buffer),
+            iv: this._bufferToBase64(iv.buffer),
+            ciphertext: this._bufferToBase64(encrypted)
+        };
+    },
+
+    async _decryptApiKey(payload, passphrase) {
+        if (!payload || !payload.ciphertext || !payload.salt || !payload.iv) {
+            throw new Error(this.lang() === 'zh' ? '加密数据无效。' : 'Encrypted payload is invalid.');
+        }
+        if (!this._isWebCryptoAvailable()) throw new Error(this.lang() === 'zh' ? '当前浏览器不支持 WebCrypto。' : 'WebCrypto is not available.');
+        const salt = new Uint8Array(this._base64ToBuffer(payload.salt));
+        const iv = new Uint8Array(this._base64ToBuffer(payload.iv));
+        const data = this._base64ToBuffer(payload.ciphertext);
+        const key = await this._deriveEncryptionKey(passphrase, salt, ['decrypt']);
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            data
+        );
+        return new TextDecoder().decode(decrypted);
+    },
+
+    async saveApiKeyPermanentEncrypted(apiKey, passphrase) {
+        const clean = (apiKey || '').trim();
+        if (!clean) {
+            this.clearApiKey();
+            return false;
+        }
+        if (!passphrase || passphrase.length < 6) {
+            throw new Error(this.lang() === 'zh' ? '口令至少 6 位。' : 'Passphrase must be at least 6 characters.');
+        }
+        const encrypted = await this._encryptApiKey(clean, passphrase);
+        this._sessionApiKey = clean;
+        State.updateSettings({
+            fingoApiKey: '',
+            fingoApiEncrypted: encrypted,
+            fingoApiStorageType: 'permanent-encrypted'
+        });
+        State.emit('fingoApiKeyReady', { storageType: 'permanent-encrypted', decrypted: true });
+        return true;
+    },
+
+    _promptDecryptPassphrase() {
+        const isZh = this.lang() === 'zh';
+        return new Promise((resolve) => {
+            FluentUI.InputDialog({
+                title: isZh ? '输入解密口令' : 'Enter Passphrase',
+                placeholder: isZh ? '请输入用于解密 API Key 的口令' : 'Enter the passphrase for your API Key',
+                inputType: 'password',
+                minLength: 1,
+                confirmText: isZh ? '解密' : 'Decrypt',
+                cancelText: isZh ? '取消' : 'Cancel',
+                onConfirm: (val) => resolve((val || '').trim()),
+                onCancel: () => resolve(null)
+            });
+        });
+    },
+
+    async getApiKeyForRequest() {
+        const sessionKey = (this._sessionApiKey || '').trim();
+        if (sessionKey) return sessionKey;
+
+        const plainKey = (State.settings.fingoApiKey || '').trim();
+        if (plainKey) {
+            this._sessionApiKey = plainKey;
+            return plainKey;
+        }
+
+        const encryptedPayload = State.settings.fingoApiEncrypted;
+        if (!encryptedPayload || !encryptedPayload.ciphertext) return null;
+
+        if (this._pendingDecryptPromise) return this._pendingDecryptPromise;
+
+        this._pendingDecryptPromise = (async () => {
+            const passphrase = await this._promptDecryptPassphrase();
+            if (!passphrase) return null;
+            try {
+                const decrypted = await this._decryptApiKey(encryptedPayload, passphrase);
+                this._sessionApiKey = decrypted.trim();
+                State.emit('fingoApiKeyReady', { storageType: 'permanent-encrypted', decrypted: true });
+                return this._sessionApiKey;
+            } catch (error) {
+                if (typeof FluentUI !== 'undefined' && FluentUI.Toast) {
+                    FluentUI.Toast({
+                        title: 'Fingo AI',
+                        message: this.lang() === 'zh' ? 'API Key 解密失败，请检查口令。' : 'Failed to decrypt API Key.',
+                        type: 'error'
+                    });
+                }
+                return null;
+            }
+        })().finally(() => {
+            this._pendingDecryptPromise = null;
+        });
+
+        return this._pendingDecryptPromise;
     },
 
     _createMessageElement(text, type) {
@@ -213,6 +529,7 @@ const Fingo = {
             this.messagesEl.innerHTML = '';
             this._saveConversations();
             this._renderHistoryList();
+            this._setHistoryExpanded(false);
         }
         this._updateEmptyState();
     },
@@ -223,7 +540,7 @@ const Fingo = {
         this.currentId = id;
         this._renderMessages(conv.messages);
         this._updateEmptyState();
-        this.historyEl.classList.remove('show');
+        this._setHistoryExpanded(false);
     },
 
     clearAll() {
@@ -232,12 +549,13 @@ const Fingo = {
         this.newConversation(true);
         this._saveConversations();
         this._renderHistoryList();
+        this._setHistoryExpanded(false);
         this._updateEmptyState();
     },
 
     _toggleHistory() {
-        this.historyEl.classList.toggle('show');
-        if (this.historyEl.classList.contains('show')) this._renderHistoryList();
+        if (!this.historyEl) return;
+        this._setHistoryExpanded(!this.historyEl.classList.contains('show'));
     },
 
     _renderHistoryList() {
@@ -267,19 +585,218 @@ const Fingo = {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
     },
 
-    processInput(text) {
+    _compactText(text) {
+        return String(text || '')
+            .toLowerCase()
+            .replace(/[\s`~!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?，。！？、；：“”‘’（）【】《》]/g, '');
+    },
+
+    _normalizeInputText(text) {
+        let normalized = String(text || '').toLowerCase();
+        normalized = normalized
+            .replace(/[’]/g, '\'')
+            .replace(/\bi'm\b/g, 'i am')
+            .replace(/\bcan't\b/g, 'cant')
+            .replace(/\bdon't\b/g, 'do not')
+            .replace(/\bwon't\b/g, 'will not')
+            .replace(/\bpls\b/g, 'please')
+            .replace(/\bthx\b/g, 'thanks');
+
+        // Remove common filler words so intent words are easier to match.
+        normalized = normalized
+            .replace(/请问|麻烦你|麻烦|帮我|帮忙|一下子?|可以吗|行吗|好吗|可不可以|能不能|呢|吧|呀|啊|嘛/g, ' ')
+            .replace(/\bplease\b/g, ' ');
+
+        normalized = normalized.replace(/\s+/g, ' ').trim();
+        return normalized;
+    },
+
+    _escapeRegex(text) {
+        return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    },
+
+    _matchPhraseInText(text, phrase) {
+        const kw = String(phrase || '').toLowerCase().trim();
+        if (!kw) return false;
+        if (/^[a-z0-9 ]+$/.test(kw)) {
+            const pattern = this._escapeRegex(kw).replace(/\s+/g, '\\s+');
+            return new RegExp(`(^|\\b)${pattern}(\\b|$)`, 'i').test(text);
+        }
+        return text.includes(kw);
+    },
+
+    _getKeywordVariants(keyword) {
+        const base = String(keyword || '').toLowerCase().trim();
+        if (!base) return [];
+
+        if (!this._keywordVariantCache) this._keywordVariantCache = new Map();
+        if (this._keywordVariantCache.has(base)) return this._keywordVariantCache.get(base);
+
+        const variants = new Set([base]);
+        const zhGroups = [
+            ['开启', '打开', '启用', '开', '启动'],
+            ['关闭', '关掉', '禁用', '停用', '关'],
+            ['切换', '改成', '换成', '调整为', '设为'],
+            ['进入', '打开', '前往', '跳转到'],
+            ['模糊', '毛玻璃', '磨砂'],
+            ['动画', '动效'],
+            ['壁纸', '桌面背景', '背景图', '墙纸'],
+            ['重启', '重新启动', '重新开机'],
+            ['关机', '关闭电脑', '关电脑'],
+            ['锁屏', '锁定', '锁定屏幕'],
+            ['卸载', '删除', '移除', '卸掉'],
+            ['安装', '下载', '装上'],
+            ['修复', '修一下', '修一修', '修好'],
+            ['亮度', '屏幕亮度'],
+            ['深色', '暗色', '黑暗', '夜间', '调暗'],
+            ['浅色', '亮色', '日间', '白天', '调亮'],
+            ['设置', '系统设置', '偏好设置']
+        ];
+        const enGroups = [
+            ['turn on', 'enable', 'open', 'start'],
+            ['turn off', 'disable', 'close', 'stop'],
+            ['switch to', 'change to', 'set to'],
+            ['dark mode', 'dark theme'],
+            ['light mode', 'light theme'],
+            ['wifi', 'wi-fi', 'wireless'],
+            ['bluetooth', 'bt'],
+            ['wallpaper', 'background'],
+            ['settings', 'setting', 'preferences']
+        ];
+
+        const applyGroups = (groups, maxRounds = 3) => {
+            for (let round = 0; round < maxRounds; round++) {
+                let changed = false;
+                const snapshot = Array.from(variants);
+                for (const phrase of snapshot) {
+                    for (const group of groups) {
+                        for (const token of group) {
+                            if (!phrase.includes(token)) continue;
+                            for (const alt of group) {
+                                if (alt === token) continue;
+                                const next = phrase.split(token).join(alt).trim();
+                                if (!next || variants.has(next)) continue;
+                                variants.add(next);
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                if (!changed) break;
+            }
+        };
+        applyGroups(zhGroups, 2);
+        applyGroups(enGroups, 2);
+
+        const zhActionVerbs = ['开启', '打开', '启用', '开', '启动', '关闭', '关掉', '禁用', '停用', '关', '切换', '改成', '换成', '设为'];
+        const zhSnapshot = Array.from(variants);
+        for (const phrase of zhSnapshot) {
+            for (const verb of zhActionVerbs) {
+                if (phrase.startsWith(verb) && phrase.length > verb.length + 1) {
+                    const obj = phrase.slice(verb.length).trim();
+                    if (obj) variants.add(`${obj}${verb}`);
+                }
+            }
+        }
+
+        const enSnapshot = Array.from(variants);
+        for (const phrase of enSnapshot) {
+            const m = phrase.match(/^(turn on|turn off|enable|disable|open|close|start|stop|switch to|change to|set to)\s+(.+)$/);
+            if (!m) continue;
+            const verb = m[1];
+            const obj = m[2].trim();
+            if (!obj) continue;
+            variants.add(`${obj} ${verb}`);
+            if (verb === 'turn on' || verb === 'enable' || verb === 'open' || verb === 'start') variants.add(`${obj} on`);
+            if (verb === 'turn off' || verb === 'disable' || verb === 'close' || verb === 'stop') variants.add(`${obj} off`);
+        }
+
+        const result = Array.from(variants).filter(Boolean).slice(0, 120);
+        this._keywordVariantCache.set(base, result);
+        return result;
+    },
+
+    _keywordMatched(lowerText, normalizedText, compactText, keyword) {
+        const variants = this._getKeywordVariants(keyword);
+        if (!variants.length) return false;
+
+        for (const phrase of variants) {
+            if (this._matchPhraseInText(lowerText, phrase)) return true;
+            if (normalizedText && normalizedText !== lowerText && this._matchPhraseInText(normalizedText, phrase)) return true;
+            const compactPhrase = this._compactText(phrase);
+            if (compactPhrase && compactText.includes(compactPhrase)) return true;
+        }
+        return false;
+    },
+
+    _pickLocalizedText(payload) {
+        if (typeof payload === 'string') return payload;
+        if (Array.isArray(payload)) {
+            if (!payload.length) return '';
+            return payload[Math.floor(Math.random() * payload.length)] || '';
+        }
+        if (!payload || typeof payload !== 'object') return '';
+
+        const lang = this.lang();
+        const localized = payload[lang] ?? payload.zh ?? payload.en ?? '';
+        if (Array.isArray(localized)) {
+            if (!localized.length) return '';
+            return localized[Math.floor(Math.random() * localized.length)] || '';
+        }
+        return typeof localized === 'string' ? localized : '';
+    },
+
+    _formatDynamicText(template) {
+        if (typeof template !== 'string') return '';
+
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const timeText = `${hh}:${mm}`;
+
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const lang = this.lang();
+        const dateText = lang === 'zh'
+            ? `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
+            : `${now.getFullYear()}-${month}-${day}`;
+
+        const weekZh = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+        const weekEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const weekdayText = lang === 'zh' ? weekZh[now.getDay()] : weekEn[now.getDay()];
+
+        return template
+            .replace(/\{time\}/g, timeText)
+            .replace(/\{date\}/g, dateText)
+            .replace(/\{weekday\}/g, weekdayText)
+            .replace(/\{datetime\}/g, `${dateText} ${timeText}`);
+    },
+
+    _resolveResponse(payload) {
+        return this._formatDynamicText(this._pickLocalizedText(payload));
+    },
+
+    async processInput(text) {
         this._expandCard();
         this.addMessage(text, 'user');
 
         // 自定义模式：全部走 API
         if (State.settings.fingoCustomMode) {
-            if (!State.settings.fingoApiKey) {
+            if (State.settings.strictCspEnabled !== true) {
+                const msg = this.lang() === 'zh'
+                    ? '启用自定义 API 前，请先在「设置 → 隐私」中开启「禁用内联脚本」。'
+                    : 'Enable "Disable Inline Scripts" in Settings → Privacy before using custom API mode.';
+                setTimeout(() => this.addMessage(msg, 'bot'), 400);
+                return;
+            }
+            const apiKey = await this.getApiKeyForRequest();
+            if (!apiKey) {
                 const msg = this.lang() === 'zh'
                     ? 'API 错误，请检查 API Key 是否正确。\n请前往「设置 → Fingo AI」填入有效的 API Key。'
                     : 'API error, please check your API Key.\nGo to Settings → Fingo AI to enter a valid key.';
                 setTimeout(() => this.addMessage(msg, 'bot'), 400);
             }else {
-                this._callApi(text);
+                this._callApi(text, apiKey);
             }
             return;
         }
@@ -292,12 +809,14 @@ const Fingo = {
 
         // 默认模式：关键词匹配（特殊命令优先）
         const lower = text.toLowerCase();
+        const normalized = this._normalizeInputText(lower);
+        const compact = this._compactText(normalized);
         const cmds = FingoData.commands;
         const specialKeys = ['uninstall', 'install', 'repair', 'wallpaper', 'openApp'];
         for (const sk of specialKeys) {
             if (!cmds[sk]) continue;
             for (const kw of cmds[sk].keywords) {
-                if (lower.includes(kw.toLowerCase())) {
+                if (this._keywordMatched(lower, normalized, compact, kw)) {
                     this['_handle_' + sk](text, lower);
                     return;
                 }
@@ -307,14 +826,18 @@ const Fingo = {
             if (specialKeys.includes(key)) continue;
             const cmd = cmds[key];
             for (const kw of cmd.keywords) {
-                if (lower.includes(kw.toLowerCase())) {
+                if (this._keywordMatched(lower, normalized, compact, kw)) {
                     this._executeAction(cmd.action);
-                    setTimeout(() => this.addMessage(cmd.response[this.lang()], 'bot'), 400);
+                    const botReply = this._resolveResponse(cmd.response);
+                    if (botReply) {
+                        setTimeout(() => this.addMessage(botReply, 'bot'), 400);
+                    }
                     return;
                 }
             }
         }
-        setTimeout(() => this.addMessage(FingoData.fallback[this.lang()], 'bot'), 400);
+        const fallbackText = this._resolveResponse(FingoData.fallback) || (this.lang() === 'zh' ? '抱歉，我暂时没听懂。' : 'Sorry, I did not understand.');
+        setTimeout(() => this.addMessage(fallbackText, 'bot'), 400);
     },
     // --- 查找应用（从用户输入中匹配） ---
     _findApp(lower) {
@@ -576,9 +1099,8 @@ const Fingo = {
         }
     },
 
-    async _callApi(text) {
+    async _callApi(text, apiKey) {
         const provider = State.settings.fingoProvider || 'openai';
-        const apiKey = State.settings.fingoApiKey;
         const lang = this.lang();
 
         // 构建消息历史（最近10条）
@@ -605,7 +1127,16 @@ const Fingo = {
         const loadingMsg = this.addMessage(lang === 'zh' ? '思考中...' : 'Thinking...', 'bot');
 
         const _updateReply = (txt) => {
-            if (loadingMsg) { loadingMsg.textContent = ''; txt.split('\n').forEach((line, i) => { if (i > 0) loadingMsg.appendChild(document.createElement('br')); loadingMsg.appendChild(document.createTextNode(line)); }); }
+            if (loadingMsg) {
+                const textEl = loadingMsg.querySelector('.fingo-msg-text');
+                if (textEl) {
+                    textEl.textContent = '';
+                    txt.split('\n').forEach((line, i) => {
+                        if (i > 0) textEl.appendChild(document.createElement('br'));
+                        textEl.appendChild(document.createTextNode(line));
+                    });
+                }
+            }
             // 更新 localStorage 中保存的最后一条 bot 消息
             const c = this.conversations.find(x => x.id === this.currentId);
             if (c && c.messages.length) { c.messages[c.messages.length - 1].text = txt; this._saveConversations(); }
@@ -621,4 +1152,3 @@ const Fingo = {
         }
     }
 };
-

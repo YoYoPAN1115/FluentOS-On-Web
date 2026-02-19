@@ -5,6 +5,20 @@ const WindowManager = {
     container: null,
     windows: [],
     zIndexCounter: 1000,
+    WINDOW_BOUNDS_KEY: 'windowBoundsMemory',
+    SNAP_MENU_HIDE_DELAY: 130,
+    EDGE_SNAP_TRIGGER: 42,
+    CORNER_SNAP_TRIGGER: 110,
+    SNAP_LAYOUTS: [
+        { id: 'left-half', previewClass: 'preview-left-half', size: 'large' },
+        { id: 'right-half', previewClass: 'preview-right-half', size: 'large' },
+        { id: 'left-two-thirds', previewClass: 'preview-left-two-thirds', size: 'large' },
+        { id: 'right-two-thirds', previewClass: 'preview-right-two-thirds', size: 'large' },
+        { id: 'top-left', previewClass: 'preview-top-left', size: 'small' },
+        { id: 'top-right', previewClass: 'preview-top-right', size: 'small' },
+        { id: 'bottom-left', previewClass: 'preview-bottom-left', size: 'small' },
+        { id: 'bottom-right', previewClass: 'preview-bottom-right', size: 'small' }
+    ],
     
     // 应用配置
     appConfigs: {
@@ -37,6 +51,306 @@ const WindowManager = {
                 }
             });
         });
+        State.on('settingsChange', (updates) => {
+            if (!updates) return;
+            if (updates.windowHoverSnapEnabled === false) {
+                this._hideAllSnapMenus();
+            }
+            if (updates.windowEdgeSnapEnabled === false) {
+                this._hideDragSnapHint(true);
+            }
+        });
+    },
+
+    _isEdgeSnapEnabled() {
+        return State.settings.windowEdgeSnapEnabled !== false;
+    },
+
+    _isHoverSnapEnabled() {
+        return State.settings.windowHoverSnapEnabled !== false;
+    },
+
+    _getTaskbarReservedHeight() {
+        const taskbar = document.querySelector('.taskbar');
+        if (!taskbar) return 0;
+        return Math.max(0, (taskbar.offsetHeight || 48) + 8);
+    },
+
+    _clampWindowBounds(bounds) {
+        const minWidth = 400;
+        const minHeight = 300;
+        const width = Math.max(minWidth, Math.round(bounds.width || minWidth));
+        const height = Math.max(minHeight, Math.round(bounds.height || minHeight));
+        const left = Math.round(Number.isFinite(bounds.left) ? bounds.left : 0);
+        const top = Math.max(0, Math.round(Number.isFinite(bounds.top) ? bounds.top : 0));
+        return { left, top, width, height };
+    },
+
+    _ensureDragSnapHint() {
+        if (this._dragSnapHintEl && document.body.contains(this._dragSnapHintEl)) return this._dragSnapHintEl;
+        if (!document.body) return null;
+
+        const hint = document.createElement('div');
+        hint.className = 'window-edge-snap-hint';
+        hint.innerHTML = '<div class="window-edge-snap-hint-core"></div>';
+        document.body.appendChild(hint);
+        this._dragSnapHintEl = hint;
+        return hint;
+    },
+
+    _showDragSnapHint(layoutId) {
+        const hint = this._ensureDragSnapHint();
+        if (!hint) return;
+        const bounds = this._getSnapBounds(layoutId);
+        if (!bounds) return;
+
+        hint.dataset.layout = layoutId;
+        hint.style.left = `${Math.round(bounds.left)}px`;
+        hint.style.top = `${Math.round(bounds.top)}px`;
+        hint.style.width = `${Math.round(bounds.width)}px`;
+        hint.style.height = `${Math.round(bounds.height)}px`;
+        hint.classList.add('show');
+    },
+
+    _hideDragSnapHint(immediate = false) {
+        const hint = this._dragSnapHintEl;
+        if (!hint) return;
+        clearTimeout(hint._hideTimer);
+        if (immediate) {
+            hint.classList.remove('show');
+            return;
+        }
+        hint._hideTimer = setTimeout(() => hint.classList.remove('show'), 70);
+    },
+
+    _getEdgeSnapLayout(clientX, clientY) {
+        if (!this._isEdgeSnapEnabled()) return null;
+
+        const trigger = this.EDGE_SNAP_TRIGGER;
+        const cornerTrigger = this.CORNER_SNAP_TRIGGER;
+        const viewportWidth = Math.max(0, globalThis.innerWidth || 0);
+        const viewportHeight = Math.max(0, (globalThis.innerHeight || 0) - this._getTaskbarReservedHeight());
+        if (!viewportWidth || !viewportHeight) return null;
+
+        const nearLeft = clientX <= trigger;
+        const nearRight = clientX >= viewportWidth - trigger;
+        const nearTop = clientY <= cornerTrigger;
+        const nearBottom = clientY >= viewportHeight - cornerTrigger;
+
+        if (nearLeft && nearTop) return 'top-left';
+        if (nearRight && nearTop) return 'top-right';
+        if (nearLeft && nearBottom) return 'bottom-left';
+        if (nearRight && nearBottom) return 'bottom-right';
+        if (nearLeft) return 'left-half';
+        if (nearRight) return 'right-half';
+
+        return null;
+    },
+
+    _applyBoundsToWindow(windowElement, bounds) {
+        if (!windowElement || !bounds) return;
+        windowElement.style.left = `${Math.round(bounds.left)}px`;
+        windowElement.style.top = `${Math.round(bounds.top)}px`;
+        windowElement.style.width = `${Math.round(bounds.width)}px`;
+        windowElement.style.height = `${Math.round(bounds.height)}px`;
+    },
+
+    _readWindowBounds(appId, config) {
+        const fallback = {
+            left: (globalThis.innerWidth - config.width) / 2,
+            top: (globalThis.innerHeight - config.height) / 2 - 50,
+            width: config.width,
+            height: config.height
+        };
+
+        const rawStore = State.settings && State.settings[this.WINDOW_BOUNDS_KEY];
+        const store = (rawStore && typeof rawStore === 'object' && !Array.isArray(rawStore)) ? rawStore : {};
+        const saved = store[appId];
+        if (!saved) return { ...this._clampWindowBounds(fallback), snapLayout: null };
+
+        const left = Number(saved.left);
+        const top = Number(saved.top);
+        const width = Number(saved.width);
+        const height = Number(saved.height);
+        if (![left, top, width, height].every(v => Number.isFinite(v))) return { ...this._clampWindowBounds(fallback), snapLayout: null };
+
+        return {
+            ...this._clampWindowBounds({ left, top, width, height }),
+            snapLayout: typeof saved.snapLayout === 'string' ? saved.snapLayout : null
+        };
+    },
+
+    _getWindowData(windowId) {
+        return this.windows.find(w => w.id === windowId);
+    },
+
+    _persistWindowBounds(windowData) {
+        if (!windowData || !windowData.element || windowData.isMaximized || windowData.isMinimized) return;
+        if (!State || !State.settings) return;
+
+        const bounds = this._clampWindowBounds({
+            left: windowData.element.offsetLeft,
+            top: windowData.element.offsetTop,
+            width: windowData.element.offsetWidth,
+            height: windowData.element.offsetHeight
+        });
+
+        const rawStore = State.settings[this.WINDOW_BOUNDS_KEY];
+        const prevStore = (rawStore && typeof rawStore === 'object' && !Array.isArray(rawStore)) ? rawStore : {};
+        const prev = prevStore[windowData.appId];
+        const same = prev &&
+            Number(prev.left) === bounds.left &&
+            Number(prev.top) === bounds.top &&
+            Number(prev.width) === bounds.width &&
+            Number(prev.height) === bounds.height &&
+            (prev.snapLayout || null) === (windowData.snapLayout || null);
+        if (same) return;
+
+        const nextStore = {
+            ...prevStore,
+            [windowData.appId]: {
+                left: bounds.left,
+                top: bounds.top,
+                width: bounds.width,
+                height: bounds.height,
+                snapLayout: windowData.snapLayout || null,
+                updatedAt: Date.now()
+            }
+        };
+        State.updateSettings({ [this.WINDOW_BOUNDS_KEY]: nextStore });
+    },
+
+    _ensureSnapMenu(windowElement) {
+        const menu = windowElement.querySelector('.window-snap-layout-menu');
+        if (!menu || menu.dataset.ready === '1') return menu;
+
+        menu.dataset.ready = '1';
+        menu.innerHTML = this.SNAP_LAYOUTS.map(layout => `
+            <button class="snap-layout-btn ${layout.size === 'large' ? 'is-large' : 'is-small'}" data-layout="${layout.id}" type="button">
+                <span class="snap-layout-mini ${layout.previewClass}"></span>
+            </button>
+        `).join('');
+
+        menu.addEventListener('mouseenter', () => this._cancelSnapMenuHide(windowElement));
+        menu.addEventListener('mouseleave', () => this._scheduleSnapMenuHide(windowElement));
+        menu.addEventListener('click', (e) => {
+            const btn = e.target.closest('.snap-layout-btn');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.applySnapLayout(windowElement.id, btn.dataset.layout);
+        });
+
+        return menu;
+    },
+
+    _hideSnapMenu(windowElement, immediate = false) {
+        const menu = windowElement?.querySelector('.window-snap-layout-menu');
+        if (!menu) return;
+        clearTimeout(menu._hideTimer);
+        if (immediate) {
+            menu.classList.remove('show');
+            windowElement.classList.remove('snap-menu-open');
+            return;
+        }
+        menu._hideTimer = setTimeout(() => {
+            menu.classList.remove('show');
+            windowElement.classList.remove('snap-menu-open');
+        }, this.SNAP_MENU_HIDE_DELAY);
+    },
+
+    _cancelSnapMenuHide(windowElement) {
+        const menu = windowElement?.querySelector('.window-snap-layout-menu');
+        if (!menu) return;
+        clearTimeout(menu._hideTimer);
+    },
+
+    _scheduleSnapMenuHide(windowElement, delay = this.SNAP_MENU_HIDE_DELAY) {
+        const menu = windowElement?.querySelector('.window-snap-layout-menu');
+        if (!menu) return;
+        clearTimeout(menu._hideTimer);
+        menu._hideTimer = setTimeout(() => {
+            menu.classList.remove('show');
+            windowElement.classList.remove('snap-menu-open');
+        }, delay);
+    },
+
+    _hideAllSnapMenus(exceptWindowId = null) {
+        const menus = document.querySelectorAll('.window-snap-layout-menu.show');
+        menus.forEach((menu) => {
+            const host = menu.closest('.window');
+            if (exceptWindowId && host && host.id === exceptWindowId) return;
+            clearTimeout(menu._hideTimer);
+            menu.classList.remove('show');
+            host?.classList.remove('snap-menu-open');
+        });
+    },
+
+    _showSnapMenu(windowElement) {
+        if (!this._isHoverSnapEnabled()) return;
+        const menu = this._ensureSnapMenu(windowElement);
+        if (!menu) return;
+
+        const windowData = this._getWindowData(windowElement.id);
+        if (windowData && windowData.isMinimized) return;
+
+        this._hideAllSnapMenus(windowElement.id);
+        this._cancelSnapMenuHide(windowElement);
+        menu.classList.add('show');
+        windowElement.classList.add('snap-menu-open');
+    },
+
+    _getSnapBounds(layoutId) {
+        const viewportWidth = Math.max(420, globalThis.innerWidth || 420);
+        const viewportHeight = Math.max(320, (globalThis.innerHeight || 320) - this._getTaskbarReservedHeight());
+        const halfWidth = Math.round(viewportWidth / 2);
+        const halfHeight = Math.round(viewportHeight / 2);
+        const twoThirdWidth = Math.round(viewportWidth * 0.66);
+
+        switch (layoutId) {
+            case 'left-half':
+                return { left: 0, top: 0, width: halfWidth, height: viewportHeight };
+            case 'right-half':
+                return { left: halfWidth, top: 0, width: viewportWidth - halfWidth, height: viewportHeight };
+            case 'left-two-thirds':
+                return { left: 0, top: 0, width: twoThirdWidth, height: viewportHeight };
+            case 'right-two-thirds':
+                return { left: viewportWidth - twoThirdWidth, top: 0, width: twoThirdWidth, height: viewportHeight };
+            case 'top-left':
+                return { left: 0, top: 0, width: halfWidth, height: halfHeight };
+            case 'top-right':
+                return { left: halfWidth, top: 0, width: viewportWidth - halfWidth, height: halfHeight };
+            case 'bottom-left':
+                return { left: 0, top: halfHeight, width: halfWidth, height: viewportHeight - halfHeight };
+            case 'bottom-right':
+                return { left: halfWidth, top: halfHeight, width: viewportWidth - halfWidth, height: viewportHeight - halfHeight };
+            default:
+                return null;
+        }
+    },
+
+    applySnapLayout(windowId, layoutId) {
+        const windowData = this._getWindowData(windowId);
+        if (!windowData) return;
+
+        const bounds = this._getSnapBounds(layoutId);
+        if (!bounds) return;
+
+        windowData.element.classList.remove('maximizing', 'unmaximizing', 'maximized');
+        windowData.isMaximized = false;
+        windowData.snapLayout = layoutId;
+
+        windowData.element.classList.add('snapping');
+        this._applyBoundsToWindow(windowData.element, bounds);
+        this.focusWindow(windowId);
+        this._hideSnapMenu(windowData.element, true);
+        this._hideDragSnapHint(true);
+        this.updateMaximizedWallpaperEffect();
+        this._persistWindowBounds(windowData);
+
+        setTimeout(() => {
+            windowData.element.classList.remove('snapping');
+        }, 260);
     },
 
     openApp(appId, data = null) {
@@ -72,14 +386,16 @@ const WindowManager = {
 
         // 创建窗口
         const windowId = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const windowElement = this.createWindow(windowId, appId, config);
+        const initialBounds = this._readWindowBounds(appId, config);
+        const windowElement = this.createWindow(windowId, appId, config, initialBounds);
         
         this.windows.push({
             id: windowId,
             appId: appId,
             element: windowElement,
             isMinimized: false,
-            isMaximized: false
+            isMaximized: false,
+            snapLayout: initialBounds.snapLayout || null
         });
 
         this.container.appendChild(windowElement);
@@ -111,20 +427,14 @@ const WindowManager = {
         this.focusWindow(windowId);
     },
 
-    createWindow(windowId, appId, config) {
+    createWindow(windowId, appId, config, initialBounds = null) {
         const windowElement = document.createElement('div');
         windowElement.className = 'window opening';
         windowElement.id = windowId;
         windowElement.dataset.appId = appId;
         
-        // 计算居中位置
-        const left = (globalThis.innerWidth - config.width) / 2;
-        const top = (globalThis.innerHeight - config.height) / 2 - 50;
-        
-        windowElement.style.width = `${config.width}px`;
-        windowElement.style.height = `${config.height}px`;
-        windowElement.style.left = `${left}px`;
-        windowElement.style.top = `${top}px`;
+        const bounds = initialBounds || this._readWindowBounds(appId, config);
+        this._applyBoundsToWindow(windowElement, bounds);
         windowElement.style.zIndex = ++this.zIndexCounter;
 
         windowElement.innerHTML = `
@@ -153,6 +463,7 @@ const WindowManager = {
                     </button>
                 </div>
             </div>
+            <div class="window-snap-layout-menu"></div>
             <div class="window-content" id="${windowId}-content"></div>
         `;
 
@@ -172,18 +483,29 @@ const WindowManager = {
         const minimizeBtn = windowElement.querySelector('.minimize');
         const maximizeBtn = windowElement.querySelector('.maximize');
         const closeBtn = windowElement.querySelector('.close');
+        const snapMenu = this._ensureSnapMenu(windowElement);
         
         let isDragging = false;
+        let dragMoved = false;
         let currentX;
         let currentY;
         let initialX;
         let initialY;
+        let dragSnapLayout = null;
 
         // 拖拽功能
         titlebar.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
             if (e.target.closest('.window-controls')) return;
+
+            const windowData = this._getWindowData(windowElement.id);
+            if (windowData && windowData.isMaximized) return;
+            this._hideAllSnapMenus(windowElement.id);
+            this._hideDragSnapHint(true);
+            dragSnapLayout = null;
             
             isDragging = true;
+            dragMoved = false;
             initialX = e.clientX - windowElement.offsetLeft;
             initialY = e.clientY - windowElement.offsetTop;
             
@@ -199,9 +521,26 @@ const WindowManager = {
             e.preventDefault();
             currentX = e.clientX - initialX;
             currentY = e.clientY - initialY;
+            dragMoved = true;
+
+            const clamped = this._clampWindowBounds({
+                left: currentX,
+                top: currentY,
+                width: windowElement.offsetWidth,
+                height: windowElement.offsetHeight
+            });
             
-            windowElement.style.left = `${currentX}px`;
-            windowElement.style.top = `${currentY}px`;
+            windowElement.style.left = `${clamped.left}px`;
+            windowElement.style.top = `${clamped.top}px`;
+
+            const edgeLayout = this._getEdgeSnapLayout(e.clientX, e.clientY);
+            if (edgeLayout) {
+                dragSnapLayout = edgeLayout;
+                this._showDragSnapHint(edgeLayout);
+            } else {
+                dragSnapLayout = null;
+                this._hideDragSnapHint();
+            }
         });
 
         document.addEventListener('mouseup', () => {
@@ -209,32 +548,66 @@ const WindowManager = {
                 isDragging = false;
                 // 恢复过渡动画
                 windowElement.style.transition = '';
+
+                const windowData = this._getWindowData(windowElement.id);
+                if (windowData && !windowData.isMaximized && dragMoved) {
+                    if (dragSnapLayout && this._isEdgeSnapEnabled()) {
+                        this.applySnapLayout(windowElement.id, dragSnapLayout);
+                    } else {
+                        windowData.snapLayout = null;
+                        this._persistWindowBounds(windowData);
+                    }
+                }
+                dragSnapLayout = null;
+                this._hideDragSnapHint();
             }
         });
 
         // 双击标题栏最大化
         titlebar.addEventListener('dblclick', () => {
+            this._hideSnapMenu(windowElement, true);
             this.toggleMaximize(windowElement.id);
         });
 
         // 最小化
         minimizeBtn.addEventListener('click', () => {
+            this._hideSnapMenu(windowElement, true);
             this.minimizeWindow(windowElement.id);
         });
 
+        maximizeBtn.addEventListener('mouseenter', () => {
+            if (this._isHoverSnapEnabled()) this._showSnapMenu(windowElement);
+        });
+        maximizeBtn.addEventListener('mouseleave', () => {
+            this._scheduleSnapMenuHide(windowElement);
+        });
+
+        if (snapMenu) {
+            snapMenu.addEventListener('mousedown', (e) => e.stopPropagation());
+        }
+
         // 最大化/还原
-        maximizeBtn.addEventListener('click', () => {
+        maximizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._hideSnapMenu(windowElement, true);
             this.toggleMaximize(windowElement.id);
         });
 
         // 关闭
         closeBtn.addEventListener('click', () => {
+            this._hideSnapMenu(windowElement, true);
             this.closeWindow(windowElement.id);
         });
 
         // 点击窗口时聚焦
-        windowElement.addEventListener('mousedown', () => {
+        windowElement.addEventListener('mousedown', (e) => {
+            if (!e.target.closest('.window-snap-layout-menu')) {
+                this._hideAllSnapMenus(windowElement.id);
+            }
             this.focusWindow(windowElement.id);
+        });
+        windowElement.addEventListener('mouseleave', () => {
+            this._scheduleSnapMenuHide(windowElement, 90);
         });
 
         // 窗口调整大小
@@ -249,9 +622,13 @@ const WindowManager = {
 
         handles.forEach(handle => {
             handle.addEventListener('mousedown', (e) => {
+                const windowData = this._getWindowData(windowElement.id);
+                if (windowData && windowData.isMaximized) return;
+
                 e.stopPropagation();
                 isResizing = true;
                 windowElement.classList.add('resizing');
+                this._hideSnapMenu(windowElement, true);
 
                 // 获取调整方向
                 if (handle.classList.contains('resize-top')) resizeDirection = 'n';
@@ -303,6 +680,17 @@ const WindowManager = {
                 newTop = startTop + (startHeight - newHeight);
             }
 
+            // 边界限制仅保留顶部：窗口顶部不能越过屏幕顶部
+            if (newTop < 0) {
+                if (resizeDirection.includes('n')) {
+                    const bottom = newTop + newHeight;
+                    newTop = 0;
+                    newHeight = Math.max(300, bottom);
+                } else {
+                    newTop = 0;
+                }
+            }
+
             // 应用新尺寸
             windowElement.style.width = `${newWidth}px`;
             windowElement.style.height = `${newHeight}px`;
@@ -315,6 +703,12 @@ const WindowManager = {
                 isResizing = false;
                 windowElement.classList.remove('resizing');
                 resizeDirection = '';
+
+                const windowData = this._getWindowData(windowElement.id);
+                if (windowData && !windowData.isMaximized) {
+                    windowData.snapLayout = null;
+                    this._persistWindowBounds(windowData);
+                }
             }
         });
     },
@@ -454,6 +848,8 @@ const WindowManager = {
     toggleMaximize(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
+        this._hideSnapMenu(windowData.element, true);
+        this._hideDragSnapHint(true);
 
         const taskbar = document.querySelector('.taskbar');
 
@@ -486,6 +882,7 @@ const WindowManager = {
             requestAnimationFrame(() => {
                 this.updateMaximizedWallpaperEffect();
             });
+            this._persistWindowBounds(windowData);
         } else {
             // 保存当前位置和大小
             windowData.savedBounds = {
@@ -539,9 +936,9 @@ const WindowManager = {
     closeWindow(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
-        
-        // 保存窗口是否最大化的状态
-        const wasMaximized = windowData.isMaximized;
+        this._hideSnapMenu(windowData.element, true);
+        this._hideDragSnapHint(true);
+        this._persistWindowBounds(windowData);
 
         const proceedClose = () => {
             // 添加关闭动画
@@ -593,4 +990,3 @@ const WindowManager = {
         };
     }
 };
-

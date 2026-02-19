@@ -268,6 +268,7 @@ const Desktop = {
                 e.target.closest('.start-menu') ||
                 e.target.closest('.control-center') ||
                 e.target.closest('.notification-center') ||
+                e.target.closest('#fingo-panel') ||
                 e.target.closest('.desktop-icon')) {
                 return;
             }
@@ -386,6 +387,7 @@ const Desktop = {
                 e.target.closest('.start-menu') ||
                 e.target.closest('.control-center') ||
                 e.target.closest('.notification-center') ||
+                e.target.closest('#fingo-panel') ||
                 e.target.closest('.desktop-icon')) {
                 return; // 不阻止默认行为，让其他元素处理
             }
