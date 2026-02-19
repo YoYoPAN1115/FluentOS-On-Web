@@ -653,6 +653,7 @@ body.fluent-v2 #oobe-screen.dark-mode .oobe-live-taskbar.taskbar {
     background-size: cover;
     background-position: center;
     transform: scale(1.02);
+    border-radius: inherit;
 }
 
 .oobe-live-lock-overlay {
@@ -660,6 +661,7 @@ body.fluent-v2 #oobe-screen.dark-mode .oobe-live-taskbar.taskbar {
     inset: 0;
     background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.36) 100%);
     z-index: 1;
+    border-radius: inherit;
 }
 
 .oobe-live-lock-preview::after {
@@ -671,6 +673,7 @@ body.fluent-v2 #oobe-screen.dark-mode .oobe-live-taskbar.taskbar {
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    border-radius: inherit;
 }
 
 .dark-mode .oobe-live-lock-preview::after {
