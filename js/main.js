@@ -381,12 +381,17 @@ function handlePowerAction({ action }) {
     }, durations[action]);
 }
 
+function getLoginScreenCard() {
+    const loginScreen = document.getElementById('login-screen');
+    return loginScreen ? loginScreen.querySelector('.login-card') : null;
+}
+
 /**
  * 锁屏 → 登录动画（锁屏元素保持模糊状态，密码卡片在上方弹入）
  */
 function handleLockToLogin() {
     const loginScreen = document.getElementById('login-screen');
-    const loginCard = document.querySelector('.login-card');
+    const loginCard = getLoginScreenCard();
     const pinInput = document.getElementById('login-pin');
     const errorElement = document.getElementById('login-error');
     const securityLink = document.getElementById('security-link');
@@ -434,7 +439,7 @@ function handleLockToLogin() {
  * 登录 → 锁屏动画（反向平滑退回）
  */
 window.handleLoginToLock = function() {
-    const loginCard = document.querySelector('.login-card');
+    const loginCard = getLoginScreenCard();
     
     // 1. 添加返回锁屏的过渡类
     document.body.classList.add('login-to-lock');
@@ -465,7 +470,7 @@ window.handleLoginToLock = function() {
  * 登录 → 桌面动画（加深模糊、淡化切换、变清晰同步进行）
  */
 function handleLoginToDesktop() {
-    const loginCard = document.querySelector('.login-card');
+    const loginCard = getLoginScreenCard();
     const lockScreen = document.getElementById('lock-screen');
     const loginScreen = document.getElementById('login-screen');
     const desktopScreen = document.getElementById('desktop-screen');

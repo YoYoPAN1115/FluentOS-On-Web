@@ -4,6 +4,8 @@
 const LoginScreen = {
     element: null,
     cardElement: null,
+    usernameElement: null,
+    emailElement: null,
     pinInput: null,
     pinToggle: null,
     submitBtn: null,
@@ -15,6 +17,8 @@ const LoginScreen = {
     init() {
         this.element = document.getElementById('login-screen');
         this.cardElement = this.element.querySelector('.login-card');
+        this.usernameElement = this.element.querySelector('.login-username');
+        this.emailElement = this.element.querySelector('.login-email');
         this.pinInput = document.getElementById('login-pin');
         this.pinToggle = document.getElementById('pin-toggle');
         this.submitBtn = document.getElementById('login-submit');
@@ -39,6 +43,8 @@ const LoginScreen = {
                 this.backToLock();
             }
         });
+        State.on('languageChange', () => this.updateTexts());
+        this.updateTexts();
     },
     
     backToLock() {
@@ -53,6 +59,7 @@ const LoginScreen = {
         this.element.classList.add('show');
         this.cardElement.classList.add('show');
         this.updateWallpaper();
+        this.updateTexts();
         this.pinInput.value = '';
         this.pinInput.focus();
         this.errorElement.classList.add('hidden');
@@ -75,6 +82,16 @@ const LoginScreen = {
         if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) {
             LockScreen.updateWallpaper();
         }
+    },
+
+    updateTexts() {
+        if (!I18n || typeof I18n.t !== 'function') return;
+        if (this.usernameElement) this.usernameElement.textContent = I18n.t('login.username');
+        if (this.emailElement) this.emailElement.textContent = I18n.t('login.email');
+        if (this.pinInput) this.pinInput.placeholder = I18n.t('login.pin.placeholder');
+        if (this.errorElement) this.errorElement.textContent = I18n.t('login.pin.error');
+        if (this.securityLink) this.securityLink.textContent = I18n.t('login.security.link');
+        if (this.submitBtn) this.submitBtn.textContent = I18n.t('login.submit');
     },
 
     togglePinVisibility() {
@@ -136,4 +153,3 @@ const LoginScreen = {
         }
     }
 };
-

@@ -6,6 +6,7 @@ const LockScreen = {
     timeElement: null,
     dateElement: null,
     wallpaperElement: null,
+    hintElement: null,
     timeInterval: null,
 
     init() {
@@ -13,6 +14,7 @@ const LockScreen = {
         this.timeElement = document.getElementById('lock-time');
         this.dateElement = document.getElementById('lock-date');
         this.wallpaperElement = this.element.querySelector('.lock-wallpaper');
+        this.hintElement = this.element.querySelector('.lock-hint');
 
         // 绑定事件
         this.element.addEventListener('click', () => this.unlock());
@@ -21,6 +23,8 @@ const LockScreen = {
                 this.unlock();
             }
         });
+        State.on('languageChange', () => this.updateTexts());
+        this.updateTexts();
     },
 
     show() {
@@ -61,8 +65,12 @@ const LockScreen = {
         this.wallpaperElement.style.backgroundImage = `url('${wallpaper}')`;
     },
 
+    updateTexts() {
+        if (!this.hintElement || !I18n || typeof I18n.t !== 'function') return;
+        this.hintElement.textContent = I18n.t('lock.hint');
+    },
+
     unlock() {
         State.setView('login');
     }
 };
-
