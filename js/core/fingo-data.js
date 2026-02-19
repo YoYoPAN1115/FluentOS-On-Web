@@ -206,6 +206,19 @@ const FingoData = {
                 en: 'I\'m Fingo, your system assistant \u{1F916} Here\'s what I can do:\n\n\u{1F3A8} Themes\n\u3000"dark mode" "light mode" "auto theme"\n\n\u2728 Effects\n\u3000"enable/disable blur" "animation" "window blur" "new UI"\n\n\u{1F4F6} Connectivity\n\u3000"enable/disable bluetooth" "enable/disable Wi-Fi"\n\n\u{1F4F1} App Management\n\u3000"install Bilibili" "uninstall xx" "repair browser"\n\u3000\u00B7 System apps can\'t be uninstalled; running apps ask for confirmation\n\n\u{1F5BC}\uFE0F Personalization\n\u3000"change wallpaper" and "brightness up/down"\n\n\u{1F4AC} Casual Chat\n\u3000"i am bored" "tell me a joke" "give me a riddle" "what time is it"\n\n\u2699\uFE0F Settings\n\u3000"language settings" "change password" "Fingo AI settings"\n\n\u26A1 Power\n\u3000"shutdown" "restart" "logout" "lock"\n\n\u{1F4A1} Say "about FluentOS" to learn more\n\u{1F9E0} Say "custom mode" to connect your own AI API'
             }
         },
+        shortcutsHelp: {
+            keywords: [
+                '快捷键', '快捷键汇总', '快捷键列表', '有哪些快捷键', '键盘快捷键', '热键',
+                '开始菜单快捷键', '打开开始菜单', '快速打开开始菜单', '怎么打开开始菜单', '如何打开开始菜单', '开始菜单打不开', 'win键', 'windows键', 'meta键',
+                'shortcut', 'shortcuts', 'hotkey', 'hotkeys', 'keyboard shortcut',
+                'start menu shortcut', 'open start menu', 'open start menu quickly', 'how to open start menu'
+            ],
+            action: 'none',
+            response: {
+                zh: '当前可用快捷键如下（统一 Alt 系）：\n\n- Alt：打开/关闭开始菜单\n- Alt+F：打开 Fingo AI\n- Alt+I：快速打开设置\n- Alt+L：快速锁屏\n- Alt+E：打开文件 App\n- Alt+A：打开控制中心\n- Alt+D：一键最小化所有窗口\n- Alt+M：最小化当前置顶窗口\n- Alt+W：打开任务视图\n\n如果你只是想快速打开开始菜单，直接按一下 Alt 键即可。',
+                en: 'Current shortcuts (all Alt-based):\n\n- Alt: Open/close Start Menu\n- Alt+F: Open Fingo AI\n- Alt+I: Open Settings\n- Alt+L: Lock screen\n- Alt+E: Open Files\n- Alt+A: Open Control Center\n- Alt+D: Minimize all windows\n- Alt+M: Minimize topmost window\n- Alt+W: Open Task View\n\nIf you only want Start Menu, just press Alt once.'
+            }
+        },
         // ===== 轻聊天增强 =====
         chatIdeas: {
             keywords: ['聊点什么', '不知道聊啥', '不知道问什么', '有什么好玩的', '推荐问题', 'what should i ask', 'what can we talk about', 'anything fun'],

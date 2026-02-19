@@ -812,7 +812,7 @@ const Fingo = {
         const normalized = this._normalizeInputText(lower);
         const compact = this._compactText(normalized);
         const cmds = FingoData.commands;
-        const specialKeys = ['uninstall', 'install', 'repair', 'wallpaper', 'openApp'];
+        const specialKeys = ['shortcutsHelp', 'uninstall', 'install', 'repair', 'wallpaper'];
         for (const sk of specialKeys) {
             if (!cmds[sk]) continue;
             for (const kw of cmds[sk].keywords) {
@@ -823,7 +823,7 @@ const Fingo = {
             }
         }
         for (const key of Object.keys(cmds)) {
-            if (specialKeys.includes(key)) continue;
+            if (specialKeys.includes(key) || key === 'openApp') continue;
             const cmd = cmds[key];
             for (const kw of cmd.keywords) {
                 if (this._keywordMatched(lower, normalized, compact, kw)) {
@@ -836,9 +836,28 @@ const Fingo = {
                 }
             }
         }
+        if (cmds.openApp) {
+            for (const kw of cmds.openApp.keywords) {
+                if (this._keywordMatched(lower, normalized, compact, kw)) {
+                    this._handle_openApp(text, lower);
+                    return;
+                }
+            }
+        }
         const fallbackText = this._resolveResponse(FingoData.fallback) || (this.lang() === 'zh' ? '抱歉，我暂时没听懂。' : 'Sorry, I did not understand.');
         setTimeout(() => this.addMessage(fallbackText, 'bot'), 400);
     },
+
+    // --- 快捷键汇总/开始菜单快捷键 ---
+    '_handle_shortcutsHelp'() {
+        const cmd = FingoData.commands.shortcutsHelp;
+        if (!cmd) return;
+        const botReply = this._resolveResponse(cmd.response);
+        if (botReply) {
+            setTimeout(() => this.addMessage(botReply, 'bot'), 400);
+        }
+    },
+
     // --- 查找应用（从用户输入中匹配） ---
     _findApp(lower) {
         for (const app of Desktop.apps) {
@@ -1111,7 +1130,10 @@ const Fingo = {
         }));
         msgs.push({ role: 'user', content: text });
 
-        const sysMsg = { role: 'system', content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely.' };
+        const sysMsg = {
+            role: 'system',
+            content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View.'
+        };
 
         let url, body, headers;
         if (provider === 'siliconflow') {

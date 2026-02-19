@@ -167,13 +167,7 @@ const Taskbar = {
             this.hideContextMenu();
         });
 
-        // 快捷键：Ctrl+W 打开任务视图
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
-                e.preventDefault();
-                if (typeof TaskView !== 'undefined') TaskView.toggle();
-            }
-        });
+        // 全局快捷键在 main.js 统一注册
     },
 
     showContextMenu(event, appId) {

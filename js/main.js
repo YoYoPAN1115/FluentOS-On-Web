@@ -148,6 +148,7 @@ function initModules() {
     WindowManager.init();
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
     Fingo.init();
+    initGlobalShortcuts();
 
     // Fingo 任务栏按钮
     const fingoBtn = document.getElementById('fingo-btn');
@@ -178,6 +179,100 @@ function initModules() {
 /**
  * 启动系统 - 每次加载网页都进入开机界面
  */
+function getDesktopWindowsSortedByZ() {
+    if (typeof WindowManager === 'undefined' || !Array.isArray(WindowManager.windows)) return [];
+    return WindowManager.windows
+        .filter(w => w && !w.isMinimized && w.element && w.element.style.display !== 'none')
+        .sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+}
+
+function minimizeAllDesktopWindows() {
+    const targets = getDesktopWindowsSortedByZ();
+    if (targets.length === 0) return false;
+    targets.forEach((w) => {
+        if (typeof WindowManager.minimizeWindow === 'function') {
+            WindowManager.minimizeWindow(w.id);
+        }
+    });
+    return true;
+}
+
+function minimizeTopDesktopWindow() {
+    const top = getDesktopWindowsSortedByZ()[0];
+    if (!top || typeof WindowManager.minimizeWindow !== 'function') return false;
+    WindowManager.minimizeWindow(top.id);
+    return true;
+}
+
+function initGlobalShortcuts() {
+    if (window.__fluentGlobalShortcutsBound) return;
+    window.__fluentGlobalShortcutsBound = true;
+
+    document.addEventListener('keydown', (e) => {
+        if (!e.altKey || e.ctrlKey || e.metaKey) return;
+        if (e.key === 'Alt') return;
+        if (State.view !== 'desktop') return;
+
+        let key = String(e.key || '').toLowerCase();
+        if ((!key || !/^[a-z]$/.test(key)) && /^Key[A-Z]$/.test(String(e.code || ''))) {
+            key = String(e.code).slice(3).toLowerCase();
+        }
+        if (!key || e.repeat) return;
+
+        let handled = false;
+        switch (key) {
+            case 'f':
+                if (typeof Fingo !== 'undefined' && typeof Fingo.toggle === 'function') {
+                    Fingo.toggle();
+                    handled = true;
+                }
+                break;
+            case 'i':
+                if (typeof WindowManager !== 'undefined') {
+                    WindowManager.openApp('settings');
+                    handled = true;
+                }
+                break;
+            case 'l':
+                if (typeof State !== 'undefined' && typeof State.lock === 'function') {
+                    State.lock();
+                    handled = true;
+                }
+                break;
+            case 'e':
+                if (typeof WindowManager !== 'undefined') {
+                    WindowManager.openApp('files');
+                    handled = true;
+                }
+                break;
+            case 'a':
+                if (typeof ControlCenter !== 'undefined' && typeof ControlCenter.toggle === 'function') {
+                    ControlCenter.toggle();
+                    handled = true;
+                }
+                break;
+            case 'd':
+                handled = minimizeAllDesktopWindows();
+                break;
+            case 'm':
+                handled = minimizeTopDesktopWindow();
+                break;
+            case 'w':
+                if (typeof TaskView !== 'undefined' && typeof TaskView.toggle === 'function') {
+                    TaskView.toggle();
+                    handled = true;
+                }
+                break;
+            default:
+                break;
+        }
+
+        if (handled) {
+            e.preventDefault();
+        }
+    });
+}
+
 function startSystem() {
     // 无论是否已登录，都先显示开机画面
     State.setView('boot');

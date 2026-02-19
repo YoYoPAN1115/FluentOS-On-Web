@@ -191,15 +191,32 @@ const StartMenu = {
             }
         });
 
-        // Win 键支持
+        // 开始菜单快捷键：Alt 单键触发（避免占用 Mac Command/Win 键）
+        this._altStartArmed = false;
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Meta' || e.key === 'OS') {
-                e.preventDefault();
-                this.toggle();
+            if (e.key === 'Alt') {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.repeat) {
+                    this._altStartArmed = true;
+                    e.preventDefault();
+                } else {
+                    this._altStartArmed = false;
+                }
+                return;
             }
+
+            this._altStartArmed = false;
             if (e.key === 'Escape' && this.isOpen) {
                 this.close();
             }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key !== 'Alt') return;
+            if (this._altStartArmed) {
+                e.preventDefault();
+                this.toggle();
+            }
+            this._altStartArmed = false;
         });
 
         // 点击外部关闭
@@ -666,5 +683,4 @@ const StartMenu = {
         }
     }
 };
-
 
