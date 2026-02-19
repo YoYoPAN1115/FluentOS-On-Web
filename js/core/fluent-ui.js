@@ -393,6 +393,165 @@ const FluentUI = {
         return wrapper;
     },
 
+    // ============ Custom Scroll Area ============
+    ScrollArea(opts = {}) {
+        const {
+            content = null,
+            maxHeight = null,
+            minThumbSize = 24,
+            alwaysVisible = false,
+            id = null,
+            className = ''
+        } = opts;
+
+        const area = this._utils.createElement('div', {
+            className: this._utils.classNames('fluent-scroll-area', alwaysVisible && 'fluent-scroll-always-visible', className),
+            id
+        });
+        const viewport = this._utils.createElement('div', { className: 'fluent-scroll-viewport' });
+        const rail = this._utils.createElement('div', { className: 'fluent-scroll-rail' });
+        const thumb = this._utils.createElement('div', { className: 'fluent-scroll-thumb' });
+        rail.appendChild(thumb);
+        area.appendChild(viewport);
+        area.appendChild(rail);
+
+        if (maxHeight !== null && maxHeight !== undefined) {
+            viewport.style.maxHeight = typeof maxHeight === 'number' ? `${maxHeight}px` : String(maxHeight);
+        }
+
+        const appendContent = (value) => {
+            viewport.innerHTML = '';
+            if (value === null || value === undefined) return;
+            if (typeof value === 'string') {
+                viewport.innerHTML = value;
+                return;
+            }
+            viewport.appendChild(value);
+        };
+        appendContent(content);
+
+        let hideTimer = null;
+        let dragging = false;
+        let dragStartY = 0;
+        let dragStartScroll = 0;
+
+        const getMetrics = () => {
+            const viewportHeight = viewport.clientHeight;
+            const scrollHeight = viewport.scrollHeight;
+            const maxScroll = Math.max(0, scrollHeight - viewportHeight);
+            return { viewportHeight, scrollHeight, maxScroll };
+        };
+
+        const refresh = () => {
+            const { viewportHeight, scrollHeight, maxScroll } = getMetrics();
+            if (scrollHeight <= viewportHeight + 1 || viewportHeight <= 0) {
+                area.classList.add('no-scroll');
+                thumb.style.height = '0px';
+                thumb.style.transform = 'translateY(0)';
+                return;
+            }
+
+            area.classList.remove('no-scroll');
+            const thumbHeight = Math.max(minThumbSize, Math.round((viewportHeight / scrollHeight) * viewportHeight));
+            thumb.style.height = `${Math.min(viewportHeight, thumbHeight)}px`;
+
+            const trackRange = Math.max(1, viewportHeight - thumb.offsetHeight);
+            const thumbTop = (viewport.scrollTop / maxScroll) * trackRange;
+            thumb.style.transform = `translateY(${thumbTop}px)`;
+        };
+
+        const markScrolling = () => {
+            area.classList.add('scrolling');
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => area.classList.remove('scrolling'), 460);
+        };
+
+        const setScrollByThumbTop = (top) => {
+            const { viewportHeight, maxScroll } = getMetrics();
+            if (maxScroll <= 0) return;
+            const trackRange = Math.max(1, viewportHeight - thumb.offsetHeight);
+            const clampedTop = Math.min(trackRange, Math.max(0, top));
+            viewport.scrollTop = (clampedTop / trackRange) * maxScroll;
+        };
+
+        const onPointerMove = (e) => {
+            if (!dragging) return;
+            const delta = e.clientY - dragStartY;
+            const { viewportHeight, maxScroll } = getMetrics();
+            if (maxScroll <= 0) return;
+            const trackRange = Math.max(1, viewportHeight - thumb.offsetHeight);
+            const nextScroll = dragStartScroll + (delta / trackRange) * maxScroll;
+            viewport.scrollTop = Math.min(maxScroll, Math.max(0, nextScroll));
+        };
+
+        const stopDrag = () => {
+            if (!dragging) return;
+            dragging = false;
+            area.classList.remove('dragging');
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', stopDrag);
+        };
+
+        thumb.addEventListener('pointerdown', (e) => {
+            if (area.classList.contains('no-scroll')) return;
+            e.preventDefault();
+            dragging = true;
+            dragStartY = e.clientY;
+            dragStartScroll = viewport.scrollTop;
+            area.classList.add('dragging');
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', stopDrag, { once: true });
+        });
+
+        rail.addEventListener('mousedown', (e) => {
+            if (e.target === thumb || area.classList.contains('no-scroll')) return;
+            const railRect = rail.getBoundingClientRect();
+            const targetTop = e.clientY - railRect.top - thumb.offsetHeight / 2;
+            setScrollByThumbTop(targetTop);
+        });
+
+        viewport.addEventListener('scroll', () => {
+            refresh();
+            markScrolling();
+        });
+
+        const onResize = () => refresh();
+        window.addEventListener('resize', onResize);
+
+        let resizeObserver = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(() => refresh());
+            resizeObserver.observe(viewport);
+        }
+
+        let mutationObserver = null;
+        if (typeof MutationObserver !== 'undefined') {
+            mutationObserver = new MutationObserver(() => refresh());
+            mutationObserver.observe(viewport, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+        }
+
+        area.getViewport = () => viewport;
+        area.setContent = (nextContent) => {
+            appendContent(nextContent);
+            refresh();
+        };
+        area.refresh = refresh;
+        area.destroy = () => {
+            stopDrag();
+            clearTimeout(hideTimer);
+            window.removeEventListener('resize', onResize);
+            if (resizeObserver) resizeObserver.disconnect();
+            if (mutationObserver) mutationObserver.disconnect();
+        };
+
+        requestAnimationFrame(refresh);
+        return area;
+    },
+
     // ============ 右键菜单 ============
     ContextMenu(opts = {}) {
         const { items = [], id = null, className = '' } = opts;

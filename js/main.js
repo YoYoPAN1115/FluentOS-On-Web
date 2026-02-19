@@ -138,6 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function initModules() {
     // UI模块
     BootScreen.init();
+    if (typeof OOBE !== 'undefined' && typeof OOBE.init === 'function') {
+        OOBE.init();
+    }
     LockScreen.init();
     LoginScreen.init();
     Desktop.init();
@@ -301,6 +304,9 @@ function handleViewChange({ oldView, newView }) {
     switch (newView) {
         case 'boot':
             BootScreen.show();
+            break;
+        case 'oobe':
+            if (typeof OOBE !== 'undefined') OOBE.show();
             break;
         case 'lock':
             LockScreen.show();
@@ -524,6 +530,9 @@ function handleLoginToDesktop() {
  */
 function hideAllViews() {
     BootScreen.hide();
+    if (typeof OOBE !== 'undefined' && typeof OOBE.hide === 'function') {
+        OOBE.hide();
+    }
     LockScreen.hide();
     LoginScreen.hide();
     Desktop.hide();

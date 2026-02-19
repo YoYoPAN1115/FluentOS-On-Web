@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/apps-unified.css">
     <link rel="stylesheet" href="css/lingyi.css">
     <link rel="stylesheet" href="css/fingo.css">
+    <link rel="stylesheet" href="css/oobe.css">
 </head>
 <body>
     <!-- 主容器 -->
@@ -27,6 +28,308 @@
                         <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"/>
                         <circle class="boot-ring-arc" cx="18" cy="18" r="14" fill="none" stroke="#0078d4" stroke-width="3" stroke-linecap="round"/>
                     </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- OOBE 首次引导 -->
+        <div id="oobe-screen" class="screen hidden">
+            <div class="oobe-background" id="oobe-background"></div>
+            <div class="oobe-background-mask"></div>
+            <div class="oobe-shell">
+                <div class="oobe-card" id="oobe-card">
+                    <div class="oobe-progress" id="oobe-progress">
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                    </div>
+
+                    <!-- Step 0: Welcome animation -->
+                    <section class="oobe-step active" data-step="0">
+                        <div class="oobe-welcome-container">
+                            <img class="oobe-welcome-logo" id="oobe-welcome-logo" src="Theme/Icon/Fluent_logo.png" alt="Fluent OS">
+                            <div class="oobe-welcome-text" id="oobe-welcome-text"></div>
+                        </div>
+                        <div class="oobe-actions oobe-welcome-actions">
+                            <button class="oobe-btn oobe-btn-primary oobe-welcome-next hidden" id="oobe-next-0" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <!-- Step 1: Language selection -->
+                    <section class="oobe-step" data-step="1">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-desktop" data-preview-desktop="language">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <!-- Simple window showing language text -->
+                                <div class="oobe-lang-preview-window" id="oobe-lang-preview-window">
+                                    <div class="oobe-lang-preview-titlebar">
+                                        <div class="oobe-lang-preview-dots">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-lang-preview-body">
+                                        <span class="oobe-lang-preview-text" id="oobe-lang-preview-text">简体</span>
+                                    </div>
+                                </div>
+                                <div class="taskbar oobe-live-taskbar">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-language">欢迎使用 FluentOS</h1>
+                        <p id="oobe-subtitle-language">选择系统语言后再继续。</p>
+                        <div class="oobe-language-options" id="oobe-language-options">
+                            <button class="oobe-option-btn" data-lang="zh" type="button">
+                                <span class="oobe-option-title">简体中文</span>
+                                <span class="oobe-option-desc">推荐中文用户</span>
+                            </button>
+                            <button class="oobe-option-btn" data-lang="en" type="button">
+                                <span class="oobe-option-title">English</span>
+                                <span class="oobe-option-desc">For English users</span>
+                            </button>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-1" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary is-disabled" id="oobe-next-1" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <!-- Step 2: Theme selection with geometric start menu -->
+                    <section class="oobe-step" data-step="2">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-desktop oobe-theme-preview" data-preview-desktop="theme">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <!-- Geometric simplified start menu -->
+                                <div class="oobe-geo-start-menu">
+                                    <div class="oobe-geo-search"><span class="oobe-geo-bar"></span></div>
+                                    <div class="oobe-geo-section">
+                                        <div class="oobe-geo-label"><span class="oobe-geo-bar-sm"></span></div>
+                                        <div class="oobe-geo-grid">
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-geo-section">
+                                        <div class="oobe-geo-label"><span class="oobe-geo-bar-sm"></span></div>
+                                        <div class="oobe-geo-recent">
+                                            <div class="oobe-geo-recent-item">
+                                                <span class="oobe-geo-recent-icon"></span>
+                                                <div class="oobe-geo-recent-info"><span class="oobe-geo-recent-name"></span><span class="oobe-geo-recent-time"></span></div>
+                                            </div>
+                                            <div class="oobe-geo-recent-item">
+                                                <span class="oobe-geo-recent-icon"></span>
+                                                <div class="oobe-geo-recent-info"><span class="oobe-geo-recent-name"></span><span class="oobe-geo-recent-time"></span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-geo-footer">
+                                        <div class="oobe-geo-footer-btns">
+                                            <span class="oobe-geo-footer-btn"></span>
+                                            <span class="oobe-geo-footer-btn"></span>
+                                        </div>
+                                        <span class="oobe-geo-power"></span>
+                                    </div>
+                                </div>
+                                <div class="taskbar oobe-live-taskbar">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-theme">主题设置</h1>
+                        <p id="oobe-subtitle-theme">实时预览浅色和深色模式的任务栏与开始菜单。</p>
+                        <div class="oobe-setting-block">
+                            <div class="oobe-setting-title" id="oobe-theme-title">主题</div>
+                            <div class="oobe-chip-group" id="oobe-theme-group">
+                                <button class="oobe-chip active" data-theme="light" type="button">浅色</button>
+                                <button class="oobe-chip" data-theme="dark" type="button">深色</button>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-2" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-2" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="3">
+                        <div class="oobe-preview-frame oobe-preview-interactive">
+                            <div class="oobe-live-fingo">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <div class="taskbar oobe-live-taskbar oobe-live-taskbar-fingo">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn active" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="oobe-live-fingo-blur"></div>
+                                <div class="fingo-content oobe-live-fingo-content fingo-empty" id="oobe-live-fingo-content">
+                                    <div class="fingo-header">
+                                        <div class="fingo-header-left">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo">
+                                            <span>Fingo</span>
+                                        </div>
+                                        <div class="fingo-toolbar">
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="+"></button>
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Timer.svg" alt="H"></button>
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Playlist Add.svg" alt="C"></button>
+                                        </div>
+                                    </div>
+                                    <div class="fingo-history" id="oobe-fingo-history"></div>
+                                    <div id="oobe-fingo-messages"></div>
+                                    <div class="fingo-input-wrap">
+                                        <div class="fingo-input-glow">
+                                            <input id="oobe-fingo-input" type="text" autocomplete="off" placeholder="Ask me anything...">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-fingo">Fingo AI 模式</h1>
+                        <p id="oobe-subtitle-fingo">你可以在上方临时对话，退出 OOBE 后不会保存记录。</p>
+                        <div class="oobe-setting-block oobe-fingo-settings-block">
+                            <div class="oobe-fingo-settings-shell">
+                                <div id="oobe-fingo-settings-scroll-host"></div>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-3" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-3" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="4">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-lock-preview" id="oobe-lock-preview">
+                                <div class="oobe-live-lock-wallpaper"></div>
+                                <div class="oobe-live-lock-overlay"></div>
+                                <div class="oobe-live-lock-time-container">
+                                    <div class="oobe-live-lock-time" id="oobe-lock-preview-time">23:24</div>
+                                    <div class="oobe-live-lock-date" id="oobe-lock-preview-date">02/18</div>
+                                </div>
+                                <div class="login-card oobe-live-login-card">
+                                    <div class="login-avatar">
+                                        <img src="Theme/Icon/UserAva.png" alt="User">
+                                    </div>
+                                    <div class="login-username">Owner</div>
+                                    <div class="login-email">owner@sample.com</div>
+                                    <div class="login-pin-container">
+                                        <input class="login-pin-input" type="password" disabled value="1234">
+                                        <button class="pin-toggle" type="button" tabindex="-1">
+                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="显示">
+                                        </button>
+                                    </div>
+                                    <div class="login-error" style="visibility:hidden">PIN 不正确</div>
+                                    <button class="login-submit" type="button" tabindex="-1">登录</button>
+                                </div>
+                                <div class="oobe-live-lock-hint">轻点屏幕以登录</div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-password">设置密码</h1>
+                        <p id="oobe-subtitle-password">输入 4-10 位 PIN，用于锁屏登录。</p>
+                        <div class="oobe-setting-block">
+                            <div class="oobe-setting-title" id="oobe-pin-title">PIN 密码</div>
+                            <input id="oobe-pin-input" class="oobe-input" type="password" maxlength="10" placeholder="留空则使用当前 PIN">
+                        </div>
+                        <div class="oobe-inline-status" id="oobe-preload-status"></div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-4" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-finish" type="button">完成并进入锁屏</button>
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
@@ -341,6 +644,7 @@
     <script src="js/core/fluent-ui.js"></script>
     <script src="js/core/lingyi.js"></script>
     <script src="js/ui/boot.js"></script>
+    <script src="js/ui/oobe.js"></script>
     <script src="js/ui/lockscreen.js"></script>
     <script src="js/ui/login.js"></script>
     <script src="js/ui/desktop.js"></script>
@@ -366,4 +670,3 @@
     <script src="js/main.js"></script>
 </body>
 </html>
-

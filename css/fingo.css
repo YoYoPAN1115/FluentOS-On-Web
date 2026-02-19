@@ -228,7 +228,8 @@ body.animations-enabled #fingo-panel.fingo-closing {
 
 .fingo-content.fingo-empty .fingo-header,
 .fingo-content.fingo-empty .fingo-history,
-.fingo-content.fingo-empty #fingo-messages {
+.fingo-content.fingo-empty #fingo-messages,
+.fingo-content.fingo-empty #oobe-fingo-messages {
     opacity: 0;
     max-height: 0;
     overflow: hidden;
@@ -246,7 +247,8 @@ body.animations-enabled #fingo-panel.fingo-closing {
 }
 
 .fingo-content:not(.fingo-empty) .fingo-header,
-.fingo-content:not(.fingo-empty) #fingo-messages {
+.fingo-content:not(.fingo-empty) #fingo-messages,
+.fingo-content:not(.fingo-empty) #oobe-fingo-messages {
     opacity: 1;
     transform: translateY(0);
     transition:
@@ -413,32 +415,38 @@ body.animations-enabled #fingo-panel.fingo-closing {
    7. Scrollbar Styling (messages & history)
    ========================================================== */
 #fingo-messages,
+#oobe-fingo-messages,
 .fingo-history {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
 }
 
 #fingo-messages:hover,
+#oobe-fingo-messages:hover,
 .fingo-history:hover {
     scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
 }
 
 .dark-mode #fingo-messages:hover,
+.dark-mode #oobe-fingo-messages:hover,
 .dark-mode .fingo-history:hover {
     scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
 #fingo-messages::-webkit-scrollbar,
+#oobe-fingo-messages::-webkit-scrollbar,
 .fingo-history::-webkit-scrollbar {
     width: 4px;
 }
 
 #fingo-messages::-webkit-scrollbar-track,
+#oobe-fingo-messages::-webkit-scrollbar-track,
 .fingo-history::-webkit-scrollbar-track {
     background: transparent;
 }
 
 #fingo-messages::-webkit-scrollbar-thumb,
+#oobe-fingo-messages::-webkit-scrollbar-thumb,
 .fingo-history::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 4px;
@@ -446,11 +454,13 @@ body.animations-enabled #fingo-panel.fingo-closing {
 }
 
 #fingo-messages:hover::-webkit-scrollbar-thumb,
+#oobe-fingo-messages:hover::-webkit-scrollbar-thumb,
 .fingo-history:hover::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.15);
 }
 
 .dark-mode #fingo-messages:hover::-webkit-scrollbar-thumb,
+.dark-mode #oobe-fingo-messages:hover::-webkit-scrollbar-thumb,
 .dark-mode .fingo-history:hover::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.18);
 }
@@ -458,7 +468,8 @@ body.animations-enabled #fingo-panel.fingo-closing {
 /* ==========================================================
    8. Messages Area
    ========================================================== */
-#fingo-messages {
+#fingo-messages,
+#oobe-fingo-messages {
     flex: 1;
     overflow-y: auto;
     padding: 8px 18px 10px;
@@ -597,7 +608,8 @@ body.animations-enabled #fingo-panel.fingo-closing {
         0 0 36px rgba(30, 170, 255, 0.12);
 }
 
-#fingo-input {
+#fingo-input,
+#oobe-fingo-input {
     width: 100%;
     padding: 10px 16px;
     border: none;
@@ -610,16 +622,19 @@ body.animations-enabled #fingo-panel.fingo-closing {
     transition: background 0.2s ease;
 }
 
-#fingo-input::placeholder {
+#fingo-input::placeholder,
+#oobe-fingo-input::placeholder {
     color: #999;
 }
 
-.dark-mode #fingo-input {
+.dark-mode #fingo-input,
+.dark-mode #oobe-fingo-input {
     background: rgba(255, 255, 255, 0.08);
     color: #e4e4e4;
 }
 
-.dark-mode #fingo-input::placeholder {
+.dark-mode #fingo-input::placeholder,
+.dark-mode #oobe-fingo-input::placeholder {
     color: #777;
 }
 
@@ -662,7 +677,8 @@ body.animations-enabled #fingo-panel.fingo-closing {
     pointer-events: none;
 }
 
-.fingo-content.fingo-empty #fingo-input {
+.fingo-content.fingo-empty #fingo-input,
+.fingo-content.fingo-empty #oobe-fingo-input {
     background: transparent !important;
     border-radius: calc(var(--fingo-glass-radius, 16px) - 1px);
 }

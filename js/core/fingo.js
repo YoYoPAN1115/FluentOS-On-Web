@@ -776,6 +776,110 @@ const Fingo = {
         return this._formatDynamicText(this._pickLocalizedText(payload));
     },
 
+    _extractAppNameFromText(text, keywords, langOverride = null) {
+        let content = String(text || '');
+        const sortedKeywords = Array.isArray(keywords)
+            ? [...keywords].sort((a, b) => String(b).length - String(a).length)
+            : [];
+
+        for (const kw of sortedKeywords) {
+            const idx = content.toLowerCase().indexOf(String(kw).toLowerCase());
+            if (idx >= 0) {
+                content = `${content.slice(0, idx)} ${content.slice(idx + String(kw).length)}`;
+                break;
+            }
+        }
+
+        const app = content.replace(/[.,!?，。！？]/g, ' ').trim();
+        const lang = langOverride === 'en' ? 'en' : (langOverride === 'zh' ? 'zh' : this.lang());
+        return app || (lang === 'zh' ? '应用' : 'app');
+    },
+
+    buildPreviewReply(rawText, options = {}) {
+        const lang = options.lang === 'en' ? 'en' : (options.lang === 'zh' ? 'zh' : this.lang());
+        const resolvePayload = (payload) => {
+            if (!payload) return '';
+            if (typeof payload === 'string') return this._formatDynamicText(payload);
+            if (Array.isArray(payload)) {
+                if (!payload.length) return '';
+                return this._formatDynamicText(payload[Math.floor(Math.random() * payload.length)] || '');
+            }
+            if (typeof payload === 'object') {
+                const localized = payload[lang] ?? payload.zh ?? payload.en ?? '';
+                if (Array.isArray(localized)) {
+                    if (!localized.length) return '';
+                    return this._formatDynamicText(localized[Math.floor(Math.random() * localized.length)] || '');
+                }
+                if (typeof localized === 'string') return this._formatDynamicText(localized);
+            }
+            return '';
+        };
+
+        const text = String(rawText || '').trim();
+        const fallbackText = options.fallbackText
+            || resolvePayload(typeof FingoData !== 'undefined' ? FingoData.fallback : null)
+            || (lang === 'zh' ? '抱歉，我暂时没听懂。' : 'Sorry, I did not understand.');
+        if (!text) return fallbackText;
+
+        const commands = (typeof FingoData !== 'undefined' && FingoData && FingoData.commands)
+            ? FingoData.commands
+            : null;
+        if (!commands) return fallbackText;
+
+        const blockedKeys = Array.isArray(options.blockedKeys) ? options.blockedKeys : [];
+        const blockedText = options.blockedText
+            || (lang === 'zh' ? '这个功能需要进入系统后才能使用。' : 'This feature requires entering the system first.');
+        const onAction = typeof options.onAction === 'function' ? options.onAction : null;
+
+        const lower = text.toLowerCase();
+        const normalized = this._normalizeInputText(lower);
+        const compact = this._compactText(normalized);
+        const specialKeys = ['shortcutsHelp', 'uninstall', 'install', 'repair', 'wallpaper'];
+        const orderedKeys = [
+            ...specialKeys.filter((key) => commands[key]),
+            ...Object.keys(commands).filter((key) => !specialKeys.includes(key) && key !== 'openApp'),
+            ...(commands.openApp ? ['openApp'] : [])
+        ];
+
+        for (const key of orderedKeys) {
+            const cmd = commands[key];
+            if (!cmd || !Array.isArray(cmd.keywords)) continue;
+
+            let matched = false;
+            for (const kw of cmd.keywords) {
+                if (this._keywordMatched(lower, normalized, compact, kw)) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) continue;
+
+            if (blockedKeys.includes(key)) {
+                return blockedText;
+            }
+
+            if (onAction) {
+                try {
+                    onAction(cmd.action, { key, cmd, text });
+                } catch (_) {
+                    // Keep preview flow resilient.
+                }
+            }
+
+            let reply = resolvePayload(cmd.response);
+            if ((!reply || !reply.trim()) && key === 'openApp') {
+                reply = resolvePayload(cmd.responseNotFound);
+            }
+            if (reply && reply.includes('{app}')) {
+                const appName = this._extractAppNameFromText(text, cmd.keywords, lang);
+                reply = reply.replace(/\{app\}/g, appName || (lang === 'zh' ? '应用' : 'app'));
+            }
+            return reply || fallbackText;
+        }
+
+        return fallbackText;
+    },
+
     async processInput(text) {
         this._expandCard();
         this.addMessage(text, 'user');
@@ -1116,6 +1220,84 @@ const Fingo = {
                 }, 400);
                 break;
         }
+    },
+
+    _buildCustomApiPayload(text, options = {}) {
+        const provider = options.provider || State.settings.fingoProvider || 'openai';
+        const historyLimit = Number.isFinite(Number(options.historyLimit)) ? Math.max(0, Number(options.historyLimit)) : 10;
+        const history = Array.isArray(options.history)
+            ? options.history
+                .map((m) => ({
+                    role: m && m.role === 'assistant' ? 'assistant' : 'user',
+                    content: String(m?.content ?? '').trim()
+                }))
+                .filter((m) => m.content)
+                .slice(-historyLimit)
+            : [];
+
+        const systemPrompt = options.systemPrompt
+            || 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View.';
+        const userMessage = { role: 'user', content: String(text || '').trim() };
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...history,
+            userMessage
+        ];
+
+        if (provider === 'siliconflow') {
+            return {
+                provider,
+                url: 'https://api.siliconflow.cn/v1/chat/completions',
+                body: {
+                    model: 'deepseek-ai/DeepSeek-V3',
+                    messages,
+                    max_tokens: 1024
+                }
+            };
+        }
+
+        return {
+            provider: 'openai',
+            url: 'https://api.openai.com/v1/chat/completions',
+            body: {
+                model: 'gpt-4o-mini',
+                messages,
+                max_tokens: 1024
+            }
+        };
+    },
+
+    async requestCustomApiReply(text, apiKey, options = {}) {
+        const input = String(text || '').trim();
+        if (!input) return '';
+
+        const token = String(apiKey || '').trim();
+        const lang = options.lang === 'zh' ? 'zh' : 'en';
+        if (!token) {
+            throw new Error(lang === 'zh' ? 'API Key 未设置。' : 'API Key is not set.');
+        }
+
+        const { url, body } = this._buildCustomApiPayload(input, options);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(body)
+        });
+
+        let data = null;
+        try {
+            data = await res.json();
+        } catch (_) {
+            data = null;
+        }
+        if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+
+        const reply = data?.choices?.[0]?.message?.content;
+        if (typeof reply === 'string' && reply.trim()) return reply.trim();
+        return lang === 'zh' ? '未收到回复。' : 'No response.';
     },
 
     async _callApi(text, apiKey) {

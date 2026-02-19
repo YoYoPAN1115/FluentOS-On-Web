@@ -1,0 +1,1653 @@
+﻿/* OOBE standalone styles */
+#oobe-screen {
+    z-index: 980;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    isolation: isolate;
+    color: var(--text-primary);
+}
+
+#oobe-screen .oobe-step {
+    color: var(--text-primary);
+}
+
+#oobe-screen.oobe-theme-light {
+    --bg-primary: #f3f3f3;
+    --bg-secondary: rgba(255, 255, 255, 0.7);
+    --bg-tertiary: rgba(255, 255, 255, 0.5);
+    --text-primary: #1f1f1f;
+    --text-secondary: #666;
+    --text-tertiary: #999;
+    --accent: #0078d4;
+    --accent-hover: #106ebe;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.18);
+}
+
+#oobe-screen.oobe-theme-light img[src*="Symbol_icon/stroke/"],
+#oobe-screen.oobe-theme-light img[src*="Symbol_icon/fill/"] {
+    filter: none !important;
+}
+
+#oobe-screen.oobe-theme-light .oobe-card {
+    background: rgba(248, 250, 255, 0.78);
+    border-color: rgba(255, 255, 255, 0.58);
+    box-shadow: 0 34px 90px rgba(0, 0, 0, 0.28);
+}
+
+#oobe-screen.oobe-theme-light .oobe-progress-dot {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#oobe-screen.oobe-theme-light .oobe-preview-frame {
+    background: rgba(255, 255, 255, 0.58);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+#oobe-screen.oobe-theme-light .oobe-live-start-menu .start-recent-items {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+#oobe-screen.oobe-theme-light .fingo-msg-bot {
+    color: #1a1a1a;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+#oobe-screen.oobe-theme-light #oobe-fingo-input {
+    background: rgba(0, 0, 0, 0.04);
+    color: #1a1a1a;
+}
+
+#oobe-screen.oobe-theme-light #oobe-fingo-input::placeholder {
+    color: #999;
+}
+
+#oobe-screen.oobe-theme-light .oobe-option-btn {
+    background: rgba(255, 255, 255, 0.66);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#oobe-screen.oobe-theme-light .oobe-option-btn.active {
+    border-color: rgba(0, 120, 212, 0.62);
+    background: rgba(228, 242, 255, 0.95);
+}
+
+#oobe-screen.oobe-theme-light .oobe-chip {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#oobe-screen.oobe-theme-light .oobe-chip.active {
+    background: #0078d4;
+    border-color: #0078d4;
+    color: #fff;
+}
+
+#oobe-screen.oobe-theme-light .oobe-chip:hover:not(.active) {
+    background: rgba(0, 120, 212, 0.08);
+    border-color: rgba(0, 120, 212, 0.3);
+}
+
+#oobe-screen.oobe-theme-light .oobe-input {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+#oobe-screen.oobe-theme-light .oobe-btn-secondary {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.oobe-background {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(135deg, #1f4eb8 0%, #2d8ec8 60%, #69bcc8 100%);
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.03);
+}
+
+.oobe-background-mask {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 14% 18%, rgba(0, 185, 255, 0.25), transparent 46%),
+        radial-gradient(circle at 82% 14%, rgba(80, 118, 255, 0.28), transparent 48%),
+        linear-gradient(180deg, rgba(10, 12, 18, 0.18) 0%, rgba(10, 12, 18, 0.36) 100%);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.oobe-shell {
+    position: relative;
+    width: min(860px, 94vw);
+    z-index: 1;
+}
+
+.oobe-card {
+    position: relative;
+    min-height: 728px;
+    padding: 24px 28px 18px;
+    border-radius: 30px;
+    background: rgba(248, 250, 255, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(24px) saturate(170%);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    box-shadow: 0 34px 90px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+.dark-mode .oobe-card {
+    background: rgba(26, 27, 34, 0.66);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 34px 96px rgba(0, 0, 0, 0.46);
+}
+
+.oobe-progress {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+
+.oobe-progress.oobe-progress-hidden {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+}
+
+.oobe-progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.2);
+    transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1), background-color 280ms ease;
+}
+
+.dark-mode .oobe-progress-dot {
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.oobe-progress-dot.active {
+    width: 24px;
+    background: #0078d4;
+}
+
+.oobe-step {
+    position: absolute;
+    inset: 32px;
+    padding-top: 20px;
+    opacity: 0;
+    transform: translateY(20px) scale(0.986);
+    pointer-events: none;
+    transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1), transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-step[data-step="0"] {
+    padding-top: 0;
+}
+
+.oobe-step.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.oobe-step h1 {
+    font-size: 30px;
+    line-height: 1.08;
+    margin-bottom: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--text-primary);
+}
+
+.oobe-step p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* Steps 1-4: move text/content slightly inward and downward */
+.oobe-step[data-step="1"] > h1,
+.oobe-step[data-step="2"] > h1,
+.oobe-step[data-step="3"] > h1,
+.oobe-step[data-step="4"] > h1 {
+    margin-left: 20px;
+    margin-top: 16px;
+}
+
+.oobe-step[data-step="1"] > p,
+.oobe-step[data-step="2"] > p,
+.oobe-step[data-step="3"] > p,
+.oobe-step[data-step="4"] > p {
+    margin-left: 20px;
+}
+
+.oobe-step[data-step="1"] > .oobe-language-options,
+.oobe-step[data-step="2"] > .oobe-setting-block,
+.oobe-step[data-step="3"] > .oobe-setting-block,
+.oobe-step[data-step="4"] > .oobe-setting-block,
+.oobe-step[data-step="4"] > .oobe-inline-status {
+    margin-left: 20px;
+    margin-top: 4px;
+    width: calc(100% - 20px);
+}
+
+.oobe-step[data-step="3"] .oobe-preview-frame {
+    width: min(100%, 600px);
+    min-height: 218px;
+    margin-bottom: 26px;
+}
+
+.oobe-step[data-step="3"] h1 {
+    margin-bottom: 8px;
+}
+
+.oobe-step[data-step="3"] p {
+    margin-bottom: 12px;
+}
+
+.oobe-preview-frame {
+    position: relative;
+    width: min(100%, 600px);
+    aspect-ratio: 16 / 9;
+    min-height: 218px;
+    margin: 0 auto 26px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.16);
+    overflow: hidden;
+}
+
+.dark-mode .oobe-preview-frame {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.oobe-preview-static,
+.oobe-preview-static * {
+    pointer-events: none;
+}
+
+.oobe-preview-interactive {
+    pointer-events: auto;
+}
+
+/* Live desktop preview: reuse real Start menu + taskbar classes */
+.oobe-live-desktop {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: inherit;
+    color: var(--text-primary);
+    transition: color 320ms ease;
+}
+
+.oobe-live-wallpaper {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform: scale(1.02);
+    transition: background-image 320ms ease;
+}
+
+.oobe-live-desktop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.04) 0%, rgba(0, 0, 0, 0.12) 100%);
+    z-index: 1;
+}
+
+.oobe-live-start-menu.start-menu {
+    position: absolute;
+    left: 50%;
+    bottom: 58px;
+    width: clamp(320px, 68%, 520px);
+    max-width: calc(100% - 24px);
+    max-height: calc(100% - 74px);
+    transform: translateX(-50%);
+    z-index: 2;
+    margin: 0;
+    padding: 12px 14px 10px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.oobe-live-start-menu .start-search {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-width: 1.5px;
+}
+
+.oobe-live-start-menu .start-search img {
+    width: 16px;
+    height: 16px;
+}
+
+.oobe-live-start-menu .start-search input {
+    font-size: 12px;
+}
+
+.oobe-live-start-menu .start-section {
+    margin-bottom: 10px;
+}
+
+.oobe-live-start-menu .start-section-header {
+    margin-bottom: 8px;
+}
+
+.oobe-live-start-menu .start-section-header span {
+    font-size: 11px;
+}
+
+.oobe-live-start-menu .start-section-link {
+    padding: 2px 6px;
+    font-size: 10px;
+}
+
+.oobe-live-start-menu .start-apps-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.oobe-live-start-menu .start-app {
+    gap: 4px;
+    padding: 6px 2px;
+    border-radius: 10px;
+}
+
+.oobe-live-start-menu .start-app img {
+    width: 24px;
+    height: 24px;
+}
+
+.oobe-live-start-menu .start-app span {
+    font-size: 10px;
+}
+
+.oobe-live-start-menu .start-recent-items {
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.04);
+    padding: 7px 8px;
+}
+
+.dark-mode .oobe-live-start-menu .start-recent-items {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.oobe-live-start-menu .recent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.oobe-live-start-menu .recent-item-icon {
+    width: 17px;
+    height: 17px;
+}
+
+.oobe-live-start-menu .recent-item-info {
+    min-width: 0;
+}
+
+.oobe-live-start-menu .recent-item-name {
+    font-size: 10px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.oobe-live-start-menu .recent-item-time {
+    font-size: 9px;
+    color: var(--text-secondary);
+}
+
+.oobe-live-start-menu .start-footer {
+    padding-top: 10px;
+}
+
+.oobe-live-start-menu .start-footer-shortcuts {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.oobe-live-start-menu .start-footer-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 6px;
+    border-radius: 8px;
+}
+
+.oobe-live-start-menu .start-footer-btn img {
+    width: 13px;
+    height: 13px;
+}
+
+.oobe-live-start-menu .start-footer-btn span {
+    font-size: 10px;
+    color: var(--text-primary);
+}
+
+.oobe-live-start-menu .start-power-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+}
+
+.oobe-live-start-menu .start-power-btn img {
+    width: 14px;
+    height: 14px;
+}
+
+.oobe-live-taskbar.taskbar {
+    position: absolute;
+    left: 50%;
+    bottom: 7px;
+    width: auto;
+    max-width: calc(100% - 14px);
+    transform: translateX(-50%);
+    z-index: 3;
+    margin: 0;
+    right: auto;
+    gap: 6px;
+    padding: 6px 10px;
+}
+
+.oobe-live-taskbar .taskbar-left,
+.oobe-live-taskbar .taskbar-center,
+.oobe-live-taskbar .taskbar-right {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.oobe-live-taskbar .taskbar-left {
+    justify-content: flex-start;
+}
+
+.oobe-live-taskbar .taskbar-center {
+    justify-content: center;
+}
+
+.oobe-live-taskbar .taskbar-right {
+    justify-content: flex-end;
+}
+
+.oobe-live-taskbar .taskbar-btn {
+    width: 42px;
+    height: 42px;
+}
+
+.oobe-live-taskbar .taskbar-btn img {
+    width: 20px;
+    height: 20px;
+}
+
+.oobe-live-taskbar .taskbar-app img {
+    width: 20px;
+    height: 20px;
+}
+
+.oobe-live-taskbar .taskbar-app::after {
+    bottom: -3px;
+    width: 3px;
+    height: 3px;
+}
+
+.oobe-live-taskbar .taskbar-notification {
+    width: auto !important;
+    padding: 0 10px !important;
+}
+
+.oobe-live-taskbar .notification-time {
+    font-size: 12px;
+}
+
+.oobe-live-taskbar .notification-date {
+    font-size: 10px;
+}
+
+/* Live fingo preview */
+.oobe-live-fingo {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    overflow: hidden;
+    color: var(--text-primary);
+}
+
+.oobe-live-fingo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.18) 100%);
+    z-index: 1;
+}
+
+.oobe-live-fingo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.24) 100%);
+    z-index: 2;
+}
+
+.oobe-live-fingo .oobe-live-wallpaper {
+    position: absolute;
+    inset: 0;
+    background-image: var(--oobe-preview-bg, url('../Theme/Picture/Fluent-2.png'));
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    transform: scale(1.02);
+}
+
+.oobe-live-fingo-blur {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+}
+
+.oobe-live-fingo-blur::before,
+.oobe-live-fingo-blur::after {
+    content: '';
+    position: absolute;
+    width: 56%;
+    height: 74%;
+    border-radius: 26px;
+    filter: blur(38px);
+}
+
+.oobe-live-fingo-blur::before {
+    left: -8%;
+    bottom: -26%;
+    background: linear-gradient(120deg, rgba(255, 120, 60, 0.38), rgba(80, 220, 120, 0.3));
+}
+
+.oobe-live-fingo-blur::after {
+    right: -10%;
+    bottom: -32%;
+    background: linear-gradient(140deg, rgba(40, 130, 255, 0.34), rgba(225, 70, 190, 0.32));
+}
+
+.oobe-live-fingo-content.fingo-content {
+    position: absolute;
+    left: 50%;
+    bottom: 68px;
+    transform: translateX(-50%);
+    z-index: 4;
+    width: min(80%, 500px);
+    height: calc(100% - 98px);
+    max-height: none;
+    transition:
+        bottom 320ms cubic-bezier(0.22, 1, 0.36, 1),
+        width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-live-fingo-content.fingo-content .fingo-history {
+    display: none;
+}
+
+.oobe-live-fingo-content.fingo-content.fingo-empty {
+    bottom: 78px;
+    width: min(74%, 380px);
+    height: auto;
+}
+
+.oobe-live-fingo-content.fingo-content.fingo-empty .fingo-input-wrap {
+    padding: 0;
+}
+
+.oobe-live-fingo-content .fingo-input-wrap {
+    padding: 7px 10px 10px;
+    transition: padding 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#oobe-fingo-messages {
+    max-height: none;
+    min-height: 0;
+}
+
+.oobe-live-taskbar-fingo.taskbar {
+    z-index: 4;
+}
+
+/* Live lock/login preview — full replica */
+.oobe-live-lock-preview {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.oobe-live-lock-wallpaper {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.02);
+}
+
+.oobe-live-lock-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.36) 100%);
+    z-index: 1;
+}
+
+.oobe-live-lock-preview::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.dark-mode .oobe-live-lock-preview::after {
+    background: rgba(10, 12, 18, 0.2);
+}
+
+.oobe-live-lock-time-container {
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    z-index: 2;
+}
+
+.oobe-live-lock-time {
+    font-size: 26px;
+    font-weight: 300;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    line-height: 1.1;
+}
+
+.oobe-live-lock-date {
+    font-size: 12px;
+    color: rgba(255,255,255,0.92);
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    margin-top: 2px;
+}
+
+.oobe-live-login-card.login-card {
+    min-width: 0;
+    width: min(320px, calc(100% - 24px));
+    max-width: 320px;
+    top: 56%;
+    padding: 14px 14px 12px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    z-index: 4;
+}
+
+.oobe-live-login-card .login-avatar {
+    width: 58px;
+    height: 58px;
+    margin: 0 auto 10px;
+}
+
+.oobe-live-login-card .login-username {
+    font-size: 18px;
+    margin-bottom: 2px;
+    color: #fff;
+}
+
+.oobe-live-login-card .login-email {
+    font-size: 11px;
+    margin-bottom: 12px;
+    color: rgba(255,255,255,0.82);
+}
+
+.oobe-live-login-card .login-pin-container {
+    margin-bottom: 8px;
+}
+
+.oobe-live-login-card .login-pin-input {
+    font-size: 12px;
+    padding: 8px 30px 8px 10px;
+    letter-spacing: 2px;
+}
+
+.oobe-live-login-card .pin-toggle {
+    right: 8px;
+    width: 18px;
+    height: 18px;
+}
+
+.oobe-live-login-card .pin-toggle img {
+    width: 100%;
+    height: 100%;
+}
+
+.oobe-live-login-card .login-error {
+    font-size: 10px;
+    margin-bottom: 4px;
+}
+
+.oobe-live-login-card .login-submit {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.oobe-live-lock-hint {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.3);
+    white-space: nowrap;
+}
+
+/* Form area */
+.oobe-language-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.oobe-option-btn {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 14px;
+    border-radius: 15px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.66);
+    transition: all 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark-mode .oobe-option-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.oobe-option-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 120, 212, 0.38);
+    box-shadow: 0 10px 22px rgba(0, 120, 212, 0.2);
+}
+
+.oobe-option-btn.active {
+    border-color: rgba(0, 120, 212, 0.62);
+    background: rgba(228, 242, 255, 0.95);
+}
+
+.dark-mode .oobe-option-btn.active {
+    background: rgba(0, 120, 212, 0.25);
+}
+
+.oobe-option-title {
+    font-size: 17px;
+    font-weight: 650;
+    color: var(--text-primary);
+}
+
+.oobe-option-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.oobe-setting-block {
+    margin-bottom: 14px;
+}
+
+.oobe-setting-title {
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--text-primary);
+}
+
+.oobe-fingo-settings-block {
+    margin-bottom: 16px;
+}
+
+.oobe-step[data-step="3"] .oobe-fingo-settings-block {
+    margin-bottom: 8px;
+}
+
+.oobe-fingo-settings-shell {
+    width: 100%;
+}
+
+#oobe-fingo-settings-scroll-host {
+    width: 100%;
+}
+
+.oobe-fingo-settings-scroll .fluent-scroll-viewport {
+    max-height: 170px;
+    padding-right: 14px;
+}
+
+.oobe-fingo-settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 2px;
+}
+
+.oobe-fingo-setting-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.oobe-fingo-section-title {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text-secondary);
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    margin-left: 2px;
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item {
+    margin-bottom: 0;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 14px;
+    padding: 14px 16px;
+}
+
+.dark-mode .oobe-fingo-settings-shell .fluent-setting-item {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item-label {
+    font-size: 13px;
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item-desc {
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item-control {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    max-width: none;
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item-control .fluent-select-wrapper {
+    width: min(280px, 100%);
+    min-width: 180px;
+}
+
+.oobe-fingo-settings-shell .fluent-setting-item-control .fluent-toggle-wrapper {
+    margin-left: auto;
+}
+
+.oobe-fingo-key-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.oobe-fingo-key-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.oobe-fingo-key-row .fluent-input-wrapper {
+    flex: 1;
+    min-width: 220px;
+}
+
+.oobe-fingo-key-status {
+    margin-top: 2px;
+}
+
+.oobe-fingo-about-note {
+    margin-bottom: 0;
+}
+
+.oobe-fingo-custom-options {
+    overflow: hidden;
+    transform-origin: top center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.oobe-fingo-custom-options .fluent-setting-item {
+    --fingo-stagger-index: 0;
+}
+
+.oobe-fingo-custom-options.anim-in {
+    animation: oobeFingoCustomSlideIn 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.oobe-fingo-custom-options.anim-out {
+    animation: oobeFingoCustomSlideOut 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    pointer-events: none;
+}
+
+.oobe-fingo-custom-options.anim-in .fluent-setting-item {
+    animation: oobeFingoCustomItemIn 520ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+    animation-delay: calc(var(--fingo-stagger-index) * 58ms);
+}
+
+.oobe-fingo-custom-options.anim-out .fluent-setting-item {
+    animation: oobeFingoCustomItemOut 280ms cubic-bezier(0.4, 0, 1, 1) both;
+    animation-delay: calc((2 - var(--fingo-stagger-index)) * 36ms);
+}
+
+@keyframes oobeFingoCustomSlideIn {
+    0% { opacity: 0; transform: translateY(-20px) scaleY(0.9); filter: blur(3px); }
+    55% { opacity: 1; filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0) scaleY(1); filter: blur(0); }
+}
+
+@keyframes oobeFingoCustomSlideOut {
+    0% { opacity: 1; transform: translateY(0) scaleY(1); filter: blur(0); }
+    100% { opacity: 0; transform: translateY(-14px) scaleY(0.88); filter: blur(2px); }
+}
+
+@keyframes oobeFingoCustomItemIn {
+    0% { opacity: 0; transform: translateX(-12px) translateY(14px) scale(0.975); }
+    100% { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+
+@keyframes oobeFingoCustomItemOut {
+    0% { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(14px) translateY(-8px) scale(0.98); }
+}
+
+.oobe-chip-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.oobe-chip {
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark-mode .oobe-chip {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.oobe-chip:hover:not(.active) {
+    background: rgba(0, 120, 212, 0.08);
+    border-color: rgba(0, 120, 212, 0.3);
+}
+
+.dark-mode .oobe-chip:hover:not(.active) {
+    background: rgba(0, 120, 212, 0.16);
+    border-color: rgba(0, 120, 212, 0.4);
+}
+
+.oobe-chip.active,
+.dark-mode .oobe-chip.active {
+    background: #0078d4;
+    border-color: #0078d4;
+    color: #fff;
+}
+
+.oobe-input {
+    width: 100%;
+    max-width: 460px;
+    height: 44px;
+    border-radius: 13px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.82);
+    padding: 0 14px;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.dark-mode .oobe-input {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.oobe-input:focus {
+    border-color: rgba(0, 120, 212, 0.66);
+}
+
+.oobe-inline-status {
+    min-height: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.oobe-actions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.oobe-btn {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 650;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.oobe-btn:hover {
+    transform: translateY(-1px);
+}
+
+.oobe-btn-primary {
+    background: #0078d4;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(0, 120, 212, 0.28);
+}
+
+.oobe-btn-primary.is-disabled {
+    background: #b6bbc3;
+    color: rgba(255, 255, 255, 0.92);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.oobe-btn-primary.is-disabled:hover {
+    transform: none;
+}
+
+.oobe-btn-secondary {
+    background: rgba(255, 255, 255, 0.82);
+    color: var(--text-primary);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .oobe-btn-secondary {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ===== Step 0 — Welcome animation ===== */
+
+.oobe-welcome-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 24px;
+    padding-bottom: 60px;
+}
+
+.oobe-welcome-logo {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    opacity: 0;
+    transform: translateY(30px) scale(0.88);
+    animation: oobeLogoIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-welcome-logo.oobe-logo-bridged {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    animation: none;
+}
+
+.oobe-welcome-logo.oobe-logo-bridge-target {
+    opacity: 0 !important;
+    animation: none !important;
+}
+
+.oobe-welcome-logo.oobe-logo-bridging {
+    opacity: 0 !important;
+    animation: none !important;
+}
+
+.oobe-logo-bridge {
+    position: fixed;
+    z-index: 2005;
+    pointer-events: none;
+    object-fit: contain;
+    will-change: left, top, width, height, opacity, filter;
+}
+
+.oobe-welcome-logo.oobe-welcome-logo-up {
+    transform: translateY(-22px) scale(0.92);
+}
+
+.oobe-welcome-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text-primary);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.oobe-welcome-text.oobe-welcome-text-show {
+    opacity: 1;
+}
+
+.oobe-welcome-letter {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(18px) scale(0.7);
+    animation: oobeLetterBounceIn 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.oobe-welcome-letter.oobe-welcome-letter-out {
+    animation: oobeLetterBounceOut 0.32s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+.oobe-welcome-actions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.oobe-welcome-next {
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-welcome-next.hidden {
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+}
+
+/* ===== Language preview window (Step 1) ===== */
+
+.oobe-lang-preview-window {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -58%);
+    z-index: 2;
+    width: clamp(140px, 44%, 230px);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.82);
+    border: 1px solid rgba(255,255,255,0.5);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+    transition: background 320ms ease, border-color 320ms ease;
+}
+
+.dark-mode .oobe-lang-preview-window {
+    background: rgba(38,40,48,0.82);
+    border-color: rgba(255,255,255,0.15);
+}
+
+.oobe-lang-preview-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.dark-mode .oobe-lang-preview-titlebar {
+    border-bottom-color: rgba(255,255,255,0.1);
+}
+
+.oobe-lang-preview-dots {
+    display: flex;
+    gap: 5px;
+}
+
+.oobe-lang-preview-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.15);
+}
+
+.dark-mode .oobe-lang-preview-dots span {
+    background: rgba(255,255,255,0.2);
+}
+
+.oobe-lang-preview-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 12px 32px;
+}
+
+.oobe-lang-preview-text {
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    transition: opacity 0.25s ease;
+}
+
+/* ===== Geometric start menu (Step 2 preview) ===== */
+
+.oobe-geo-start-menu {
+    position: absolute;
+    left: 50%;
+    bottom: 68px;
+    width: clamp(300px, 45%, 500px);
+    max-width: calc(100% - 24px);
+    transform: translateX(-50%);
+    z-index: 2;
+    padding: 12px 14px 10px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.82);
+    border: 1px solid rgba(255,255,255,0.5);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: var(--shadow-lg);
+    transition: background 320ms ease, border-color 320ms ease;
+}
+
+.dark-mode .oobe-geo-start-menu {
+    background: rgba(38,40,48,0.78);
+    border-color: rgba(255,255,255,0.15);
+}
+
+.oobe-geo-search {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.04);
+    display: flex;
+    align-items: center;
+}
+
+.dark-mode .oobe-geo-search {
+    background: rgba(255,255,255,0.06);
+}
+
+.oobe-geo-bar {
+    display: block;
+    width: 52%;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.1);
+}
+
+.dark-mode .oobe-geo-bar {
+    background: rgba(255,255,255,0.1);
+}
+
+.oobe-geo-bar-sm {
+    display: block;
+    width: 42px;
+    height: 7px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.1);
+}
+
+.dark-mode .oobe-geo-bar-sm {
+    background: rgba(255,255,255,0.1);
+}
+
+.oobe-geo-bar-xs {
+    display: block;
+    width: 18px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.08);
+    margin-top: 4px;
+}
+
+.dark-mode .oobe-geo-bar-xs {
+    background: rgba(255,255,255,0.08);
+}
+
+.oobe-geo-section {
+    margin-bottom: 8px;
+}
+
+.oobe-geo-label {
+    margin-bottom: 6px;
+}
+
+.oobe-geo-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+}
+
+.oobe-geo-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 2px;
+    border-radius: 10px;
+}
+
+.oobe-geo-icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.08);
+}
+
+.dark-mode .oobe-geo-icon {
+    background: rgba(255,255,255,0.1);
+}
+
+.oobe-geo-recent {
+    border-radius: 10px;
+    background: rgba(0,0,0,0.04);
+    padding: 7px 8px;
+    margin-bottom: 8px;
+}
+
+.dark-mode .oobe-geo-recent {
+    background: rgba(255,255,255,0.08);
+}
+
+.oobe-geo-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+}
+
+.oobe-geo-recent-icon {
+    display: block;
+    width: 17px;
+    height: 17px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.08);
+}
+
+.dark-mode .oobe-geo-recent-icon {
+    background: rgba(255,255,255,0.1);
+}
+
+.oobe-geo-recent-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.oobe-geo-recent-name {
+    display: block;
+    width: 56px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.1);
+}
+
+.dark-mode .oobe-geo-recent-name {
+    background: rgba(255,255,255,0.1);
+}
+
+.oobe-geo-recent-time {
+    display: block;
+    width: 32px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.06);
+}
+
+.dark-mode .oobe-geo-recent-time {
+    background: rgba(255,255,255,0.07);
+}
+
+.oobe-geo-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.dark-mode .oobe-geo-footer {
+    border-top-color: rgba(255,255,255,0.08);
+}
+
+.oobe-geo-footer-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.oobe-geo-footer-btn {
+    width: 30px;
+    height: 18px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.05);
+}
+
+.dark-mode .oobe-geo-footer-btn {
+    background: rgba(255,255,255,0.06);
+}
+
+.oobe-geo-power {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.06);
+}
+
+.dark-mode .oobe-geo-power {
+    background: rgba(255,255,255,0.07);
+}
+
+/* ===== Keyframes ===== */
+
+@keyframes oobeLogoIn {
+    0% {
+        opacity: 0;
+        transform: translateY(30px) scale(0.88);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes oobeLetterBounceIn {
+    0% {
+        opacity: 0;
+        transform: translateY(18px) scale(0.7);
+    }
+    60% {
+        opacity: 1;
+        transform: translateY(-4px) scale(1.05);
+    }
+    80% {
+        transform: translateY(2px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes oobeLetterBounceOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    40% {
+        opacity: 0.6;
+        transform: translateY(-6px) scale(1.04);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(16px) scale(0.7);
+    }
+}
+
+@keyframes oobeMsgIn {
+    0% {
+        opacity: 0;
+        transform: translateY(6px) scale(0.985);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 860px) {
+    .oobe-card {
+        min-height: 784px;
+        border-radius: 24px;
+        padding: 20px 16px 14px;
+    }
+
+    .oobe-step {
+        inset: 20px;
+        padding-top: 16px;
+    }
+
+    .oobe-step[data-step="0"] {
+        padding-top: 0;
+    }
+
+    .oobe-step h1 {
+        font-size: 26px;
+    }
+
+    .oobe-step[data-step="1"] > h1,
+    .oobe-step[data-step="2"] > h1,
+    .oobe-step[data-step="3"] > h1,
+    .oobe-step[data-step="4"] > h1 {
+        margin-left: 12px;
+        margin-top: 10px;
+    }
+
+    .oobe-step[data-step="1"] > p,
+    .oobe-step[data-step="2"] > p,
+    .oobe-step[data-step="3"] > p,
+    .oobe-step[data-step="4"] > p {
+        margin-left: 12px;
+    }
+
+    .oobe-step[data-step="1"] > .oobe-language-options,
+    .oobe-step[data-step="2"] > .oobe-setting-block,
+    .oobe-step[data-step="3"] > .oobe-setting-block,
+    .oobe-step[data-step="4"] > .oobe-setting-block,
+    .oobe-step[data-step="4"] > .oobe-inline-status {
+        margin-left: 12px;
+        margin-top: 4px;
+        width: calc(100% - 12px);
+    }
+
+    .oobe-preview-frame {
+        width: 100%;
+        min-height: 190px;
+        margin: 0 auto 20px;
+    }
+
+    .oobe-live-start-menu.start-menu {
+        width: min(calc(100% - 16px), 88%);
+        bottom: 52px;
+        padding: 10px;
+    }
+
+    .oobe-live-start-menu .start-apps-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .oobe-fingo-settings-scroll .fluent-scroll-viewport {
+        max-height: 156px;
+        padding-right: 12px;
+    }
+
+    .oobe-fingo-settings-shell .fluent-setting-item-control {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .oobe-fingo-settings-shell .fluent-setting-item-control .fluent-select-wrapper {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .oobe-fingo-key-row .fluent-input-wrapper {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .oobe-live-taskbar.taskbar {
+        width: calc(100% - 18px);
+        min-width: 0;
+    }
+
+    .oobe-live-login-card.login-card {
+        width: calc(100% - 16px);
+    }
+
+    .oobe-language-options {
+        grid-template-columns: 1fr;
+    }
+
+    .oobe-welcome-text {
+        font-size: 32px;
+    }
+
+    .oobe-welcome-logo {
+        width: 72px;
+        height: 72px;
+    }
+
+    .oobe-lang-preview-text {
+        font-size: 42px;
+    }
+
+    .oobe-geo-start-menu {
+        width: min(calc(100% - 18px), 86%);
+        bottom: 54px;
+        padding: 10px;
+    }
+
+    .oobe-geo-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}

@@ -195,6 +195,80 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 
 .fluent-select-disabled { opacity: 0.5; pointer-events: none; }
 
+/* ============ 自渲染滚动容器 ============ */
+.fluent-scroll-area {
+    position: relative;
+    width: 100%;
+    min-height: 0;
+}
+
+.fluent-scroll-viewport {
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    padding-right: 12px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.fluent-scroll-viewport::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.fluent-scroll-rail {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    bottom: 2px;
+    width: 8px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+}
+
+.fluent-scroll-thumb {
+    position: absolute;
+    top: 0;
+    left: 1px;
+    width: 6px;
+    min-height: 24px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.24);
+    transition: background 150ms ease, opacity 150ms ease;
+    cursor: pointer;
+}
+
+.dark-mode .fluent-scroll-thumb {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+.fluent-scroll-area:hover .fluent-scroll-rail,
+.fluent-scroll-area.scrolling .fluent-scroll-rail,
+.fluent-scroll-area.dragging .fluent-scroll-rail,
+.fluent-scroll-area.fluent-scroll-always-visible .fluent-scroll-rail {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.fluent-scroll-area:hover .fluent-scroll-thumb {
+    background: rgba(0, 0, 0, 0.34);
+}
+
+.dark-mode .fluent-scroll-area:hover .fluent-scroll-thumb {
+    background: rgba(255, 255, 255, 0.38);
+}
+
+.fluent-scroll-area.dragging .fluent-scroll-thumb {
+    background: rgba(0, 120, 212, 0.62);
+}
+
+.fluent-scroll-area.no-scroll .fluent-scroll-rail {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* ============ 开关/滑块 ============ */
 .fluent-toggle-wrapper { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
 .fluent-toggle-disabled { opacity: 0.5; pointer-events: none; }

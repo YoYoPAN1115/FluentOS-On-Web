@@ -29,6 +29,8 @@ const BootScreen = {
             logo.src = document.body.classList.contains('dark-mode')
                 ? 'Theme/Icon/Fluent_logo_dark.png'
                 : 'Theme/Icon/Fluent_logo.png';
+            logo.style.opacity = '1';
+            logo.style.visibility = '';
         }
 
         this.element.classList.remove('hidden');
@@ -39,7 +41,13 @@ const BootScreen = {
         this._hideFirstHint();
         this._firstBootDone = false;
 
-        if (this.isFirstBoot()) {
+        const shouldShowOobe = typeof OOBE !== 'undefined'
+            && typeof OOBE.shouldShowOnFirstLaunch === 'function'
+            && OOBE.shouldShowOnFirstLaunch();
+
+        if (shouldShowOobe) {
+            setTimeout(() => this.fadeToLock(), this.FAST_DURATION);
+        } else if (this.isFirstBoot()) {
             this._firstBoot();
         } else {
             setTimeout(() => this.fadeToLock(), this.FAST_DURATION);
@@ -251,23 +259,41 @@ const BootScreen = {
     },
 
     fadeToLock() {
-        LockScreen.show();
-        const lockEl = document.getElementById('lock-screen');
-        lockEl.style.opacity = '0';
-        lockEl.classList.remove('hidden');
+        const shouldGoOobe = typeof OOBE !== 'undefined'
+            && typeof OOBE.shouldShowOnFirstLaunch === 'function'
+            && OOBE.shouldShowOnFirstLaunch();
+
+        const bootLogoEl = this.element ? this.element.querySelector('.boot-logo') : null;
+        if (shouldGoOobe && typeof OOBE.show === 'function') {
+            OOBE.show({ bootLogoEl });
+        } else {
+            LockScreen.show();
+        }
+
+        const targetEl = shouldGoOobe
+            ? document.getElementById('oobe-screen')
+            : document.getElementById('lock-screen');
+
+        if (!targetEl) {
+            State.view = shouldGoOobe ? 'oobe' : 'lock';
+            return;
+        }
+
+        targetEl.style.opacity = '0';
+        targetEl.classList.remove('hidden');
 
         this.element.style.transition = 'opacity 0.8s ease';
         this.element.style.opacity = '0';
-        lockEl.style.transition = 'opacity 0.8s ease';
-        lockEl.style.opacity = '1';
+        targetEl.style.transition = 'opacity 0.8s ease';
+        targetEl.style.opacity = '1';
 
         setTimeout(() => {
             this.element.classList.add('hidden');
             this.element.style.transition = '';
             this.element.style.opacity = '';
-            lockEl.style.transition = '';
-            lockEl.style.opacity = '';
-            State.view = 'lock';
+            targetEl.style.transition = '';
+            targetEl.style.opacity = '';
+            State.view = shouldGoOobe ? 'oobe' : 'lock';
         }, 800);
     },
 
