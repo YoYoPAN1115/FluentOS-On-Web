@@ -19,6 +19,7 @@ const OOBE = {
 
     selectedLang: null,
     selectedTheme: 'light',
+    selectedAutoFullscreen: true,
     selectedFingoMode: 'local',
     currentStep: 0,
     finishing: false,
@@ -75,6 +76,10 @@ const OOBE = {
             themeTitle: '主题',
             themeLight: '浅色',
             themeDark: '深色',
+            autoFullscreenTitle: '\u5f00\u673a\u81ea\u52a8\u7f51\u9875\u5168\u5c4f',
+            autoFullscreenDesc: '\u5f00\u673a\u7b2c2\u79d2\u81ea\u52a8\u8fdb\u5165\u7f51\u9875\u5168\u5c4f\uff0c\u5e26\u6765\u66f4\u4e3a\u6c89\u6d78\u7684\u4f53\u9a8c\u3002',
+            autoFullscreenOn: '\u5f00\u542f',
+            autoFullscreenOff: '\u5173\u95ed',
 
             fingoPageTitle: 'Fingo AI 模式',
             fingoPageSubtitle: '你可以在上方临时对话，退出 OOBE 后不会保存记录。',
@@ -130,6 +135,10 @@ const OOBE = {
             themeTitle: 'Theme',
             themeLight: 'Light',
             themeDark: 'Dark',
+            autoFullscreenTitle: 'Auto Web Fullscreen On Boot',
+            autoFullscreenDesc: 'Automatically enter web fullscreen at second 2 after boot for a more immersive experience.',
+            autoFullscreenOn: 'On',
+            autoFullscreenOff: 'Off',
 
             fingoPageTitle: 'Fingo AI Mode',
             fingoPageSubtitle: 'Chat above in temporary mode. Nothing is saved after OOBE.',
@@ -400,6 +409,14 @@ const OOBE = {
             });
         });
 
+        const autoFullscreenButtons = Array.from(this.element.querySelectorAll('#oobe-auto-fullscreen-group .oobe-chip'));
+        autoFullscreenButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.selectedAutoFullscreen = btn.dataset.autoFullscreen !== 'false';
+                autoFullscreenButtons.forEach(item => item.classList.toggle('active', item === btn));
+            });
+        });
+
         /* Welcome step 0 next */
         const next0 = document.getElementById('oobe-next-0');
         if (next0) {
@@ -491,6 +508,7 @@ const OOBE = {
         this.finishing = false;
         this.selectedLang = null;
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
+        this.selectedAutoFullscreen = State?.settings?.autoEnterFullscreen !== false;
         this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
         this.fingoModeAnimating = false;
         this.pendingFingoCustomEnter = false;
@@ -502,6 +520,7 @@ const OOBE = {
         languageButtons.forEach(btn => btn.classList.remove('active'));
 
         this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === this.selectedTheme);
+        this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
         this._renderFingoSettingsPanel();
 
         this._syncNextStep1State();
@@ -1074,6 +1093,7 @@ const OOBE = {
     _applySelections() {
         const updates = {
             theme: this.selectedTheme,
+            autoEnterFullscreen: this.selectedAutoFullscreen,
             fingoCustomMode: this.selectedFingoMode === 'custom'
         };
 
@@ -1306,6 +1326,18 @@ const OOBE = {
             return;
         }
 
+        if (action === 'confirmAutoFullscreen:disable' || action === 'setAutoFullscreen:false') {
+            this.selectedAutoFullscreen = false;
+            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            return;
+        }
+
+        if (action === 'setAutoFullscreen:true') {
+            this.selectedAutoFullscreen = true;
+            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            return;
+        }
+
         if (action === 'openSettings:time-language') {
             this._setStep(1);
             return;
@@ -1421,6 +1453,8 @@ const OOBE = {
         setText('oobe-title-theme', d.themePageTitle);
         setText('oobe-subtitle-theme', d.themePageSubtitle);
         setText('oobe-theme-title', d.themeTitle);
+        setText('oobe-auto-fullscreen-title', d.autoFullscreenTitle);
+        setText('oobe-auto-fullscreen-desc', d.autoFullscreenDesc);
         setText('oobe-title-fingo', d.fingoPageTitle);
         setText('oobe-subtitle-fingo', d.fingoPageSubtitle);
         setText('oobe-fingo-title', this._fingoText('settings.fingo-title', 'Fingo AI', 'Fingo AI'));
@@ -1444,6 +1478,10 @@ const OOBE = {
         const themeDark = this.element.querySelector('#oobe-theme-group [data-theme="dark"]');
         if (themeLight) themeLight.textContent = d.themeLight;
         if (themeDark) themeDark.textContent = d.themeDark;
+        const autoFullscreenOn = this.element.querySelector('#oobe-auto-fullscreen-group [data-auto-fullscreen="true"]');
+        const autoFullscreenOff = this.element.querySelector('#oobe-auto-fullscreen-group [data-auto-fullscreen="false"]');
+        if (autoFullscreenOn) autoFullscreenOn.textContent = d.autoFullscreenOn;
+        if (autoFullscreenOff) autoFullscreenOff.textContent = d.autoFullscreenOff;
 
         const next0 = document.getElementById('oobe-next-0');
         const next1 = document.getElementById('oobe-next-1');

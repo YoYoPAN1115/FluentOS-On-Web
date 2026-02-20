@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Fingo AI 助手 - 核心逻辑
  */
 const Fingo = {
@@ -884,12 +884,6 @@ const Fingo = {
         this._expandCard();
         this.addMessage(text, 'user');
 
-        // Handle pending confirmations first so they are not intercepted by custom API mode.
-        if (this._pendingAction) {
-            this._handleConfirmation(text);
-            return;
-        }
-
         // 自定义模式：全部走 API
         if (State.settings.fingoCustomMode) {
             if (State.settings.strictCspEnabled !== true) {
@@ -987,23 +981,6 @@ const Fingo = {
         WindowManager.windows.filter(w => w.appId === appId).forEach(w => WindowManager.closeWindow(w.id));
     },
 
-    _exitDocumentFullscreen() {
-        const exit =
-            document.exitFullscreen
-            || document.webkitExitFullscreen
-            || document.mozCancelFullScreen
-            || document.msExitFullscreen;
-        if (typeof exit !== 'function') return;
-        try {
-            const ret = exit.call(document);
-            if (ret && typeof ret.catch === 'function') {
-                ret.catch(() => {});
-            }
-        } catch (_) {
-            // Ignore fullscreen exit failures.
-        }
-    },
-
     // --- 确认流程 ---
     _handleConfirmation(text) {
         const lower = text.toLowerCase();
@@ -1020,14 +997,6 @@ const Fingo = {
             return;
         }
         // 用户确认
-        if (pa.type === 'disableAutoFullscreen') {
-            State.updateSettings({ autoEnterFullscreen: false });
-            this._exitDocumentFullscreen();
-            setTimeout(() => this.addMessage(this.lang() === 'zh'
-                ? '已关闭开机自动网页全屏。'
-                : 'Auto web fullscreen on boot is now disabled.', 'bot'), 300);
-            return;
-        }
         if (pa.type === 'installAndOpen') {
             this._doInstallAndOpen(pa.shopApp);
         } else {
@@ -1206,17 +1175,6 @@ const Fingo = {
             case 'setAnimation': State.updateSettings({ enableAnimation: value === 'true' }); break;
             case 'setWindowBlur': State.updateSettings({ enableWindowBlur: value === 'true' }); break;
             case 'setFluentV2': State.updateSettings({ enableFluentV2: value === 'true' }); break;
-            case 'setAutoFullscreen':
-                State.updateSettings({ autoEnterFullscreen: value === 'true' });
-                if (value !== 'true') {
-                    this._exitDocumentFullscreen();
-                }
-                break;
-            case 'confirmAutoFullscreen':
-                if (value === 'disable') {
-                    this._pendingAction = { type: 'disableAutoFullscreen' };
-                }
-                break;
             case 'setBluetooth':
                 State.updateSettings({ bluetoothEnabled: value === 'true' });
                 if (typeof ControlCenter !== 'undefined') ControlCenter.updateTiles();
@@ -1278,7 +1236,7 @@ const Fingo = {
             : [];
 
         const systemPrompt = options.systemPrompt
-            || 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation.';
+            || 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View.';
         const userMessage = { role: 'user', content: String(text || '').trim() };
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -1356,7 +1314,7 @@ const Fingo = {
 
         const sysMsg = {
             role: 'system',
-            content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation.'
+            content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View.'
         };
 
         let url, body, headers;

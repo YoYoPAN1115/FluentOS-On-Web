@@ -105,6 +105,73 @@ if (typeof window !== 'undefined') {
     window.StrictScriptGuard = StrictScriptGuard;
 }
 
+const AUTO_FULLSCREEN_DELAY_MS = 2000;
+let autoFullscreenTimer = null;
+let autoFullscreenRetryBound = false;
+
+function bindFullscreenRetryOnNextInteraction() {
+    if (autoFullscreenRetryBound) return;
+    autoFullscreenRetryBound = true;
+
+    const tryOnce = async () => {
+        unbind();
+        if (!State || !State.settings || State.settings.autoEnterFullscreen === false) return;
+        await requestDocumentFullscreen();
+    };
+
+    const unbind = () => {
+        document.removeEventListener('pointerdown', tryOnce, true);
+        document.removeEventListener('keydown', tryOnce, true);
+        autoFullscreenRetryBound = false;
+    };
+
+    document.addEventListener('pointerdown', tryOnce, true);
+    document.addEventListener('keydown', tryOnce, true);
+}
+
+function isDocumentFullscreen() {
+    return !!(
+        document.fullscreenElement
+        || document.webkitFullscreenElement
+        || document.mozFullScreenElement
+        || document.msFullscreenElement
+    );
+}
+
+async function requestDocumentFullscreen() {
+    if (isDocumentFullscreen()) return true;
+    const root = document.documentElement;
+    if (!root) return false;
+
+    const request =
+        root.requestFullscreen
+        || root.webkitRequestFullscreen
+        || root.mozRequestFullScreen
+        || root.msRequestFullscreen;
+
+    if (typeof request !== 'function') return false;
+
+    try {
+        const ret = request.call(root);
+        if (ret && typeof ret.then === 'function') {
+            await ret;
+        }
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function scheduleAutoEnterFullscreen() {
+    clearTimeout(autoFullscreenTimer);
+    autoFullscreenTimer = setTimeout(async () => {
+        autoFullscreenTimer = null;
+        if (!State || !State.settings || State.settings.autoEnterFullscreen === false) return;
+        const ok = await requestDocumentFullscreen();
+        if (!ok) bindFullscreenRetryOnNextInteraction();
+    }, AUTO_FULLSCREEN_DELAY_MS);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('%c Fluent OS ', 'background: #0078d4; color: white; font-size: 16px; padding: 4px 8px; border-radius: 4px;');
     console.log('正在启动系统...');
@@ -277,8 +344,8 @@ function initGlobalShortcuts() {
 }
 
 function startSystem() {
-    // 无论是否已登录，都先显示开机画面
     State.setView('boot');
+    scheduleAutoEnterFullscreen();
 }
 
 /**
@@ -361,6 +428,7 @@ function handlePowerAction({ action }) {
             hideAllViews();
             BootScreen.show();
             State.view = 'boot';
+            scheduleAutoEnterFullscreen();
         } else if (action === 'logout') {
             hideAllViews();
             LockScreen.show();

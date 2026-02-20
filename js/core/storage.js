@@ -64,6 +64,7 @@ const Storage = {
                 wallpaperLock: 'Theme/Picture/Fluent-1.png',
                 enableBlur: true,
                 enableAnimation: true,
+                autoEnterFullscreen: true,
                 enableWindowBlur: true,  // 窗口模糊效果
                 enableFluentV2: false,   // 新版实验性 UI
                 pin: '1234',

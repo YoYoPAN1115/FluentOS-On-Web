@@ -835,6 +835,10 @@ body.fluent-v2 #oobe-screen.dark-mode .oobe-live-taskbar.taskbar {
     color: var(--text-primary);
 }
 
+.oobe-setting-desc {
+    margin-bottom: 10px;
+}
+
 .oobe-fingo-settings-block {
     margin-bottom: 16px;
 }
@@ -1165,6 +1169,15 @@ body.fluent-v2 #oobe-screen.dark-mode .oobe-fingo-settings-shell .fluent-toggle.
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    pointer-events: none;
+}
+
+.oobe-step.active .oobe-actions .oobe-btn {
+    pointer-events: auto;
+}
+
+.oobe-step:not(.active) .oobe-actions .oobe-btn {
+    pointer-events: none;
 }
 
 .oobe-btn {

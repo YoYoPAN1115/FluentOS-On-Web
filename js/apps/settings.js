@@ -1855,6 +1855,23 @@ const SettingsApp = {
                 }
             })
         }));
+
+        appearanceSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.auto-fullscreen'),
+            description: t('settings.auto-fullscreen.desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.autoEnterFullscreen !== false,
+                onChange: (v) => {
+                    State.updateSettings({ autoEnterFullscreen: v });
+                    this.addRecentSetting(t('settings.auto-fullscreen'), v ? t('settings.on') : t('settings.off'), 'personalization');
+                    State.addNotification({
+                        title: t('settings.auto-fullscreen'),
+                        message: t('settings.auto-fullscreen-changed', { status: v ? t('settings.on') : t('settings.off') }),
+                        type: 'success'
+                    });
+                }
+            })
+        }));
         
         container.appendChild(appearanceSection);
     },

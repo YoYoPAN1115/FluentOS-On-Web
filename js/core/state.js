@@ -104,6 +104,7 @@ const State = {
             fingoApiEncrypted: null,
             fingoApiStorageType: 'none',
             fingoApiSaveMode: 'temporary',
+            autoEnterFullscreen: true,
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowBoundsMemory: {}

@@ -60,7 +60,52 @@ const FingoData = {
             action: 'setWindowBlur:false',
             response: { zh: '窗口模糊效果已关闭', en: 'Window blur disabled' }
         },
-        // ===== 电源操作 =====
+        // ===== 网页全屏 =====
+        autoFullscreenOn: {
+            keywords: [
+                '开启网页自动全屏',
+                '开启网页全屏',
+                '打开网页全屏',
+                '启用网页全屏',
+                '打开网页自动全屏',
+                '启用网页自动全屏',
+                '开启自动网页全屏',
+                '打开自动网页全屏',
+                '启用自动网页全屏',
+                '开启自动全屏',
+                '打开自动全屏',
+                '启用自动全屏',
+                '开启开机自动全屏',
+                '打开开机自动全屏',
+                'enable auto fullscreen',
+                'turn on auto fullscreen',
+                'enable web auto fullscreen',
+                'turn on web auto fullscreen'
+            ],
+            action: 'setAutoFullscreen:true',
+            response: {
+                zh: '已开启“开机自动网页全屏”。',
+                en: 'Enabled "Auto Web Fullscreen On Boot".'
+            }
+        },
+        // ===== 全屏相关（默认走关闭确认） =====
+        autoFullscreen: {
+            keywords: [
+                '\u5168\u5c4f',
+                '\u81ea\u52a8\u5168\u5c4f',
+                '\u7f51\u9875\u5168\u5c4f',
+                '\u5f00\u673a\u5168\u5c4f',
+                '\u9000\u51fa\u5168\u5c4f',
+                'fullscreen',
+                'full screen',
+                'auto fullscreen'
+            ],
+            action: 'confirmAutoFullscreen:disable',
+            response: {
+                zh: '\u68c0\u6d4b\u5230\u4f60\u5728\u95ee\u5168\u5c4f\u3002\u8981\u5173\u95ed\u201c\u5f00\u673a\u81ea\u52a8\u7f51\u9875\u5168\u5c4f\u201d\u5417\uff1f\uff08\u786e\u5b9a/\u4e0d\u8981\uff09',
+                en: 'You asked about fullscreen. Disable "Auto Web Fullscreen On Boot"? (yes/no)'
+            }
+        },
         shutdown: {
             keywords: ['关机', '关闭电脑', 'shutdown', 'power off', 'shut down'],
             action: 'power:shutdown',
@@ -203,7 +248,7 @@ const FingoData = {
             action: 'none',
             response: {
                 zh: '我是 Fingo，你的系统智能助手 🤖 以下是我能帮你做的事：\n\n🎨外观主题\n　「切换深色模式」「浅色模式」「自动主题」\n\n✨ 系统效果\n　「开启/关闭模糊」「开启/关闭动画」「窗口模糊」「新版外观」\n\n📶 连接与网络\n　「开启/关闭蓝牙」「开启/关闭Wi-Fi」\n\n📱应用管理\n　「安装哔哩哔哩」「卸载xx」「修复浏览器」\n　· 系统应用不可卸载，运行中的应用会先询问确认\n\n🖼️ 个性化\n　「换张壁纸」自动从 Bing 获取精美壁纸\n　「调高/调低亮度」\n\n💬 休闲聊天\n　「我好无聊」「讲个笑话」「来个谜语」「现在几点」\n\n⚙️ 系统设置\n　「语言设置」「改密码」「Fingo AI 设置」\n\n⚡ 电源操作\n　「关机」「重启」「注销」「锁屏」\n\n💡 想了解 FluentOS？说「介绍FluentOS」\n🧠 想让我更聪明？说「自定义模式」了解 API 接入',
-                en: 'I\'m Fingo, your system assistant \u{1F916} Here\'s what I can do:\n\n\u{1F3A8} Themes\n\u3000"dark mode" "light mode" "auto theme"\n\n\u2728 Effects\n\u3000"enable/disable blur" "animation" "window blur" "new UI"\n\n\u{1F4F6} Connectivity\n\u3000"enable/disable bluetooth" "enable/disable Wi-Fi"\n\n\u{1F4F1} App Management\n\u3000"install Bilibili" "uninstall xx" "repair browser"\n\u3000\u00B7 System apps can\'t be uninstalled; running apps ask for confirmation\n\n\u{1F5BC}\uFE0F Personalization\n\u3000"change wallpaper" and "brightness up/down"\n\n\u{1F4AC} Casual Chat\n\u3000"i am bored" "tell me a joke" "give me a riddle" "what time is it"\n\n\u2699\uFE0F Settings\n\u3000"language settings" "change password" "Fingo AI settings"\n\n\u26A1 Power\n\u3000"shutdown" "restart" "logout" "lock"\n\n\u{1F4A1} Say "about FluentOS" to learn more\n\u{1F9E0} Say "custom mode" to connect your own AI API'
+                en: 'I\'m Fingo, your system assistant \u{1F916} Here\'s what I can do:\n\n\u{1F3A8} Themes\n\u3000"dark mode" "light mode" "auto theme"\n\n\u2728 Effects\n\u3000"enable/disable blur" "animation" "window blur" "new UI" "fullscreen"\n\n\u{1F4F6} Connectivity\n\u3000"enable/disable bluetooth" "enable/disable Wi-Fi"\n\n\u{1F4F1} App Management\n\u3000"install Bilibili" "uninstall xx" "repair browser"\n\u3000\u00B7 System apps can\'t be uninstalled; running apps ask for confirmation\n\n\u{1F5BC}\uFE0F Personalization\n\u3000"change wallpaper" and "brightness up/down"\n\n\u{1F4AC} Casual Chat\n\u3000"i am bored" "tell me a joke" "give me a riddle" "what time is it"\n\n\u2699\uFE0F Settings\n\u3000"language settings" "change password" "Fingo AI settings"\n\n\u26A1 Power\n\u3000"shutdown" "restart" "logout" "lock"\n\n\u{1F4A1} Say "about FluentOS" to learn more\n\u{1F9E0} Say "custom mode" to connect your own AI API'
             }
         },
         shortcutsHelp: {
