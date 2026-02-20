@@ -1415,6 +1415,7 @@ body.animations-enabled .taskbar-center {
 .window-resize-handle {
     position: absolute;
     z-index: 10;
+    touch-action: none;
 }
 
 .window-resize-handle.resize-top {
@@ -1510,6 +1511,7 @@ body.animations-enabled .taskbar-center {
     border-bottom: 1px solid var(--border-color);
     cursor: move;
     user-select: none;
+    touch-action: none;
 }
 
 .window-title-section {
@@ -1542,6 +1544,7 @@ body.animations-enabled .taskbar-center {
     justify-content: center;
     border-radius: var(--radius-sm);
     transition: background var(--transition-fast);
+    touch-action: manipulation;
 }
 
 .window-control-btn:hover {
@@ -1769,6 +1772,26 @@ body.animations-enabled .taskbar-center {
     width: 100% !important;
     height: 100% !important;
     border-radius: 0 !important;
+}
+
+@media (pointer: coarse) {
+    .window-resize-handle.resize-top,
+    .window-resize-handle.resize-bottom {
+        height: 10px;
+    }
+
+    .window-resize-handle.resize-left,
+    .window-resize-handle.resize-right {
+        width: 10px;
+    }
+
+    .window-resize-handle.resize-top-left,
+    .window-resize-handle.resize-top-right,
+    .window-resize-handle.resize-bottom-left,
+    .window-resize-handle.resize-bottom-right {
+        width: 22px;
+        height: 22px;
+    }
 }
 
 .window.minimizing,

@@ -68,6 +68,9 @@ const Storage = {
                 enableWindowBlur: true,  // 窗口模糊效果
                 enableFluentV2: false,   // 新版实验性 UI
                 pin: '1234',
+                userName: 'Owner',
+                userEmail: 'owner@sample.com',
+                userAvatar: 'Theme/Profile_img/UserAva.png',
                 language: 'zh',
                 volume: 50,
                 brightness: 100,

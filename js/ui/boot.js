@@ -166,7 +166,13 @@ const BootScreen = {
             'Theme/Picture/Fluent-8.png'
         ]);
 
+        const profileAvatarDefaults = [
+            'Theme/Profile_img/UserAva.png',
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
+        ];
         const avatars = uniq([
+            settings.userAvatar || 'Theme/Profile_img/UserAva.png',
+            ...profileAvatarDefaults,
             'Theme/Icon/UserAva.png'
         ]);
 

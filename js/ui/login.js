@@ -1,9 +1,10 @@
 /**
- * 登录屏幕模块
+ * Login screen module
  */
 const LoginScreen = {
     element: null,
     cardElement: null,
+    avatarElement: null,
     usernameElement: null,
     emailElement: null,
     pinInput: null,
@@ -17,6 +18,7 @@ const LoginScreen = {
     init() {
         this.element = document.getElementById('login-screen');
         this.cardElement = this.element.querySelector('.login-card');
+        this.avatarElement = this.element.querySelector('.login-avatar img');
         this.usernameElement = this.element.querySelector('.login-username');
         this.emailElement = this.element.querySelector('.login-email');
         this.pinInput = document.getElementById('login-pin');
@@ -26,29 +28,36 @@ const LoginScreen = {
         this.securityLink = document.getElementById('security-link');
         this.wallpaperElement = this.element.querySelector('.login-wallpaper');
 
-        // 绑定事件
         this.submitBtn.addEventListener('click', () => this.handleLogin());
         this.pinInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 this.handleLogin();
             }
         });
-        
+
         this.pinToggle.addEventListener('click', () => this.togglePinVisibility());
-        
-        // 点击模糊区域（非密码卡片）退回锁屏
+
         this.element.addEventListener('click', (e) => {
-            // 如果点击的不是密码卡片内部，则返回锁屏
             if (State.view === 'login' && !this.cardElement.contains(e.target)) {
                 this.backToLock();
             }
         });
+
         State.on('languageChange', () => this.updateTexts());
+        State.on('settingsChange', (updates = {}) => {
+            if (
+                updates.userName !== undefined ||
+                updates.userEmail !== undefined ||
+                updates.userAvatar !== undefined
+            ) {
+                this.updateProfile();
+            }
+        });
+
         this.updateTexts();
     },
-    
+
     backToLock() {
-        // 触发返回锁屏的动画
         if (window.handleLoginToLock) {
             window.handleLoginToLock();
         }
@@ -74,31 +83,47 @@ const LoginScreen = {
     },
 
     updateWallpaper() {
-        // 登录界面不设置自己的壁纸，而是同步更新锁屏壁纸
-        // 因为登录界面的 .login-wallpaper 是透明的，让锁屏的模糊壁纸透过来
-        // 确保 .login-wallpaper 始终保持 background-image: none
         this.wallpaperElement.style.backgroundImage = 'none';
-        // 同步更新锁屏壁纸（锁屏壁纸是登录界面的实际背景）
         if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) {
             LockScreen.updateWallpaper();
         }
     },
 
+    getProfile() {
+        const fallbackName = (I18n && typeof I18n.t === 'function') ? I18n.t('login.username') : 'Owner';
+        const fallbackEmail = (I18n && typeof I18n.t === 'function') ? I18n.t('login.email') : 'owner@sample.com';
+        const name = String(State?.settings?.userName || '').trim() || fallbackName;
+        const email = String(State?.settings?.userEmail || '').trim() || fallbackEmail;
+        const avatar = String(State?.settings?.userAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+        return { name, email, avatar };
+    },
+
+    updateProfile() {
+        const profile = this.getProfile();
+        if (this.usernameElement) this.usernameElement.textContent = profile.name;
+        if (this.emailElement) this.emailElement.textContent = profile.email;
+        if (this.avatarElement) {
+            this.avatarElement.onerror = () => {
+                this.avatarElement.onerror = null;
+                this.avatarElement.src = 'Theme/Profile_img/UserAva.png';
+            };
+            this.avatarElement.src = profile.avatar;
+        }
+    },
+
     updateTexts() {
         if (!I18n || typeof I18n.t !== 'function') return;
-        if (this.usernameElement) this.usernameElement.textContent = I18n.t('login.username');
-        if (this.emailElement) this.emailElement.textContent = I18n.t('login.email');
         if (this.pinInput) this.pinInput.placeholder = I18n.t('login.pin.placeholder');
         if (this.errorElement) this.errorElement.textContent = I18n.t('login.pin.error');
         if (this.securityLink) this.securityLink.textContent = I18n.t('login.security.link');
         if (this.submitBtn) this.submitBtn.textContent = I18n.t('login.submit');
+        this.updateProfile();
     },
 
     togglePinVisibility() {
         const isPassword = this.pinInput.type === 'password';
         this.pinInput.type = isPassword ? 'text' : 'password';
-        
-        // 切换图标
+
         const strokeIcon = this.pinToggle.querySelector('.icon-stroke');
         const fillIcon = this.pinToggle.querySelector('.icon-fill');
         if (isPassword) {
@@ -115,35 +140,31 @@ const LoginScreen = {
         const correctPin = State.settings.pin || '1234';
 
         if (pin === correctPin) {
-            // 登录成功
             this.attempts = 0;
-            State.updateSession({ 
-                isLoggedIn: true, 
+            State.updateSession({
+                isLoggedIn: true,
                 lastLogin: new Date().toISOString(),
                 loginAttempts: 0
             });
             State.setView('desktop');
-            
-            // 发送欢迎通知
+
+            const profile = this.getProfile();
             State.addNotification({
                 title: '登录成功',
-                message: '欢迎回来，Owner！',
+                message: `欢迎回来，${profile.name}`,
                 type: 'success'
             });
         } else {
-            // 登录失败
             this.attempts++;
             State.updateSession({ loginAttempts: this.attempts });
-            
+
             this.pinInput.classList.add('error');
             this.errorElement.classList.remove('hidden');
-            
-            // 显示抖动动画
+
             setTimeout(() => {
                 this.pinInput.classList.remove('error');
             }, 400);
 
-            // 3次失败后显示安全问题链接
             if (this.attempts >= 3) {
                 this.securityLink.classList.remove('hidden');
             }

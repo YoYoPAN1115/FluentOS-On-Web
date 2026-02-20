@@ -141,6 +141,7 @@ const I18n = {
             // 设置
             'settings.title': '设置',
             'settings.overview': '概览',
+            'settings.user': '用户',
             'settings.network': '网络',
             'settings.personalization': '个性化',
             'settings.applications': '应用程序',
@@ -489,6 +490,7 @@ const I18n = {
 
             // 设置应用额外
             'settings.overview-desc': '主页',
+            'settings.user-desc': '头像、用户名和邮箱',
             'settings.network-desc': 'WiFi、蓝牙',
             'settings.personalization-desc': '壁纸、主题、颜色',
             'settings.applications-desc': '应用管理、存储',
@@ -918,6 +920,7 @@ const I18n = {
             // Settings
             'settings.title': 'Settings',
             'settings.overview': 'Overview',
+            'settings.user': 'User',
             'settings.network': 'Network',
             'settings.personalization': 'Personalization',
             'settings.applications': 'Applications',
@@ -1267,6 +1270,7 @@ const I18n = {
 
             // Settings extra
             'settings.overview-desc': 'Home',
+            'settings.user-desc': 'Avatar, name and email',
             'settings.network-desc': 'WiFi, Bluetooth',
             'settings.personalization-desc': 'Wallpaper, Theme, Color',
             'settings.applications-desc': 'App management, Storage',

@@ -9,6 +9,7 @@ const SettingsApp = {
     getPages() {
         return [
             { id: 'overview', label: 'settings.overview', icon: 'Home', desc: t('settings.overview-desc') },
+            { id: 'user', label: 'settings.user', icon: 'User Circle', desc: t('settings.user-desc') },
             { id: 'network', label: 'settings.network', icon: 'Globe', desc: t('settings.network-desc') },
             { id: 'personalization', label: 'settings.personalization', icon: 'Color Picker', desc: t('settings.personalization-desc') },
             { id: 'applications', label: 'settings.applications', icon: 'Inbox Download', desc: t('settings.applications-desc') },
@@ -28,6 +29,10 @@ const SettingsApp = {
     repairingApps: [],
     _fingoModeAnimating: false,
     _pendingFingoCustomEnter: false,
+    _avatarThumbCache: null,
+    _avatarThumbBuildPromise: null,
+    _avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
+    _avatarPlaceholderSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
     
     // 获取应用大小
     getAppSize(appId, isPWA = false) {
@@ -853,6 +858,145 @@ const SettingsApp = {
             .app-action-desc-danger {
                 color: #dc3545;
             }
+
+            .settings-user-profile-card {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                gap: 18px;
+            }
+
+            .settings-user-avatar-preview {
+                width: 84px;
+                height: 84px;
+                border-radius: 50%;
+                overflow: hidden;
+                box-shadow: var(--shadow-md);
+                border: 2px solid var(--border-color);
+                flex-shrink: 0;
+                background: var(--bg-secondary);
+            }
+
+            .settings-user-avatar-preview img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            .settings-user-profile-text {
+                min-width: 0;
+                flex: 1;
+                text-align: left;
+            }
+
+            .settings-user-profile-name {
+                font-size: 20px;
+                font-weight: 600;
+                margin-bottom: 4px;
+            }
+
+            .settings-user-profile-email {
+                font-size: 13px;
+                color: var(--text-secondary);
+                word-break: break-all;
+            }
+
+            .settings-user-avatar-grid {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 12px;
+                padding-left: 20px;
+                margin-top: 14px;
+            }
+
+            .settings-user-avatar-actions {
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-left: auto;
+            }
+
+            .settings-user-avatar-item {
+                position: relative;
+                flex: 0 0 68px;
+                width: 68px;
+                height: 68px;
+                border-radius: 50%;
+                overflow: hidden;
+                background: var(--bg-secondary);
+                border: 2px solid transparent;
+                box-shadow: var(--shadow-sm);
+                cursor: pointer;
+                padding: 0;
+                transition: transform 0.18s ease, border-color 0.18s ease;
+            }
+
+            .settings-user-avatar-item:hover {
+                transform: translateY(-2px);
+            }
+
+            .settings-user-avatar-item.selected {
+                border-color: var(--accent);
+            }
+
+            .settings-user-avatar-item img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            .settings-user-save-row {
+                display: flex;
+                justify-content: flex-end;
+                margin-top: 8px;
+                padding: 0;
+                background: transparent;
+                border: 0;
+                box-shadow: none;
+            }
+
+            .settings-user-danger-content {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .settings-user-danger-content .fluent-btn {
+                align-self: flex-end;
+            }
+
+            .settings-user-danger-text {
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.6;
+                width: 100%;
+                text-align: left;
+            }
+
+            body:not(.fluent-v2) .settings-user-danger-content .fluent-btn-danger {
+                color: #fff !important;
+            }
+
+            body:not(.fluent-v2) .settings-user-danger-content .fluent-btn-danger .fluent-btn-text {
+                color: #fff !important;
+            }
+
+            .settings-reset-warning {
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.7;
+            }
+
+            .settings-reset-countdown {
+                margin-top: 10px;
+                color: #d13438;
+                font-weight: 600;
+            }
         `;
         document.head.appendChild(style);
     },
@@ -861,6 +1005,9 @@ const SettingsApp = {
         switch (this.currentPage) {
             case 'overview':
                 this.renderOverview(container);
+                break;
+            case 'user':
+                this.renderUser(container);
                 break;
             case 'network':
                 this.renderNetwork(container);
@@ -1048,6 +1195,460 @@ const SettingsApp = {
         }
     },
     
+    getUserAvatarOptions() {
+        return [
+            'Theme/Profile_img/UserAva.png',
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
+        ];
+    },
+
+    getAvatarThumbCache() {
+        if (this._avatarThumbCache) return this._avatarThumbCache;
+        try {
+            const raw = localStorage.getItem(this._avatarThumbStorageKey);
+            const parsed = raw ? JSON.parse(raw) : {};
+            this._avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_) {
+            this._avatarThumbCache = {};
+        }
+        return this._avatarThumbCache;
+    },
+
+    saveAvatarThumbCache() {
+        try {
+            localStorage.setItem(this._avatarThumbStorageKey, JSON.stringify(this._avatarThumbCache || {}));
+        } catch (_) {
+            // ignore storage errors
+        }
+    },
+
+    getAvatarThumbSrc(src, fallback = '') {
+        const cache = this.getAvatarThumbCache();
+        return cache[src] || fallback || this._avatarPlaceholderSrc;
+    },
+
+    async buildAvatarThumb(src, size = 80) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => {
+                try {
+                    const width = Number(img.naturalWidth) || size;
+                    const height = Number(img.naturalHeight) || size;
+                    const cropSize = Math.min(width, height);
+                    const sx = Math.max(0, (width - cropSize) / 2);
+                    const sy = Math.max(0, (height - cropSize) / 2);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(src);
+                        return;
+                    }
+
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+                    resolve(canvas.toDataURL('image/jpeg', 0.76));
+                } catch (_) {
+                    resolve(src);
+                }
+            };
+            img.onerror = () => resolve(src);
+            img.src = src;
+        });
+    },
+
+    async ensureAvatarThumbs(sources = []) {
+        if (!Array.isArray(sources) || sources.length === 0) return;
+        if (this._avatarThumbBuildPromise) return this._avatarThumbBuildPromise;
+
+        this._avatarThumbBuildPromise = (async () => {
+            const cache = this.getAvatarThumbCache();
+            let changed = false;
+
+            for (const src of sources) {
+                if (!src || cache[src] || /^data:image\//i.test(src)) continue;
+
+                await new Promise((resolve) => {
+                    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+                        window.requestIdleCallback(() => resolve(), { timeout: 120 });
+                    } else {
+                        setTimeout(resolve, 16);
+                    }
+                });
+
+                const thumb = await this.buildAvatarThumb(src, 80);
+                if (!thumb || thumb === src) continue;
+
+                cache[src] = thumb;
+                changed = true;
+
+                if (this.currentPage === 'user' && this.container) {
+                    const key = encodeURIComponent(src);
+                    const imgs = this.container.querySelectorAll(`img[data-avatar-key="${key}"]`);
+                    imgs.forEach((img) => {
+                        img.src = thumb;
+                    });
+
+                    const selectedAvatar = String(State?.settings?.userAvatar || '').trim();
+                    const preview = this.container.querySelector('.settings-user-avatar-preview img[data-avatar-preview="1"]');
+                    if (preview && selectedAvatar === src) preview.src = thumb;
+                }
+            }
+
+            if (changed) {
+                this._avatarThumbCache = cache;
+                this.saveAvatarThumbCache();
+            }
+        })().finally(() => {
+            this._avatarThumbBuildPromise = null;
+        });
+
+        return this._avatarThumbBuildPromise;
+    },
+
+    async resizeImageFileToDataUrl(file, size = 192, quality = 0.8) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('read-failed'));
+            reader.onload = () => {
+                const src = String(reader.result || '');
+                if (!/^data:image\//i.test(src)) {
+                    reject(new Error('invalid-image'));
+                    return;
+                }
+
+                const img = new Image();
+                img.decoding = 'async';
+                img.onerror = () => reject(new Error('decode-failed'));
+                img.onload = () => {
+                    try {
+                        const width = Number(img.naturalWidth) || size;
+                        const height = Number(img.naturalHeight) || size;
+                        const cropSize = Math.min(width, height);
+                        const sx = Math.max(0, (width - cropSize) / 2);
+                        const sy = Math.max(0, (height - cropSize) / 2);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            resolve(src);
+                            return;
+                        }
+
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                img.src = src;
+            };
+            reader.readAsDataURL(file);
+        });
+    },
+
+    getUserProfile() {
+        const fallbackName = (typeof I18n !== 'undefined' && typeof I18n.t === 'function')
+            ? I18n.t('login.username')
+            : 'Owner';
+        const fallbackEmail = (typeof I18n !== 'undefined' && typeof I18n.t === 'function')
+            ? I18n.t('login.email')
+            : 'owner@sample.com';
+        const avatars = this.getUserAvatarOptions();
+        const rawAvatar = String(State.settings.userAvatar || '').trim();
+        const isCustomAvatar = /^data:image\//i.test(rawAvatar);
+        const avatar = (avatars.includes(rawAvatar) || isCustomAvatar) ? rawAvatar : avatars[0];
+        const name = String(State.settings.userName || '').trim() || fallbackName;
+        const email = String(State.settings.userEmail || '').trim() || fallbackEmail;
+        return { name, email, avatar };
+    },
+
+    renderUser(container) {
+        container.className = 'settings-content settings-user';
+
+        const profile = this.getUserProfile();
+        const avatars = this.getUserAvatarOptions();
+        const previewAvatarSrc = this.getAvatarThumbSrc(profile.avatar, profile.avatar);
+
+        const profileSection = this.createSection(t('settings.user'));
+        const profileCard = document.createElement('div');
+        profileCard.className = 'fluent-setting-item settings-user-profile-card';
+        profileCard.innerHTML = `
+            <div class="settings-user-avatar-preview">
+                <img src="${previewAvatarSrc}" data-avatar-preview="1" alt="avatar" loading="lazy" decoding="async">
+            </div>
+            <div class="settings-user-profile-text">
+                <div class="settings-user-profile-name">${profile.name}</div>
+                <div class="settings-user-profile-email">${profile.email}</div>
+            </div>
+        `;
+        profileSection.appendChild(profileCard);
+
+        const avatarGrid = document.createElement('div');
+        avatarGrid.className = 'settings-user-avatar-grid';
+        avatars.forEach((avatarPath, index) => {
+            const avatarBtn = document.createElement('button');
+            avatarBtn.className = `settings-user-avatar-item ${avatarPath === profile.avatar ? 'selected' : ''}`;
+            const thumbSrc = this.getAvatarThumbSrc(avatarPath, this._avatarPlaceholderSrc);
+            const avatarKey = encodeURIComponent(avatarPath);
+            avatarBtn.innerHTML = `<img src="${thumbSrc}" data-avatar-key="${avatarKey}" alt="avatar-${index + 1}" loading="lazy" decoding="async">`;
+            avatarBtn.addEventListener('click', () => {
+                State.updateSettings({ userAvatar: avatarPath });
+                this.addRecentSetting(
+                    t('settings.user.recent-avatar'),
+                    t('settings.user.recent-avatar-index', { index: index + 1 }),
+                    'user'
+                );
+                State.addNotification({
+                    title: t('settings.user'),
+                    message: t('settings.user.avatar-updated'),
+                    type: 'success'
+                });
+                this.render();
+            });
+            avatarGrid.appendChild(avatarBtn);
+        });
+        profileSection.appendChild(avatarGrid);
+
+        const thumbSources = profile.avatar && !avatars.includes(profile.avatar)
+            ? [...avatars, profile.avatar]
+            : avatars.slice();
+        requestAnimationFrame(() => {
+            this.ensureAvatarThumbs(thumbSources);
+        });
+
+        const avatarUploadInput = document.createElement('input');
+        avatarUploadInput.type = 'file';
+        avatarUploadInput.accept = 'image/*';
+        avatarUploadInput.style.display = 'none';
+        avatarUploadInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            if (!file.type || !file.type.startsWith('image/')) {
+                FluentUI.Toast({
+                    title: t('settings.user'),
+                    message: t('settings.user.avatar-file-invalid'),
+                    type: 'error'
+                });
+                avatarUploadInput.value = '';
+                return;
+            }
+
+            this.resizeImageFileToDataUrl(file, 192, 0.8)
+                .then((dataUrl) => {
+                    State.updateSettings({ userAvatar: dataUrl });
+                    this.addRecentSetting(
+                        t('settings.user.recent-avatar'),
+                        t('settings.user.recent-avatar-custom'),
+                        'user'
+                    );
+                    State.addNotification({
+                        title: t('settings.user'),
+                        message: t('settings.user.custom-avatar-updated'),
+                        type: 'success'
+                    });
+                    this.render();
+                })
+                .catch(() => {
+                    FluentUI.Toast({
+                        title: t('settings.user'),
+                        message: t('settings.user.avatar-read-failed'),
+                        type: 'error'
+                    });
+                })
+                .finally(() => {
+                    avatarUploadInput.value = '';
+                });
+        });
+
+        const avatarActions = document.createElement('div');
+        avatarActions.className = 'settings-user-avatar-actions';
+        avatarActions.appendChild(FluentUI.Button({
+            text: t('settings.user.upload-avatar'),
+            variant: 'secondary',
+            onClick: () => avatarUploadInput.click()
+        }));
+        avatarActions.appendChild(FluentUI.Button({
+            text: t('settings.user.restore-avatar'),
+            variant: 'secondary',
+            onClick: () => {
+                State.updateSettings({ userAvatar: 'Theme/Profile_img/UserAva.png' });
+                this.addRecentSetting(
+                    t('settings.user.recent-avatar'),
+                    t('settings.user.recent-avatar-default'),
+                    'user'
+                );
+                State.addNotification({
+                    title: t('settings.user'),
+                    message: t('settings.user.default-avatar-restored'),
+                    type: 'info'
+                });
+                this.render();
+            }
+        }));
+        profileCard.appendChild(avatarActions);
+        profileSection.appendChild(avatarUploadInput);
+        container.appendChild(profileSection);
+
+        const fallbackName = (typeof I18n !== 'undefined' && typeof I18n.t === 'function')
+            ? I18n.t('login.username')
+            : 'Owner';
+        const fallbackEmail = (typeof I18n !== 'undefined' && typeof I18n.t === 'function')
+            ? I18n.t('login.email')
+            : 'owner@sample.com';
+        const profileNameEl = profileCard.querySelector('.settings-user-profile-name');
+        const profileEmailEl = profileCard.querySelector('.settings-user-profile-email');
+        const syncProfilePreviewText = (name, email) => {
+            if (profileNameEl) profileNameEl.textContent = String(name || '').trim() || fallbackName;
+            if (profileEmailEl) profileEmailEl.textContent = String(email || '').trim() || fallbackEmail;
+        };
+
+        const infoSection = this.createSection(t('settings.user.info-section'));
+        const nameInput = FluentUI.Input({
+            value: profile.name,
+            placeholder: t('settings.user.name-placeholder'),
+            onChange: (value) => {
+                const nextName = String(value || '');
+                State.updateSettings({ userName: nextName });
+                syncProfilePreviewText(nextName, emailInput.getValue());
+            }
+        });
+        infoSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.user.name'),
+            description: t('settings.user.lock-preview-desc'),
+            control: nameInput
+        }));
+
+        const emailInput = FluentUI.Input({
+            value: profile.email,
+            placeholder: t('settings.user.email-placeholder'),
+            onChange: (value) => {
+                const nextEmail = String(value || '');
+                State.updateSettings({ userEmail: nextEmail });
+                syncProfilePreviewText(nameInput.getValue(), nextEmail);
+            }
+        });
+        infoSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.user.email'),
+            description: t('settings.user.lock-preview-desc'),
+            control: emailInput
+        }));
+        container.appendChild(infoSection);
+
+        const resetSection = this.createSection(t('settings.user.data-clear-section'));
+        const resetCard = document.createElement('div');
+        resetCard.className = 'fluent-setting-item settings-user-danger-content';
+        resetCard.innerHTML = `
+            <div class="settings-user-danger-text">
+                ${t('settings.user.data-clear-description')}
+            </div>
+        `;
+        resetCard.appendChild(FluentUI.Button({
+            text: t('settings.user.data-clear-button'),
+            variant: 'danger',
+            onClick: () => this.confirmDataClear()
+        }));
+        resetSection.appendChild(resetCard);
+        container.appendChild(resetSection);
+    },
+
+    confirmDataClear() {
+        const delaySeconds = 5;
+        let remaining = delaySeconds;
+        let timer = null;
+
+        const dialogRef = FluentUI.Dialog({
+            type: 'warning',
+            title: t('settings.user.data-clear-dialog-title'),
+            closeOnOverlay: false,
+            content: `
+                <div class="settings-reset-warning">
+                    <div>${t('settings.user.data-clear-dialog-line1')}</div>
+                    <div>${t('settings.user.data-clear-dialog-line2')}</div>
+                    <div id="settings-reset-countdown" class="settings-reset-countdown">${t('settings.user.data-clear-dialog-countdown', { seconds: delaySeconds })}</div>
+                </div>
+            `,
+            buttons: [
+                { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                { text: t('settings.user.data-clear-dialog-continue-seconds', { seconds: delaySeconds }), variant: 'danger', value: 'continue' }
+            ],
+            onClose: (result) => {
+                if (timer) clearInterval(timer);
+                if (result === 'continue') {
+                    this.promptDataClearPin();
+                }
+            }
+        });
+
+        const continueBtn = dialogRef.dialog.querySelector('.fluent-btn-danger');
+        const continueBtnText = continueBtn?.querySelector('.fluent-btn-text');
+        const countdownEl = dialogRef.dialog.querySelector('#settings-reset-countdown');
+        if (continueBtn) continueBtn.disabled = true;
+
+        timer = setInterval(() => {
+            remaining -= 1;
+            if (remaining <= 0) {
+                clearInterval(timer);
+                timer = null;
+                if (continueBtn) continueBtn.disabled = false;
+                if (continueBtnText) continueBtnText.textContent = t('settings.user.data-clear-dialog-continue');
+                if (countdownEl) countdownEl.textContent = t('settings.user.data-clear-dialog-unlocked');
+                return;
+            }
+
+            if (continueBtnText) continueBtnText.textContent = t('settings.user.data-clear-dialog-continue-seconds', { seconds: remaining });
+            if (countdownEl) countdownEl.textContent = t('settings.user.data-clear-dialog-countdown', { seconds: remaining });
+        }, 1000);
+    },
+
+    promptDataClearPin() {
+        const currentPin = String(State.settings.pin || '1234');
+        FluentUI.InputDialog({
+            title: t('settings.user.pin-title'),
+            placeholder: t('settings.user.pin-placeholder'),
+            inputType: 'password',
+            confirmText: t('settings.user.pin-confirm'),
+            cancelText: t('cancel'),
+            closeOnOverlay: false,
+            validateFn: (value) => {
+                const pin = String(value || '').trim();
+                if (!pin) return t('settings.user.pin-required');
+                if (pin !== currentPin) return t('settings.user.pin-invalid');
+                return true;
+            },
+            onConfirm: () => this.runDataClearAndReboot()
+        });
+    },
+
+    runDataClearAndReboot() {
+        FluentUI.Toast({
+            title: t('settings.title'),
+            message: t('settings.user.data-clear-rebooting'),
+            type: 'warning'
+        });
+
+        if (typeof State !== 'undefined' && typeof State.restart === 'function') {
+            State.restart();
+        }
+
+        setTimeout(() => {
+            try {
+                localStorage.clear();
+            } catch (error) {
+                console.error('Failed to clear localStorage:', error);
+            }
+            window.location.reload();
+        }, 900);
+    },
+
     // 网络页面
     renderNetwork(container) {
         container.className = 'settings-content settings-network';

@@ -43,6 +43,7 @@
                         <span class="oobe-progress-dot"></span>
                         <span class="oobe-progress-dot"></span>
                         <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
                     </div>
 
                     <!-- Step 0: Welcome animation -->
@@ -301,41 +302,100 @@
 
                     <section class="oobe-step" data-step="4">
                         <div class="oobe-preview-frame oobe-preview-static">
-                            <div class="oobe-live-lock-preview" id="oobe-lock-preview">
+                            <div class="oobe-live-lock-preview">
                                 <div class="oobe-live-lock-wallpaper"></div>
                                 <div class="oobe-live-lock-overlay"></div>
                                 <div class="oobe-live-lock-time-container">
-                                    <div class="oobe-live-lock-time" id="oobe-lock-preview-time">23:24</div>
-                                    <div class="oobe-live-lock-date" id="oobe-lock-preview-date">02/18</div>
+                                    <div class="oobe-live-lock-time oobe-lock-preview-time">23:24</div>
+                                    <div class="oobe-live-lock-date oobe-lock-preview-date">02/18</div>
                                 </div>
                                 <div class="login-card oobe-live-login-card">
                                     <div class="login-avatar">
-                                        <img src="Theme/Icon/UserAva.png" alt="User">
+                                        <img class="oobe-lock-preview-avatar" src="Theme/Profile_img/UserAva.png" alt="User">
                                     </div>
-                                    <div class="login-username">Owner</div>
-                                    <div class="login-email">owner@sample.com</div>
+                                    <div class="login-username oobe-lock-preview-username">Owner</div>
+                                    <div class="login-email oobe-lock-preview-email">owner@sample.com</div>
                                     <div class="login-pin-container">
                                         <input class="login-pin-input" type="password" disabled value="1234">
                                         <button class="pin-toggle" type="button" tabindex="-1">
-                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="显示">
+                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="show">
                                         </button>
                                     </div>
-                                    <div class="login-error" style="visibility:hidden">PIN 不正确</div>
-                                    <button class="login-submit" type="button" tabindex="-1">登录</button>
+                                    <div class="login-error" style="visibility:hidden">PIN Error</div>
+                                    <button class="login-submit" type="button" tabindex="-1">Sign in</button>
                                 </div>
-                                <div class="oobe-live-lock-hint">轻点屏幕以登录</div>
+                                <div class="oobe-live-lock-hint">Tap screen to sign in</div>
                             </div>
                         </div>
-                        <h1 id="oobe-title-password">设置密码</h1>
-                        <p id="oobe-subtitle-password">输入 4-10 位 PIN，用于锁屏登录。</p>
+                        <h1 id="oobe-title-user">User</h1>
+                        <p id="oobe-subtitle-user">Set user name, email and avatar before continuing.</p>
+                        <div class="oobe-user-settings-shell">
+                            <div id="oobe-user-settings-scroll-host">
+                                <div class="oobe-user-settings-body" id="oobe-user-settings-body">
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-avatar-title">Avatar</div>
+                                        <div class="oobe-avatar-grid" id="oobe-user-avatar-grid"></div>
+                                        <div class="oobe-avatar-actions">
+                                            <button class="oobe-chip" id="oobe-user-upload-avatar" type="button">Upload Custom Avatar</button>
+                                            <button class="oobe-chip" id="oobe-user-default-avatar" type="button">Restore Default Avatar</button>
+                                            <input id="oobe-user-avatar-file" type="file" accept="image/*" hidden>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-name-title">User Name</div>
+                                        <input id="oobe-user-name-input" class="oobe-input" type="text" maxlength="40" placeholder="Enter user name">
+                                    </div>
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-email-title">Email</div>
+                                        <input id="oobe-user-email-input" class="oobe-input" type="email" maxlength="80" placeholder="Enter email">
+                                    </div>
+                                    <div class="oobe-inline-status" id="oobe-user-inline-status"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-4" type="button">Back</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-4" type="button">Next</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="5">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-lock-preview">
+                                <div class="oobe-live-lock-wallpaper"></div>
+                                <div class="oobe-live-lock-overlay"></div>
+                                <div class="oobe-live-lock-time-container">
+                                    <div class="oobe-live-lock-time oobe-lock-preview-time">23:24</div>
+                                    <div class="oobe-live-lock-date oobe-lock-preview-date">02/18</div>
+                                </div>
+                                <div class="login-card oobe-live-login-card">
+                                    <div class="login-avatar">
+                                        <img class="oobe-lock-preview-avatar" src="Theme/Profile_img/UserAva.png" alt="User">
+                                    </div>
+                                    <div class="login-username oobe-lock-preview-username">Owner</div>
+                                    <div class="login-email oobe-lock-preview-email">owner@sample.com</div>
+                                    <div class="login-pin-container">
+                                        <input class="login-pin-input" type="password" disabled value="1234">
+                                        <button class="pin-toggle" type="button" tabindex="-1">
+                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="show">
+                                        </button>
+                                    </div>
+                                    <div class="login-error" style="visibility:hidden">PIN Error</div>
+                                    <button class="login-submit" type="button" tabindex="-1">Sign in</button>
+                                </div>
+                                <div class="oobe-live-lock-hint">Tap screen to sign in</div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-password">Set Password</h1>
+                        <p id="oobe-subtitle-password">Enter a 4-10 digit PIN for lock screen login.</p>
                         <div class="oobe-setting-block">
-                            <div class="oobe-setting-title" id="oobe-pin-title">PIN 密码</div>
-                            <input id="oobe-pin-input" class="oobe-input" type="password" maxlength="10" placeholder="留空则使用当前 PIN">
+                            <div class="oobe-setting-title" id="oobe-pin-title">PIN</div>
+                            <input id="oobe-pin-input" class="oobe-input" type="password" maxlength="10" placeholder="Leave empty to keep current PIN">
                         </div>
                         <div class="oobe-inline-status" id="oobe-preload-status"></div>
                         <div class="oobe-actions">
-                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-4" type="button">返回</button>
-                            <button class="oobe-btn oobe-btn-primary" id="oobe-finish" type="button">完成并进入锁屏</button>
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-5" type="button">Back</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-finish" type="button">Finish and enter lock screen</button>
                         </div>
                     </section>
                 </div>
@@ -373,7 +433,7 @@
             <div class="login-wallpaper"></div>
             <div class="login-card">
                 <div class="login-avatar">
-                    <img src="Theme/Icon/UserAva.png" alt="User">
+                    <img src="Theme/Profile_img/UserAva.png" alt="User">
                 </div>
                 <div class="login-username">Owner</div>
                 <div class="login-email">owner@sample.com</div>

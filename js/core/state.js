@@ -105,6 +105,9 @@ const State = {
             fingoApiStorageType: 'none',
             fingoApiSaveMode: 'temporary',
             autoEnterFullscreen: true,
+            userName: 'Owner',
+            userEmail: 'owner@sample.com',
+            userAvatar: 'Theme/Profile_img/UserAva.png',
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowBoundsMemory: {}

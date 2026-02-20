@@ -1,13 +1,13 @@
 /**
  * OOBE first-launch onboarding flow.
- * Standalone module: 5 steps (0-4) with live preview.
+ * Standalone module: 6 steps (0-5) with live preview.
  */
 const OOBE = {
     STORAGE_KEY: 'fluentos.oobe_completed',
 
     element: null,
     backgroundElement: null,
-    lockPreviewElement: null,
+    lockPreviewElements: [],
 
     steps: [],
     progressDots: [],
@@ -16,11 +16,32 @@ const OOBE = {
     previewTimeNodes: [],
     previewDateNodes: [],
     previewSearchInputNodes: [],
+    lockPreviewTimeNodes: [],
+    lockPreviewDateNodes: [],
+
+    userNameInputEl: null,
+    userEmailInputEl: null,
+    userInlineStatusEl: null,
+    userSettingsHostEl: null,
+    userSettingsBodyEl: null,
+    userSettingsScrollArea: null,
+    userSettingsViewportEl: null,
+    userAvatarGridEl: null,
+    userAvatarUploadBtnEl: null,
+    userAvatarResetBtnEl: null,
+    userAvatarFileInputEl: null,
 
     selectedLang: null,
     selectedTheme: 'light',
     selectedAutoFullscreen: true,
     selectedFingoMode: 'local',
+    selectedUserName: '',
+    selectedUserEmail: '',
+    selectedUserAvatar: 'Theme/Profile_img/UserAva.png',
+    avatarThumbCache: null,
+    avatarThumbBuildPromise: null,
+    avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
+    avatarPlaceholderSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
     currentStep: 0,
     finishing: false,
 
@@ -188,7 +209,7 @@ const OOBE = {
         if (!this.element) return;
 
         this.backgroundElement = document.getElementById('oobe-background');
-        this.lockPreviewElement = document.getElementById('oobe-lock-preview');
+        this.lockPreviewElements = Array.from(this.element.querySelectorAll('.oobe-live-lock-preview'));
 
         this.steps = Array.from(this.element.querySelectorAll('.oobe-step'));
         this.progressDots = Array.from(this.element.querySelectorAll('.oobe-progress-dot'));
@@ -197,12 +218,24 @@ const OOBE = {
         this.previewTimeNodes = Array.from(this.element.querySelectorAll('.oobe-preview-time'));
         this.previewDateNodes = Array.from(this.element.querySelectorAll('.oobe-preview-date'));
         this.previewSearchInputNodes = Array.from(this.element.querySelectorAll('[data-preview-placeholder="search"]'));
+        this.lockPreviewTimeNodes = Array.from(this.element.querySelectorAll('.oobe-lock-preview-time'));
+        this.lockPreviewDateNodes = Array.from(this.element.querySelectorAll('.oobe-lock-preview-date'));
 
         this.fingoMessagesEl = document.getElementById('oobe-fingo-messages');
         this.fingoInputEl = document.getElementById('oobe-fingo-input');
         this.fingoHistoryEl = document.getElementById('oobe-fingo-history');
         this.fingoPreviewContentEl = document.getElementById('oobe-live-fingo-content');
         this.fingoSettingsHostEl = document.getElementById('oobe-fingo-settings-scroll-host');
+        this.userSettingsHostEl = document.getElementById('oobe-user-settings-scroll-host');
+        this.userSettingsBodyEl = document.getElementById('oobe-user-settings-body');
+        this._initUserSettingsPanel();
+        this.userNameInputEl = document.getElementById('oobe-user-name-input');
+        this.userEmailInputEl = document.getElementById('oobe-user-email-input');
+        this.userInlineStatusEl = document.getElementById('oobe-user-inline-status');
+        this.userAvatarGridEl = document.getElementById('oobe-user-avatar-grid');
+        this.userAvatarUploadBtnEl = document.getElementById('oobe-user-upload-avatar');
+        this.userAvatarResetBtnEl = document.getElementById('oobe-user-default-avatar');
+        this.userAvatarFileInputEl = document.getElementById('oobe-user-avatar-file');
 
         /* Welcome elements */
         this.welcomeLogoEl = document.getElementById('oobe-welcome-logo');
@@ -389,6 +422,308 @@ const OOBE = {
         }, 620);
     },
 
+    _getUserAvatarOptions() {
+        return [
+            'Theme/Profile_img/UserAva.png',
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
+        ];
+    },
+
+    _getProfileFallbacks() {
+        const fallbackName = (I18n && typeof I18n.t === 'function') ? I18n.t('login.username') : 'Owner';
+        const fallbackEmail = (I18n && typeof I18n.t === 'function') ? I18n.t('login.email') : 'owner@sample.com';
+        return { fallbackName, fallbackEmail };
+    },
+
+    _getInitialUserProfileDraft() {
+        const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
+        const avatars = this._getUserAvatarOptions();
+        const rawAvatar = String(State?.settings?.userAvatar || '').trim();
+        const isCustomAvatar = /^data:image\//i.test(rawAvatar);
+        const avatar = (avatars.includes(rawAvatar) || isCustomAvatar) ? rawAvatar : avatars[0];
+        const name = String(State?.settings?.userName || '').trim() || fallbackName;
+        const email = String(State?.settings?.userEmail || '').trim() || fallbackEmail;
+        return { name, email, avatar };
+    },
+
+    _isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+    },
+
+    _getAvatarThumbCache() {
+        if (this.avatarThumbCache) return this.avatarThumbCache;
+        try {
+            const raw = localStorage.getItem(this.avatarThumbStorageKey);
+            const parsed = raw ? JSON.parse(raw) : {};
+            this.avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (_) {
+            this.avatarThumbCache = {};
+        }
+        return this.avatarThumbCache;
+    },
+
+    _saveAvatarThumbCache() {
+        try {
+            localStorage.setItem(this.avatarThumbStorageKey, JSON.stringify(this.avatarThumbCache || {}));
+        } catch (_) {
+            // ignore storage errors
+        }
+    },
+
+    _getAvatarThumbSrc(src, fallback = '') {
+        const cache = this._getAvatarThumbCache();
+        return cache[src] || fallback || this.avatarPlaceholderSrc;
+    },
+
+    async _buildAvatarThumb(src, size = 80) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.decoding = 'async';
+            img.onload = () => {
+                try {
+                    const width = Number(img.naturalWidth) || size;
+                    const height = Number(img.naturalHeight) || size;
+                    const cropSize = Math.min(width, height);
+                    const sx = Math.max(0, (width - cropSize) / 2);
+                    const sy = Math.max(0, (height - cropSize) / 2);
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(src);
+                        return;
+                    }
+
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+                    resolve(canvas.toDataURL('image/jpeg', 0.76));
+                } catch (_) {
+                    resolve(src);
+                }
+            };
+            img.onerror = () => resolve(src);
+            img.src = src;
+        });
+    },
+
+    async _ensureAvatarThumbs(sources = []) {
+        if (!Array.isArray(sources) || sources.length === 0) return;
+        if (this.avatarThumbBuildPromise) return this.avatarThumbBuildPromise;
+
+        this.avatarThumbBuildPromise = (async () => {
+            const cache = this._getAvatarThumbCache();
+            let changed = false;
+
+            for (const src of sources) {
+                if (!src || cache[src] || /^data:image\//i.test(src)) continue;
+
+                await new Promise((resolve) => {
+                    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+                        window.requestIdleCallback(() => resolve(), { timeout: 120 });
+                    } else {
+                        setTimeout(resolve, 16);
+                    }
+                });
+
+                const thumb = await this._buildAvatarThumb(src, 80);
+                if (!thumb || thumb === src) continue;
+
+                cache[src] = thumb;
+                changed = true;
+
+                if (this.element) {
+                    const key = encodeURIComponent(src);
+                    const imgs = this.element.querySelectorAll(`img[data-avatar-key="${key}"]`);
+                    imgs.forEach((img) => {
+                        img.src = thumb;
+                    });
+
+                    const selectedAvatar = String(this.selectedUserAvatar || '').trim();
+                    if (selectedAvatar === src) {
+                        this._syncLockPreviewProfile();
+                    }
+                }
+            }
+
+            if (changed) {
+                this.avatarThumbCache = cache;
+                this._saveAvatarThumbCache();
+            }
+        })().finally(() => {
+            this.avatarThumbBuildPromise = null;
+        });
+
+        return this.avatarThumbBuildPromise;
+    },
+
+    _syncUserProfileDraftToInputs() {
+        if (this.userNameInputEl) this.userNameInputEl.value = this.selectedUserName;
+        if (this.userEmailInputEl) this.userEmailInputEl.value = this.selectedUserEmail;
+    },
+
+    _syncLockPreviewProfile() {
+        const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
+        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+        const previewAvatarSrc = this._getAvatarThumbSrc(avatar, avatar);
+        const name = String(this.selectedUserName || '').trim() || fallbackName;
+        const email = String(this.selectedUserEmail || '').trim() || fallbackEmail;
+
+        this.element.querySelectorAll('.oobe-lock-preview-username').forEach((el) => {
+            el.textContent = name;
+        });
+        this.element.querySelectorAll('.oobe-lock-preview-email').forEach((el) => {
+            el.textContent = email;
+        });
+        this.element.querySelectorAll('.oobe-lock-preview-avatar').forEach((img) => {
+            img.onerror = () => {
+                img.onerror = null;
+                img.src = 'Theme/Profile_img/UserAva.png';
+            };
+            img.src = previewAvatarSrc;
+        });
+    },
+
+    _renderUserAvatarGrid() {
+        if (!this.userAvatarGridEl) return;
+        this.userAvatarGridEl.innerHTML = '';
+
+        const avatars = this._getUserAvatarOptions();
+        const selected = String(this.selectedUserAvatar || '').trim();
+        const isCustomSelected = /^data:image\//i.test(selected) && !avatars.includes(selected);
+        const sources = isCustomSelected ? [selected, ...avatars] : avatars;
+        const thumbSources = avatars.slice();
+
+        sources.forEach((avatarPath, index) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `oobe-avatar-item ${avatarPath === selected ? 'active' : ''}`;
+            const thumbSrc = this._getAvatarThumbSrc(avatarPath, /^data:image\//i.test(avatarPath) ? avatarPath : this.avatarPlaceholderSrc);
+            const avatarKey = encodeURIComponent(avatarPath);
+            btn.innerHTML = `<img src="${thumbSrc}" data-avatar-key="${avatarKey}" alt="avatar-${index + 1}" loading="lazy" decoding="async">`;
+            btn.addEventListener('click', () => {
+                this.selectedUserAvatar = avatarPath;
+                this._renderUserAvatarGrid();
+                this._syncLockPreviewProfile();
+            });
+            this.userAvatarGridEl.appendChild(btn);
+        });
+
+        requestAnimationFrame(() => {
+            this._ensureAvatarThumbs(thumbSources);
+        });
+
+        if (this.userSettingsScrollArea && typeof this.userSettingsScrollArea.refresh === 'function') {
+            requestAnimationFrame(() => this.userSettingsScrollArea.refresh());
+        }
+    },
+
+    _syncUserStepState() {
+        const d = this._dict();
+        const next4 = document.getElementById('oobe-next-4');
+
+        const name = String(this.selectedUserName || '').trim();
+        const email = String(this.selectedUserEmail || '').trim();
+        let message = '';
+        let valid = true;
+
+        if (!name) {
+            valid = false;
+            message = d.userNameRequired;
+        } else if (!this._isValidEmail(email)) {
+            valid = false;
+            message = d.userEmailInvalid;
+        }
+
+        if (this.userInlineStatusEl) {
+            this.userInlineStatusEl.textContent = message;
+            this.userInlineStatusEl.classList.toggle('error', !valid);
+        }
+
+        if (next4) {
+            next4.disabled = !valid;
+            next4.classList.toggle('is-disabled', !valid);
+        }
+
+        return valid;
+    },
+
+    async _resizeImageFileToDataUrl(file, size = 192, quality = 0.8) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('read-failed'));
+            reader.onload = () => {
+                const src = String(reader.result || '');
+                if (!/^data:image\//i.test(src)) {
+                    reject(new Error('invalid-image'));
+                    return;
+                }
+
+                const img = new Image();
+                img.decoding = 'async';
+                img.onerror = () => reject(new Error('decode-failed'));
+                img.onload = () => {
+                    try {
+                        const width = Number(img.naturalWidth) || size;
+                        const height = Number(img.naturalHeight) || size;
+                        const cropSize = Math.min(width, height);
+                        const sx = Math.max(0, (width - cropSize) / 2);
+                        const sy = Math.max(0, (height - cropSize) / 2);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            resolve(src);
+                            return;
+                        }
+
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                img.src = src;
+            };
+            reader.readAsDataURL(file);
+        });
+    },
+
+    _initUserSettingsPanel() {
+        if (!this.userSettingsHostEl || !this.userSettingsBodyEl) return;
+
+        const body = this.userSettingsBodyEl;
+        this.userSettingsHostEl.innerHTML = '';
+
+        if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.ScrollArea === 'function') {
+            const scrollArea = FluentUI.ScrollArea({
+                className: 'oobe-user-settings-scroll'
+            });
+            this.userSettingsHostEl.appendChild(scrollArea);
+            this.userSettingsScrollArea = scrollArea;
+            this.userSettingsViewportEl = typeof scrollArea.getViewport === 'function'
+                ? scrollArea.getViewport()
+                : scrollArea.querySelector('.fluent-scroll-viewport');
+            (this.userSettingsViewportEl || this.userSettingsHostEl).appendChild(body);
+            requestAnimationFrame(() => {
+                if (this.userSettingsScrollArea && typeof this.userSettingsScrollArea.refresh === 'function') {
+                    this.userSettingsScrollArea.refresh();
+                }
+            });
+            return;
+        }
+
+        this.userSettingsScrollArea = null;
+        this.userSettingsViewportEl = this.userSettingsHostEl;
+        this.userSettingsHostEl.appendChild(body);
+    },
+
     _bindEvents() {
         const languageButtons = Array.from(this.element.querySelectorAll('.oobe-option-btn[data-lang]'));
         languageButtons.forEach((btn) => {
@@ -432,9 +767,11 @@ const OOBE = {
         const back1 = document.getElementById('oobe-back-1');
         const next2 = document.getElementById('oobe-next-2');
         const next3 = document.getElementById('oobe-next-3');
+        const next4 = document.getElementById('oobe-next-4');
         const back2 = document.getElementById('oobe-back-2');
         const back3 = document.getElementById('oobe-back-3');
         const back4 = document.getElementById('oobe-back-4');
+        const back5 = document.getElementById('oobe-back-5');
         const finish = document.getElementById('oobe-finish');
 
         if (next1) {
@@ -446,10 +783,67 @@ const OOBE = {
         if (back1) back1.addEventListener('click', () => { this._setStep(0); this._startWelcomeAnimation(); });
         if (next2) next2.addEventListener('click', () => this._setStep(3));
         if (next3) next3.addEventListener('click', () => this._setStep(4));
+        if (next4) next4.addEventListener('click', () => {
+            if (!this._syncUserStepState()) return;
+            this._setStep(5);
+        });
         if (back2) back2.addEventListener('click', () => this._setStep(1));
         if (back3) back3.addEventListener('click', () => this._setStep(2));
         if (back4) back4.addEventListener('click', () => this._setStep(3));
+        if (back5) back5.addEventListener('click', () => this._setStep(4));
         if (finish) finish.addEventListener('click', () => this.completeAndEnterLock());
+
+        if (this.userNameInputEl) {
+            this.userNameInputEl.addEventListener('input', () => {
+                this.selectedUserName = String(this.userNameInputEl.value || '');
+                this._syncLockPreviewProfile();
+                this._syncUserStepState();
+            });
+        }
+
+        if (this.userEmailInputEl) {
+            this.userEmailInputEl.addEventListener('input', () => {
+                this.selectedUserEmail = String(this.userEmailInputEl.value || '');
+                this._syncLockPreviewProfile();
+                this._syncUserStepState();
+            });
+        }
+
+        if (this.userAvatarUploadBtnEl && this.userAvatarFileInputEl) {
+            this.userAvatarUploadBtnEl.addEventListener('click', () => {
+                this.userAvatarFileInputEl.click();
+            });
+        }
+
+        if (this.userAvatarResetBtnEl) {
+            this.userAvatarResetBtnEl.addEventListener('click', () => {
+                this.selectedUserAvatar = 'Theme/Profile_img/UserAva.png';
+                this._renderUserAvatarGrid();
+                this._syncLockPreviewProfile();
+            });
+        }
+
+        if (this.userAvatarFileInputEl) {
+            this.userAvatarFileInputEl.addEventListener('change', async (e) => {
+                const file = e.target?.files && e.target.files[0];
+                if (!file) return;
+                if (!file.type || !file.type.startsWith('image/')) {
+                    this.userAvatarFileInputEl.value = '';
+                    return;
+                }
+
+                try {
+                    const dataUrl = await this._resizeImageFileToDataUrl(file, 192, 0.8);
+                    this.selectedUserAvatar = dataUrl;
+                    this._renderUserAvatarGrid();
+                    this._syncLockPreviewProfile();
+                } catch (_) {
+                    // ignore invalid file
+                } finally {
+                    this.userAvatarFileInputEl.value = '';
+                }
+            });
+        }
 
         if (this.fingoInputEl) {
             this.fingoInputEl.addEventListener('keydown', (e) => {
@@ -479,7 +873,7 @@ const OOBE = {
             }
         });
 
-        /* Progress dots map to steps 1-4 (4 dots, indices 0-3) */
+        /* Progress dots map to steps 1-5 */
         this.progressDots.forEach((dot, idx) => {
             dot.classList.toggle('active', idx === step - 1);
         });
@@ -500,6 +894,23 @@ const OOBE = {
             }
         }
 
+        if (step === 4) {
+            this._syncUserProfileDraftToInputs();
+            this._renderUserAvatarGrid();
+            this._syncLockPreviewProfile();
+            this._syncUserStepState();
+            if (this.userSettingsScrollArea && typeof this.userSettingsScrollArea.refresh === 'function') {
+                requestAnimationFrame(() => this.userSettingsScrollArea.refresh());
+            }
+            if (this.userNameInputEl) {
+                setTimeout(() => this.userNameInputEl.focus(), 120);
+            }
+        }
+
+        if (step === 5) {
+            this._syncLockPreviewProfile();
+        }
+
         /* Sync language preview text when entering step 1 */
         if (step === 1) {
             this._syncLangPreviewText();
@@ -512,6 +923,10 @@ const OOBE = {
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
         this.selectedAutoFullscreen = State?.settings?.autoEnterFullscreen !== false;
         this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
+        const draft = this._getInitialUserProfileDraft();
+        this.selectedUserName = draft.name;
+        this.selectedUserEmail = draft.email;
+        this.selectedUserAvatar = draft.avatar;
         this.fingoModeAnimating = false;
         this.pendingFingoCustomEnter = false;
 
@@ -524,6 +939,10 @@ const OOBE = {
         this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === this.selectedTheme);
         this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
         this._renderFingoSettingsPanel();
+        this._syncUserProfileDraftToInputs();
+        this._renderUserAvatarGrid();
+        this._syncUserStepState();
+        this._syncLockPreviewProfile();
 
         this._syncNextStep1State();
         this._resetTempFingoChat();
@@ -553,11 +972,13 @@ const OOBE = {
             this.backgroundElement.style.backgroundImage = `url('${lockWallpaper}')`;
         }
 
-        /* Lock preview wallpaper element */
-        const lockWpEl = this.lockPreviewElement?.querySelector('.oobe-live-lock-wallpaper');
-        if (lockWpEl) {
-            lockWpEl.style.backgroundImage = `url('${lockWallpaper}')`;
-        }
+        /* Lock preview wallpaper elements */
+        this.lockPreviewElements.forEach((preview) => {
+            const lockWpEl = preview.querySelector('.oobe-live-lock-wallpaper');
+            if (lockWpEl) {
+                lockWpEl.style.backgroundImage = `url('${lockWallpaper}')`;
+            }
+        });
 
         this.previewDesktopElements.forEach((preview) => {
             const wallpaper = preview.querySelector('.oobe-live-wallpaper');
@@ -627,10 +1048,12 @@ const OOBE = {
             node.textContent = dateText;
         });
 
-        const lockTime = document.getElementById('oobe-lock-preview-time');
-        const lockDate = document.getElementById('oobe-lock-preview-date');
-        if (lockTime) lockTime.textContent = timeText;
-        if (lockDate) lockDate.textContent = dateText;
+        this.lockPreviewTimeNodes.forEach((node) => {
+            node.textContent = timeText;
+        });
+        this.lockPreviewDateNodes.forEach((node) => {
+            node.textContent = dateText;
+        });
     },
 
     _startPreviewClockTimer() {
@@ -1094,10 +1517,18 @@ const OOBE = {
     },
 
     _applySelections() {
+        const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
+        const name = String(this.selectedUserName || '').trim();
+        const email = String(this.selectedUserEmail || '').trim();
+        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+
         const updates = {
             theme: this.selectedTheme,
             autoEnterFullscreen: this.selectedAutoFullscreen,
-            fingoCustomMode: this.selectedFingoMode === 'custom'
+            fingoCustomMode: this.selectedFingoMode === 'custom',
+            userName: name || fallbackName,
+            userEmail: this._isValidEmail(email) ? email : fallbackEmail,
+            userAvatar: avatar
         };
 
         const pinInput = document.getElementById('oobe-pin-input');
@@ -1579,12 +2010,21 @@ const OOBE = {
         setText('oobe-title-fingo', d.fingoPageTitle);
         setText('oobe-subtitle-fingo', d.fingoPageSubtitle);
         setText('oobe-fingo-title', this._fingoText('settings.fingo-title', 'Fingo AI', 'Fingo AI'));
+        setText('oobe-title-user', d.userPageTitle);
+        setText('oobe-subtitle-user', d.userPageSubtitle);
+        setText('oobe-user-avatar-title', d.userAvatarTitle);
+        setText('oobe-user-name-title', d.userNameTitle);
+        setText('oobe-user-email-title', d.userEmailTitle);
         setText('oobe-title-password', d.passwordPageTitle);
         setText('oobe-subtitle-password', d.passwordPageSubtitle);
         setText('oobe-pin-title', d.pinTitle);
 
         const pinInput = document.getElementById('oobe-pin-input');
         if (pinInput) pinInput.placeholder = d.pinPlaceholder;
+        if (this.userNameInputEl) this.userNameInputEl.placeholder = d.userNamePlaceholder;
+        if (this.userEmailInputEl) this.userEmailInputEl.placeholder = d.userEmailPlaceholder;
+        if (this.userAvatarUploadBtnEl) this.userAvatarUploadBtnEl.textContent = d.userUploadAvatar;
+        if (this.userAvatarResetBtnEl) this.userAvatarResetBtnEl.textContent = d.userResetAvatar;
 
         const langZhTitle = this.element.querySelector('[data-lang="zh"] .oobe-option-title');
         const langZhDesc = this.element.querySelector('[data-lang="zh"] .oobe-option-desc');
@@ -1609,9 +2049,11 @@ const OOBE = {
         const back1 = document.getElementById('oobe-back-1');
         const next2 = document.getElementById('oobe-next-2');
         const next3 = document.getElementById('oobe-next-3');
+        const next4 = document.getElementById('oobe-next-4');
         const back2 = document.getElementById('oobe-back-2');
         const back3 = document.getElementById('oobe-back-3');
         const back4 = document.getElementById('oobe-back-4');
+        const back5 = document.getElementById('oobe-back-5');
         const finish = document.getElementById('oobe-finish');
 
         if (next0) next0.textContent = d.welcomeNext;
@@ -1619,19 +2061,24 @@ const OOBE = {
         if (back1) back1.textContent = d.back;
         if (next2) next2.textContent = d.next;
         if (next3) next3.textContent = d.next;
+        if (next4) next4.textContent = d.next;
         if (back2) back2.textContent = d.back;
         if (back3) back3.textContent = d.back;
         if (back4) back4.textContent = d.back;
+        if (back5) back5.textContent = d.back;
         if (finish) finish.textContent = d.finish;
 
         if (this.fingoInputEl) {
             this.fingoInputEl.placeholder = d.fingoInputPlaceholder;
         }
 
-        const previewLoginBtn = this.element.querySelector('.oobe-live-login-card .login-submit');
-        if (previewLoginBtn) previewLoginBtn.textContent = d.previewLogin;
+        this.element.querySelectorAll('.oobe-live-login-card .login-submit').forEach((btn) => {
+            btn.textContent = d.previewLogin;
+        });
 
         this._renderFingoSettingsPanel();
+        this._syncUserStepState();
+        this._syncLockPreviewProfile();
         this._syncDesktopPreviewState();
         this._updatePreloadStatusText();
     },
@@ -1650,7 +2097,34 @@ const OOBE = {
 
     _dict() {
         const lang = this._langCode();
-        return this.i18n[lang] || this.i18n.zh;
+        const base = lang === 'en'
+            ? {
+                userPageTitle: 'User',
+                userPageSubtitle: 'Set avatar, user name and email. The lock preview above updates in real time.',
+                userAvatarTitle: 'Avatar',
+                userUploadAvatar: 'Upload Custom Avatar',
+                userResetAvatar: 'Restore Default Avatar',
+                userNameTitle: 'User Name',
+                userNamePlaceholder: 'Enter user name',
+                userEmailTitle: 'Email',
+                userEmailPlaceholder: 'Enter email',
+                userNameRequired: 'User name cannot be empty.',
+                userEmailInvalid: 'Invalid email format.'
+            }
+            : {
+                userPageTitle: '\u7528\u6237',
+                userPageSubtitle: '\u8bbe\u7f6e\u5934\u50cf\u3001\u7528\u6237\u540d\u548c\u90ae\u7bb1\uff0c\u4e0a\u65b9\u9501\u5c4f\u9884\u89c8\u4f1a\u5b9e\u65f6\u540c\u6b65\u3002',
+                userAvatarTitle: '\u5934\u50cf',
+                userUploadAvatar: '\u4e0a\u4f20\u81ea\u5b9a\u4e49\u5934\u50cf',
+                userResetAvatar: '\u6062\u590d\u9ed8\u8ba4\u5934\u50cf',
+                userNameTitle: '\u7528\u6237\u540d',
+                userNamePlaceholder: '\u8bf7\u8f93\u5165\u7528\u6237\u540d',
+                userEmailTitle: '\u90ae\u7bb1',
+                userEmailPlaceholder: '\u8bf7\u8f93\u5165\u90ae\u7bb1',
+                userNameRequired: '\u7528\u6237\u540d\u4e0d\u80fd\u4e3a\u7a7a',
+                userEmailInvalid: '\u90ae\u7bb1\u683c\u5f0f\u4e0d\u6b63\u786e'
+            };
+        return { ...base, ...(this.i18n[lang] || this.i18n.zh) };
     },
 
     /* ===== Welcome animation (Step 0) ===== */

@@ -876,6 +876,7 @@ const WindowManager = {
         }
         
         let isDragging = false;
+        let dragPointerId = null;
         let dragMoved = false;
         let currentX;
         let currentY;
@@ -884,8 +885,9 @@ const WindowManager = {
         let dragSnapLayout = null;
 
         // 绑定标题栏拖动事件 - Bind titlebar drag event
-        titlebar.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
+        titlebar.addEventListener('pointerdown', (e) => {
+            if (typeof e.button === 'number' && e.button !== 0) return;
+            if (e.isPrimary === false) return;
             if (e.target.closest('.window-controls')) return;
 
             const windowData = this._getWindowData(windowElement.id);
@@ -895,18 +897,29 @@ const WindowManager = {
             dragSnapLayout = null;
             
             isDragging = true;
+            dragPointerId = e.pointerId;
             dragMoved = false;
             initialX = e.clientX - windowElement.offsetLeft;
             initialY = e.clientY - windowElement.offsetTop;
             
             // 禁用过渡以实现平滑拖动 - Disable transition for smooth drag
             windowElement.style.transition = 'none';
+
+            if (typeof titlebar.setPointerCapture === 'function') {
+                try {
+                    titlebar.setPointerCapture(e.pointerId);
+                } catch (err) {
+                    // no-op for unsupported capture targets
+                }
+            }
             
             this.focusWindow(windowElement.id);
+            e.preventDefault();
         });
 
-        document.addEventListener('mousemove', (e) => {
+        document.addEventListener('pointermove', (e) => {
             if (!isDragging) return;
+            if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
             
             e.preventDefault();
             currentX = e.clientX - initialX;
@@ -933,9 +946,18 @@ const WindowManager = {
             }
         });
 
-        document.addEventListener('mouseup', () => {
+        const finalizeDrag = (e) => {
             if (isDragging) {
+                if (dragPointerId !== null && e && e.pointerId !== dragPointerId) return;
                 isDragging = false;
+                if (dragPointerId !== null && typeof titlebar.releasePointerCapture === 'function') {
+                    try {
+                        titlebar.releasePointerCapture(dragPointerId);
+                    } catch (err) {
+                        // no-op
+                    }
+                }
+                dragPointerId = null;
                 // 恢复过渡 - Restore transition
                 windowElement.style.transition = '';
 
@@ -951,7 +973,9 @@ const WindowManager = {
                 dragSnapLayout = null;
                 this._hideDragSnapHint();
             }
-        });
+        };
+        document.addEventListener('pointerup', finalizeDrag);
+        document.addEventListener('pointercancel', finalizeDrag);
 
         // 绑定标题栏拖动事件 - Bind titlebar drag event
         titlebar.addEventListener('dblclick', () => {
@@ -973,6 +997,7 @@ const WindowManager = {
         });
 
         if (snapMenu) {
+            snapMenu.addEventListener('pointerdown', (e) => e.stopPropagation());
             snapMenu.addEventListener('mousedown', (e) => e.stopPropagation());
         }
 
@@ -989,7 +1014,7 @@ const WindowManager = {
             this.closeWindow(windowElement.id);
         });
 
-        windowElement.addEventListener('mousedown', (e) => {
+        windowElement.addEventListener('pointerdown', (e) => {
             if (!e.target.closest('.window-snap-layout-menu')) {
                 this._hideAllSnapMenus(windowElement.id);
             }
@@ -1006,16 +1031,22 @@ const WindowManager = {
     bindResizeEvents(windowElement) {
         const handles = windowElement.querySelectorAll('.window-resize-handle');
         let isResizing = false;
+        let resizePointerId = null;
         let resizeDirection = '';
         let startX, startY, startWidth, startHeight, startLeft, startTop;
+        let activeResizeHandle = null;
 
         handles.forEach(handle => {
-            handle.addEventListener('mousedown', (e) => {
+            handle.addEventListener('pointerdown', (e) => {
                 const windowData = this._getWindowData(windowElement.id);
                 if (windowData && windowData.isMaximized) return;
+                if (typeof e.button === 'number' && e.button !== 0) return;
+                if (e.isPrimary === false) return;
 
                 e.stopPropagation();
                 isResizing = true;
+                resizePointerId = e.pointerId;
+                activeResizeHandle = handle;
                 windowElement.classList.add('resizing');
                 this._hideSnapMenu(windowElement, true);
 
@@ -1038,11 +1069,20 @@ const WindowManager = {
 
                 // 防止默认行为和文本选择 - Prevent default and text selection
                 e.preventDefault();
+                if (typeof handle.setPointerCapture === 'function') {
+                    try {
+                        handle.setPointerCapture(e.pointerId);
+                    } catch (err) {
+                        // no-op
+                    }
+                }
             });
         });
 
-        document.addEventListener('mousemove', (e) => {
+        document.addEventListener('pointermove', (e) => {
             if (!isResizing) return;
+            if (resizePointerId !== null && e.pointerId !== resizePointerId) return;
+            e.preventDefault();
 
             const deltaX = e.clientX - startX;
             const deltaY = e.clientY - startY;
@@ -1084,9 +1124,19 @@ const WindowManager = {
             windowElement.style.top = `${newTop}px`;
         });
 
-        document.addEventListener('mouseup', () => {
+        const finalizeResize = (e) => {
             if (isResizing) {
+                if (resizePointerId !== null && e && e.pointerId !== resizePointerId) return;
                 isResizing = false;
+                if (activeResizeHandle && resizePointerId !== null && typeof activeResizeHandle.releasePointerCapture === 'function') {
+                    try {
+                        activeResizeHandle.releasePointerCapture(resizePointerId);
+                    } catch (err) {
+                        // no-op
+                    }
+                }
+                resizePointerId = null;
+                activeResizeHandle = null;
                 windowElement.classList.remove('resizing');
                 resizeDirection = '';
 
@@ -1096,7 +1146,9 @@ const WindowManager = {
                     this._persistWindowBounds(windowData);
                 }
             }
-        });
+        };
+        document.addEventListener('pointerup', finalizeResize);
+        document.addEventListener('pointercancel', finalizeResize);
     },
 
     focusWindow(windowId) {
