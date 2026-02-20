@@ -156,18 +156,18 @@ const NotificationCenter = {
         
         const panelRect = this.element.getBoundingClientRect();
         const btnCenterX = btnRect.left + btnRect.width / 2;
-        
-        // 强制紧贴任务栏：面板底部对齐任务栏顶部
-        const bottomDistance = window.innerHeight - taskbarRect.top - 2; // 视觉贴合，向下压 2px
-        
+
+        // 强制紧贴任务栏：面板底部对齐任务栏顶部（增加1px间距）
+        const bottomDistance = window.innerHeight - taskbarRect.top - 1; // 视觉贴合，向下压 1px
+
         console.log('[NotificationCenter] 定位信息:', {
             windowHeight: window.innerHeight,
             taskbarTop: taskbarRect.top,
             bottomDistance: bottomDistance,
             panelHeight: panelRect.height,
-            计算公式: `${window.innerHeight} - ${taskbarRect.top} - 2 = ${bottomDistance}`
+            计算公式: `${window.innerHeight} - ${taskbarRect.top}- 1 = ${bottomDistance}`
         });
-        
+
         this.element.style.bottom = `${bottomDistance}px`;
         this.element.style.left = `${btnCenterX - panelRect.width / 2}px`;
         this.element.style.right = 'auto';

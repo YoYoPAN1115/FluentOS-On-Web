@@ -658,6 +658,7 @@ body.animations-enabled .login-card.show {
 }
 
 /* ============ 任务栏 ============ */
+/* 任务栏层级，低于面板但高于窗口 - Taskbar z-index, below panels but above windows */
 .taskbar {
     position: fixed;
     bottom: 8px;
@@ -672,7 +673,7 @@ body.animations-enabled .login-card.show {
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255, 255, 255, 0.1);
     border: 1px solid var(--border-color);
-    z-index: 9000;
+    z-index: 10000;
 }
 
 /* 任务栏显示动画 - 从下方弹入（非线性平滑） */
@@ -825,6 +826,7 @@ body.animations-enabled .taskbar-center {
 }
 
 /* ============ 开始菜单 ============ */
+/* 开始菜单在任务栏上方 - Start menu above taskbar */
 .start-menu {
     position: fixed;
     bottom: 80px;
@@ -837,7 +839,7 @@ body.animations-enabled .taskbar-center {
     padding: 24px;
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-color);
-    z-index: 9500;
+    z-index: 10200;
     transform-origin: center bottom;
 }
 
@@ -1024,6 +1026,7 @@ body.animations-enabled .taskbar-center {
 }
 
 /* ============ 电源菜单 ============ */
+/* 电源菜单在任务栏上方 - Power menu above taskbar */
 .power-menu {
     position: fixed;
     bottom: 80px;
@@ -1035,7 +1038,7 @@ body.animations-enabled .taskbar-center {
     min-width: 180px;
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
-    z-index: 9600;
+    z-index: 10200;
 }
 
 .power-menu-item {
@@ -1062,6 +1065,7 @@ body.animations-enabled .taskbar-center {
 }
 
 /* ============ 控制中心 ============ */
+/* 控制中心在任务栏上方 - Control center above taskbar */
 .control-center {
     position: fixed;
     /* 不设置默认bottom，由JS动态计算 */
@@ -1072,7 +1076,7 @@ body.animations-enabled .taskbar-center {
     padding: 20px;
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-color);
-    z-index: 9500;
+    z-index: 10200;
 }
 
 .control-center-grid {
@@ -1263,6 +1267,7 @@ body.animations-enabled .taskbar-center {
 }
 
 /* ============ 通知中心 ============ */
+/* 通知中心在任务栏上方 - Notification center above taskbar */
 .notification-center {
     position: fixed;
     top: 0;
@@ -1273,7 +1278,7 @@ body.animations-enabled .taskbar-center {
     backdrop-filter: blur(var(--blur-lg)) saturate(150%);
     box-shadow: var(--shadow-xl);
     border-left: 1px solid var(--border-color);
-    z-index: 9500;
+    z-index: 10200;
     display: flex;
     flex-direction: column;
 }

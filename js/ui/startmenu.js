@@ -421,7 +421,11 @@ const StartMenu = {
         this.element.classList.remove('closing');
         this.isOpen = true;
         this.searchInput.focus();
-        
+
+        // 切换开始按钮图标为fill - Switch start button icon to fill
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) startBtn.classList.add('active');
+
         // 关闭其他面板
         ControlCenter.close();
         NotificationCenter.close();
@@ -430,7 +434,7 @@ const StartMenu = {
 
     close() {
         if (!this.isOpen) return;
-        
+
         // 添加关闭动画
         if (State.settings.enableAnimation) {
             this.element.classList.add('closing');
@@ -438,13 +442,17 @@ const StartMenu = {
                 this.element.classList.add('hidden');
                 this.element.classList.remove('closing');
             }, 200);
-        } else {
+        }else {
             this.element.classList.add('hidden');
         }
-        
+
         this.isOpen = false;
         this.searchInput.value = '';
         this.filterApps('');
+
+        // 切换开始按钮图标回stroke - Switch start button icon back to stroke
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) startBtn.classList.remove('active');
     },
 
     filterApps(query) {
