@@ -41,6 +41,8 @@ const OOBE = {
     fingoCustomOptionsWrapEl: null,
     fingoModeAnimating: false,
     pendingFingoCustomEnter: false,
+    tempFingoPendingAction: null,
+    oobeForceRestarting: false,
     oobeFingoApiListenerBound: false,
 
     /* Welcome animation state */
@@ -796,6 +798,7 @@ const OOBE = {
 
     _handleOobeFingoCustomModeToggle(enableCustom) {
         if (this.fingoModeAnimating) return;
+        this.tempFingoPendingAction = null;
 
         if (enableCustom) {
             const zhGuardContent = '\u5f00\u542f\u81ea\u5b9a\u4e49 API \u6a21\u5f0f\u524d\uff0c\u9700\u8981\u5f00\u542f\u300c\u7981\u7528\u5185\u8054\u811a\u672c\u300d\u3002\u70b9\u51fb\u300c\u786e\u5b9a\u300d\u540e\u5c06\u81ea\u52a8\u542f\u7528\u8be5\u5b89\u5168\u9879\u5e76\u5f00\u542f\u81ea\u5b9a\u4e49\u6a21\u5f0f\u3002';
@@ -1124,6 +1127,8 @@ const OOBE = {
             this.fingoPreviewContentEl.classList.add('fingo-empty');
         }
         this.fingoInputOnlyMode = true;
+        this.tempFingoPendingAction = null;
+        this.oobeForceRestarting = false;
         if (this.fingoInputEl) {
             this.fingoInputEl.value = '';
             this.fingoInputEl.placeholder = this._dict().fingoInputPlaceholder;
@@ -1189,6 +1194,19 @@ const OOBE = {
     async _buildTempFingoReply(rawText) {
         const text = String(rawText || '').trim();
         if (!text) return this._dict().fingoFallback;
+
+        if (this._isOobeForceRestartIntent(text)) {
+            this.tempFingoPendingAction = null;
+            this._triggerOobeForceRestart();
+            return this._langCode() === 'zh'
+                ? '已触发彩蛋：正在强制重启，系统将再次进入 OOBE。'
+                : 'Easter egg triggered: forcing restart. The system will enter OOBE again.';
+        }
+
+        const pendingReply = this._handleTempFingoPending(text);
+        if (typeof pendingReply === 'string' && pendingReply.trim()) {
+            return pendingReply;
+        }
 
         const useCustomApi = this.selectedFingoMode === 'custom' || State?.settings?.fingoCustomMode === true;
         if (useCustomApi && typeof Fingo !== 'undefined' && Fingo) {
@@ -1301,8 +1319,106 @@ const OOBE = {
         return this._resolveFingoPayload(typeof FingoData !== 'undefined' ? FingoData.fallback : null) || this._dict().fingoFallback;
     },
 
+    _matchTempConfirmIntent(text) {
+        const lower = String(text || '').toLowerCase();
+        const yesWords = Array.isArray(FingoData?.confirmYes) ? FingoData.confirmYes : ['是', 'yes', 'ok', 'confirm'];
+        const noWords = Array.isArray(FingoData?.confirmNo) ? FingoData.confirmNo : ['否', '不', 'no', 'cancel'];
+        const isYes = yesWords.some((w) => lower.includes(String(w || '').toLowerCase()));
+        const isNo = noWords.some((w) => lower.includes(String(w || '').toLowerCase()));
+        return { isYes, isNo };
+    },
+
+    _handleTempFingoPending(text) {
+        const pa = this.tempFingoPendingAction;
+        if (!pa || !pa.type) return null;
+
+        const { isYes, isNo } = this._matchTempConfirmIntent(text);
+        if (!isYes && !isNo) {
+            if (pa.type === 'offerQuickStart') {
+                // Greeting suggestion is optional; continue with normal intent parsing.
+                this.tempFingoPendingAction = null;
+                return null;
+            }
+            return this._langCode() === 'zh' ? '请回答「是」或「否」。' : 'Please answer "yes" or "no".';
+        }
+
+        this.tempFingoPendingAction = null;
+
+        if (isNo) {
+            return this._langCode() === 'zh'
+                ? '好的，已取消操作。'
+                : 'OK, operation cancelled.';
+        }
+
+        if (pa.type === 'offerQuickStart') {
+            return this._langCode() === 'zh'
+                ? '太好了，给你一份超快上手指南：\n1. 按 Alt 打开开始菜单\n2. 按 Alt+I 打开设置\n3. 按 Alt+W 打开任务视图\n4. 想固定应用到任务栏：在开始菜单中右键应用，选「固定到任务栏」\n\n你也可以直接问我：「怎么分屏」「怎么切换语言」「怎么安装应用」。'
+                : 'Great. Here is a quick-start guide:\n1. Press Alt to open Start Menu\n2. Press Alt+I to open Settings\n3. Press Alt+W to open Task View\n4. To pin an app: right-click it in Start Menu, then choose "Pin to taskbar"\n\nYou can also ask me directly: "how to snap windows", "how to change language", or "how to install apps".';
+        }
+
+        if (pa.type === 'disableAutoFullscreen') {
+            this.selectedAutoFullscreen = false;
+            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            return this._langCode() === 'zh'
+                ? '已关闭开机自动网页全屏。'
+                : 'Auto web fullscreen on boot is now disabled.';
+        }
+
+        return null;
+    },
+
+    _isOobeForceRestartIntent(text) {
+        const lower = String(text || '').toLowerCase();
+        const normalized = this._normalizeFingoText(lower);
+        const compact = this._compactFingoText(normalized);
+        const keywords = [
+            '强制退出/关闭oobe',
+            '强制退出或关闭oobe',
+            '强制退出oobe',
+            '强制关闭oobe',
+            '关闭oobe',
+            '退出oobe',
+            '强制退出引导',
+            '强制关闭引导',
+            '关闭新手引导',
+            '退出新手引导',
+            'force exit oobe',
+            'force close oobe',
+            'force quit oobe',
+            'close oobe',
+            'exit oobe',
+            'quit oobe',
+            'restart oobe'
+        ];
+
+        return keywords.some((kw) => this._fingoKeywordMatched(lower, normalized, compact, kw));
+    },
+
+    _triggerOobeForceRestart() {
+        if (this.oobeForceRestarting) return;
+        this.oobeForceRestarting = true;
+        try {
+            localStorage.removeItem(this.STORAGE_KEY);
+        } catch (_) {
+            // ignore storage errors
+        }
+
+        setTimeout(() => {
+            if (State && typeof State.restart === 'function') {
+                State.restart();
+            } else {
+                window.location.reload();
+            }
+        }, 320);
+    },
+
     _applyPreviewActionFromCommand(action) {
         if (typeof action !== 'string') return;
+
+        if (action === 'offerQuickStart') {
+            this.tempFingoPendingAction = { type: 'offerQuickStart' };
+            return;
+        }
 
         if (action === 'setTheme:dark') {
             this.selectedTheme = 'dark';
@@ -1326,7 +1442,12 @@ const OOBE = {
             return;
         }
 
-        if (action === 'confirmAutoFullscreen:disable' || action === 'setAutoFullscreen:false') {
+        if (action === 'confirmAutoFullscreen:disable') {
+            this.tempFingoPendingAction = { type: 'disableAutoFullscreen' };
+            return;
+        }
+
+        if (action === 'setAutoFullscreen:false') {
             this.selectedAutoFullscreen = false;
             this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
             return;

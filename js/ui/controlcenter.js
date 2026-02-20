@@ -258,11 +258,14 @@ const ControlCenter = {
         
         // 更新按钮状态
         btn.classList.add('active');
-        
-        // 关闭其他面板
+
+        // 关闭其他面板（互斥）
         StartMenu.close();
         NotificationCenter.close();
-        if (typeof Fingo !== 'undefined') Fingo.hide();
+        if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen) {
+            Fingo.hide('panel-switch');
+        }
+
     },
 
     close() {
@@ -290,4 +293,3 @@ const ControlCenter = {
         this.isOpen = false;
     }
 };
-

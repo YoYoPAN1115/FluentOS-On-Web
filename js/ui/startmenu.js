@@ -426,10 +426,13 @@ const StartMenu = {
         const startBtn = document.getElementById('start-btn');
         if (startBtn) startBtn.classList.add('active');
 
-        // 关闭其他面板
+        // 关闭其他面板（互斥）
         ControlCenter.close();
         NotificationCenter.close();
-        if (typeof Fingo !== 'undefined') Fingo.hide();
+        if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen) {
+            Fingo.hide('panel-switch');
+        }
+
     },
 
     close() {
@@ -691,4 +694,3 @@ const StartMenu = {
         }
     }
 };
-

@@ -1115,6 +1115,10 @@ const WindowManager = {
 
         this._syncZIndexCounter();
         windowData.element.style.zIndex = ++this.zIndexCounter;
+
+        if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
+            Fingo._ensurePanelForeground();
+        }
     },
 
     minimizeWindow(windowId) {

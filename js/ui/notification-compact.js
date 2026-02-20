@@ -180,10 +180,14 @@ const NotificationCenter = {
         if (typeof CalendarWidget !== 'undefined') {
             CalendarWidget.render();
         }
-        
-        // 关闭其他面板
+
+        // 关闭其他面板（互斥）
         if (typeof StartMenu !== 'undefined') StartMenu.close();
         if (typeof ControlCenter !== 'undefined') ControlCenter.close();
+        if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen) {
+            Fingo.hide('panel-switch');
+        }
+
     },
 
     close() {
@@ -472,4 +476,3 @@ function notify(title, message, type = 'info') {
 }
 
 console.log('[NotificationCenter] 模块已加载');
-

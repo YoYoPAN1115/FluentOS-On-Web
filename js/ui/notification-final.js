@@ -159,8 +159,10 @@ const NotificationCenter = {
         // 关闭其他面板
         if (typeof StartMenu !== 'undefined') StartMenu.close();
         if (typeof ControlCenter !== 'undefined') ControlCenter.close();
-        if (typeof Fingo !== 'undefined') Fingo.hide();
-        
+        if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
+            Fingo._ensurePanelForeground();
+        }
+
         console.log('[NotificationCenter] 通知中心已打开');
     },
 

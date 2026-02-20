@@ -6,19 +6,26 @@ const FingoData = {
     systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos'],
 
     // 用户确认关键词
-    confirmYes: ['是', '好', '好的', '确认', '确定', '对', '行', '行的', '可以', '可以的', '没问题', '继续', '嗯', '嗯嗯', 'yes', 'ok', 'okay', 'confirm', 'sure', 'y', 'yeah', 'yep'],
-    confirmNo: ['否', '不', '不要', '不行', '不了', '取消', '拒绝', '算了', '不用', '别', 'no', 'cancel', 'n', 'nope', 'nah'],
+    confirmYes: [
+        '是', '好', '好的', '确认', '确定', '对', '行', '行的', '可以', '可以的', '没问题', '继续', '嗯', '嗯嗯',
+        '当然', '要的', '没错', '确定关闭', '确认关闭', '可以关闭', '就这样', '可以执行',
+        'yes', 'ok', 'okay', 'confirm', 'sure', 'y', 'yeah', 'yep', 'do it', 'go ahead','Y','Yes','OK','Ok'
+    ],
+    confirmNo: [
+        '否', '不', '不要', '不行', '不了', '取消', '拒绝', '算了', '不用', '别', '不要了', '不用了', '先不要', '暂时不要', '别了',
+        'no', 'cancel', 'n', 'nope', 'nah', 'not now', 'stop it','N','NO','No'
+    ],
 
     // 关键词 → 动作映射，每项: { keywords, action, response, responseFail? }
     commands: {
         // ===== 主题切换 =====
         darkMode: {
-            keywords: ['深色模式', '深色', '暗色', '暗色模式', '夜间模式', 'dark mode', 'dark theme', '开启深色', '切换深色', '黑暗模式'],
+            keywords: ['深色模式', '深色', '暗色', '暗色模式', '夜间模式', '深色主题', '黑夜模式', 'dark mode', 'dark theme', 'enable dark mode', '开启深色', '切换深色', '黑暗模式'],
             action: 'setTheme:dark',
             response: { zh: '已为你切换到深色模式 🌙', en: 'Switched to dark mode 🌙' }
         },
         lightMode: {
-            keywords: ['浅色模式', '浅色', '亮色', '亮色模式', '日间模式', 'light mode', 'light theme', '开启浅色', '切换浅色', '白天模式'],
+            keywords: ['浅色模式', '浅色', '亮色', '亮色模式', '日间模式', '浅色主题', '白天模式', 'light mode', 'light theme', 'enable light mode', '开启浅色', '切换浅色'],
             action: 'setTheme:light',
             response: { zh: '已为你切换到浅色模式 ☀️', en: 'Switched to light mode ☀️' }
         },
@@ -88,6 +95,76 @@ const FingoData = {
                 en: 'Enabled "Auto Web Fullscreen On Boot".'
             }
         },
+        autoFullscreenOff: {
+            keywords: [
+                '关闭网页自动全屏',
+                '关闭自动网页全屏',
+                '关闭自动全屏',
+                '关掉自动全屏',
+                '禁用自动网页全屏',
+                '禁用自动全屏',
+                '关闭开机自动全屏',
+                'disable auto fullscreen',
+                'turn off auto fullscreen',
+                'disable web auto fullscreen',
+                'turn off web auto fullscreen'
+            ],
+            action: 'setAutoFullscreen:false',
+            response: {
+                zh: '已关闭“开机自动网页全屏”。',
+                en: 'Disabled "Auto Web Fullscreen On Boot".'
+            }
+        },
+        enterWebFullscreen: {
+            keywords: [
+                '进入网页全屏',
+                '进入全屏',
+                '打开当前全屏',
+                '当前页面全屏',
+                '立刻全屏',
+                '马上全屏',
+                'enter fullscreen',
+                'go fullscreen',
+                'fullscreen now'
+            ],
+            action: 'setDocumentFullscreen:true',
+            response: {
+                zh: '正在进入网页全屏。',
+                en: 'Entering web fullscreen.'
+            }
+        },
+        exitWebFullscreen: {
+            keywords: [
+                '退出网页全屏',
+                '退出全屏',
+                '关闭当前全屏',
+                '取消全屏',
+                '恢复窗口模式',
+                'exit fullscreen',
+                'leave fullscreen',
+                'close fullscreen'
+            ],
+            action: 'setDocumentFullscreen:false',
+            response: {
+                zh: '已退出网页全屏。',
+                en: 'Exited web fullscreen.'
+            }
+        },
+        autoFullscreenBootGuide: {
+            keywords: [
+                '开机自动网页全屏怎么开',
+                '开机自动网页全屏怎么关',
+                '自动网页全屏怎么开',
+                '自动网页全屏怎么关',
+                'how to enable auto web fullscreen on boot',
+                'how to disable auto web fullscreen on boot'
+            ],
+            action: 'openSettings:personalization',
+            response: {
+                zh: '你可以在「设置 → 个性化」里找到「开机自动网页全屏」开关。\n我已帮你打开对应页面。\n\n你也可以直接对我说：\n-「开启网页自动全屏」\n-「关闭网页自动全屏」',
+                en: 'Go to "Settings → Personalization" and find "Auto Web Fullscreen On Boot".\nI opened that page for you.\n\nYou can also tell me directly:\n- "enable auto fullscreen"\n- "disable auto fullscreen"'
+            }
+        },
         // ===== 全屏相关（默认走关闭确认） =====
         autoFullscreen: {
             keywords: [
@@ -104,6 +181,157 @@ const FingoData = {
             response: {
                 zh: '\u68c0\u6d4b\u5230\u4f60\u5728\u95ee\u5168\u5c4f\u3002\u8981\u5173\u95ed\u201c\u5f00\u673a\u81ea\u52a8\u7f51\u9875\u5168\u5c4f\u201d\u5417\uff1f\uff08\u786e\u5b9a/\u4e0d\u8981\uff09',
                 en: 'You asked about fullscreen. Disable "Auto Web Fullscreen On Boot"? (yes/no)'
+            }
+        },
+        taskViewOpen: {
+            keywords: ['打开任务视图', '打开多任务视图', '进入任务视图', '进入多任务视图', 'open task view', 'open multitask view'],
+            action: 'taskView:open',
+            response: { zh: '已打开任务视图。', en: 'Task View opened.' }
+        },
+        taskViewClose: {
+            keywords: ['关闭任务视图', '关闭多任务视图', '退出任务视图', '退出多任务视图', 'close task view', 'exit task view'],
+            action: 'taskView:close',
+            response: { zh: '已关闭任务视图。', en: 'Task View closed.' }
+        },
+        minimizeAllWindows: {
+            keywords: ['最小化全部窗口', '最小化所有窗口', '收起全部窗口', '一键最小化', 'minimize all windows', 'show desktop'],
+            action: 'window:minimizeAll',
+            response: { zh: '已最小化所有窗口。', en: 'All windows minimized.' }
+        },
+        minimizeTopWindow: {
+            keywords: ['最小化当前窗口', '最小化前台窗口', '收起当前窗口', '收起前台窗口', 'minimize current window', 'minimize top window'],
+            action: 'window:minimizeTop',
+            response: { zh: '已最小化当前窗口。', en: 'Top window minimized.' }
+        },
+        snapLayoutGuide: {
+            keywords: [
+                '怎么分屏',
+                '如何分屏',
+                '贴边布局怎么用',
+                '怎么贴边布局',
+                '窗口贴边',
+                '分屏布局',
+                'how to snap windows',
+                'how to use snap layout',
+                'window snapping'
+            ],
+            action: 'openSettings:multitask',
+            response: {
+                zh: '分屏/贴边布局可以这样用：\n1. 拖动窗口到屏幕左/右边缘，松手即可半屏\n2. 拖动到四角可四分屏\n3. 鼠标悬停窗口「最大化」按钮，也可选择布局\n\n我已为你打开「设置 → 多任务」，你可以检查贴边分屏是否开启。',
+                en: 'Use snap layouts like this:\n1. Drag a window to left/right edge and release for half screen\n2. Drag to corners for quarter layouts\n3. Hover the maximize button to pick a layout\n\nI opened "Settings → Multitasking" so you can check snap options.'
+            }
+        },
+        panelGuide: {
+            keywords: [
+                '怎么打开控制中心',
+                '如何打开控制中心',
+                '怎么打开通知中心',
+                '如何打开通知中心',
+                '控制中心怎么开',
+                '通知中心怎么开',
+                'how to open control center',
+                'how to open notification center'
+            ],
+            action: 'none',
+            response: {
+                zh: '打开方式如下：\n1. 控制中心：点任务栏右下角快捷区，或按 Alt+A\n2. 通知中心：点任务栏时间区域\n\n如果你愿意，我也可以直接帮你打开控制中心。',
+                en: 'Here are quick ways:\n1. Control Center: click the quick-area at bottom-right, or press Alt+A\n2. Notification Center: click the taskbar time area\n\nIf you want, I can also open Control Center for you now.'
+            }
+        },
+        openControlCenter: {
+            keywords: ['打开控制中心', '打开快捷设置', 'open control center', 'open quick settings'],
+            action: 'panel:control',
+            response: { zh: '已为你打开控制中心。', en: 'Control Center opened.' }
+        },
+        openNotificationCenter: {
+            keywords: ['打开通知中心', '查看通知', '打开消息中心', 'open notification center', 'open notifications'],
+            action: 'panel:notification',
+            response: { zh: '已为你打开通知中心。', en: 'Notification Center opened.' }
+        },
+        resetThemeEffectsGuide: {
+            keywords: [
+                '怎么重置主题和动效到默认',
+                '如何重置主题和动效',
+                '主题和动效怎么恢复默认',
+                'how to reset theme and effects to default',
+                'how to reset appearance defaults'
+            ],
+            action: 'none',
+            response: {
+                zh: '你可以这样恢复默认外观：\n1. 主题设为浅色（Light）\n2. 开启动画\n3. 开启模糊与窗口模糊\n4. 关闭新版外观（V2）\n\n如果你希望我直接执行，回复「重置主题和动效」。',
+                en: 'To restore default appearance:\n1. Set theme to Light\n2. Enable animation\n3. Enable blur and window blur\n4. Disable Fluent V2\n\nIf you want me to apply it now, reply "reset theme and effects".'
+            }
+        },
+        resetThemeEffectsNow: {
+            keywords: ['重置主题和动效', '恢复默认主题和动效', '重置外观默认', 'reset theme and effects', 'reset appearance defaults'],
+            action: 'resetAppearanceDefaults',
+            response: { zh: '已将主题与动效恢复为默认设置。', en: 'Theme and effects have been reset to defaults.' }
+        },
+        taskbarPinGuide: {
+            keywords: [
+                '任务栏能不能固定app',
+                '任务栏能固定app吗',
+                '任务栏可以固定应用吗',
+                '怎么固定到任务栏',
+                '如何固定到任务栏',
+                '固定app到任务栏',
+                '把应用固定到任务栏',
+                'pin app to taskbar',
+                'pin to taskbar',
+                'can i pin app to taskbar',
+                'how to pin app to taskbar'
+            ],
+            action: 'none',
+            response: {
+                zh: '可以，操作很简单：\n1. 打开开始菜单（按 Alt 或点任务栏开始按钮）\n2. 找到目标 App，鼠标右键\n3. 在菜单里点「固定到任务栏」\n\n如果 App 已经在运行，也可以直接右键任务栏里的该图标，选择「固定到任务栏」。',
+                en: 'Yes, it is easy:\n1. Open Start Menu (press Alt or click Start)\n2. Right-click the target app\n3. Choose "Pin to taskbar"\n\nIf the app is already running, right-click its taskbar icon and choose "Pin to taskbar".'
+            }
+        },
+        taskbarUnpinGuide: {
+            keywords: [
+                '怎么取消固定任务栏',
+                '如何取消固定任务栏',
+                '从任务栏取消固定',
+                '取消固定到任务栏',
+                '解除任务栏固定',
+                'unpin from taskbar',
+                'how to unpin app from taskbar'
+            ],
+            action: 'none',
+            response: {
+                zh: '取消固定也很快：\n1. 在任务栏找到该 App 图标\n2. 右键图标\n3. 选择「从任务栏取消固定」',
+                en: 'To unpin:\n1. Find the app icon on taskbar\n2. Right-click it\n3. Choose "Unpin from taskbar"'
+            }
+        },
+        windowRestoreGuide: {
+            keywords: [
+                '最小化窗口去哪了',
+                '窗口最小化后怎么恢复',
+                '窗口不见了怎么办',
+                '怎么恢复窗口',
+                'where is minimized window',
+                'how to restore minimized window'
+            ],
+            action: 'none',
+            response: {
+                zh: '可以这样恢复窗口：\n1. 点击任务栏中对应 App 图标（最常用）\n2. 或按 Alt+W 打开任务视图，再单击窗口\n3. 若全都收起了，可先按 Alt+D 再点目标 App',
+                en: 'You can restore windows by:\n1. Clicking the app icon on taskbar (most common)\n2. Or press Alt+W for Task View, then click the window\n3. If everything is minimized, press Alt+D first, then click the target app'
+            }
+        },
+        quickStartGuide: {
+            keywords: [
+                '新手怎么用',
+                '怎么快速上手',
+                '刚开始怎么用',
+                '新手教程',
+                'quick start',
+                'new user guide',
+                'how to get started'
+            ],
+            action: 'none',
+            response: {
+                zh: '给你一份 30 秒快速上手：\n1. 按 Alt 打开开始菜单\n2. 按 Alt+I 打开设置\n3. 按 Alt+W 打开任务视图\n4. 右键开始菜单中的 App 可「固定到任务栏」\n5. 不会的直接问我：例如「怎么切换语言」「怎么安装应用」',
+                en: 'Here is a 30-second quick start:\n1. Press Alt to open Start Menu\n2. Press Alt+I to open Settings\n3. Press Alt+W to open Task View\n4. Right-click apps in Start Menu to "Pin to taskbar"\n5. Ask me directly, e.g. "how to change language" or "how to install apps"'
             }
         },
         shutdown: {
@@ -128,7 +356,7 @@ const FingoData = {
         },
         // ===== 打开应用（通用） =====
         openApp: {
-            keywords: ['打开', '启动', '运行', 'open', 'launch', 'run', 'start'],
+            keywords: ['打开', '启动', '运行', '打开一下', '开一下', '点开', 'open', 'launch', 'run', 'start'],
             action: 'openApp',
             response: { zh: '正在打开 {app} ...', en: 'Opening {app} ...' },
             responseNotFound: { zh: '找不到该应用，你可以打开 App Shop 浏览可用应用 🛒', en: 'App not found. Open App Shop to browse available apps 🛒' },
@@ -173,16 +401,54 @@ const FingoData = {
         },
         // ===== 网络 =====
         wifiOn: {
-            keywords: ['开启网络', '打开wifi', '打开网络', '开启wifi', 'wifi on', 'enable wifi', 'turn on wifi'],
+            keywords: ['开启网络', '打开wifi', '打开wi-fi', '打开网络', '开启wifi', '开启wi-fi', '打开无线网', '开启无线网', 'wifi on', 'enable wifi', 'turn on wifi'],
             action: 'setWifi:true',
             response: { zh: 'Wi-Fi 已开启 📡', en: 'Wi-Fi enabled 📡' }
         },
         wifiOff: {
-            keywords: ['关闭网络', '关闭wifi', '禁用网络', 'wifi off', 'disable wifi', 'turn off wifi'],
+            keywords: ['关闭网络', '关闭wifi', '关闭wi-fi', '禁用网络', '关闭无线网', '断开无线网', 'wifi off', 'disable wifi', 'turn off wifi'],
             action: 'setWifi:false',
             response: { zh: 'Wi-Fi 已关闭', en: 'Wi-Fi disabled' }
         },
         // ===== 语言设置 =====
+        languageSupportInfo: {
+            keywords: [
+                '你会什么语言',
+                '你会说什么语言',
+                '你支持什么语言',
+                '你会哪些语言',
+                '你会说啥语言',
+                'what languages do you speak',
+                'what language do you support',
+                'which languages do you support'
+            ],
+            action: 'none',
+            response: {
+                zh: '我目前只支持中文和英语，我正在努力学习更多语言，敬请期待。',
+                en: 'I currently support only Chinese and English. I am learning more languages, so stay tuned.'
+            }
+        },
+        languageAbilityGuide: {
+            keywords: [
+                '你会说英文吗',
+                '你会说中文吗',
+                '你会英语吗',
+                '你会中文吗',
+                '可以说英文吗',
+                '可以说中文吗',
+                '能切换英文吗',
+                '能切换中文吗',
+                'can you speak english',
+                'can you speak chinese',
+                'do you support english',
+                'do you support chinese'
+            ],
+            action: 'openSettings:time-language',
+            response: {
+                zh: '我目前支持中文和英语。已为你打开「语言设置」🌍\n你可以在里面切换为中文或 English。',
+                en: 'I currently support Chinese and English. I opened Language Settings 🌍\nYou can switch to English or Chinese there.'
+            }
+        },
         langSettings: {
             keywords: ['语言设置', '切换语言', '更改语言', 'language settings', 'change language'],
             action: 'openSettings:time-language',
@@ -196,7 +462,7 @@ const FingoData = {
         },
         // ===== Fingo AI 设置 =====
         fingoSettings: {
-            keywords: ['fingo设置', 'fingo ai设置', '调整fingo', 'ai设置', 'fingo settings', 'ai settings'],
+            keywords: ['fingo设置', 'fingo ai设置', 'fingo ai 设定', 'fingoai设置', '调整fingo', 'ai设置', 'fingo settings', 'ai settings', 'fingo ai settings'],
             action: 'openSettings:fingo',
             response: { zh: '正在打开 Fingo AI 设置... 🤖', en: 'Opening Fingo AI settings... 🤖' }
         },
@@ -231,24 +497,24 @@ const FingoData = {
         // ===== 问候/帮助 =====
         greet: {
             keywords: ['你好', '嗨', '在吗', 'hello', 'hi', 'hey', '你是谁', 'who are you'],
-            action: 'none',
+            action: 'offerQuickStart',
             response: {
                 zh: [
-                    '你好！我是 Fingo，你的系统助手 👋\n试试对我说「切换深色模式」或「打开设置」',
-                    '我在这儿 👀\n你可以让我执行系统操作，或者闲聊：比如说「我好无聊」'
+                    '你好呀，我是 Fingo 👋 你的系统搭子已上线！\n要不要我给你一份 30 秒新手指引？（是/否）',
+                    '嗨～Fingo 在这儿 ✨\n想快速熟悉 FluentOS 吗？回复「是」我马上带你上手。'
                 ],
                 en: [
-                    'Hi! I\'m Fingo, your system assistant 👋\nTry saying "switch to dark mode" or "open settings"',
-                    'I am here 👀\nYou can ask me to do system tasks, or just chat if you are bored.'
+                    'Hi, I am Fingo 👋 Your system sidekick is ready.\nWant a 30-second quick-start guide? (yes/no)',
+                    'Hey there ✨\nWant to learn FluentOS quickly? Reply "yes" and I will guide you.'
                 ]
             }
         },
         help: {
-            keywords: ['帮助', '你能做什么', '功能', '你能干啥', 'help', 'what can you do'],
+            keywords: ['帮助', '帮助一下', '你能做什么', '功能', '你能干啥', '怎么用', 'help', 'what can you do', 'how to use'],
             action: 'none',
             response: {
-                zh: '我是 Fingo，你的系统智能助手 🤖 以下是我能帮你做的事：\n\n🎨外观主题\n　「切换深色模式」「浅色模式」「自动主题」\n\n✨ 系统效果\n　「开启/关闭模糊」「开启/关闭动画」「窗口模糊」「新版外观」\n\n📶 连接与网络\n　「开启/关闭蓝牙」「开启/关闭Wi-Fi」\n\n📱应用管理\n　「安装哔哩哔哩」「卸载xx」「修复浏览器」\n　· 系统应用不可卸载，运行中的应用会先询问确认\n\n🖼️ 个性化\n　「换张壁纸」自动从 Bing 获取精美壁纸\n　「调高/调低亮度」\n\n💬 休闲聊天\n　「我好无聊」「讲个笑话」「来个谜语」「现在几点」\n\n⚙️ 系统设置\n　「语言设置」「改密码」「Fingo AI 设置」\n\n⚡ 电源操作\n　「关机」「重启」「注销」「锁屏」\n\n💡 想了解 FluentOS？说「介绍FluentOS」\n🧠 想让我更聪明？说「自定义模式」了解 API 接入',
-                en: 'I\'m Fingo, your system assistant \u{1F916} Here\'s what I can do:\n\n\u{1F3A8} Themes\n\u3000"dark mode" "light mode" "auto theme"\n\n\u2728 Effects\n\u3000"enable/disable blur" "animation" "window blur" "new UI" "fullscreen"\n\n\u{1F4F6} Connectivity\n\u3000"enable/disable bluetooth" "enable/disable Wi-Fi"\n\n\u{1F4F1} App Management\n\u3000"install Bilibili" "uninstall xx" "repair browser"\n\u3000\u00B7 System apps can\'t be uninstalled; running apps ask for confirmation\n\n\u{1F5BC}\uFE0F Personalization\n\u3000"change wallpaper" and "brightness up/down"\n\n\u{1F4AC} Casual Chat\n\u3000"i am bored" "tell me a joke" "give me a riddle" "what time is it"\n\n\u2699\uFE0F Settings\n\u3000"language settings" "change password" "Fingo AI settings"\n\n\u26A1 Power\n\u3000"shutdown" "restart" "logout" "lock"\n\n\u{1F4A1} Say "about FluentOS" to learn more\n\u{1F9E0} Say "custom mode" to connect your own AI API'
+                zh: '我是 Fingo，你的系统智能助手 🤖 以下是我能帮你做的事：\n\n🎨外观主题\n　「切换深色模式」「浅色模式」「自动主题」\n\n✨ 系统效果\n　「开启/关闭模糊」「开启/关闭动画」「窗口模糊」「新版外观」\n　「进入网页全屏」「退出网页全屏」「开启/关闭开机自动网页全屏」\n　「重置主题和动效」恢复默认外观\n\n🧭 多任务与窗口\n　「打开/关闭任务视图」「最小化所有窗口」「最小化当前窗口」\n　「怎么分屏/贴边布局」「窗口不见了怎么办」\n\n📶 连接与网络\n　「开启/关闭蓝牙」「开启/关闭Wi-Fi」\n\n📱应用管理\n　「安装哔哩哔哩」「卸载xx」「修复浏览器」\n　· 系统应用不可卸载，运行中的应用会先询问确认\n\n🖼️ 个性化\n　「换张壁纸」自动从 Bing 获取精美壁纸\n　「调高/调低亮度」\n　「任务栏能不能固定App」\n\n💬 休闲聊天\n　「我好无聊」「讲个笑话」「来个谜语」「现在几点」\n\n⚙️ 系统设置\n　「语言设置」「改密码」「Fingo AI 设置」\n　「你会说什么语言」「你会说英文吗」\n\n⚡ 电源操作\n　「关机」「重启」「注销」「锁屏」\n\n💡 想了解 FluentOS？说「介绍FluentOS」\n🧠 想让我更聪明？说「自定义模式」了解 API 接入',
+                en: 'I\'m Fingo, your system assistant \u{1F916} Here\'s what I can do:\n\n\u{1F3A8} Themes\n\u3000"dark mode" "light mode" "auto theme"\n\n\u2728 Effects\n\u3000"enable/disable blur" "animation" "window blur" "new UI"\n\u3000"enter fullscreen" "exit fullscreen" "enable/disable auto web fullscreen on boot"\n\u3000"reset theme and effects" to defaults\n\n\u{1F9ED} Multitasking\n\u3000"open/close task view" "minimize all windows" "minimize current window"\n\u3000"how to snap windows" "where is minimized window"\n\n\u{1F4F6} Connectivity\n\u3000"enable/disable bluetooth" "enable/disable Wi-Fi"\n\n\u{1F4F1} App Management\n\u3000"install Bilibili" "uninstall xx" "repair browser"\n\u3000\u00B7 System apps can\'t be uninstalled; running apps ask for confirmation\n\n\u{1F5BC}\uFE0F Personalization\n\u3000"change wallpaper" and "brightness up/down"\n\u3000"how to pin app to taskbar"\n\n\u{1F4AC} Casual Chat\n\u3000"i am bored" "tell me a joke" "give me a riddle" "what time is it"\n\n\u2699\uFE0F Settings\n\u3000"language settings" "change password" "Fingo AI settings"\n\u3000"what languages do you speak" "can you speak english/chinese"\n\n\u26A1 Power\n\u3000"shutdown" "restart" "logout" "lock"\n\n\u{1F4A1} Say "about FluentOS" to learn more\n\u{1F9E0} Say "custom mode" to connect your own AI API'
             }
         },
         shortcutsHelp: {

@@ -18,6 +18,7 @@ const Fingo = {
     _sessionApiKey: '',
     _pendingDecryptPromise: null,
     API_KEY_CRYPTO_VERSION: 1,
+    PANEL_BASE_Z: 10200,
 
     init() {
         this.element = document.getElementById('fingo-panel');
@@ -35,7 +36,7 @@ const Fingo = {
         this.bindEvents();
     },
 
-    toggle() { this.isOpen ? this.hide() : this.show(); },
+    toggle() { this.isOpen ? this.hide('manual') : this.show(); },
 
     show() {
         this.isOpen = true;
@@ -43,15 +44,15 @@ const Fingo = {
         if (typeof StartMenu !== 'undefined') StartMenu.close();
         if (typeof ControlCenter !== 'undefined') ControlCenter.close();
         if (typeof NotificationCenter !== 'undefined') NotificationCenter.close();
-
         this.element.classList.remove('hidden', 'fingo-closing');
+        this._ensurePanelForeground();
         if (this.blurLayer) this.blurLayer.classList.add('fingo-visible');
         const btn = document.getElementById('fingo-btn');
         if (btn) btn.classList.add('active');
         setTimeout(() => this.input.focus(), 300);
     },
 
-    hide() {
+    hide(reason = 'external') {
         if (!this.isOpen) return;
         this.isOpen = false;
         this._hideContextMenu();
@@ -68,6 +69,26 @@ const Fingo = {
         } else {
             this.element.classList.add('hidden');
         }
+    },
+
+    _ensurePanelForeground() {
+        if (!this.element) return;
+        let topWindowZ = 0;
+
+        if (typeof WindowManager !== 'undefined') {
+            const counter = Number(WindowManager.zIndexCounter);
+            if (Number.isFinite(counter)) topWindowZ = Math.max(topWindowZ, counter);
+            if (Array.isArray(WindowManager.windows)) {
+                WindowManager.windows.forEach((w) => {
+                    if (!w || !w.element) return;
+                    const z = Number.parseInt(w.element.style.zIndex, 10);
+                    if (Number.isFinite(z)) topWindowZ = Math.max(topWindowZ, z);
+                });
+            }
+        }
+
+        const targetZ = Math.max(this.PANEL_BASE_Z, topWindowZ + 200);
+        this.element.style.zIndex = String(targetZ);
     },
 
     bindEvents() {
@@ -88,7 +109,7 @@ const Fingo = {
                 this._hideContextMenu();
             }
             if (this.isOpen && !this.element.contains(e.target) && !e.target.closest('#fingo-btn') && !e.target.closest('#fingo-context-menu')) {
-                this.hide();
+                this.hide('outside-click');
             }
         });
         document.addEventListener('keydown', (e) => {
@@ -97,7 +118,7 @@ const Fingo = {
                 this._hideContextMenu();
                 return;
             }
-            if (this.isOpen) this.hide();
+            if (this.isOpen) this.hide('manual');
         });
         // 工具栏按钮
         document.getElementById('fingo-new-chat')?.addEventListener('click', () => this.newConversation());
@@ -595,16 +616,26 @@ const Fingo = {
         let normalized = String(text || '').toLowerCase();
         normalized = normalized
             .replace(/[’]/g, '\'')
-            .replace(/\bi'm\b/g, 'i am')
-            .replace(/\bcan't\b/g, 'cant')
-            .replace(/\bdon't\b/g, 'do not')
-            .replace(/\bwon't\b/g, 'will not')
-            .replace(/\bpls\b/g, 'please')
-            .replace(/\bthx\b/g, 'thanks');
+            .replace(/[“”]/g, '"')
+            .replace(/\bi['’]?m\b/g, 'i am')
+            .replace(/\bcan['’]?t\b/g, 'cant')
+            .replace(/\bdon['’]?t\b/g, 'do not')
+            .replace(/\bwon['’]?t\b/g, 'will not')
+            .replace(/\bpls\b|\bplz\b/g, 'please')
+            .replace(/\bthx\b|\bty\b/g, 'thanks')
+            .replace(/\bwi[\s-]?fi\b/g, 'wifi')
+            .replace(/\bfull\s*screen\b/g, 'fullscreen')
+            .replace(/\bsign\s*out\b/g, 'logout')
+            .replace(/\blog\s*out\b/g, 'logout')
+            .replace(/\bfingo\s*ai\b/g, 'fingo ai')
+            .replace(/fingoai/g, 'fingo ai')
+            .replace(/全屏幕/g, '全屏')
+            .replace(/网页全屏模式/g, '网页全屏');
 
         // Remove common filler words so intent words are easier to match.
         normalized = normalized
-            .replace(/请问|麻烦你|麻烦|帮我|帮忙|一下子?|可以吗|行吗|好吗|可不可以|能不能|呢|吧|呀|啊|嘛/g, ' ')
+            .replace(/请问一下|请问|麻烦你|麻烦您|麻烦|请你|请|帮我把|帮我|帮忙把|帮忙|给我把|给我|把|一下下?|一下子?|可不可以|能不能|可以吗|行吗|好吗|好嘛|呢|吧|呀|啊|嘛|哦|呗|哈/g, ' ')
+            .replace(/我想要|我想把|我想|我想让你|想要|我要|希望你|希望/g, ' ')
             .replace(/\bplease\b/g, ' ');
 
         normalized = normalized.replace(/\s+/g, ' ').trim();
@@ -625,6 +656,53 @@ const Fingo = {
         return text.includes(kw);
     },
 
+    _extractWordTokens(text) {
+        const stopWords = new Set([
+            'a', 'an', 'the', 'to', 'for', 'of', 'in', 'on', 'at', 'by', 'with',
+            'is', 'are', 'be', 'please', 'me', 'my', 'your', 'now'
+        ]);
+        return String(text || '')
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .map(s => s.trim())
+            .filter(Boolean)
+            .filter(token => token.length > 1 && !stopWords.has(token));
+    },
+
+    _containsOrderedChars(text, pattern) {
+        const src = String(text || '');
+        const pat = String(pattern || '');
+        if (!src || !pat) return false;
+        let i = 0;
+        for (const ch of src) {
+            if (ch === pat[i]) i += 1;
+            if (i >= pat.length) return true;
+        }
+        return false;
+    },
+
+    _matchLoosePhrase(normalizedText, compactText, phrase) {
+        const kw = String(phrase || '').toLowerCase().trim();
+        if (!kw) return false;
+
+        if (/^[a-z0-9 ]+$/.test(kw) && kw.includes(' ')) {
+            const kwTokens = this._extractWordTokens(kw);
+            if (kwTokens.length >= 2) {
+                const textTokens = new Set(this._extractWordTokens(normalizedText));
+                if (kwTokens.every(token => textTokens.has(token))) return true;
+            }
+        }
+
+        if (/[\u4e00-\u9fff]/.test(kw)) {
+            const compactKw = this._compactText(kw);
+            if (compactKw.length >= 4 && this._containsOrderedChars(compactText, compactKw)) {
+                return true;
+            }
+        }
+
+        return false;
+    },
+
     _getKeywordVariants(keyword) {
         const base = String(keyword || '').toLowerCase().trim();
         if (!base) return [];
@@ -640,6 +718,17 @@ const Fingo = {
             ['进入', '打开', '前往', '跳转到'],
             ['模糊', '毛玻璃', '磨砂'],
             ['动画', '动效'],
+            ['任务视图', '多任务视图', '任务切换', '任务管理视图'],
+            ['分屏', '贴边布局', '窗口贴边', '贴边分屏'],
+            ['控制中心', '快捷设置'],
+            ['通知中心', '消息中心'],
+            ['最小化', '缩小', '收起'],
+            ['当前窗口', '前台窗口', '顶部窗口', '置顶窗口'],
+            ['全屏', '网页全屏', '网页自动全屏', '自动全屏'],
+            ['固定到任务栏', '固定任务栏', '任务栏固定'],
+            ['从任务栏取消固定', '取消固定任务栏', '解除任务栏固定'],
+            ['重置', '恢复默认', '还原'],
+            ['主题和动效', '外观默认', '视觉效果'],
             ['壁纸', '桌面背景', '背景图', '墙纸'],
             ['重启', '重新启动', '重新开机'],
             ['关机', '关闭电脑', '关电脑'],
@@ -661,7 +750,18 @@ const Fingo = {
             ['wifi', 'wi-fi', 'wireless'],
             ['bluetooth', 'bt'],
             ['wallpaper', 'background'],
-            ['settings', 'setting', 'preferences']
+            ['settings', 'setting', 'preferences'],
+            ['fullscreen', 'full screen'],
+            ['task view', 'multitask view', 'taskview'],
+            ['snap windows', 'snap layout', 'window snapping'],
+            ['control center', 'quick settings'],
+            ['notification center', 'notifications'],
+            ['minimize', 'shrink'],
+            ['current window', 'top window', 'foreground window'],
+            ['pin to taskbar', 'pin taskbar', 'taskbar pin'],
+            ['unpin from taskbar', 'taskbar unpin'],
+            ['reset', 'restore default'],
+            ['theme and effects', 'appearance defaults']
         ];
 
         const applyGroups = (groups, maxRounds = 3) => {
@@ -725,6 +825,7 @@ const Fingo = {
             if (normalizedText && normalizedText !== lowerText && this._matchPhraseInText(normalizedText, phrase)) return true;
             const compactPhrase = this._compactText(phrase);
             if (compactPhrase && compactText.includes(compactPhrase)) return true;
+            if (this._matchLoosePhrase(normalizedText, compactText, phrase)) return true;
         }
         return false;
     },
@@ -886,8 +987,20 @@ const Fingo = {
 
         // Handle pending confirmations first so they are not intercepted by custom API mode.
         if (this._pendingAction) {
-            this._handleConfirmation(text);
-            return;
+            if (this._pendingAction.type === 'offerQuickStart') {
+                const lower = text.toLowerCase();
+                const isYes = FingoData.confirmYes.some(w => lower.includes(w));
+                const isNo = FingoData.confirmNo.some(w => lower.includes(w));
+                if (isYes || isNo) {
+                    this._handleConfirmation(text);
+                    return;
+                }
+                // Non yes/no input means user skipped the prompt; continue with normal intent parsing.
+                this._pendingAction = null;
+            } else {
+                this._handleConfirmation(text);
+                return;
+            }
         }
 
         // 自定义模式：全部走 API
@@ -913,8 +1026,19 @@ const Fingo = {
 
         // 处理待确认操作
         if (this._pendingAction) {
-            this._handleConfirmation(text);
-            return;
+            if (this._pendingAction.type === 'offerQuickStart') {
+                const lower = text.toLowerCase();
+                const isYes = FingoData.confirmYes.some(w => lower.includes(w));
+                const isNo = FingoData.confirmNo.some(w => lower.includes(w));
+                if (isYes || isNo) {
+                    this._handleConfirmation(text);
+                    return;
+                }
+                this._pendingAction = null;
+            } else {
+                this._handleConfirmation(text);
+                return;
+            }
         }
 
         // 默认模式：关键词匹配（特殊命令优先）
@@ -987,7 +1111,42 @@ const Fingo = {
         WindowManager.windows.filter(w => w.appId === appId).forEach(w => WindowManager.closeWindow(w.id));
     },
 
+    _isGuideQuestion(text) {
+        const normalized = this._normalizeInputText(String(text || '').toLowerCase());
+        return /(怎么|如何|怎样|教程|步骤|能不能|可以吗|help|guide|how to|how do i|can i)/.test(normalized);
+    },
+
+    _isDocumentFullscreen() {
+        return !!(
+            document.fullscreenElement
+            || document.webkitFullscreenElement
+            || document.mozFullScreenElement
+            || document.msFullscreenElement
+        );
+    },
+
+    _enterDocumentFullscreen() {
+        if (this._isDocumentFullscreen()) return;
+        const root = document.documentElement;
+        if (!root) return;
+        const request =
+            root.requestFullscreen
+            || root.webkitRequestFullscreen
+            || root.mozRequestFullScreen
+            || root.msRequestFullscreen;
+        if (typeof request !== 'function') return;
+        try {
+            const ret = request.call(root);
+            if (ret && typeof ret.catch === 'function') {
+                ret.catch(() => {});
+            }
+        } catch (_) {
+            // Ignore fullscreen enter failures.
+        }
+    },
+
     _exitDocumentFullscreen() {
+        if (!this._isDocumentFullscreen()) return;
         const exit =
             document.exitFullscreen
             || document.webkitExitFullscreen
@@ -1014,6 +1173,21 @@ const Fingo = {
             setTimeout(() => this.addMessage(this.lang() === 'zh' ? '请回答「是」或「否」' : 'Please answer "yes" or "no"', 'bot'), 300);
             return;
         }
+
+        if (pa && pa.type === 'offerQuickStart') {
+            this._pendingAction = null;
+            if (isYes) {
+                setTimeout(() => this.addMessage(this.lang() === 'zh'
+                    ? '太好了，给你一份超快上手指南：\n1. 按 Alt 打开开始菜单\n2. 按 Alt+I 打开设置\n3. 按 Alt+W 打开任务视图\n4. 想固定应用到任务栏：在开始菜单中右键应用，选「固定到任务栏」\n\n你也可以直接问我：「怎么分屏」「怎么切换语言」「怎么安装应用」。'
+                    : 'Great. Here is a quick-start guide:\n1. Press Alt to open Start Menu\n2. Press Alt+I to open Settings\n3. Press Alt+W to open Task View\n4. To pin an app: right-click it in Start Menu, then choose "Pin to taskbar"\n\nYou can also ask me directly: "how to snap windows", "how to change language", or "how to install apps".', 'bot'), 300);
+            } else {
+                setTimeout(() => this.addMessage(this.lang() === 'zh'
+                    ? '好的，不打扰你啦。需要时随时说「新手教程」或「帮助」。'
+                    : 'No problem. Say "quick start" or "help" whenever you need it.', 'bot'), 300);
+            }
+            return;
+        }
+
         this._pendingAction = null;
         if (isNo) {
             setTimeout(() => this.addMessage(this.lang() === 'zh' ? '好的，已取消操作 ✋' : 'OK, operation cancelled ✋', 'bot'), 300);
@@ -1047,8 +1221,10 @@ const Fingo = {
         const installed = this._findApp(lower);
         if (installed) {
             const name = Desktop.getAppName(installed);
-            this.hide();
-            setTimeout(() => WindowManager.openApp(installed.id), 400);
+            setTimeout(() => {
+                WindowManager.openApp(installed.id);
+                this._ensurePanelForeground();
+            }, 400);
             setTimeout(() => this.addMessage(cmd.response[lang].replace('{app}', name), 'bot'), 400);
             return;
         }
@@ -1077,16 +1253,27 @@ const Fingo = {
         const script = document.createElement('script');
         script.src = `js/third_parts_apps/${shopApp.id}.js`;
         document.head.appendChild(script);
-        this.hide();
-        setTimeout(() => WindowManager.openApp(shopApp.id), 600);
+        setTimeout(() => {
+            WindowManager.openApp(shopApp.id);
+            this._ensurePanelForeground();
+        }, 600);
         setTimeout(() => this.addMessage(lang === 'zh' ? `${shopApp.name} 已安装并打开 ✅` : `${shopApp.name} installed and opened ✅`, 'bot'), 400);
     },
 
     // --- 卸载 ---
-    '_handle_uninstall'(_text, lower) {
+    '_handle_uninstall'(text, lower) {
         const lang = this.lang();
         const app = this._findApp(lower);
         if (!app) {
+            if (this._isGuideQuestion(text)) {
+                setTimeout(() => this.addMessage(
+                    lang === 'zh'
+                        ? '如果你是问怎么卸载应用：\n1. 打开设置（Alt+I）→ 应用\n2. 找到目标 App 并点卸载\n3. 也可以直接对我说「卸载 + 应用名」'
+                        : 'If you are asking how to uninstall an app:\n1. Open Settings (Alt+I) → Applications\n2. Find the target app and click uninstall\n3. Or tell me directly: "uninstall + app name"',
+                    'bot'
+                ), 400);
+                return;
+            }
             setTimeout(() => this.addMessage(lang === 'zh' ? '请告诉我你要卸载哪个应用，例如「卸载天气」' : 'Which app? e.g. "uninstall weather"', 'bot'), 400);
             return;
         }
@@ -1121,7 +1308,7 @@ const Fingo = {
     },
 
     // --- 安装 ---
-    '_handle_install'(_text, lower) {
+    '_handle_install'(text, lower) {
         const lang = this.lang();
         if (typeof AppShop === 'undefined') {
             setTimeout(() => this.addMessage(lang === 'zh' ? 'App Shop 未加载' : 'App Shop not loaded', 'bot'), 400);
@@ -1133,6 +1320,15 @@ const Fingo = {
             if (lower.includes(shopApp.name.toLowerCase()) || lower.includes(shopApp.id)) { found = shopApp; break; }
         }
         if (!found) {
+            if (this._isGuideQuestion(text)) {
+                setTimeout(() => this.addMessage(
+                    lang === 'zh'
+                        ? '如果你是问怎么安装应用：\n1. 打开 App Shop\n2. 选择想安装的应用并点击安装\n3. 也可以直接对我说「安装 + 应用名」\n\n需要的话我也可以现在帮你打开 App Shop。'
+                        : 'If you are asking how to install apps:\n1. Open App Shop\n2. Select an app and click install\n3. Or tell me directly: "install + app name"\n\nI can also open App Shop for you now.',
+                    'bot'
+                ), 400);
+                return;
+            }
             setTimeout(() => this.addMessage(lang === 'zh' ? '⚠️ 该应用还未上架 App Shop，暂时无法安装。\n你可以打开 App Shop 浏览可用应用。' : '⚠️ This app is not available in App Shop yet.\nOpen App Shop to browse available apps.', 'bot'), 400);
             return;
         }
@@ -1201,6 +1397,9 @@ const Fingo = {
         if (action === 'none' || action === 'suggestCustom') return;
         const [type, value] = action.split(':');
         switch (type) {
+            case 'offerQuickStart':
+                this._pendingAction = { type: 'offerQuickStart' };
+                break;
             case 'setTheme': State.updateSettings({ theme: value }); break;
             case 'setBlur': State.updateSettings({ enableBlur: value === 'true' }); break;
             case 'setAnimation': State.updateSettings({ enableAnimation: value === 'true' }); break;
@@ -1212,9 +1411,69 @@ const Fingo = {
                     this._exitDocumentFullscreen();
                 }
                 break;
+            case 'setDocumentFullscreen':
+                if (value === 'true') this._enterDocumentFullscreen();
+                else this._exitDocumentFullscreen();
+                break;
+            case 'resetAppearanceDefaults':
+                State.updateSettings({
+                    theme: 'light',
+                    enableBlur: true,
+                    enableAnimation: true,
+                    enableWindowBlur: true,
+                    enableFluentV2: false
+                });
+                break;
             case 'confirmAutoFullscreen':
                 if (value === 'disable') {
                     this._pendingAction = { type: 'disableAutoFullscreen' };
+                }
+                break;
+            case 'taskView':
+                if (typeof TaskView !== 'undefined') {
+                    if (value === 'open') {
+                        if (!TaskView.isOpen) {
+                            if (typeof TaskView.open === 'function') TaskView.open();
+                            else if (typeof TaskView.toggle === 'function') TaskView.toggle();
+                        }
+                    } else if (value === 'close') {
+                        if (TaskView.isOpen) {
+                            if (typeof TaskView.close === 'function') TaskView.close();
+                            else if (typeof TaskView.toggle === 'function') TaskView.toggle();
+                        }
+                    } else if (typeof TaskView.toggle === 'function') {
+                        TaskView.toggle();
+                    }
+                }
+                break;
+            case 'panel':
+                if (value === 'control' && typeof ControlCenter !== 'undefined') {
+                    if (typeof ControlCenter.open === 'function') ControlCenter.open();
+                    else if (typeof ControlCenter.toggle === 'function') ControlCenter.toggle();
+                } else if (value === 'notification' && typeof NotificationCenter !== 'undefined') {
+                    if (typeof NotificationCenter.open === 'function') NotificationCenter.open();
+                    else if (typeof NotificationCenter.toggle === 'function') NotificationCenter.toggle();
+                }
+                break;
+            case 'window':
+                if (value === 'minimizeAll') {
+                    if (typeof minimizeAllDesktopWindows === 'function') {
+                        minimizeAllDesktopWindows();
+                    } else if (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows) && typeof WindowManager.minimizeWindow === 'function') {
+                        WindowManager.windows
+                            .filter(w => w && !w.isMinimized && w.element && w.element.style.display !== 'none')
+                            .sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0))
+                            .forEach((w) => WindowManager.minimizeWindow(w.id));
+                    }
+                } else if (value === 'minimizeTop') {
+                    if (typeof minimizeTopDesktopWindow === 'function') {
+                        minimizeTopDesktopWindow();
+                    } else if (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows) && typeof WindowManager.minimizeWindow === 'function') {
+                        const top = WindowManager.windows
+                            .filter(w => w && !w.isMinimized && w.element && w.element.style.display !== 'none')
+                            .sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0))[0];
+                        if (top) WindowManager.minimizeWindow(top.id);
+                    }
                 }
                 break;
             case 'setBluetooth':
@@ -1237,7 +1496,7 @@ const Fingo = {
                 break;
             }
             case 'power':
-                this.hide();
+                this.hide('manual');
                 setTimeout(() => {
                     if (value === 'shutdown') State.shutdown();
                     else if (value === 'restart') State.restart();
@@ -1246,13 +1505,15 @@ const Fingo = {
                 }, 600);
                 break;
             case 'openApp':
-                this.hide();
-                setTimeout(() => WindowManager.openApp(value), 400);
+                setTimeout(() => {
+                    WindowManager.openApp(value);
+                    this._ensurePanelForeground();
+                }, 400);
                 break;
             case 'openSettings':
-                this.hide();
                 setTimeout(() => {
                     WindowManager.openApp('settings');
+                    this._ensurePanelForeground();
                     setTimeout(() => {
                         if (typeof SettingsApp !== 'undefined') {
                             SettingsApp.currentPage = value;
@@ -1278,7 +1539,7 @@ const Fingo = {
             : [];
 
         const systemPrompt = options.systemPrompt
-            || 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation.';
+            || 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation. If user asks what languages you support, say you currently support Chinese and English and are learning more languages. On greeting, proactively offer a quick-start guide and ask yes/no.';
         const userMessage = { role: 'user', content: String(text || '').trim() };
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -1356,7 +1617,7 @@ const Fingo = {
 
         const sysMsg = {
             role: 'system',
-            content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation.'
+            content: 'You are Fingo, a helpful assistant built into FluentOS. Reply concisely. If user asks about shortcuts, provide this mapping: Alt opens Start Menu; Alt+F Fingo AI; Alt+I Settings; Alt+L lock screen; Alt+E Files; Alt+A Control Center; Alt+D minimize all windows; Alt+M minimize topmost window; Alt+W Task View. If user asks about fullscreen, ask whether to disable "Auto Web Fullscreen On Boot" and wait for yes/no confirmation. If user asks what languages you support, say you currently support Chinese and English and are learning more languages. On greeting, proactively offer a quick-start guide and ask yes/no.'
         };
 
         let url, body, headers;
