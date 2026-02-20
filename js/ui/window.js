@@ -1,5 +1,6 @@
 /**
- * 窗口管理模块
+ * 窗口管理器 - Window Manager
+ * Manages all application windows, including creation, positioning, snapping, and lifecycle.
  */
 const WindowManager = {
     container: null,
@@ -9,6 +10,16 @@ const WindowManager = {
     SNAP_MENU_HIDE_DELAY: 130,
     EDGE_SNAP_TRIGGER: 42,
     CORNER_SNAP_TRIGGER: 110,
+    TASKBAR_AUTO_HIDE_EDGE: 2,
+    TASKBAR_AUTO_HIDE_DELAY: 240,
+    TASKBAR_HIDE_ANIM_MS: 380,
+    MINIMIZE_DOCK_SCALE: 0.08,
+    MINIMIZE_DURATION_MS: 460,
+    RESTORE_DURATION_MS: 520,
+    TASKBAR_ICON_FEEDBACK_MS: 280,
+    _taskbarAutoHideBound: false,
+    _taskbarAutoHideTimer: null,
+    _taskbarHideAnimTimer: null,
     SNAP_LAYOUTS: [
         { id: 'left-half', previewClass: 'preview-left-half', size: 'large' },
         { id: 'right-half', previewClass: 'preview-right-half', size: 'large' },
@@ -19,8 +30,8 @@ const WindowManager = {
         { id: 'bottom-left', previewClass: 'preview-bottom-left', size: 'small' },
         { id: 'bottom-right', previewClass: 'preview-bottom-right', size: 'small' }
     ],
-    
-    // 应用配置
+
+    // 应用配置 - Application configurations
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
@@ -33,7 +44,7 @@ const WindowManager = {
         photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/gallery.png', width: 1000, height: 700, component: 'PhotosApp' }
     },
 
-    // 获取应用配置（动态解析标题）
+    // 获取应用配置 - Get application configuration
     getAppConfig(appId) {
         const cfg = this.appConfigs[appId];
         if (!cfg) return null;
@@ -60,6 +71,7 @@ const WindowManager = {
                 this._hideDragSnapHint(true);
             }
         });
+        this._initTaskbarAutoHide();
     },
 
     _isEdgeSnapEnabled() {
@@ -70,10 +82,393 @@ const WindowManager = {
         return State.settings.windowHoverSnapEnabled !== false;
     },
 
+    _getTaskbarElement() {
+        return document.getElementById('taskbar') || document.querySelector('.taskbar');
+    },
+
+    _isTaskbarInteractivePanelOpen() {
+        const panelIds = ['start-menu', 'control-center', 'notification-center', 'fingo-panel'];
+        return panelIds.some((id) => {
+            const panel = document.getElementById(id);
+            return Boolean(panel && !panel.classList.contains('hidden'));
+        });
+    },
+
+    _clearTaskbarTimers() {
+        clearTimeout(this._taskbarAutoHideTimer);
+        clearTimeout(this._taskbarHideAnimTimer);
+        this._taskbarAutoHideTimer = null;
+        this._taskbarHideAnimTimer = null;
+    },
+
+    _showTaskbarForAutoHide(taskbar, withBounce = false) {
+        if (!taskbar) return;
+        this._clearTaskbarTimers();
+        taskbar.classList.remove('hiding');
+        taskbar.classList.remove('hidden');
+        if (withBounce) {
+            taskbar.classList.remove('peek-pop');
+            void taskbar.offsetHeight;
+            taskbar.classList.add('peek-pop');
+            this._taskbarHideAnimTimer = setTimeout(() => {
+                taskbar.classList.remove('peek-pop');
+                this._taskbarHideAnimTimer = null;
+            }, 520);
+        } else {
+            taskbar.classList.remove('peek-pop');
+        }
+    },
+
+    _hideTaskbarForAutoHide(taskbar, immediate = false) {
+        if (!taskbar) return;
+        clearTimeout(this._taskbarAutoHideTimer);
+        this._taskbarAutoHideTimer = null;
+        clearTimeout(this._taskbarHideAnimTimer);
+        this._taskbarHideAnimTimer = null;
+
+        if (immediate) {
+            taskbar.classList.remove('peek-pop');
+            taskbar.classList.remove('hiding');
+            taskbar.classList.add('hidden');
+            return;
+        }
+
+        taskbar.classList.remove('peek-pop');
+        taskbar.classList.add('hiding');
+        this._taskbarHideAnimTimer = setTimeout(() => {
+            taskbar.classList.remove('hiding');
+            taskbar.classList.add('hidden');
+            this._taskbarHideAnimTimer = null;
+        }, this.TASKBAR_HIDE_ANIM_MS);
+    },
+
+    _scheduleTaskbarAutoHide(delay = this.TASKBAR_AUTO_HIDE_DELAY) {
+        const taskbar = this._getTaskbarElement();
+        if (!taskbar) return;
+        clearTimeout(this._taskbarAutoHideTimer);
+        this._taskbarAutoHideTimer = setTimeout(() => {
+            this._taskbarAutoHideTimer = null;
+            if (!document.body.classList.contains('has-maximized-window')) return;
+            if (document.body.classList.contains('in-taskview')) return;
+            if (taskbar.matches(':hover')) return;
+            if (this._isTaskbarInteractivePanelOpen()) return;
+            this._hideTaskbarForAutoHide(taskbar);
+        }, delay);
+    },
+
+    _initTaskbarAutoHide() {
+        if (this._taskbarAutoHideBound) return;
+        const taskbar = this._getTaskbarElement();
+        if (!taskbar) return;
+        this._taskbarAutoHideBound = true;
+
+        taskbar.addEventListener('mouseenter', () => {
+            if (!document.body.classList.contains('has-maximized-window')) return;
+            this._showTaskbarForAutoHide(taskbar);
+        });
+
+        taskbar.addEventListener('mouseleave', (e) => {
+            if (!document.body.classList.contains('has-maximized-window')) return;
+            const viewportHeight = globalThis.innerHeight || 0;
+            const nearBottomEdge = e.clientY >= (viewportHeight - this.TASKBAR_AUTO_HIDE_EDGE - 2);
+            this._scheduleTaskbarAutoHide(nearBottomEdge ? 520 : this.TASKBAR_AUTO_HIDE_DELAY);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!document.body.classList.contains('has-maximized-window')) return;
+            if (document.body.classList.contains('in-taskview')) return;
+
+            const viewportHeight = globalThis.innerHeight || 0;
+            const nearBottomEdge = e.clientY >= (viewportHeight - this.TASKBAR_AUTO_HIDE_EDGE);
+            if (nearBottomEdge) {
+                this._showTaskbarForAutoHide(taskbar, taskbar.classList.contains('hidden') || taskbar.classList.contains('hiding'));
+                this._scheduleTaskbarAutoHide(900);
+                return;
+            }
+
+            if (!taskbar.matches(':hover') && !this._isTaskbarInteractivePanelOpen()) {
+                this._scheduleTaskbarAutoHide();
+            }
+        }, true);
+
+        document.addEventListener('click', () => {
+            if (!document.body.classList.contains('has-maximized-window')) return;
+            if (this._isTaskbarInteractivePanelOpen()) {
+                this._showTaskbarForAutoHide(taskbar);
+            } else if (!taskbar.matches(':hover')) {
+                this._scheduleTaskbarAutoHide(360);
+            }
+        }, true);
+    },
+
     _getTaskbarReservedHeight() {
         const taskbar = document.querySelector('.taskbar');
         if (!taskbar) return 0;
         return Math.max(0, (taskbar.offsetHeight || 48) + 8);
+    },
+
+    _syncZIndexCounter() {
+        let maxZ = this.zIndexCounter;
+        this.windows.forEach((w) => {
+            if (!w || !w.element) return;
+            const z = Number.parseInt(w.element.style.zIndex, 10);
+            if (Number.isFinite(z)) {
+                maxZ = Math.max(maxZ, z);
+            }
+        });
+        this.zIndexCounter = maxZ;
+    },
+
+    _isAnimationEnabled() {
+        if (typeof State === 'undefined' || !State.settings) return true;
+        return State.settings.enableAnimation !== false;
+    },
+
+    _playTaskbarDockFeedback(appId) {
+        if (!appId || !this._isAnimationEnabled()) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
+        if (!taskbarBtn) return;
+
+        taskbarBtn.classList.remove('taskbar-app-dock-hit');
+        void taskbarBtn.offsetHeight;
+        taskbarBtn.classList.add('taskbar-app-dock-hit');
+
+        if (taskbarBtn._dockHitTimer) {
+            clearTimeout(taskbarBtn._dockHitTimer);
+        }
+        taskbarBtn._dockHitTimer = setTimeout(() => {
+            taskbarBtn.classList.remove('taskbar-app-dock-hit');
+            taskbarBtn._dockHitTimer = null;
+        }, this.TASKBAR_ICON_FEEDBACK_MS);
+    },
+
+    _effectiveDuration(duration) {
+        if (!this._isAnimationEnabled()) return 0;
+        return Math.max(0, Math.round(duration || 0));
+    },
+
+    _clearWindowMotionTimers(windowData) {
+        if (!windowData) return;
+        if (windowData._minimizeTimer) {
+            clearTimeout(windowData._minimizeTimer);
+            windowData._minimizeTimer = null;
+        }
+        if (windowData._restoreTimer) {
+            clearTimeout(windowData._restoreTimer);
+            windowData._restoreTimer = null;
+        }
+        if (windowData._dockFeedbackTimer) {
+            clearTimeout(windowData._dockFeedbackTimer);
+            windowData._dockFeedbackTimer = null;
+        }
+    },
+
+    _captureWindowVisualState(windowData) {
+        if (!windowData || !windowData.element) return { transform: '', opacity: '1' };
+        const el = windowData.element;
+        const computed = getComputedStyle(el);
+        const transform = computed.transform && computed.transform !== 'none'
+            ? computed.transform
+            : (el.style.transform || '');
+        const opacity = computed.opacity || (el.style.opacity || '1');
+        return { transform, opacity };
+    },
+
+    _holdWindowCurrentVisualState(windowData) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        if (el.style.display === 'none') return;
+
+        const visual = this._captureWindowVisualState(windowData);
+        el.style.transition = 'none';
+        el.style.transformOrigin = 'center center';
+        el.style.willChange = 'transform, opacity';
+        el.style.transform = visual.transform || '';
+        el.style.opacity = visual.opacity;
+        el.offsetHeight;
+    },
+
+    _getWindowBaseCenter(windowData) {
+        const el = windowData.element;
+        const styleLeft = Number.parseFloat(el.style.left);
+        const styleTop = Number.parseFloat(el.style.top);
+        const styleWidth = Number.parseFloat(el.style.width);
+        const styleHeight = Number.parseFloat(el.style.height);
+        const rect = el.getBoundingClientRect();
+
+        const width = Number.isFinite(styleWidth) && styleWidth > 1 ? styleWidth : rect.width;
+        const height = Number.isFinite(styleHeight) && styleHeight > 1 ? styleHeight : rect.height;
+        const left = Number.isFinite(styleLeft) ? styleLeft : rect.left;
+        const top = Number.isFinite(styleTop) ? styleTop : rect.top;
+
+        return {
+            x: left + width / 2,
+            y: top + height / 2
+        };
+    },
+
+    _finalizeMinimize(windowData) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        this._clearWindowMotionTimers(windowData);
+        el.style.display = 'none';
+        el.classList.remove('minimizing', 'restoring');
+        el.style.transition = '';
+        el.style.transform = '';
+        el.style.transformOrigin = '';
+        el.style.willChange = '';
+        el.style.opacity = '';
+        windowData.isMinimized = true;
+        windowData.isMinimizing = false;
+        windowData.isRestoring = false;
+        this.updateMaximizedWallpaperEffect();
+    },
+
+    _finalizeRestore(windowData) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        this._clearWindowMotionTimers(windowData);
+        el.style.display = 'flex';
+        el.classList.remove('restoring', 'minimizing');
+        el.style.transition = '';
+        el.style.transform = '';
+        el.style.transformOrigin = '';
+        el.style.willChange = '';
+        el.style.opacity = '';
+        windowData.isMinimized = false;
+        windowData.isRestoring = false;
+        windowData.isMinimizing = false;
+    },
+
+    _startMinimizeAnimation(windowData, fromInterruptedRestore = false) {
+        if (!windowData || !windowData.element || windowData.isMinimized) return;
+        const el = windowData.element;
+        this._clearWindowMotionTimers(windowData);
+
+        if (fromInterruptedRestore) {
+            this._holdWindowCurrentVisualState(windowData);
+        } else {
+            el.style.transition = 'none';
+            el.style.transformOrigin = 'center center';
+            el.style.willChange = 'transform, opacity';
+            el.style.transform = '';
+            el.style.opacity = '1';
+            el.offsetHeight;
+        }
+
+        windowData.savedPosition = {
+            left: el.style.left,
+            top: el.style.top,
+            width: el.style.width,
+            height: el.style.height
+        };
+
+        windowData.isMinimizing = true;
+        windowData.isRestoring = false;
+        windowData.isMinimized = false;
+        el.classList.remove('restoring');
+        el.classList.add('minimizing');
+
+        const duration = this._effectiveDuration(this.MINIMIZE_DURATION_MS);
+        const dockPoint = this.getTaskbarButtonPosition(windowData.appId);
+        const baseCenter = this._getWindowBaseCenter(windowData);
+        const translateX = dockPoint.x - baseCenter.x;
+        const translateY = dockPoint.y - baseCenter.y;
+
+        if (duration <= 0) {
+            this._finalizeMinimize(windowData);
+            return;
+        }
+
+        const opacityDuration = Math.round(duration * 0.56);
+        el.style.transition = `transform ${duration}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+
+        requestAnimationFrame(() => {
+            if (!windowData.isMinimizing) return;
+            el.style.transform = `translate(${translateX}px, ${translateY}px) scale(${this.MINIMIZE_DOCK_SCALE})`;
+            el.style.opacity = '0';
+        });
+
+        windowData._dockFeedbackTimer = setTimeout(() => {
+            if (!windowData.isMinimizing) return;
+            windowData._dockFeedbackTimer = null;
+            this._playTaskbarDockFeedback(windowData.appId);
+        }, Math.round(duration * 0.62));
+
+        windowData._minimizeTimer = setTimeout(() => {
+            if (!windowData.isMinimizing) return;
+            this._finalizeMinimize(windowData);
+        }, duration);
+    },
+
+    _startRestoreAnimation(windowData, fromInterruptedMinimize = false) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        this._clearWindowMotionTimers(windowData);
+
+        const fromHidden = windowData.isMinimized || el.style.display === 'none';
+        if (fromHidden) {
+            const saved = windowData.savedPosition || {};
+            if (saved.left != null) el.style.left = saved.left;
+            if (saved.top != null) el.style.top = saved.top;
+            if (saved.width != null) el.style.width = saved.width;
+            if (saved.height != null) el.style.height = saved.height;
+            el.style.display = 'flex';
+        }
+
+        if (fromHidden) {
+            const dockPoint = this.getTaskbarButtonPosition(windowData.appId);
+            const baseCenter = this._getWindowBaseCenter(windowData);
+            const translateX = dockPoint.x - baseCenter.x;
+            const translateY = dockPoint.y - baseCenter.y;
+            el.style.transition = 'none';
+            el.style.transformOrigin = 'center center';
+            el.style.willChange = 'transform, opacity';
+            el.style.transform = `translate(${translateX}px, ${translateY}px) scale(${this.MINIMIZE_DOCK_SCALE})`;
+            el.style.opacity = '0';
+            el.offsetHeight;
+        } else if (fromInterruptedMinimize) {
+            this._holdWindowCurrentVisualState(windowData);
+        }
+
+        windowData.isMinimized = false;
+        windowData.isRestoring = true;
+        windowData.isMinimizing = false;
+        el.classList.remove('minimizing');
+        el.classList.add('restoring');
+
+        const duration = this._effectiveDuration(this.RESTORE_DURATION_MS);
+        if (duration <= 0) {
+            this._finalizeRestore(windowData);
+            this.focusWindow(windowData.id);
+            this.updateMaximizedWallpaperEffect();
+            return;
+        }
+
+        const opacityDuration = Math.round(duration * 0.68);
+        el.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        requestAnimationFrame(() => {
+            if (!windowData.isRestoring) return;
+            el.style.transform = '';
+            el.style.opacity = '1';
+        });
+
+        this.focusWindow(windowData.id);
+        this.updateMaximizedWallpaperEffect();
+
+        windowData._restoreTimer = setTimeout(() => {
+            if (!windowData.isRestoring) return;
+            this._finalizeRestore(windowData);
+        }, duration);
+    },
+
+    _getMinimizeDockPoint() {
+        const vw = Math.max(0, globalThis.innerWidth || 0);
+        const vh = Math.max(0, globalThis.innerHeight || 0);
+        return {
+            x: vw / 2,
+            y: Math.max(0, vh - 8)
+        };
     },
 
     _clampWindowBounds(bounds) {
@@ -354,11 +749,10 @@ const WindowManager = {
     },
 
     openApp(appId, data = null) {
-        console.log(`尝试打开应用: ${appId}`, data);
 
         const config = this.getAppConfig(appId);
         if (!config) {
-            console.warn(`应用 ${appId} 未配置`);
+            console.warn(`App ${appId} not configured`);
             State.addNotification({
                 title: t('close'),
                 message: `Cannot open app: ${appId}`,
@@ -366,14 +760,12 @@ const WindowManager = {
             });
             return;
         }
-        
-        // 检查应用是否已打开
+
+        // 检查是否已经打开该应用窗口 - Check if app window already exists
         const existingWindow = this.windows.find(w => w.appId === appId);
         if (existingWindow) {
-            console.log(`应用 ${appId} 已打开，聚焦窗口`);
             this.focusWindow(existingWindow.id);
             
-            // 如果有数据参数，传递给已打开的应用
             if (data && config.component && globalThis[config.component]) {
                 if (data.fileId && globalThis[config.component].loadFile) {
                     globalThis[config.component].loadFile(data.fileId);
@@ -381,11 +773,10 @@ const WindowManager = {
             }
             return;
         }
-        
-        console.log(`创建窗口: ${config.title}`);
 
-        // 创建窗口
-        const windowId = `window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        // 创建新窗口 - Create new window
+        const windowId = `window-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         const initialBounds = this._readWindowBounds(appId, config);
         const windowElement = this.createWindow(windowId, appId, config, initialBounds);
         
@@ -394,36 +785,30 @@ const WindowManager = {
             appId: appId,
             element: windowElement,
             isMinimized: false,
+            isMinimizing: false,
+            isRestoring: false,
             isMaximized: false,
             snapLayout: initialBounds.snapLayout || null
         });
 
         this.container.appendChild(windowElement);
         
-        // 标记应用为运行状态
         State.addRunningApp(appId);
 
-        // 初始化应用内容
-        console.log(`[WindowManager] 检查组件: ${config.component}`);
-        console.log(`[WindowManager] 组件是否存在: ${config.component && globalThis[config.component]}`);
-        console.log(`[WindowManager] globalThis 上的应用对象:`, Object.keys(globalThis).filter(k => k.includes('App')));
         
         if (config.component && globalThis[config.component]) {
-            console.log(`[WindowManager] 初始化应用组件: ${config.component}`);
-            console.log(`[WindowManager] windowId: ${windowId}`);
             globalThis[config.component].init(windowId);
             
-            // 如果有数据参数，在初始化后传递
             if (data && data.fileId && globalThis[config.component].loadFile) {
                 setTimeout(() => {
                     globalThis[config.component].loadFile(data.fileId);
                 }, 0);
             }
         } else {
-            console.error(`[WindowManager] 组件未找到: ${config.component}`);
+            console.error(`[WindowManager] 未找到组件 - Component not found: ${config.component}`);
         }
 
-        // 聚焦窗口
+        // 聚焦新窗口 - Focus the new window
         this.focusWindow(windowId);
     },
 
@@ -435,6 +820,7 @@ const WindowManager = {
         
         const bounds = initialBounds || this._readWindowBounds(appId, config);
         this._applyBoundsToWindow(windowElement, bounds);
+        this._syncZIndexCounter();
         windowElement.style.zIndex = ++this.zIndexCounter;
 
         windowElement.innerHTML = `
@@ -453,13 +839,13 @@ const WindowManager = {
                 </div>
                 <div class="window-controls">
                     <button class="window-control-btn minimize">
-                        <img src="Theme/Icon/Symbol_icon/stroke/Minimize.svg" alt="最小化">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Minimize.svg" alt="Minimize">
                     </button>
                     <button class="window-control-btn maximize">
-                        <img src="Theme/Icon/Symbol_icon/stroke/Maximize.svg" alt="最大化">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Maximize.svg" alt="Maximize">
                     </button>
                     <button class="window-control-btn close">
-                        <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="关闭">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="Close">
                     </button>
                 </div>
             </div>
@@ -467,10 +853,10 @@ const WindowManager = {
             <div class="window-content" id="${windowId}-content"></div>
         `;
 
-        // 绑定窗口事件
+        // 绑定窗口事件 - Bind window events
         this.bindWindowEvents(windowElement);
 
-        // 移除开场动画类
+        // 延迟移除opening类 - Remove opening class after animation
         setTimeout(() => {
             windowElement.classList.remove('opening');
         }, 200);
@@ -484,6 +870,10 @@ const WindowManager = {
         const maximizeBtn = windowElement.querySelector('.maximize');
         const closeBtn = windowElement.querySelector('.close');
         const snapMenu = this._ensureSnapMenu(windowElement);
+        if (!titlebar || !minimizeBtn || !maximizeBtn || !closeBtn) {
+            console.error('[WindowManager] Window controls missing, skip binding events');
+            return;
+        }
         
         let isDragging = false;
         let dragMoved = false;
@@ -493,7 +883,7 @@ const WindowManager = {
         let initialY;
         let dragSnapLayout = null;
 
-        // 拖拽功能
+        // 绑定标题栏拖动事件 - Bind titlebar drag event
         titlebar.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
             if (e.target.closest('.window-controls')) return;
@@ -509,7 +899,7 @@ const WindowManager = {
             initialX = e.clientX - windowElement.offsetLeft;
             initialY = e.clientY - windowElement.offsetTop;
             
-            // 拖动时禁用过渡动画，防止延迟
+            // 禁用过渡以实现平滑拖动 - Disable transition for smooth drag
             windowElement.style.transition = 'none';
             
             this.focusWindow(windowElement.id);
@@ -546,7 +936,7 @@ const WindowManager = {
         document.addEventListener('mouseup', () => {
             if (isDragging) {
                 isDragging = false;
-                // 恢复过渡动画
+                // 恢复过渡 - Restore transition
                 windowElement.style.transition = '';
 
                 const windowData = this._getWindowData(windowElement.id);
@@ -563,13 +953,13 @@ const WindowManager = {
             }
         });
 
-        // 双击标题栏最大化
+        // 绑定标题栏拖动事件 - Bind titlebar drag event
         titlebar.addEventListener('dblclick', () => {
             this._hideSnapMenu(windowElement, true);
             this.toggleMaximize(windowElement.id);
         });
 
-        // 最小化
+        // 最小化按钮 - Minimize button
         minimizeBtn.addEventListener('click', () => {
             this._hideSnapMenu(windowElement, true);
             this.minimizeWindow(windowElement.id);
@@ -586,20 +976,19 @@ const WindowManager = {
             snapMenu.addEventListener('mousedown', (e) => e.stopPropagation());
         }
 
-        // 最大化/还原
+        // 最大化按钮 - Maximize button
         maximizeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._hideSnapMenu(windowElement, true);
             this.toggleMaximize(windowElement.id);
         });
 
-        // 关闭
+        // 关闭按钮 - Close button
         closeBtn.addEventListener('click', () => {
             this._hideSnapMenu(windowElement, true);
             this.closeWindow(windowElement.id);
         });
 
-        // 点击窗口时聚焦
         windowElement.addEventListener('mousedown', (e) => {
             if (!e.target.closest('.window-snap-layout-menu')) {
                 this._hideAllSnapMenus(windowElement.id);
@@ -610,7 +999,7 @@ const WindowManager = {
             this._scheduleSnapMenuHide(windowElement, 90);
         });
 
-        // 窗口调整大小
+        // 绑定调整大小事件 - Bind resize events
         this.bindResizeEvents(windowElement);
     },
 
@@ -630,7 +1019,7 @@ const WindowManager = {
                 windowElement.classList.add('resizing');
                 this._hideSnapMenu(windowElement, true);
 
-                // 获取调整方向
+                // 确定调整方向 - Determine resize direction
                 if (handle.classList.contains('resize-top')) resizeDirection = 'n';
                 else if (handle.classList.contains('resize-bottom')) resizeDirection = 's';
                 else if (handle.classList.contains('resize-left')) resizeDirection = 'w';
@@ -640,7 +1029,6 @@ const WindowManager = {
                 else if (handle.classList.contains('resize-bottom-left')) resizeDirection = 'sw';
                 else if (handle.classList.contains('resize-bottom-right')) resizeDirection = 'se';
 
-                // 记录初始状态
                 startX = e.clientX;
                 startY = e.clientY;
                 startWidth = windowElement.offsetWidth;
@@ -648,7 +1036,7 @@ const WindowManager = {
                 startLeft = windowElement.offsetLeft;
                 startTop = windowElement.offsetTop;
 
-                // 防止文本选择
+                // 防止默认行为和文本选择 - Prevent default and text selection
                 e.preventDefault();
             });
         });
@@ -664,7 +1052,6 @@ const WindowManager = {
             let newLeft = startLeft;
             let newTop = startTop;
 
-            // 根据方向计算新尺寸
             if (resizeDirection.includes('e')) {
                 newWidth = Math.max(400, startWidth + deltaX);
             }
@@ -680,7 +1067,7 @@ const WindowManager = {
                 newTop = startTop + (startHeight - newHeight);
             }
 
-            // 边界限制仅保留顶部：窗口顶部不能越过屏幕顶部
+            // 限制窗口边界 - Constrain window bounds
             if (newTop < 0) {
                 if (resizeDirection.includes('n')) {
                     const bottom = newTop + newHeight;
@@ -691,7 +1078,6 @@ const WindowManager = {
                 }
             }
 
-            // 应用新尺寸
             windowElement.style.width = `${newWidth}px`;
             windowElement.style.height = `${newHeight}px`;
             windowElement.style.left = `${newLeft}px`;
@@ -717,154 +1103,59 @@ const WindowManager = {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
 
-        // 如果窗口已最小化，则恢复它
-        if (windowData.isMinimized) {
-            this.toggleWindow(windowData.appId);
+        if (windowData.isMinimizing) {
+            this._startRestoreAnimation(windowData, true);
+            return;
         }
 
+        if (windowData.isMinimized) {
+            this._startRestoreAnimation(windowData, false);
+            return;
+        }
+
+        this._syncZIndexCounter();
         windowData.element.style.zIndex = ++this.zIndexCounter;
     },
 
     minimizeWindow(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
-        if (!windowData) return;
-
-        // 获取窗口当前位置和大小
-        const windowRect = windowData.element.getBoundingClientRect();
-        
-        // 获取任务栏对应应用图标的位置
-        const taskbarBtn = document.querySelector(`[data-app-id="${windowData.appId}"]`);
-        let targetX = globalThis.innerWidth / 2;
-        let targetY = globalThis.innerHeight - 36;
-        
-        if (taskbarBtn) {
-            const btnRect = taskbarBtn.getBoundingClientRect();
-            targetX = btnRect.left + btnRect.width / 2;
-            targetY = btnRect.top + btnRect.height / 2;
-        }
-
-        // 计算从窗口中心到任务栏图标的位移
-        const windowCenterX = windowRect.left + windowRect.width / 2;
-        const windowCenterY = windowRect.top + windowRect.height / 2;
-        const translateX = targetX - windowCenterX;
-        const translateY = targetY - windowCenterY;
-
-        // 保存位置信息用于还原动画
-        windowData.savedPosition = {
-            left: windowData.element.style.left,
-            top: windowData.element.style.top,
-            width: windowData.element.style.width,
-            height: windowData.element.style.height,
-            windowCenterX: windowCenterX,
-            windowCenterY: windowCenterY,
-            targetX: targetX,
-            targetY: targetY
-        };
-
-        // 添加最小化动画类并应用变换
-        windowData.element.classList.add('minimizing');
-        windowData.element.style.transform = `translate(${translateX}px, ${translateY}px) scale(0.05)`;
-        windowData.element.style.opacity = '0';
-
-        setTimeout(() => {
-            windowData.element.style.display = 'none';
-            windowData.element.classList.remove('minimizing');
-            windowData.element.style.transform = '';
-            windowData.element.style.opacity = '';
-            windowData.isMinimized = true;
-        }, 400);
+        if (!windowData || windowData.isMinimized || windowData.isMinimizing) return;
+        this._startMinimizeAnimation(windowData, windowData.isRestoring);
     },
 
     toggleWindow(appId) {
         const windowData = this.windows.find(w => w.appId === appId);
         if (!windowData) return;
 
-        if (windowData.isMinimized) {
-            // 从最小化状态恢复
-            windowData.isMinimized = false;
-            
-            // 先恢复窗口的位置和大小（不可见状态）
-            if (windowData.savedPosition) {
-                windowData.element.style.left = windowData.savedPosition.left;
-                windowData.element.style.top = windowData.savedPosition.top;
-                windowData.element.style.width = windowData.savedPosition.width;
-                windowData.element.style.height = windowData.savedPosition.height;
-            }
-            
-            // 显示窗口（但仍然不可见，因为我们会设置初始 transform）
-            windowData.element.style.display = 'flex';
-            
-            // 获取任务栏图标位置
-            const taskbarBtn = document.querySelector(`[data-app-id="${appId}"]`);
-            let targetX = globalThis.innerWidth / 2;
-            let targetY = globalThis.innerHeight - 36;
-            
-            if (taskbarBtn) {
-                const btnRect = taskbarBtn.getBoundingClientRect();
-                targetX = btnRect.left + btnRect.width / 2;
-                targetY = btnRect.top + btnRect.height / 2;
-            }
-            
-            // 使用保存的窗口中心位置计算偏移
-            let windowCenterX, windowCenterY;
-            if (windowData.savedPosition) {
-                windowCenterX = windowData.savedPosition.windowCenterX;
-                windowCenterY = windowData.savedPosition.windowCenterY;
-            } else {
-                const windowRect = windowData.element.getBoundingClientRect();
-                windowCenterX = windowRect.left + windowRect.width / 2;
-                windowCenterY = windowRect.top + windowRect.height / 2;
-            }
-            
-            // 计算从任务栏图标到窗口中心的位移
-            const translateX = targetX - windowCenterX;
-            const translateY = targetY - windowCenterY;
-            
-            // 1. 设置初始状态：在任务栏位置，缩小，透明
-            windowData.element.style.transition = 'none';
-            windowData.element.style.transform = `translate(${translateX}px, ${translateY}px) scale(0.05)`;
-            windowData.element.style.opacity = '0';
-            
-            // 强制浏览器应用初始状态
-            windowData.element.offsetHeight;
-            
-            // 2. 添加动画类并移除 transform 和 opacity 以触发动画
-            windowData.element.classList.add('restoring');
-            windowData.element.style.transition = ''; // 使用 class 中定义的 transition
-            windowData.element.style.transform = '';
-            windowData.element.style.opacity = '1';
-            
-            this.focusWindow(windowData.id);
+        if (windowData.isMinimizing) {
+            this._startRestoreAnimation(windowData, true);
+            return;
+        }
 
-            setTimeout(() => {
-                windowData.element.classList.remove('restoring');
-            }, 400); // 匹配 CSS 动画时长
-            
+        if (windowData.isRestoring) {
+            this._startMinimizeAnimation(windowData, true);
+            return;
+        }
+
+        if (windowData.isMinimized) {
+            this._startRestoreAnimation(windowData, false);
         } else {
-            this.minimizeWindow(windowData.id);
+            this._startMinimizeAnimation(windowData, false);
         }
     },
-
     toggleMaximize(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
         this._hideSnapMenu(windowData.element, true);
         this._hideDragSnapHint(true);
 
-        const taskbar = document.querySelector('.taskbar');
-
         if (windowData.isMaximized) {
-            // 还原窗口
+            // 取消最大化动画 - Unmaximize animation
             windowData.element.classList.add('unmaximizing');
             windowData.element.classList.remove('maximized');
             
-            // 显示任务栏（带弹簧动画）
-            if (taskbar) {
-                taskbar.classList.remove('hiding');
-                taskbar.classList.remove('hidden');
-            }
+            // 恢复到之前的位置和大小 - Restore previous position and size
             
-            // 恢复原始位置和大小
             if (windowData.savedBounds) {
                 windowData.element.style.left = windowData.savedBounds.left;
                 windowData.element.style.top = windowData.savedBounds.top;
@@ -878,13 +1169,12 @@ const WindowManager = {
             
             windowData.isMaximized = false;
             
-            // 使用 requestAnimationFrame 确保过渡动画正确触发
+            // 应用最大化样式 - Apply maximized styles
             requestAnimationFrame(() => {
                 this.updateMaximizedWallpaperEffect();
             });
             this._persistWindowBounds(windowData);
         } else {
-            // 保存当前位置和大小
             windowData.savedBounds = {
                 left: windowData.element.style.left,
                 top: windowData.element.style.top,
@@ -892,18 +1182,11 @@ const WindowManager = {
                 height: windowData.element.style.height
             };
             
-            // 最大化
+            // 最大化动画 - Maximize animation
             windowData.element.classList.add('maximizing');
             windowData.element.classList.add('maximized');
             
-            // 隐藏任务栏（带弹簧动画）
-            if (taskbar) {
-                taskbar.classList.add('hiding');
-                setTimeout(() => {
-                    taskbar.classList.remove('hiding');
-                    taskbar.classList.add('hidden');
-                }, 400);
-            }
+            // 设置最大化位置和大小 - Set maximized position and size
             
             setTimeout(() => {
                 windowData.element.classList.remove('maximizing');
@@ -911,22 +1194,32 @@ const WindowManager = {
             
             windowData.isMaximized = true;
             
-            // 添加壁纸景深效果
+            // 更新壁纸效果 - Update wallpaper effect
             this.updateMaximizedWallpaperEffect();
         }
     },
     
-    // 更新壁纸最大化效果和任务栏显示
+    // 更新最大化窗口的壁纸效果 - Update wallpaper effect for maximized windows
     updateMaximizedWallpaperEffect() {
-        const hasMaximized = this.windows.some(w => w.isMaximized);
-        const taskbar = document.querySelector('.taskbar');
+        const hasMaximized = this.windows.some(w => w.isMaximized && !w.isMinimized && w.element && w.element.style.display !== 'none');
+        const taskbar = this._getTaskbarElement();
         
         if (hasMaximized) {
             document.body.classList.add('has-maximized-window');
+            if (taskbar) {
+                taskbar.classList.add('auto-hide-active');
+                if (document.body.classList.contains('in-taskview') || taskbar.matches(':hover') || this._isTaskbarInteractivePanelOpen()) {
+                    this._showTaskbarForAutoHide(taskbar);
+                } else {
+                    this._hideTaskbarForAutoHide(taskbar);
+                }
+            }
         } else {
             document.body.classList.remove('has-maximized-window');
-            // 没有最大化窗口时，显示任务栏
-            if (taskbar && taskbar.classList.contains('hidden')) {
+            this._clearTaskbarTimers();
+            if (taskbar) {
+                taskbar.classList.remove('auto-hide-active');
+                taskbar.classList.remove('peek-pop');
                 taskbar.classList.remove('hiding');
                 taskbar.classList.remove('hidden');
             }
@@ -941,7 +1234,15 @@ const WindowManager = {
         this._persistWindowBounds(windowData);
 
         const proceedClose = () => {
-            // 添加关闭动画
+            this._clearWindowMotionTimers(windowData);
+            windowData.isMinimizing = false;
+            windowData.isRestoring = false;
+            windowData.element.classList.remove('minimizing', 'restoring');
+            windowData.element.style.transition = '';
+            windowData.element.style.transform = '';
+            windowData.element.style.transformOrigin = '';
+            windowData.element.style.willChange = '';
+            windowData.element.style.opacity = '';
             windowData.element.classList.add('closing');
             setTimeout(() => {
                 windowData.element.remove();
@@ -950,12 +1251,12 @@ const WindowManager = {
                 if (!hasOtherWindows) {
                     State.removeRunningApp(windowData.appId);
                 }
-                // 更新壁纸效果和任务栏
+                // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
             }, 250);
         };
 
-        // 通知应用进行 beforeClose 钩子（可异步；返回 false 可中止关闭）
+        // 调用组件的beforeClose钩子 - Call component beforeClose hook
         try {
             const appId = windowData.appId;
             const config = this.appConfigs[appId]; // raw config ok here, only need component
@@ -965,18 +1266,19 @@ const WindowManager = {
                 if (result && typeof result.then === 'function') {
                     result.then((ok) => { if (ok === false) return; proceedClose(); })
                           .catch(() => proceedClose());
-                    return; // 等待异步确认
+                    return; // 等待用户确认 - Wait for user confirmation
                 }
-                if (result === false) return; // 同步阻止
+                if (result === false) return; // 用户取消关闭 - User cancelled close
             }
-        } catch (e) { console.warn('beforeClose 调用失败:', e); }
+        }catch (e) {
+            console.warn('beforeClose 执行失败，继续关闭窗口 - beforeClose failed, continue closing', e);
+        }
 
         proceedClose();
     },
     
-    // 获取任务栏图标位置（用于最小化动画）
     getTaskbarButtonPosition(appId) {
-        const taskbarBtn = document.querySelector(`[data-app-id="${appId}"]`);
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
         if (taskbarBtn) {
             const rect = taskbarBtn.getBoundingClientRect();
             return {
@@ -984,9 +1286,7 @@ const WindowManager = {
                 y: rect.top + rect.height / 2
             };
         }
-        return {
-            x: globalThis.innerWidth / 2,
-            y: globalThis.innerHeight - 36
-        };
+        return this._getMinimizeDockPoint();
     }
 };
+

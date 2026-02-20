@@ -12,6 +12,7 @@ const Taskbar = {
     timeInterval: null,
     contextMenu: null,
     taskViewBtn: null,
+    _taskViewIgnoreClickUntil: 0,
 
     init() {
         this.element = document.getElementById('taskbar');
@@ -157,8 +158,19 @@ const Taskbar = {
         });
 
         // 任务视图按钮
+        this.taskViewBtn?.addEventListener('pointerdown', (e) => {
+            if (typeof e.button === 'number' && e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const now = globalThis.performance ? performance.now() : Date.now();
+            this._taskViewIgnoreClickUntil = now + 220;
+            if (typeof TaskView !== 'undefined') TaskView.toggle();
+        });
+
         this.taskViewBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
+            const now = globalThis.performance ? performance.now() : Date.now();
+            if (now < this._taskViewIgnoreClickUntil) return;
             if (typeof TaskView !== 'undefined') TaskView.toggle();
         });
 

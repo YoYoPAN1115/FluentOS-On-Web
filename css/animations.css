@@ -222,6 +222,25 @@ body.animations-enabled .taskbar-app-exiting {
     animation: taskbarAppExit 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
+@keyframes taskbarAppDockHit {
+    0% {
+        transform: scale(1);
+    }
+    38% {
+        transform: scale(0.78);
+    }
+    72% {
+        transform: scale(1.06);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+body.animations-enabled .taskbar-app-dock-hit {
+    animation: taskbarAppDockHit 0.28s cubic-bezier(0.2, 0.9, 0.28, 1);
+}
+
 /* ============ 开始菜单动画 ============ */
 @keyframes startMenuOpen {
     from {
@@ -363,4 +382,3 @@ body.animations-disabled .window {
     transition: none !important;
     animation: none !important;
 }
-

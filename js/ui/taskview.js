@@ -1,21 +1,24 @@
 /**
- * 任务视图 - 智能布局，避免窗口重叠，仅虚化背景
+ * Task View - proportional window previews and quick switching.
  */
 const TaskView = {
     overlay: null,
     isOpen: false,
-    windowStates: new Map(), // windowId -> { origPos, origSize, origZ, clickHandler }
+    windowStates: new Map(),
     autoTimer: null,
+    settleTimer: null,
+    cycleToken: 0,
+    ENTER_DURATION_MS: 460,
+    EXIT_DURATION_MS: 420,
 
     init() {
         if (this.overlay) return;
-        // 遮罩层仅用于拦截点击和虚化背景（不包含窗口）
+
         this.overlay = document.createElement('div');
         this.overlay.id = 'taskview-overlay';
         this.overlay.className = 'taskview hidden';
         document.body.appendChild(this.overlay);
 
-        // 点击遮罩层（空白处）退出任务视图
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) {
                 this.close();
@@ -26,225 +29,672 @@ const TaskView = {
             if (this.isOpen && e.key === 'Escape') this.close();
         });
 
-        // 点击任务栏也退出任务视图
-        document.addEventListener('click', (e) => {
-            if (this.isOpen && e.target.closest('.taskbar')) {
-                this.close();
+        document.addEventListener('pointerdown', (e) => {
+            if (!this.isOpen) return;
+            if (typeof e.button === 'number' && e.button !== 0) return;
+
+            const hitWindowId = this._resolveTaskViewHitWindowId(e);
+            if (hitWindowId) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.closeWithTarget(hitWindowId);
+                return;
             }
+
+            if (e.target.closest('.taskbar')) return;
+            this.close();
         }, true);
+    },
+
+    _resolveTaskViewHitWindowId(e) {
+        const path = typeof e.composedPath === 'function' ? e.composedPath() : null;
+        if (Array.isArray(path)) {
+            for (let i = 0; i < path.length; i++) {
+                const node = path[i];
+                if (!node || !node.classList || !node.classList.contains('taskview-window-active')) continue;
+                if (node.id) return node.id;
+            }
+        }
+
+        if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return null;
+        const x = e.clientX;
+        const y = e.clientY;
+        const windows = (WindowManager.windows || [])
+            .filter((w) => w && w.element && w.element.classList && w.element.classList.contains('taskview-window-active'))
+            .map((w) => w.element);
+        if (windows.length === 0) return null;
+
+        const domOrder = new Map();
+        Array.from(document.querySelectorAll('.window')).forEach((el, idx) => domOrder.set(el, idx));
+        const sorted = windows.slice().sort((a, b) => {
+            const za = Number.parseInt(a.style.zIndex, 10);
+            const zb = Number.parseInt(b.style.zIndex, 10);
+            const safeZa = Number.isFinite(za) ? za : 0;
+            const safeZb = Number.isFinite(zb) ? zb : 0;
+            if (safeZa !== safeZb) return safeZb - safeZa;
+            const ia = domOrder.has(a) ? domOrder.get(a) : -1;
+            const ib = domOrder.has(b) ? domOrder.get(b) : -1;
+            return ib - ia;
+        });
+
+        for (let i = 0; i < sorted.length; i++) {
+            const el = sorted[i];
+            const rect = el.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                return el.id || null;
+            }
+        }
+
+        return null;
     },
 
     toggle() {
         if (this.isOpen) this.close(); else this.open();
     },
 
+    _parsePixel(value, fallback = NaN) {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    },
+
+    _isAnimationEnabled() {
+        if (typeof State === 'undefined' || !State.settings) return true;
+        return State.settings.enableAnimation !== false;
+    },
+
+    _effectiveDuration(duration) {
+        if (!this._isAnimationEnabled()) return 0;
+        return Math.max(0, Math.round(duration || 0));
+    },
+
+    _captureVisualState(el) {
+        const computed = getComputedStyle(el);
+        const transform = computed.transform && computed.transform !== 'none'
+            ? computed.transform
+            : (el.style.transform || 'none');
+        const opacity = computed.opacity || (el.style.opacity || '1');
+        return { transform, opacity };
+    },
+
+    _primeExitAnimation(el, visualState) {
+        el.style.transition = 'none';
+        el.style.transformOrigin = 'top left';
+        el.style.transform = visualState.transform;
+        el.style.opacity = visualState.opacity;
+        el.offsetHeight;
+    },
+
+    _runExitAnimation(el, cycleId, transition, endTransform, endOpacity) {
+        el.style.transition = transition;
+        requestAnimationFrame(() => {
+            if (cycleId !== this.cycleToken) return;
+            el.style.transform = endTransform;
+            el.style.opacity = endOpacity;
+        });
+    },
+
+    _syncWindowManagerZCounterWithStateEntries(stateEntries) {
+        if (typeof WindowManager === 'undefined') return;
+        let maxZ = Number.isFinite(WindowManager.zIndexCounter) ? WindowManager.zIndexCounter : 1000;
+
+        (WindowManager.windows || []).forEach((w) => {
+            if (!w || !w.element) return;
+            const z = Number.parseInt(w.element.style.zIndex, 10);
+            if (Number.isFinite(z)) maxZ = Math.max(maxZ, z);
+        });
+
+        (stateEntries || []).forEach((entry) => {
+            const state = Array.isArray(entry) ? entry[1] : null;
+            if (!state) return;
+            const z = Number.parseInt(state.origZ, 10);
+            if (Number.isFinite(z)) maxZ = Math.max(maxZ, z);
+        });
+
+        WindowManager.zIndexCounter = maxZ;
+    },
+
+    _nextCycleToken() {
+        this.cycleToken += 1;
+        return this.cycleToken;
+    },
+
+    _clearRuntimeTimers() {
+        clearTimeout(this.autoTimer);
+        clearTimeout(this.settleTimer);
+        this.autoTimer = null;
+        this.settleTimer = null;
+    },
+
+    _markTaskViewManaged(el, state) {
+        if (!el) return;
+        el.dataset.taskviewManaged = '1';
+        el.dataset.taskviewOrigDisplay = state.origDisplay || '';
+        el.dataset.taskviewOrigZ = state.origZ || '';
+        el.dataset.taskviewOrigTransform = state.origTransform || '';
+        el.dataset.taskviewOrigTransition = state.origTransition || '';
+        el.dataset.taskviewOrigTransformOrigin = state.origTransformOrigin || '';
+        el.dataset.taskviewOrigOpacity = state.origOpacity || '';
+        el.dataset.taskviewOrigPointerEvents = state.origPointerEvents || '';
+    },
+
+    _clearTaskViewManaged(el) {
+        if (!el) return;
+        delete el.dataset.taskviewManaged;
+        delete el.dataset.taskviewOrigDisplay;
+        delete el.dataset.taskviewOrigZ;
+        delete el.dataset.taskviewOrigTransform;
+        delete el.dataset.taskviewOrigTransition;
+        delete el.dataset.taskviewOrigTransformOrigin;
+        delete el.dataset.taskviewOrigOpacity;
+        delete el.dataset.taskviewOrigPointerEvents;
+    },
+
+    _restoreInterruptedManagedWindows() {
+        const windows = (WindowManager.windows || []).filter((w) => w && w.element);
+        windows.forEach((windowData) => {
+            const el = windowData.element;
+            if (!el || el.dataset.taskviewManaged !== '1') return;
+
+            const origDisplay = el.dataset.taskviewOrigDisplay || '';
+            el.classList.remove('taskview-window-active');
+            el.style.transition = el.dataset.taskviewOrigTransition || '';
+            el.style.transform = el.dataset.taskviewOrigTransform || '';
+            el.style.transformOrigin = el.dataset.taskviewOrigTransformOrigin || '';
+            el.style.opacity = el.dataset.taskviewOrigOpacity || '';
+            el.style.pointerEvents = el.dataset.taskviewOrigPointerEvents || '';
+            el.style.zIndex = el.dataset.taskviewOrigZ || '';
+            if (windowData.isMinimized) {
+                el.style.display = origDisplay || 'none';
+            } else {
+                el.style.display = origDisplay || '';
+            }
+
+            this._clearTaskViewManaged(el);
+        });
+    },
+
+    _resolveWindowBounds(windowData, element) {
+        const rect = element.getBoundingClientRect();
+        const styleWidth = this._parsePixel(element.style.width);
+        const styleHeight = this._parsePixel(element.style.height);
+        const styleLeft = this._parsePixel(element.style.left);
+        const styleTop = this._parsePixel(element.style.top);
+        let width = Number.isFinite(styleWidth) && styleWidth > 1 ? styleWidth : rect.width;
+        let height = Number.isFinite(styleHeight) && styleHeight > 1 ? styleHeight : rect.height;
+        let left = Number.isFinite(styleLeft) ? styleLeft : rect.left;
+        let top = Number.isFinite(styleTop) ? styleTop : rect.top;
+
+        if (windowData.isMinimized || element.style.display === 'none') {
+            const saved = windowData.savedPosition || {};
+            if (width <= 1) width = this._parsePixel(saved.width, width);
+            if (height <= 1) height = this._parsePixel(saved.height, height);
+            if (!Number.isFinite(left)) left = this._parsePixel(saved.left, left);
+            if (!Number.isFinite(top)) top = this._parsePixel(saved.top, top);
+        }
+
+        if (width <= 1 || height <= 1) {
+            width = this._parsePixel(element.style.width, width);
+            height = this._parsePixel(element.style.height, height);
+        }
+
+        if (windowData.isMaximized) {
+            width = Math.max(width || 0, globalThis.innerWidth || 0);
+            height = Math.max(height || 0, globalThis.innerHeight || 0);
+            left = 0;
+            top = 0;
+        }
+
+        if (!Number.isFinite(width) || width <= 1) width = 900;
+        if (!Number.isFinite(height) || height <= 1) height = 600;
+        if (!Number.isFinite(left)) left = Math.max(0, ((globalThis.innerWidth || width) - width) / 2);
+        if (!Number.isFinite(top)) top = Math.max(0, ((globalThis.innerHeight || height) - height) / 2 - 40);
+
+        return {
+            left,
+            top,
+            width,
+            height
+        };
+    },
+
+    _captureWindowState(windowData) {
+        const el = windowData.element;
+        return {
+            origPos: { left: el.style.left, top: el.style.top },
+            origSize: { width: el.style.width, height: el.style.height },
+            origDisplay: el.style.display || '',
+            origZ: el.style.zIndex || '',
+            origTransform: el.style.transform || '',
+            origTransition: el.style.transition || '',
+            origTransformOrigin: el.style.transformOrigin || '',
+            origOpacity: el.style.opacity || '',
+            origPointerEvents: el.style.pointerEvents || '',
+            wasMinimized: windowData.isMinimized === true,
+            bounds: this._resolveWindowBounds(windowData, el),
+            clickHandler: null
+        };
+    },
+
+    _getMinimizeScale() {
+        if (typeof WindowManager !== 'undefined' && Number.isFinite(WindowManager.MINIMIZE_DOCK_SCALE)) {
+            return WindowManager.MINIMIZE_DOCK_SCALE;
+        }
+        return 0.08;
+    },
+
+    _getDockPoint(windowData) {
+        if (typeof WindowManager !== 'undefined' && typeof WindowManager.getTaskbarButtonPosition === 'function') {
+            return WindowManager.getTaskbarButtonPosition(windowData.appId);
+        }
+        return {
+            x: (globalThis.innerWidth || 0) / 2,
+            y: Math.max(0, (globalThis.innerHeight || 0) - 8)
+        };
+    },
+
+    _buildDockTransform(bounds, dockPoint, scale) {
+        const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 0.08;
+        const tx = dockPoint.x - bounds.left - (bounds.width * safeScale / 2);
+        const ty = dockPoint.y - bounds.top - (bounds.height * safeScale / 2);
+        return `translate(${Math.round(tx)}px, ${Math.round(ty)}px) scale(${Number(safeScale.toFixed(4))})`;
+    },
+
+    _buildTaskViewTransform(bounds, target) {
+        const tx = target.x - bounds.left;
+        const ty = target.y - bounds.top;
+        return `translate(${Math.round(tx)}px, ${Math.round(ty)}px) scale(${target.scale})`;
+    },
+
+    _buildEnterTransition() {
+        const duration = this._effectiveDuration(this.ENTER_DURATION_MS);
+        if (duration <= 0) return 'none';
+        const opacityDuration = Math.round(duration * 0.52);
+        return `transform ${duration}ms cubic-bezier(0.2, 1.12, 0.26, 1), opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    },
+
+    _buildReturnTransition(duration = this.EXIT_DURATION_MS) {
+        const resolved = this._effectiveDuration(duration);
+        if (resolved <= 0) return 'none';
+        const opacityDuration = Math.round(resolved * 0.58);
+        return `transform ${resolved}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+    },
+
     open() {
         if (this.isOpen) return;
         this.init();
+        const cycleId = this._nextCycleToken();
+        this._clearRuntimeTimers();
+        this._restoreInterruptedManagedWindows();
+        this.overlay.style.pointerEvents = 'auto';
 
-        const windows = WindowManager.windows || [];
+        const windows = (WindowManager.windows || []).filter((w) => w && w.element);
         if (windows.length === 0) {
-            // 无窗口：仅显示虚化背景，1秒后自动关闭
             this.overlay.classList.remove('hidden');
             this.isOpen = true;
             document.body.classList.add('in-taskview');
-            clearTimeout(this.autoTimer);
-            this.autoTimer = setTimeout(() => this.close(), 200);
+            if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
+                WindowManager.updateMaximizedWallpaperEffect();
+            }
+            this.autoTimer = setTimeout(() => {
+                if (cycleId !== this.cycleToken || !this.isOpen) return;
+                this.close();
+            }, 200);
             return;
         }
 
-        // 计算智能布局（避免重叠）
-        const layout = this.calculateLayout(windows);
+        this.windowStates.clear();
+        const entries = windows.map((windowData) => {
+            const state = this._captureWindowState(windowData);
+            this.windowStates.set(windowData.id, state);
+            return { windowData, state };
+        });
 
-        windows.forEach((w, i) => {
-            const el = w.element;
-            if (!el) return;
+        const layout = this.calculateLayout(entries);
 
-            // 保存原始状态
-            const rect = el.getBoundingClientRect();
-            this.windowStates.set(w.id, {
-                origPos: { left: el.style.left, top: el.style.top },
-                origSize: { width: el.style.width, height: el.style.height },
-                origZ: el.style.zIndex,
-                origTransform: el.style.transform
-            });
+        entries.forEach((entry, i) => {
+            const { windowData, state } = entry;
+            const el = windowData.element;
+            const target = layout[i];
+            if (!target) return;
 
-            const pos = layout[i];
-            // 设置新位置和缩放
-            el.style.transition = 'all 420ms cubic-bezier(0.22, 0.61, 0.36, 1)';
-            el.style.left = pos.x + 'px';
-            el.style.top = pos.y + 'px';
-            el.style.width = pos.width + 'px';
-            el.style.height = pos.height + 'px';
-            el.style.zIndex = '9100'; // 高于背景遮罩
+            const finalTransform = this._buildTaskViewTransform(state.bounds, target);
+            const wasMinimized = state.wasMinimized || state.origDisplay === 'none';
+            const minimizeScale = this._getMinimizeScale();
+            const enterTransition = this._buildEnterTransition();
+
+            this._markTaskViewManaged(el, state);
+            el.style.transformOrigin = 'top left';
+            el.style.zIndex = '9100';
+            el.style.pointerEvents = 'auto';
             el.classList.add('taskview-window-active');
 
-            // 点击窗口聚焦并退出
-            const onClick = (evt) => {
-                evt.stopPropagation();
-                const targetId = w.id;
+            if (wasMinimized) {
+                const dockPoint = this._getDockPoint(windowData);
+                const dockTransform = this._buildDockTransform(state.bounds, dockPoint, minimizeScale);
+                el.style.display = 'flex';
+                el.style.transition = 'none';
+                el.style.transform = dockTransform;
+                el.style.opacity = '0';
+                el.offsetHeight;
+                requestAnimationFrame(() => {
+                    if (cycleId !== this.cycleToken || !this.isOpen) return;
+                    el.style.transition = enterTransition;
+                    el.style.transform = finalTransform;
+                    el.style.opacity = '1';
+                });
+            } else {
+                el.style.transition = enterTransition;
+                el.style.transform = finalTransform;
+                el.style.opacity = '1';
+            }
 
-                // 关键修复：只让被点击的窗口动画回位，其他窗口保持在任务视图位置不动
-                this.closeWithTarget(targetId);
-            };
-            el.addEventListener('click', onClick, { once: true });
-            const state = this.windowStates.get(w.id);
-            state.clickHandler = onClick;
+            state.clickHandler = null;
         });
 
         this.overlay.classList.remove('hidden');
         this.isOpen = true;
         document.body.classList.add('in-taskview');
+        if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
+            WindowManager.updateMaximizedWallpaperEffect();
+        }
     },
 
-    // 点击窗口后：目标窗口平滑回位并置顶，其他窗口瞬时回到原位（无动画）
     closeWithTarget(targetId) {
         if (!this.isOpen) return;
+        const cycleId = this._nextCycleToken();
+        this._clearRuntimeTimers();
+        const stateEntries = Array.from(this.windowStates.entries());
+        this.windowStates.clear();
 
-        // 1. 先关闭遮罩和虚化效果
-        this.overlay.classList.add('hidden');
         this.isOpen = false;
         document.body.classList.remove('in-taskview');
-        clearTimeout(this.autoTimer);
+        this.overlay.style.pointerEvents = 'none';
 
-        // 2. 其他窗口：立即无动画恢复到原位
-        this.windowStates.forEach((state, windowId) => {
-            if (windowId === targetId) return; // 跳过目标窗口
-            
-            const w = WindowManager.windows.find(win => win.id === windowId);
-            if (!w || !w.element) return;
-            const el = w.element;
-
-            // 移除点击事件
-            if (state.clickHandler) {
-                el.removeEventListener('click', state.clickHandler);
-            }
-
-            // 关键：先移除 transition，然后恢复位置（无动画）
-            el.style.transition = 'none';
-            el.classList.remove('taskview-window-active');
-            el.style.left = state.origPos.left;
-            el.style.top = state.origPos.top;
-            el.style.width = state.origSize.width;
-            el.style.height = state.origSize.height;
-            el.style.zIndex = state.origZ;
-            el.style.transform = state.origTransform || '';
-            
-            // 强制浏览器重绘，确保无动画生效
-            void el.offsetHeight;
-            
-            // 清理 transition（不恢复，避免后续误触发动画）
-            setTimeout(() => {
-                el.style.transition = '';
-            }, 50);
-        });
-
-        // 3. 目标窗口：保持 transition，平滑回位并置顶
-        const targetState = this.windowStates.get(targetId);
-        const targetWindow = WindowManager.windows.find(w => w.id === targetId);
-        
-        if (targetState && targetWindow && targetWindow.element) {
-            const el = targetWindow.element;
-            
-            // 移除点击事件
-            if (targetState.clickHandler) {
-                el.removeEventListener('click', targetState.clickHandler);
-            }
-            
-            // 保持 transition 以实现平滑动画
-            el.style.transition = 'all 420ms cubic-bezier(0.22, 0.61, 0.36, 1)';
-            el.classList.remove('taskview-window-active');
-            
-            // 恢复原始位置和大小（带动画）
-            el.style.left = targetState.origPos.left;
-            el.style.top = targetState.origPos.top;
-            el.style.width = targetState.origSize.width;
-            el.style.height = targetState.origSize.height;
-            el.style.transform = targetState.origTransform || '';
-            
-            // 动画完成后提升到最前并清理
-            setTimeout(() => {
-                WindowManager.focusWindow(targetId);
-                el.style.transition = '';
-            }, 420);
+        const restoreDuration = this._effectiveDuration(this.EXIT_DURATION_MS);
+        const minimizeScale = this._getMinimizeScale();
+        this._syncWindowManagerZCounterWithStateEntries(stateEntries);
+        const targetFrontZ = (typeof WindowManager !== 'undefined' && Number.isFinite(WindowManager.zIndexCounter))
+            ? (WindowManager.zIndexCounter + 1)
+            : 9101;
+        const targetWindowNow = (WindowManager.windows || []).find((w) => w && w.id === targetId);
+        if (targetWindowNow && targetWindowNow.element) {
+            targetWindowNow.element.style.zIndex = String(targetFrontZ);
+        }
+        if (typeof WindowManager !== 'undefined' && Number.isFinite(targetFrontZ)) {
+            WindowManager.zIndexCounter = targetFrontZ;
         }
 
-        // 4. 清理所有状态
-        this.windowStates.clear();
+        stateEntries.forEach(([windowId, state]) => {
+            const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
+            if (!targetWindow || !targetWindow.element) return;
+
+            const el = targetWindow.element;
+            if (state.clickHandler) {
+                el.removeEventListener('mousedown', state.clickHandler, true);
+            }
+
+            el.classList.remove('taskview-window-active');
+            el.style.pointerEvents = 'none';
+            const visualState = this._captureVisualState(el);
+            this._primeExitAnimation(el, visualState);
+            if (state.wasMinimized && windowId !== targetId) {
+                const dockPoint = this._getDockPoint(targetWindow);
+                this._runExitAnimation(
+                    el,
+                    cycleId,
+                    this._buildReturnTransition(360),
+                    this._buildDockTransform(state.bounds, dockPoint, minimizeScale),
+                    '0'
+                );
+                const feedbackDelay = Math.round(this._effectiveDuration(360) * 0.62);
+                setTimeout(() => {
+                    if (cycleId !== this.cycleToken) return;
+                    if (typeof WindowManager !== 'undefined' && typeof WindowManager._playTaskbarDockFeedback === 'function') {
+                        WindowManager._playTaskbarDockFeedback(targetWindow.appId);
+                    }
+                }, feedbackDelay);
+            } else {
+                this._runExitAnimation(
+                    el,
+                    cycleId,
+                    this._buildReturnTransition(restoreDuration),
+                    state.origTransform || '',
+                    state.origOpacity || ''
+                );
+            }
+            if (windowId !== targetId) {
+                el.style.zIndex = state.origZ;
+            }
+        });
+
+        this.settleTimer = setTimeout(() => {
+            if (cycleId !== this.cycleToken) {
+                this.settleTimer = null;
+                return;
+            }
+
+            stateEntries.forEach(([windowId, state]) => {
+                const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
+                if (!targetWindow || !targetWindow.element) return;
+
+                const el = targetWindow.element;
+
+                if (state.wasMinimized) {
+                    if (windowId === targetId) {
+                        targetWindow.isMinimized = false;
+                        el.style.display = 'flex';
+                    } else {
+                        el.style.display = state.origDisplay || 'none';
+                    }
+                } else {
+                    el.style.display = state.origDisplay || '';
+                }
+
+                el.style.transition = state.origTransition || '';
+                el.style.transform = state.origTransform || '';
+                el.style.transformOrigin = state.origTransformOrigin || '';
+                el.style.opacity = state.origOpacity || '';
+                el.style.pointerEvents = state.origPointerEvents || '';
+                if (windowId !== targetId) {
+                    el.style.zIndex = state.origZ;
+                }
+                this._clearTaskViewManaged(el);
+            });
+
+            this._syncWindowManagerZCounterWithStateEntries(stateEntries);
+            if (typeof WindowManager !== 'undefined' && typeof WindowManager.focusWindow === 'function') {
+                WindowManager.focusWindow(targetId);
+                requestAnimationFrame(() => {
+                    WindowManager.focusWindow(targetId);
+                });
+            }
+
+            this.overlay.classList.add('hidden');
+            this.overlay.style.pointerEvents = 'none';
+            this.settleTimer = null;
+            if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
+                WindowManager.updateMaximizedWallpaperEffect();
+            }
+        }, restoreDuration);
     },
 
     close() {
         if (!this.isOpen) return;
-
-        // 所有窗口都平滑恢复原位（用于 ESC 或点击背景）
-        this.windowStates.forEach((state, windowId) => {
-            const w = WindowManager.windows.find(win => win.id === windowId);
-            if (!w || !w.element) return;
-            const el = w.element;
-
-            el.classList.remove('taskview-window-active');
-            el.style.left = state.origPos.left;
-            el.style.top = state.origPos.top;
-            el.style.width = state.origSize.width;
-            el.style.height = state.origSize.height;
-            el.style.zIndex = state.origZ;
-            el.style.transform = state.origTransform || '';
-
-            if (state.clickHandler) {
-                el.removeEventListener('click', state.clickHandler);
-            }
-
-            // 移除 transition 避免其他操作被动画影响
-            setTimeout(() => { el.style.transition = ''; }, 450);
-        });
+        const cycleId = this._nextCycleToken();
+        this._clearRuntimeTimers();
+        const stateEntries = Array.from(this.windowStates.entries());
         this.windowStates.clear();
 
-        this.overlay.classList.add('hidden');
         this.isOpen = false;
         document.body.classList.remove('in-taskview');
-        clearTimeout(this.autoTimer);
+        this.overlay.style.pointerEvents = 'none';
+
+        const restoreDuration = this._effectiveDuration(this.EXIT_DURATION_MS);
+        const minimizeScale = this._getMinimizeScale();
+
+        stateEntries.forEach(([windowId, state]) => {
+            const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
+            if (!targetWindow || !targetWindow.element) return;
+
+            const el = targetWindow.element;
+            if (state.clickHandler) {
+                el.removeEventListener('mousedown', state.clickHandler, true);
+            }
+
+            el.classList.remove('taskview-window-active');
+            el.style.pointerEvents = 'none';
+            const visualState = this._captureVisualState(el);
+            this._primeExitAnimation(el, visualState);
+            if (state.wasMinimized) {
+                const dockPoint = this._getDockPoint(targetWindow);
+                this._runExitAnimation(
+                    el,
+                    cycleId,
+                    this._buildReturnTransition(360),
+                    this._buildDockTransform(state.bounds, dockPoint, minimizeScale),
+                    '0'
+                );
+                const feedbackDelay = Math.round(this._effectiveDuration(360) * 0.62);
+                setTimeout(() => {
+                    if (cycleId !== this.cycleToken) return;
+                    if (typeof WindowManager !== 'undefined' && typeof WindowManager._playTaskbarDockFeedback === 'function') {
+                        WindowManager._playTaskbarDockFeedback(targetWindow.appId);
+                    }
+                }, feedbackDelay);
+            } else {
+                this._runExitAnimation(
+                    el,
+                    cycleId,
+                    this._buildReturnTransition(restoreDuration),
+                    state.origTransform || '',
+                    state.origOpacity || ''
+                );
+            }
+            el.style.zIndex = state.origZ;
+        });
+
+        this.settleTimer = setTimeout(() => {
+            if (cycleId !== this.cycleToken) {
+                this.settleTimer = null;
+                return;
+            }
+
+            stateEntries.forEach(([windowId, state]) => {
+                const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
+                if (!targetWindow || !targetWindow.element) return;
+
+                const el = targetWindow.element;
+                if (state.wasMinimized) {
+                    el.style.display = state.origDisplay || 'none';
+                } else {
+                    el.style.display = state.origDisplay || '';
+                }
+
+                el.style.transition = state.origTransition || '';
+                el.style.transform = state.origTransform || '';
+                el.style.transformOrigin = state.origTransformOrigin || '';
+                el.style.opacity = state.origOpacity || '';
+                el.style.pointerEvents = state.origPointerEvents || '';
+                el.style.zIndex = state.origZ;
+                this._clearTaskViewManaged(el);
+            });
+
+            this.overlay.classList.add('hidden');
+            this.overlay.style.pointerEvents = 'none';
+            this.settleTimer = null;
+            if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
+                WindowManager.updateMaximizedWallpaperEffect();
+            }
+        }, restoreDuration);
     },
 
-    calculateLayout(windows) {
-        // 简单网格布局：3列，根据窗口数量自动行数
+    calculateLayout(entries) {
+        const count = entries.length;
+        if (count === 0) return [];
+
         const padding = 32;
         const gap = 24;
-        const cols = 3;
-        const rows = Math.ceil(windows.length / cols);
 
-        const availableWidth = window.innerWidth - padding * 2;
-        const availableHeight = window.innerHeight - 100 - padding * 2; // 底部留给任务栏
+        const cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(count * 1.2))));
+        const rows = Math.ceil(count / cols);
 
+        const availableWidth = Math.max(260, window.innerWidth - padding * 2);
+        const availableHeight = Math.max(220, window.innerHeight - 110 - padding * 2);
         const cellWidth = (availableWidth - gap * (cols - 1)) / cols;
         const cellHeight = (availableHeight - gap * (rows - 1)) / rows;
 
-        return windows.map((w, i) => {
+        const maxScale = count === 1 ? 0.88 : 0.8;
+        const slots = Array.from({ length: count }, (_, i) => {
             const col = i % cols;
             const row = Math.floor(i / cols);
+            return {
+                index: i,
+                col,
+                row,
+                baseX: padding + col * (cellWidth + gap),
+                baseY: padding + row * (cellHeight + gap)
+            };
+        });
 
-            // 计算目标位置（居中网格）
-            const x = padding + col * (cellWidth + gap);
-            const y = padding + row * (cellHeight + gap);
+        const minimizedEntryIndexes = [];
+        const normalEntryIndexes = [];
+        entries.forEach((entry, entryIndex) => {
+            if (entry && entry.state && entry.state.wasMinimized) {
+                minimizedEntryIndexes.push(entryIndex);
+            } else {
+                normalEntryIndexes.push(entryIndex);
+            }
+        });
 
-            // 计算缩放比例（保持窗口比例）
-            const el = w.element;
-            const rect = el.getBoundingClientRect();
-            const scaleW = cellWidth / rect.width;
-            const scaleH = cellHeight / rect.height;
-            const scale = Math.min(scaleW, scaleH, 0.75); // 最大缩小到75%
+        const assignment = new Array(count).fill(-1);
+        const shouldPinMinimizedRight = normalEntryIndexes.length > 0 && minimizedEntryIndexes.length > 0;
 
-            const targetWidth = rect.width * scale;
-            const targetHeight = rect.height * scale;
+        if (shouldPinMinimizedRight) {
+            const rightPrioritySlotIndexes = slots
+                .slice()
+                .sort((a, b) => {
+                    if (b.col !== a.col) return b.col - a.col;
+                    if (a.row !== b.row) return a.row - b.row;
+                    return a.index - b.index;
+                })
+                .map((slot) => slot.index);
 
-            // 在单元格内居中
-            const finalX = x + (cellWidth - targetWidth) / 2;
-            const finalY = y + (cellHeight - targetHeight) / 2;
+            const minimizedSlotIndexes = rightPrioritySlotIndexes.slice(0, minimizedEntryIndexes.length);
+            const minimizedSlotSet = new Set(minimizedSlotIndexes);
+            const normalSlotIndexes = slots
+                .map((slot) => slot.index)
+                .filter((slotIndex) => !minimizedSlotSet.has(slotIndex));
+
+            normalEntryIndexes.forEach((entryIndex, i) => {
+                assignment[entryIndex] = normalSlotIndexes[i];
+            });
+            minimizedEntryIndexes.forEach((entryIndex, i) => {
+                assignment[entryIndex] = minimizedSlotIndexes[i];
+            });
+        } else {
+            slots.forEach((slot) => {
+                assignment[slot.index] = slot.index;
+            });
+        }
+
+        return entries.map((entry, entryIndex) => {
+            const slotIndex = Number.isFinite(assignment[entryIndex]) && assignment[entryIndex] >= 0
+                ? assignment[entryIndex]
+                : entryIndex;
+            const slot = slots[slotIndex] || slots[Math.min(entryIndex, slots.length - 1)];
+
+            const bounds = entry.state.bounds;
+            const scaleW = cellWidth / bounds.width;
+            const scaleH = cellHeight / bounds.height;
+            const scale = Math.max(0.14, Math.min(scaleW, scaleH, maxScale));
+
+            const previewWidth = bounds.width * scale;
+            const previewHeight = bounds.height * scale;
 
             return {
-                x: finalX,
-                y: finalY,
-                width: targetWidth,
-                height: targetHeight
+                x: slot.baseX + (cellWidth - previewWidth) / 2,
+                y: slot.baseY + (cellHeight - previewHeight) / 2,
+                scale: Number(scale.toFixed(4))
             };
         });
     }
