@@ -902,6 +902,92 @@ const SettingsApp = {
                 word-break: break-all;
             }
 
+            .settings-about-hero-card {
+                display: flex;
+                align-items: center;
+                gap: 18px;
+            }
+
+            .settings-about-logo-wrap {
+                width: 84px;
+                height: 84px;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .settings-about-logo-wrap img {
+                width: 84px;
+                height: 84px;
+                object-fit: contain;
+                display: block;
+                box-shadow: none;
+            }
+
+            .settings-about-hero-text {
+                min-width: 0;
+                flex: 1;
+                text-align: left;
+                min-height: 84px;
+                display: flex;
+                align-items: center;
+            }
+
+            .settings-about-hero-name {
+                font-size: 40px;
+                font-weight: 700;
+                line-height: 1;
+                margin: 0;
+            }
+
+            .settings-about-hero-meta {
+                font-size: 14px;
+                color: var(--text-secondary);
+                word-break: break-word;
+            }
+
+            .settings-about-meta-card {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .settings-about-meta-row {
+                display: flex;
+                align-items: baseline;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .settings-about-meta-label {
+                font-size: 13px;
+                color: var(--text-secondary);
+                min-width: 84px;
+            }
+
+            .settings-about-meta-value {
+                font-size: 14px;
+                color: var(--text-primary);
+            }
+
+            .settings-about-meta-link {
+                font-size: 14px;
+                color: var(--accent);
+                text-decoration: none;
+                word-break: break-all;
+            }
+
+            .settings-about-meta-link:hover {
+                text-decoration: underline;
+            }
+
+            @media (max-width: 900px) {
+                .settings-about-hero-name {
+                    font-size: 30px;
+                }
+            }
+
             .settings-user-avatar-grid {
                 display: flex;
                 flex-wrap: wrap;
@@ -3215,9 +3301,36 @@ const SettingsApp = {
     },
 
     renderAbout(container) {
+        container.className = 'settings-content settings-about';
+
         const section = this.createSection(t('settings.about-title'));
-        
-        // 使用 FluentUI.List 显示关于信息
+        const aboutLogo = (State?.settings?.theme === 'dark')
+            ? 'Theme/Icon/Fluent_logo_dark.png'
+            : 'Theme/Icon/Fluent_logo.png';
+
+        const heroCard = document.createElement('div');
+        heroCard.className = 'fluent-setting-item settings-about-hero-card';
+        heroCard.innerHTML = `
+            <div class="settings-about-logo-wrap">
+                <img src="${aboutLogo}" alt="FluentOS">
+            </div>
+            <div class="settings-about-hero-text">
+                <div class="settings-about-hero-name">FluentOS</div>
+            </div>
+        `;
+        section.appendChild(heroCard);
+
+        const projectUrl = 'https://github.com/YoYoPAN1115/FluentOS-On-Web';
+        const metaCard = document.createElement('div');
+        metaCard.className = 'fluent-setting-item settings-about-meta-card';
+        metaCard.innerHTML = `
+            <div class="settings-about-meta-row">
+                <div class="settings-about-meta-label">${t('settings.about.project-url')}</div>
+                <a class="settings-about-meta-link" href="${projectUrl}" target="_blank" rel="noopener noreferrer">${projectUrl}</a>
+            </div>
+        `;
+        section.appendChild(metaCard);
+
         const list = FluentUI.List({
             items: [
                 { id: 'version', title: t('settings.version'), description: '1.0.0 MVP', icon: 'Information Circle' },
