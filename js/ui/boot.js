@@ -273,10 +273,12 @@ const BootScreen = {
             'Theme/Profile_img/UserAva.png',
             ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
         ];
+        const normalizedUserAvatar = (typeof State !== 'undefined' && typeof State.normalizeUserAvatar === 'function')
+            ? State.normalizeUserAvatar(settings.userAvatar)
+            : (settings.userAvatar || 'Theme/Profile_img/UserAva.png');
         const avatars = this._uniqAssets([
-            settings.userAvatar || 'Theme/Profile_img/UserAva.png',
-            ...profileAvatarDefaults,
-            'Theme/Icon/UserAva.png'
+            normalizedUserAvatar || 'Theme/Profile_img/UserAva.png',
+            ...profileAvatarDefaults
         ]);
 
         const staticIcons = [

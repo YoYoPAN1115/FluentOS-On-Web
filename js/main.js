@@ -684,6 +684,275 @@ if (window.performance && window.performance.timing) {
 /**
  * 导出全局API（供调试和扩展使用）
  */
+const ResourceMonitor = {
+    _running: false,
+    _observer: null,
+    _errorHandler: null,
+    _records: [],
+    _seen: new Set(),
+    _nextId: 1,
+    _maxRecords: 800,
+    _liveConsole: false,
+
+    isRunning() {
+        return this._running;
+    },
+
+    _roundNumber(value, digits = 1) {
+        if (!Number.isFinite(value)) return null;
+        const fixed = Number(value.toFixed(digits));
+        return Number.isFinite(fixed) ? fixed : null;
+    },
+
+    _normalizeResourceMeta(input) {
+        if (!input || typeof input !== 'string') {
+            return { file: '', scope: 'unknown', origin: '' };
+        }
+
+        const raw = input.trim();
+        if (!raw) {
+            return { file: '', scope: 'unknown', origin: '' };
+        }
+        if (raw.startsWith('data:')) {
+            return { file: '[data-url]', scope: 'inline', origin: 'data:' };
+        }
+
+        try {
+            const url = new URL(raw, window.location.href);
+            const isLocal = url.origin === window.location.origin;
+            const file = isLocal
+                ? `${decodeURIComponent(url.pathname.replace(/^\//, ''))}${url.search || ''}`
+                : url.href;
+            return { file, scope: isLocal ? 'local' : 'remote', origin: url.origin };
+        } catch (_) {
+            const cleaned = raw.replace(/^\.\//, '').replace(/^\//, '');
+            return { file: cleaned, scope: 'local', origin: window.location.origin };
+        }
+    },
+
+    _guessType(path, fallbackType = 'other') {
+        const fallback = String(fallbackType || 'other').trim() || 'other';
+        const clean = String(path || '').split('?')[0].toLowerCase();
+        if (!clean) return fallback;
+        if (clean.endsWith('.js') || clean.endsWith('.mjs')) return 'script';
+        if (clean.endsWith('.css')) return 'style';
+        if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|ico|avif)$/.test(clean)) return 'image';
+        if (/\.(woff|woff2|ttf|otf|eot)$/.test(clean)) return 'font';
+        if (/\.(mp4|webm|mp3|wav|ogg)$/.test(clean)) return 'media';
+        if (/\.(json|xml|txt|csv)$/.test(clean)) return 'data';
+        return fallback;
+    },
+
+    _pushRecord(entry) {
+        const record = {
+            id: this._nextId++,
+            time: new Date().toISOString(),
+            result: entry.result || 'loaded',
+            scope: entry.scope || 'unknown',
+            type: entry.type || 'other',
+            file: entry.file || '',
+            durationMs: entry.durationMs ?? null,
+            sizeBytes: entry.sizeBytes ?? null,
+            source: entry.source || 'unknown'
+        };
+
+        this._records.push(record);
+        if (this._records.length > this._maxRecords) {
+            this._records.splice(0, this._records.length - this._maxRecords);
+        }
+
+        if (this._liveConsole) {
+            const zhState = record.result === 'failed' ? '\u5931\u8d25' : '\u6210\u529f';
+            const enState = record.result === 'failed' ? 'FAILED' : 'LOADED';
+            console.log(
+                `[ResourceMonitor] ${zhState}/${enState} | ${record.type} | ${record.scope} | ${record.file}`
+            );
+        }
+
+        return record;
+    },
+
+    _ingestPerformanceEntry(entry) {
+        if (!entry || entry.entryType !== 'resource') return;
+
+        const meta = this._normalizeResourceMeta(entry.name || '');
+        if (!meta.file) return;
+
+        const key = `${this._roundNumber(entry.startTime, 1)}|${entry.initiatorType || ''}|${meta.file}`;
+        if (this._seen.has(key)) return;
+        this._seen.add(key);
+
+        const initiatorType = String(entry.initiatorType || '').trim();
+        const transferSize = Number.isFinite(entry.transferSize) ? entry.transferSize : null;
+        const encodedBodySize = Number.isFinite(entry.encodedBodySize) ? entry.encodedBodySize : null;
+
+        this._pushRecord({
+            result: 'loaded',
+            scope: meta.scope,
+            type: this._guessType(meta.file, initiatorType || 'resource'),
+            file: meta.file,
+            durationMs: this._roundNumber(entry.duration, 1),
+            sizeBytes: transferSize ?? encodedBodySize,
+            source: 'performance'
+        });
+    },
+
+    _handleResourceError(event) {
+        const target = event && event.target;
+        if (!target || target === window || target === document) return;
+
+        const url = target.currentSrc || target.src || target.href;
+        if (!url || typeof url !== 'string') return;
+
+        const meta = this._normalizeResourceMeta(url);
+        if (!meta.file) return;
+
+        const tagName = String(target.tagName || '').toLowerCase();
+        this._pushRecord({
+            result: 'failed',
+            scope: meta.scope,
+            type: this._guessType(meta.file, tagName || 'resource'),
+            file: meta.file,
+            durationMs: null,
+            sizeBytes: null,
+            source: `error:${tagName || 'element'}`
+        });
+    },
+
+    _observePerformanceResources() {
+        if (typeof PerformanceObserver === 'undefined') return;
+        this._observer = new PerformanceObserver((list) => {
+            list.getEntries().forEach((entry) => this._ingestPerformanceEntry(entry));
+        });
+
+        try {
+            this._observer.observe({ type: 'resource', buffered: true });
+        } catch (_) {
+            try {
+                this._observer.observe({ entryTypes: ['resource'] });
+            } catch (_) {
+                this._observer = null;
+            }
+        }
+    },
+
+    _captureBufferedResources() {
+        if (!window.performance || typeof performance.getEntriesByType !== 'function') return;
+        performance.getEntriesByType('resource').forEach((entry) => this._ingestPerformanceEntry(entry));
+    },
+
+    start(options = {}) {
+        const nextMax = Number(options.maxRecords);
+        if (Number.isFinite(nextMax) && nextMax > 0) {
+            this._maxRecords = Math.floor(nextMax);
+        }
+        this._liveConsole = options.liveConsole === true;
+
+        if (this._running) return true;
+        this._running = true;
+
+        this._captureBufferedResources();
+        this._observePerformanceResources();
+
+        this._errorHandler = (event) => this._handleResourceError(event);
+        window.addEventListener('error', this._errorHandler, true);
+        return true;
+    },
+
+    stop() {
+        if (!this._running) return false;
+        this._running = false;
+
+        if (this._observer) {
+            this._observer.disconnect();
+            this._observer = null;
+        }
+        if (this._errorHandler) {
+            window.removeEventListener('error', this._errorHandler, true);
+            this._errorHandler = null;
+        }
+        return true;
+    },
+
+    clear() {
+        this._records = [];
+        this._seen.clear();
+        this._nextId = 1;
+    },
+
+    list(options = {}) {
+        if (!this._running) {
+            this.start({ liveConsole: false });
+        }
+
+        const failedOnly = options.failedOnly === true;
+        const scope = options.scope ? String(options.scope).toLowerCase() : '';
+        const type = options.type ? String(options.type).toLowerCase() : '';
+        const limit = Number(options.limit);
+
+        let rows = this._records.slice();
+        if (failedOnly) rows = rows.filter((item) => item.result === 'failed');
+        if (scope) rows = rows.filter((item) => String(item.scope).toLowerCase() === scope);
+        if (type) rows = rows.filter((item) => String(item.type).toLowerCase() === type);
+
+        if (Number.isFinite(limit) && limit > 0) {
+            rows = rows.slice(-Math.floor(limit));
+        }
+        return rows;
+    },
+
+    table(options = {}) {
+        const rows = this.list(options).map((item) => ({
+            id: item.id,
+            time: item.time,
+            result: item.result,
+            scope: item.scope,
+            type: item.type,
+            file: item.file,
+            durationMs: item.durationMs,
+            sizeBytes: item.sizeBytes,
+            source: item.source
+        }));
+
+        if (rows.length) {
+            console.table(rows);
+        } else {
+            console.log('[ResourceMonitor] \u6682\u65e0\u8d44\u6e90\u8bb0\u5f55 / No resource records.');
+        }
+        return rows;
+    },
+
+    summary() {
+        if (!this._running) {
+            this.start({ liveConsole: false });
+        }
+
+        const rows = this._records;
+        const loaded = rows.filter((item) => item.result === 'loaded').length;
+        const failed = rows.filter((item) => item.result === 'failed').length;
+        const local = rows.filter((item) => item.scope === 'local').length;
+        const remote = rows.filter((item) => item.scope === 'remote').length;
+        const inline = rows.filter((item) => item.scope === 'inline').length;
+        const byType = rows.reduce((acc, item) => {
+            const key = item.type || 'other';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+
+        const summary = {
+            total: rows.length,
+            loaded,
+            failed,
+            local,
+            remote,
+            inline,
+            byType
+        };
+        console.log('[ResourceMonitor] \u8d44\u6e90\u6c47\u603b / Resource summary:', summary);
+        return summary;
+    }
+};
+
 window.FluentOS = {
     version: '1.0.0',
     State,
@@ -726,7 +995,16 @@ window.FluentOS = {
             return data;
         },
         getState: () => State,
-        getWindows: () => WindowManager.windows
+        getWindows: () => WindowManager.windows,
+        resources: {
+            start: (options = {}) => ResourceMonitor.start(options),
+            stop: () => ResourceMonitor.stop(),
+            clear: () => ResourceMonitor.clear(),
+            list: (options = {}) => ResourceMonitor.list(options),
+            table: (options = {}) => ResourceMonitor.table(options),
+            summary: () => ResourceMonitor.summary(),
+            isRunning: () => ResourceMonitor.isRunning()
+        }
     }
 };
 

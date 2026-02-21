@@ -92,6 +92,72 @@ const State = {
         Storage.set(Storage.keys.FS, this.fs);
     },
 
+    getDefaultUserAvatar() {
+        return 'Theme/Profile_img/UserAva.png';
+    },
+
+    getBuiltInUserAvatars() {
+        return [
+            this.getDefaultUserAvatar(),
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
+        ];
+    },
+
+    normalizeUserAvatar(value) {
+        const fallback = this.getDefaultUserAvatar();
+        if (typeof value !== 'string') return fallback;
+
+        const raw = value.trim();
+        if (!raw) return fallback;
+        if (/^data:image\//i.test(raw)) return raw;
+
+        let normalized = raw.replace(/\\/g, '/');
+        if (/^https?:\/\//i.test(normalized)) {
+            try {
+                const url = new URL(normalized, window.location.href);
+                if (url.origin !== window.location.origin) return fallback;
+                normalized = decodeURIComponent(url.pathname.replace(/^\//, ''));
+            } catch (_) {
+                return fallback;
+            }
+        }
+
+        normalized = normalized.replace(/^\.\//, '').replace(/^\//, '');
+        const lower = normalized.toLowerCase();
+
+        if (
+            lower === 'userava.png'
+            || lower === 'theme/icon/userava.png'
+            || lower === 'icon/userava.png'
+            || lower === 'profile_img/userava.png'
+            || lower === 'theme/profile_img/userava.png'
+        ) {
+            return fallback;
+        }
+
+        const builtIn = this.getBuiltInUserAvatars();
+        const exact = builtIn.find((item) => item.toLowerCase() === lower);
+        if (exact) return exact;
+
+        const profileMatch = lower.match(/^(?:theme\/)?profile_img\/(\d+)\.jpg$/);
+        if (profileMatch) {
+            const index = Number(profileMatch[1]);
+            if (index >= 1 && index <= 10) {
+                return `Theme/Profile_img/${index}.jpg`;
+            }
+        }
+
+        const plainMatch = lower.match(/^(\d+)\.jpg$/);
+        if (plainMatch) {
+            const index = Number(plainMatch[1]);
+            if (index >= 1 && index <= 10) {
+                return `Theme/Profile_img/${index}.jpg`;
+            }
+        }
+
+        return fallback;
+    },
+
     ensureSettingsDefaults() {
         this.settings = this.settings || {};
         let changed = false;
@@ -107,7 +173,7 @@ const State = {
             autoEnterFullscreen: true,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
-            userAvatar: 'Theme/Profile_img/UserAva.png',
+            userAvatar: this.getDefaultUserAvatar(),
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowBoundsMemory: {}
@@ -128,6 +194,12 @@ const State = {
             } else {
                 this.settings.fingoApiStorageType = 'none';
             }
+            changed = true;
+        }
+
+        const normalizedUserAvatar = this.normalizeUserAvatar(this.settings.userAvatar);
+        if (normalizedUserAvatar !== this.settings.userAvatar) {
+            this.settings.userAvatar = normalizedUserAvatar;
             changed = true;
         }
 
@@ -160,30 +232,35 @@ const State = {
 
     // 更新设置
     updateSettings(updates) {
-        this.settings = { ...this.settings, ...updates };
+        const safeUpdates = { ...(updates || {}) };
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'userAvatar')) {
+            safeUpdates.userAvatar = this.normalizeUserAvatar(safeUpdates.userAvatar);
+        }
+
+        this.settings = { ...this.settings, ...safeUpdates };
         Storage.set(Storage.keys.SETTINGS, this.settings);
-        this.emit('settingsChange', updates);
+        this.emit('settingsChange', safeUpdates);
         
         // 应用相关设置
-        if (updates.theme !== undefined) {
+        if (safeUpdates.theme !== undefined) {
             this.applyTheme();
         }
-        if (updates.enableAnimation !== undefined) {
+        if (safeUpdates.enableAnimation !== undefined) {
             this.applyAnimationSetting();
         }
-        if (updates.enableBlur !== undefined) {
+        if (safeUpdates.enableBlur !== undefined) {
             this.applyBlurSetting();
         }
-        if (updates.brightness !== undefined) {
+        if (safeUpdates.brightness !== undefined) {
             this.applyBrightness();
         }
-        if (updates.enableWindowBlur !== undefined) {
+        if (safeUpdates.enableWindowBlur !== undefined) {
             this.applyWindowBlurSetting();
         }
-        if (updates.enableFluentV2 !== undefined) {
+        if (safeUpdates.enableFluentV2 !== undefined) {
             this.applyFluentV2Setting();
         }
-        if (updates.strictCspEnabled !== undefined) {
+        if (safeUpdates.strictCspEnabled !== undefined) {
             this.applyStrictCspSetting();
         }
     },
