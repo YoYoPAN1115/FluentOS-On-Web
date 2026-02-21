@@ -263,19 +263,10 @@ const Fingo = {
     },
 
     saveApiKeyPermanentPlain(apiKey) {
-        const clean = (apiKey || '').trim();
-        if (!clean) {
-            this.clearApiKey();
-            return false;
-        }
-        this._sessionApiKey = clean;
-        State.updateSettings({
-            fingoApiKey: clean,
-            fingoApiEncrypted: null,
-            fingoApiStorageType: 'permanent-plain'
-        });
-        State.emit('fingoApiKeyReady', { storageType: 'permanent-plain', decrypted: true });
-        return true;
+        // Security hardening: permanently storing API keys in plain text is disabled.
+        throw new Error(this.lang() === 'zh'
+            ? '出于安全原因，已禁用永久明文保存 API Key。'
+            : 'Permanent plain-text API key storage is disabled for security reasons.');
     },
 
     clearApiKey() {
@@ -364,8 +355,8 @@ const Fingo = {
             this.clearApiKey();
             return false;
         }
-        if (!passphrase || passphrase.length < 6) {
-            throw new Error(this.lang() === 'zh' ? '口令至少 6 位。' : 'Passphrase must be at least 6 characters.');
+        if (!passphrase || passphrase.length < 8) {
+            throw new Error(this.lang() === 'zh' ? '口令至少 8 位。' : 'Passphrase must be at least 8 characters.');
         }
         const encrypted = await this._encryptApiKey(clean, passphrase);
         this._sessionApiKey = clean;
@@ -398,10 +389,9 @@ const Fingo = {
         const sessionKey = (this._sessionApiKey || '').trim();
         if (sessionKey) return sessionKey;
 
-        const plainKey = (State.settings.fingoApiKey || '').trim();
-        if (plainKey) {
-            this._sessionApiKey = plainKey;
-            return plainKey;
+        // Legacy cleanup: plain-text permanent keys are no longer supported.
+        if ((State.settings.fingoApiKey || '').trim()) {
+            State.updateSettings({ fingoApiKey: '', fingoApiStorageType: 'none' });
         }
 
         const encryptedPayload = State.settings.fingoApiEncrypted;
@@ -1003,17 +993,20 @@ const Fingo = {
             }
         }
 
-        // 强制本地模式：禁用云端 API 路径
+        // Custom mode: use selected cloud API provider.
         if (State.settings.fingoCustomMode) {
-            if (typeof State.updateSettings === 'function') {
-                State.updateSettings({ fingoCustomMode: false });
-            } else {
-                State.settings.fingoCustomMode = false;
+            const apiKey = typeof this.getApiKeyForRequest === 'function'
+                ? await this.getApiKeyForRequest()
+                : null;
+            if (!apiKey) {
+                const msg = this.lang() === 'zh'
+                    ? 'API 错误，请检查 API Key 是否正确。请先在 Fingo AI 设置中填写有效 Key。'
+                    : 'API error, please check your API Key. Set a valid key in Fingo AI settings first.';
+                setTimeout(() => this.addMessage(msg, 'bot'), 260);
+                return;
             }
-            const msg = this.lang() === 'zh'
-                ? '当前版本仅支持浏览器本地模式，已自动关闭云端 API 模式。'
-                : 'This build runs in local browser mode only. Cloud API mode has been turned off.';
-            setTimeout(() => this.addMessage(msg, 'bot'), 260);
+            await this._callApi(text, apiKey);
+            return;
         }
 
         // 处理待确认操作

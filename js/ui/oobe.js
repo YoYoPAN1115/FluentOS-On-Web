@@ -1226,11 +1226,12 @@ const OOBE = {
         this.tempFingoPendingAction = null;
 
         if (enableCustom) {
-            const enableWithSecurity = () => {
+            const enableWithSecurity = (enableStrictCsp) => {
                 this.selectedFingoMode = 'custom';
                 if (State && typeof State.updateSettings === 'function') {
+                    const currentStrict = State?.settings?.strictCspEnabled === true;
                     State.updateSettings({
-                        strictCspEnabled: true,
+                        strictCspEnabled: enableStrictCsp === true || currentStrict,
                         fingoCustomMode: true
                     });
                 }
@@ -1245,44 +1246,15 @@ const OOBE = {
                 }
                 this._renderFingoSettingsPanel();
             };
-
-            if (State?.settings?.strictCspEnabled !== true) {
-                const title = this._fingoText(
-                    'settings.strict-csp-required-title',
-                    '需要先启用禁用内联脚本',
-                    'Enable Inline Script Blocking First'
-                );
-                const content = this._fingoText(
-                    'settings.strict-csp-required-content',
-                    '开启 API 自定义前，将自动启用「禁用内联脚本」增强安全性。点击确定继续。',
-                    'Before enabling custom API mode, "Disable Inline Scripts" will be turned on automatically for better security. Confirm to continue.'
-                );
-                if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Dialog === 'function') {
-                    FluentUI.Dialog({
-                        type: 'warning',
-                        title,
-                        content,
-                        buttons: [
-                            { text: this._fingoText('cancel', '取消', 'Cancel'), variant: 'secondary', value: 'cancel' },
-                            { text: this._fingoText('ok', '确定', 'OK'), variant: 'primary', value: 'confirm' }
-                        ],
-                        onClose: (result) => {
-                            if (result === 'confirm') {
-                                enableWithSecurity();
-                            } else {
-                                keepDisabled();
-                            }
-                        }
-                    });
-                } else if (window.confirm(content)) {
-                    enableWithSecurity();
-                } else {
+            this._showOobeFingoCustomRiskDialog().then((accepted) => {
+                if (!accepted) {
                     keepDisabled();
+                    return;
                 }
-                return;
-            }
-
-            enableWithSecurity();
+                this._showOobeStrictCspChoiceDialog().then((enableStrictCsp) => {
+                    enableWithSecurity(enableStrictCsp);
+                });
+            });
             return;
         }
 
@@ -1303,6 +1275,103 @@ const OOBE = {
         } else {
             finishDisable();
         }
+    },
+
+    _showOobeFingoCustomRiskDialog() {
+        return new Promise((resolve) => {
+            if (typeof FluentUI === 'undefined' || !FluentUI || typeof FluentUI.Dialog !== 'function') {
+                resolve(false);
+                return;
+            }
+
+            let timer = null;
+            const dialogRef = FluentUI.Dialog({
+                type: 'warning',
+                title: this._fingoText(
+                    'settings.fingo-custom-risk-title',
+                    '启用自定义 API 模式风险提示',
+                    'Custom API Mode Risk Notice'
+                ),
+                content: `<div class="fingo-custom-risk-content">${this._fingoText(
+                    'settings.fingo-custom-risk-content',
+                    '你正在启用自定义 API 模式。该模式会把请求发送到第三方服务，可能产生费用与数据外发风险。<br><br>建议：<br>1. 为 API 设置额度上限与告警。<br>2. 优先使用临时 Key 或低权限 Key，并定期轮换。<br>3. 不要在共享设备长期保存 Key。<br><br>Fluent Studio 仅提供本地工具，不托管第三方 API 服务，不对因密钥泄露、额度超支、账号封禁或第三方服务异常导致的损失承担责任。继续即表示你已理解并自行承担相关风险。',
+                    'You are enabling custom API mode. Requests will be sent to third-party services, which may cause billing and data exposure risks.<br><br>Recommendations:<br>1. Set API budget limits and alerts.<br>2. Prefer temporary or low-privilege keys and rotate them regularly.<br>3. Avoid keeping keys on shared devices.<br><br>Fluent Studio only provides local tooling and does not host third-party API services. Fluent Studio is not responsible for losses caused by key leakage, quota overrun, account restrictions, or third-party service failures. Continuing means you understand and accept these risks.'
+                )}</div>`,
+                closeOnOverlay: false,
+                buttons: [
+                    { text: this._fingoText('cancel', '取消', 'Cancel'), variant: 'secondary', value: 'cancel' },
+                    { text: this._fingoText('settings.fingo-custom-risk-ack', '我已知晓', 'I Understand'), variant: 'primary', value: 'confirm' }
+                ],
+                onClose: (result) => {
+                    if (timer) clearInterval(timer);
+                    resolve(result === 'confirm');
+                }
+            });
+
+            const buttons = dialogRef?.dialog?.querySelectorAll('.fluent-dialog-footer .fluent-btn');
+            const confirmBtn = buttons && buttons.length ? buttons[buttons.length - 1] : null;
+            if (!confirmBtn) return;
+
+            const textEl = confirmBtn.querySelector('.fluent-btn-text');
+            const setConfirmText = (txt) => {
+                if (textEl) textEl.textContent = txt;
+                else confirmBtn.textContent = txt;
+            };
+
+            let remaining = 10;
+            confirmBtn.disabled = true;
+            setConfirmText(this._fingoText(
+                'settings.fingo-custom-risk-ack-countdown',
+                '我已知晓（{seconds}s）',
+                'I Understand ({seconds}s)'
+            ).replace('{seconds}', remaining));
+
+            timer = setInterval(() => {
+                remaining -= 1;
+                if (remaining > 0) {
+                    setConfirmText(this._fingoText(
+                        'settings.fingo-custom-risk-ack-countdown',
+                        '我已知晓（{seconds}s）',
+                        'I Understand ({seconds}s)'
+                    ).replace('{seconds}', remaining));
+                    return;
+                }
+                clearInterval(timer);
+                confirmBtn.disabled = false;
+                setConfirmText(this._fingoText('settings.fingo-custom-risk-ack', '我已知晓', 'I Understand'));
+            }, 1000);
+        });
+    },
+
+    _showOobeStrictCspChoiceDialog() {
+        return new Promise((resolve) => {
+            if (typeof FluentUI === 'undefined' || !FluentUI || typeof FluentUI.Dialog !== 'function') {
+                resolve(false);
+                return;
+            }
+
+            FluentUI.Dialog({
+                type: 'warning',
+                title: this._fingoText(
+                    'settings.strict-csp-optin-title',
+                    '开启禁用内联脚本',
+                    'Enable Inline Script Blocking'
+                ),
+                content: `<div class="fingo-custom-risk-content">${this._fingoText(
+                    'settings.strict-csp-optin-content',
+                    '是否同时开启「禁用内联脚本」？开启后会启用真实 CSP，可进一步增强 API Key 安全性。',
+                    'Do you want to enable "Disable Inline Scripts" too? This will enable real CSP and further improve API key security.'
+                )}</div>`,
+                closeOnOverlay: false,
+                buttons: [
+                    { text: this._fingoText('settings.strict-csp-optin-skip', '暂不开启', 'Not Now'), variant: 'secondary', value: 'skip' },
+                    { text: this._fingoText('settings.strict-csp-optin-enable', '立即开启', 'Enable Now'), variant: 'primary', value: 'enable' }
+                ],
+                onClose: (result) => {
+                    resolve(result === 'enable');
+                }
+            });
+        });
     },
 
     _renderOobeFingoCustomOptions() {
@@ -1368,8 +1437,8 @@ const OOBE = {
             : '';
         const encryptedLocked = currentStorageType === 'permanent-encrypted' && !sessionKey;
         const uiKeyValue = (typeof Fingo !== 'undefined' && typeof Fingo.getSessionApiKey === 'function')
-            ? (Fingo.getSessionApiKey() || (State?.settings?.fingoApiStorageType === 'permanent-plain' ? (State?.settings?.fingoApiKey || '') : ''))
-            : (State?.settings?.fingoApiStorageType === 'permanent-plain' ? (State?.settings?.fingoApiKey || '') : '');
+            ? (Fingo.getSessionApiKey() || '')
+            : '';
 
         const keyInput = FluentUI.Input({
             type: 'password',
@@ -1483,10 +1552,10 @@ const OOBE = {
         return new Promise((resolve) => {
             FluentUI.InputDialog({
                 title: this._fingoText('settings.fingo-encrypt-passphrase-title', 'Set Encryption Passphrase', 'Set Encryption Passphrase'),
-                placeholder: this._fingoText('settings.fingo-encrypt-passphrase-placeholder', 'At least 6 characters', 'At least 6 characters'),
+                placeholder: this._fingoText('settings.fingo-encrypt-passphrase-placeholder', 'At least 8 characters', 'At least 8 characters'),
                 inputType: 'password',
-                minLength: 6,
-                validateFn: (value) => value.length >= 6 || this._fingoText('settings.fingo-encrypt-passphrase-error', 'Passphrase must be at least 6 characters.', 'Passphrase must be at least 6 characters.'),
+                minLength: 8,
+                validateFn: (value) => value.length >= 8 || this._fingoText('settings.fingo-encrypt-passphrase-error', 'Passphrase must be at least 8 characters.', 'Passphrase must be at least 8 characters.'),
                 confirmText: this._fingoText('ok', 'OK', 'OK'),
                 cancelText: this._fingoText('cancel', 'Cancel', 'Cancel'),
                 onConfirm: (passphrase) => resolve(passphrase),
@@ -1499,28 +1568,12 @@ const OOBE = {
         FluentUI.Dialog({
             type: 'warning',
             title: this._fingoText('settings.fingo-perm-save-title', 'Save API Key Permanently', 'Save API Key Permanently'),
-            content: this._fingoText('settings.fingo-perm-save-content', 'Permanent API Key storage carries risks. Encrypted storage is recommended.', 'Permanent API Key storage carries risks. Encrypted storage is recommended.'),
+            content: this._fingoText('settings.fingo-perm-save-content', 'Permanent API Key storage is risky. Only WebCrypto-encrypted storage is allowed now.', 'Permanent API Key storage is risky. Only WebCrypto-encrypted storage is allowed now.'),
             buttons: [
                 { text: this._fingoText('cancel', 'Cancel', 'Cancel'), variant: 'secondary', value: 'cancel' },
-                { text: this._fingoText('settings.fingo-perm-save-plain', 'Save as Plain Text', 'Save as Plain Text'), variant: 'danger', value: 'plain' },
                 { text: this._fingoText('settings.fingo-perm-save-encrypted', 'Use WebCrypto Encryption', 'Use WebCrypto Encryption'), variant: 'primary', value: 'encrypted' }
             ],
             onClose: async (result) => {
-                if (result === 'plain') {
-                    if (typeof Fingo !== 'undefined' && typeof Fingo.saveApiKeyPermanentPlain === 'function') {
-                        Fingo.saveApiKeyPermanentPlain(apiKey);
-                    } else if (State && typeof State.updateSettings === 'function') {
-                        State.updateSettings({ fingoApiKey: apiKey, fingoApiEncrypted: null, fingoApiStorageType: 'permanent-plain' });
-                    }
-                    FluentUI.Toast({
-                        title: this._fingoText('settings.fingo', 'Fingo AI', 'Fingo AI'),
-                        message: this._fingoText('settings.fingo-perm-plain-saved', 'API Key saved permanently as plain text.', 'API Key saved permanently as plain text.'),
-                        type: 'warning'
-                    });
-                    this._renderFingoSettingsPanel();
-                    return;
-                }
-
                 if (result !== 'encrypted') return;
 
                 const passphrase = await this._promptOobeFingoEncryptPassphrase();
@@ -1674,12 +1727,6 @@ const OOBE = {
 
         const useCustomApi = this.selectedFingoMode === 'custom' || State?.settings?.fingoCustomMode === true;
         if (useCustomApi && typeof Fingo !== 'undefined' && Fingo) {
-            if (State?.settings?.strictCspEnabled !== true) {
-                return this._langCode() === 'zh'
-                    ? '启用自定义 API 前，请先开启「禁用内联脚本」。'
-                    : 'Enable "Disable Inline Scripts" before using custom API mode.';
-            }
-
             try {
                 const apiKey = typeof Fingo.getApiKeyForRequest === 'function'
                     ? await Fingo.getApiKeyForRequest()
@@ -1691,6 +1738,7 @@ const OOBE = {
                 }
 
                 if (typeof Fingo.requestCustomApiReply === 'function') {
+                    const provider = State?.settings?.fingoProvider || 'openai';
                     const history = this._collectTempFingoHistory(8);
                     if (history.length > 0) {
                         const last = history[history.length - 1];
@@ -1699,6 +1747,7 @@ const OOBE = {
                         }
                     }
                     const reply = await Fingo.requestCustomApiReply(text, apiKey, {
+                        provider,
                         history,
                         lang: this._langCode()
                     });

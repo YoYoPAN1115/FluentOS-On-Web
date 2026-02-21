@@ -38,6 +38,7 @@ const State = {
         this.desktopLayout = Storage.get(Storage.keys.DESKTOP_LAYOUT);
         this.notifications = Storage.get(Storage.keys.NOTIFICATIONS) || [];
         this.ensureSettingsDefaults();
+        this.restoreStrictCspOnStartup();
         
         // 校验并修复文件系统完整性（防止关键目录缺失）
         this.ensureFSIntegrity();
@@ -164,7 +165,9 @@ const State = {
 
         const defaults = {
             strictCspEnabled: false,
+            strictCspLastEnabled: false,
             fingoCustomMode: false,
+            fingoCustomLastEnabled: false,
             fingoProvider: 'openai',
             fingoApiKey: '',
             fingoApiEncrypted: null,
@@ -186,12 +189,31 @@ const State = {
             }
         });
 
+        // Migration: remember prior "enabled" state for startup auto-restore.
+        if (this.settings.strictCspEnabled === true && this.settings.strictCspLastEnabled !== true) {
+            this.settings.strictCspLastEnabled = true;
+            changed = true;
+        }
+
+        // Migration: preserve prior custom mode preference for startup restoration.
+        if (this.settings.fingoCustomMode === true && this.settings.fingoCustomLastEnabled !== true) {
+            this.settings.fingoCustomLastEnabled = true;
+            changed = true;
+        }
+
         if (!this.settings.fingoApiStorageType) {
             if (this.settings.fingoApiEncrypted && this.settings.fingoApiEncrypted.ciphertext) {
                 this.settings.fingoApiStorageType = 'permanent-encrypted';
-            } else if (this.settings.fingoApiKey) {
-                this.settings.fingoApiStorageType = 'permanent-plain';
             } else {
+                this.settings.fingoApiStorageType = 'none';
+            }
+            changed = true;
+        }
+
+        if ((this.settings.fingoApiKey || '').trim()) {
+            // Security hardening: plain-text permanent API key storage is no longer supported.
+            this.settings.fingoApiKey = '';
+            if (this.settings.fingoApiStorageType === 'permanent-plain') {
                 this.settings.fingoApiStorageType = 'none';
             }
             changed = true;
@@ -200,6 +222,30 @@ const State = {
         const normalizedUserAvatar = this.normalizeUserAvatar(this.settings.userAvatar);
         if (normalizedUserAvatar !== this.settings.userAvatar) {
             this.settings.userAvatar = normalizedUserAvatar;
+            changed = true;
+        }
+
+        if (changed) {
+            Storage.set(Storage.keys.SETTINGS, this.settings);
+        }
+    },
+
+    restoreStrictCspOnStartup() {
+        if (!this.settings) return;
+        let changed = false;
+
+        if (this.settings.strictCspEnabled !== true && this.settings.strictCspLastEnabled === true) {
+            this.settings.strictCspEnabled = true;
+            changed = true;
+        }
+
+        // If strict CSP is restored, restore last custom-mode preference too.
+        if (
+            this.settings.strictCspEnabled === true
+            && this.settings.fingoCustomMode !== true
+            && this.settings.fingoCustomLastEnabled === true
+        ) {
+            this.settings.fingoCustomMode = true;
             changed = true;
         }
 
@@ -233,13 +279,44 @@ const State = {
     // 更新设置
     updateSettings(updates) {
         const safeUpdates = { ...(updates || {}) };
+        const turningOffCustomMode = safeUpdates.fingoCustomMode === false
+            && this.settings
+            && this.settings.fingoCustomMode === true;
         if (Object.prototype.hasOwnProperty.call(safeUpdates, 'userAvatar')) {
             safeUpdates.userAvatar = this.normalizeUserAvatar(safeUpdates.userAvatar);
+        }
+        if (safeUpdates.strictCspEnabled === true) {
+            safeUpdates.strictCspLastEnabled = true;
+        } else if (safeUpdates.strictCspEnabled === false) {
+            // User explicitly disabled: keep it permanently off.
+            safeUpdates.strictCspLastEnabled = false;
+        }
+        if (safeUpdates.fingoCustomMode === true) {
+            if (!Object.prototype.hasOwnProperty.call(safeUpdates, 'fingoCustomLastEnabled')) {
+                safeUpdates.fingoCustomLastEnabled = true;
+            }
+        } else if (safeUpdates.fingoCustomMode === false) {
+            if (!Object.prototype.hasOwnProperty.call(safeUpdates, 'fingoCustomLastEnabled')) {
+                safeUpdates.fingoCustomLastEnabled = false;
+            }
+        }
+        if (turningOffCustomMode) {
+            // Security hardening: when custom mode is disabled, clear all API key material.
+            safeUpdates.fingoApiKey = '';
+            safeUpdates.fingoApiEncrypted = null;
+            safeUpdates.fingoApiStorageType = 'none';
         }
 
         this.settings = { ...this.settings, ...safeUpdates };
         Storage.set(Storage.keys.SETTINGS, this.settings);
         this.emit('settingsChange', safeUpdates);
+        if (turningOffCustomMode) {
+            if (typeof window !== 'undefined' && window.Fingo) {
+                window.Fingo._sessionApiKey = '';
+                window.Fingo._pendingDecryptPromise = null;
+            }
+            this.emit('fingoApiKeyReady', { storageType: 'none', decrypted: false });
+        }
         
         // 应用相关设置
         if (safeUpdates.theme !== undefined) {
@@ -341,6 +418,11 @@ const State = {
     applyStrictCspSetting() {
         const enabled = this.settings.strictCspEnabled === true;
         document.body.classList.toggle('strict-csp-enabled', enabled);
+        if (typeof window !== 'undefined' &&
+            window.RealCSP &&
+            typeof window.RealCSP.apply === 'function') {
+            window.RealCSP.apply(enabled);
+        }
         if (typeof window !== 'undefined' &&
             window.StrictScriptGuard &&
             typeof window.StrictScriptGuard.setEnabled === 'function') {

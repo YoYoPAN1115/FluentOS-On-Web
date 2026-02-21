@@ -181,8 +181,12 @@ const PhotosApp = {
                 <img src="Theme/Icon/Symbol_icon/stroke/Exclamation Circle.svg" alt="">
                 <h3>${t('photos.error-title')}</h3>
                 <p>${t('photos.error-desc')}</p>
-                <button class="photos-retry-btn" onclick="PhotosApp.fetchBingWallpapers()">${t('photos.retry')}</button>
+                <button class="photos-retry-btn">${t('photos.retry')}</button>
             </div>`;
+        const retryBtn = gallery.querySelector('.photos-retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.fetchBingWallpapers());
+        }
     },
 
     getGreeting() {
@@ -861,4 +865,3 @@ const PhotosApp = {
 };
 
 window.PhotosApp = PhotosApp;
-

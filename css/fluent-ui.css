@@ -1436,6 +1436,10 @@ body.fluent-v2 .calc-btn-equals {
     text-align: center;
 }
 
+.fluent-dialog-content .fingo-custom-risk-content {
+    text-align: left;
+}
+
 .fluent-dialog-footer {
     display: flex;
     justify-content: center;

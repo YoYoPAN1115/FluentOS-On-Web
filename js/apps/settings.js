@@ -29,6 +29,7 @@ const SettingsApp = {
     repairingApps: [],
     _fingoModeAnimating: false,
     _pendingFingoCustomEnter: false,
+    _fingoCustomRiskAcknowledgedForCsp: false,
     _avatarThumbCache: null,
     _avatarThumbBuildPromise: null,
     _avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
@@ -160,6 +161,20 @@ const SettingsApp = {
             .fluent-setting-item.highlight-fade { background: transparent !important; transition: background 0.5s ease; }
             .fluent-setting-item.highlight-soft-blue { background: rgba(111, 203, 255, 0.28) !important; transition: background 0.2s ease; }
             .fluent-setting-item.highlight-soft-blue-fade { background: transparent !important; transition: background 0.3s ease; }
+            body.fluent-v2 .fluent-setting-item.highlight-soft-blue {
+                background: rgba(98, 196, 255, 0.42) !important;
+                border-color: rgba(54, 142, 255, 0.62) !important;
+                box-shadow: 0 0 0 1px rgba(54, 142, 255, 0.32), 0 8px 22px rgba(54, 142, 255, 0.2) !important;
+                transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+            body.fluent-v2.dark-mode .fluent-setting-item.highlight-soft-blue {
+                background: rgba(84, 170, 255, 0.34) !important;
+                border-color: rgba(122, 196, 255, 0.7) !important;
+                box-shadow: 0 0 0 1px rgba(122, 196, 255, 0.42), 0 10px 24px rgba(39, 129, 255, 0.28) !important;
+            }
+            body.fluent-v2 .fluent-setting-item.highlight-soft-blue-fade {
+                transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+            }
 
             .settings-fingo-custom-options {
                 overflow: hidden;
@@ -2019,6 +2034,8 @@ const SettingsApp = {
                     const updates = { strictCspEnabled: v };
                     if (!v && State.settings.fingoCustomMode) {
                         updates.fingoCustomMode = false;
+                        // Keep last custom-mode preference so startup CSP restore can recover it.
+                        updates.fingoCustomLastEnabled = true;
                     }
                     State.updateSettings(updates);
                     this.addRecentSetting(t('settings.strict-csp'), v ? t('settings.on') : t('settings.off'), 'privacy');
@@ -2062,63 +2079,52 @@ const SettingsApp = {
                 checked: customEnabled,
                 onChange: (v) => {
                     if (this._fingoModeAnimating) return;
-                    if (v && State.settings.strictCspEnabled !== true) {
-                        const enableWithSecurity = () => {
-                            State.updateSettings({
-                                strictCspEnabled: true,
-                                fingoCustomMode: true
-                            });
-                            this.addRecentSetting(t('settings.strict-csp'), t('settings.on'), 'privacy');
-                            this.addRecentSetting(t('settings.fingo-custom'), t('settings.on'), 'fingo');
-                            State.addNotification({
-                                title: t('settings.privacy-title'),
-                                message: t('settings.strict-csp-on'),
-                                type: 'info'
-                            });
-                            this._pendingFingoCustomEnter = true;
-                            this.render();
-                        };
-
-                        const keepDisabled = () => {
-                            this.render();
-                        };
-
-                        if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Dialog === 'function') {
-                            FluentUI.Dialog({
-                                type: 'warning',
-                                title: t('settings.strict-csp-required-title'),
-                                content: t('settings.strict-csp-required-content'),
-                                buttons: [
-                                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
-                                    { text: t('ok'), variant: 'primary', value: 'confirm' }
-                                ],
-                                onClose: (result) => {
-                                    if (result === 'confirm') {
-                                        enableWithSecurity();
-                                    } else {
-                                        keepDisabled();
-                                    }
-                                }
-                            });
-                        } else if (window.confirm(t('settings.strict-csp-required-content'))) {
-                            enableWithSecurity();
-                        } else {
-                            keepDisabled();
-                        }
-                        return;
-                    }
-
-                    this.addRecentSetting(t('settings.fingo-custom'), v ? t('settings.on') : t('settings.off'), 'fingo');
-
                     if (v) {
-                        State.updateSettings({ fingoCustomMode: true });
-                        this._pendingFingoCustomEnter = true;
-                        this.render();
+                        const enableCustomMode = () => {
+                            State.updateSettings({ fingoCustomMode: true });
+                            this.addRecentSetting(t('settings.fingo-custom'), t('settings.on'), 'fingo');
+                            this._pendingFingoCustomEnter = true;
+                            this._fingoCustomRiskAcknowledgedForCsp = false;
+                            this.render();
+                        };
+
+                        const promptEnableCsp = () => {
+                            this._showFingoCustomRequireCspDialog().then((goEnableCsp) => {
+                                if (goEnableCsp) {
+                                    this._goPrivacyAndHighlightStrictCsp();
+                                    return;
+                                }
+                                this.render();
+                            });
+                        };
+
+                        const strictEnabled = State.settings.strictCspEnabled === true;
+                        if (this._fingoCustomRiskAcknowledgedForCsp) {
+                            if (strictEnabled) enableCustomMode();
+                            else promptEnableCsp();
+                            return;
+                        }
+
+                        this._showFingoCustomRiskDialog().then((accepted) => {
+                            if (!accepted) {
+                                this.render();
+                                return;
+                            }
+                            if (State.settings.strictCspEnabled !== true) {
+                                this._fingoCustomRiskAcknowledgedForCsp = true;
+                                promptEnableCsp();
+                                return;
+                            }
+                            enableCustomMode();
+                        });
                         return;
                     }
+
+                    this.addRecentSetting(t('settings.fingo-custom'), t('settings.off'), 'fingo');
 
                     const finishDisable = () => {
                         State.updateSettings({ fingoCustomMode: false });
+                        this._fingoCustomRiskAcknowledgedForCsp = false;
                         this.render();
                         this._fingoModeAnimating = false;
                     };
@@ -2185,8 +2191,8 @@ const SettingsApp = {
                 : '';
             const encryptedLocked = currentStorageType === 'permanent-encrypted' && !sessionKey;
             const uiKeyValue = (typeof Fingo !== 'undefined' && typeof Fingo.getSessionApiKey === 'function')
-                ? (Fingo.getSessionApiKey() || (State.settings.fingoApiStorageType === 'permanent-plain' ? (State.settings.fingoApiKey || '') : ''))
-                : (State.settings.fingoApiStorageType === 'permanent-plain' ? (State.settings.fingoApiKey || '') : '');
+                ? (Fingo.getSessionApiKey() || '')
+                : '';
             const keyInput = FluentUI.Input({
                 type: 'password',
                 placeholder: encryptedLocked ? t('settings.fingo-key-encrypted-placeholder') : t('settings.fingo-apikey-placeholder'),
@@ -2282,6 +2288,83 @@ const SettingsApp = {
         container.appendChild(aboutSection);
     },
 
+    _showFingoCustomRiskDialog() {
+        return new Promise((resolve) => {
+            if (typeof FluentUI === 'undefined' || !FluentUI || typeof FluentUI.Dialog !== 'function') {
+                resolve(false);
+                return;
+            }
+
+            let timer = null;
+            const dialogRef = FluentUI.Dialog({
+                type: 'warning',
+                title: t('settings.fingo-custom-risk-title'),
+                content: `<div class="fingo-custom-risk-content">${t('settings.fingo-custom-risk-content')}</div>`,
+                closeOnOverlay: false,
+                buttons: [
+                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                    { text: t('settings.fingo-custom-risk-ack'), variant: 'primary', value: 'confirm' }
+                ],
+                onClose: (result) => {
+                    if (timer) clearInterval(timer);
+                    resolve(result === 'confirm');
+                }
+            });
+
+            const buttons = dialogRef?.dialog?.querySelectorAll('.fluent-dialog-footer .fluent-btn');
+            const confirmBtn = buttons && buttons.length ? buttons[buttons.length - 1] : null;
+            if (!confirmBtn) return;
+
+            const textEl = confirmBtn.querySelector('.fluent-btn-text');
+            const setConfirmText = (txt) => {
+                if (textEl) textEl.textContent = txt;
+                else confirmBtn.textContent = txt;
+            };
+
+            let remaining = 10;
+            confirmBtn.disabled = true;
+            setConfirmText(t('settings.fingo-custom-risk-ack-countdown', { seconds: remaining }));
+
+            timer = setInterval(() => {
+                remaining -= 1;
+                if (remaining > 0) {
+                    setConfirmText(t('settings.fingo-custom-risk-ack-countdown', { seconds: remaining }));
+                    return;
+                }
+                clearInterval(timer);
+                confirmBtn.disabled = false;
+                setConfirmText(t('settings.fingo-custom-risk-ack'));
+            }, 1000);
+        });
+    },
+
+    _showFingoCustomRequireCspDialog() {
+        return new Promise((resolve) => {
+            if (typeof FluentUI === 'undefined' || !FluentUI || typeof FluentUI.Dialog !== 'function') {
+                resolve(window.confirm(t('settings.fingo-custom-csp-required-content')));
+                return;
+            }
+
+            FluentUI.Dialog({
+                type: 'warning',
+                title: t('settings.fingo-custom-csp-required-title'),
+                content: `<div class="fingo-custom-risk-content">${t('settings.fingo-custom-csp-required-content')}</div>`,
+                closeOnOverlay: false,
+                buttons: [
+                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                    { text: t('settings.fingo-custom-csp-required-go'), variant: 'primary', value: 'go' }
+                ],
+                onClose: (result) => resolve(result === 'go')
+            });
+        });
+    },
+
+    _goPrivacyAndHighlightStrictCsp() {
+        this.currentPage = 'privacy';
+        this.render();
+        this.highlightSettingByDataId('privacy-strict-csp', 1200);
+    },
+
     _getFingoApiStorageStatusText(type) {
         switch (type) {
             case 'session':
@@ -2301,8 +2384,8 @@ const SettingsApp = {
                 title: t('settings.fingo-encrypt-passphrase-title'),
                 placeholder: t('settings.fingo-encrypt-passphrase-placeholder'),
                 inputType: 'password',
-                minLength: 6,
-                validateFn: (value) => value.length >= 6 || t('settings.fingo-encrypt-passphrase-error'),
+                minLength: 8,
+                validateFn: (value) => value.length >= 8 || t('settings.fingo-encrypt-passphrase-error'),
                 confirmText: t('ok'),
                 cancelText: t('cancel'),
                 onConfirm: (passphrase) => resolve(passphrase),
@@ -2318,21 +2401,9 @@ const SettingsApp = {
             content: t('settings.fingo-perm-save-content'),
             buttons: [
                 { text: t('cancel'), variant: 'secondary', value: 'cancel' },
-                { text: t('settings.fingo-perm-save-plain'), variant: 'danger', value: 'plain' },
                 { text: t('settings.fingo-perm-save-encrypted'), variant: 'primary', value: 'encrypted' }
             ],
             onClose: async (result) => {
-                if (result === 'plain') {
-                    if (typeof Fingo !== 'undefined' && typeof Fingo.saveApiKeyPermanentPlain === 'function') {
-                        Fingo.saveApiKeyPermanentPlain(apiKey);
-                    } else {
-                        State.updateSettings({ fingoApiKey: apiKey, fingoApiEncrypted: null, fingoApiStorageType: 'permanent-plain' });
-                    }
-                    FluentUI.Toast({ title: t('settings.fingo'), message: t('settings.fingo-perm-plain-saved'), type: 'warning' });
-                    this.render();
-                    return;
-                }
-
                 if (result !== 'encrypted') return;
 
                 const passphrase = await this._promptFingoEncryptPassphrase();
@@ -2626,9 +2697,15 @@ const SettingsApp = {
         const lingyiNotice = document.createElement('div');
         lingyiNotice.className = 'lab-notice lingyi-notice';
         lingyiNotice.innerHTML = `
-            <img src="Theme/Icon/Symbol_icon/stroke/Hand.svg" alt="" style="width: 20px; height: 20px; opacity: 0.7;" onerror="this.src='Theme/Icon/Symbol_icon/stroke/Stars A.svg'">
+            <img src="Theme/Icon/Symbol_icon/stroke/Hand.svg" alt="" style="width: 20px; height: 20px; opacity: 0.7;">
             <span style="font-size: 13px; color: var(--text-secondary);">${t('settings.lingyi-notice')}</span>
         `;
+        const lingyiNoticeIcon = lingyiNotice.querySelector('img');
+        if (lingyiNoticeIcon) {
+            lingyiNoticeIcon.addEventListener('error', () => {
+                lingyiNoticeIcon.src = 'Theme/Icon/Symbol_icon/stroke/Stars A.svg';
+            }, { once: true });
+        }
         lingyiNotice.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(100, 180, 255, 0.1); border-radius: var(--radius-md); margin-bottom: 16px;';
         lingyiSection.appendChild(lingyiNotice);
         
