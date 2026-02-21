@@ -359,9 +359,14 @@ const BootScreen = {
         const pack = this._buildPriorityAssets();
         const essential = this._buildOobeEssentialAssets();
         const essentialIcons = new Set(essential.icons);
+        const aiScripts = this._uniqAssets([
+            'js/core/fingo-data.js',
+            'js/core/fingo.js'
+        ]);
         return {
             desktopWallpapers: pack.desktopWallpapers,
-            icons: pack.icons.filter((src) => !essentialIcons.has(src))
+            icons: pack.icons.filter((src) => !essentialIcons.has(src)),
+            aiScripts
         };
     },
 
@@ -525,6 +530,7 @@ const BootScreen = {
         const pack = this._buildOobeDeferredAssets();
         await this._preloadGroup(pack.desktopWallpapers, 4); // OOBE 中继续加载桌面壁纸
         await this._preloadGroup(pack.icons, 8);             // OOBE 中继续加载其余图标
+        await this._preloadGroup(pack.aiScripts, 2);         // OOBE 中缓存 AI 组件脚本
     },
 
     fadeToLock() {

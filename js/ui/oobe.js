@@ -922,10 +922,7 @@ const OOBE = {
         this.selectedLang = null;
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
         this.selectedAutoFullscreen = State?.settings?.autoEnterFullscreen !== false;
-        this.selectedFingoMode = 'local';
-        if (State && typeof State.updateSettings === 'function' && State?.settings?.fingoCustomMode) {
-            State.updateSettings({ fingoCustomMode: false });
-        }
+        this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
         const draft = this._getInitialUserProfileDraft();
         this.selectedUserName = draft.name;
         this.selectedUserEmail = draft.email;
@@ -1081,10 +1078,6 @@ const OOBE = {
                 if (State && typeof State.ensureFSIntegrity === 'function') {
                     State.ensureFSIntegrity();
                 }
-                if (State && typeof State.updateSettings === 'function') {
-                    // OOBE 阶段强制使用本地模式，禁止云端 API 依赖。
-                    State.updateSettings({ fingoCustomMode: false });
-                }
                 if (BootScreen && typeof BootScreen._preloadOobeDeferredResources === 'function') {
                     await BootScreen._preloadOobeDeferredResources();
                 } else if (BootScreen && typeof BootScreen._preloadResourcePackByPriority === 'function') {
@@ -1233,20 +1226,63 @@ const OOBE = {
         this.tempFingoPendingAction = null;
 
         if (enableCustom) {
-            this.selectedFingoMode = 'local';
-            if (State && typeof State.updateSettings === 'function') {
-                State.updateSettings({ fingoCustomMode: false });
+            const enableWithSecurity = () => {
+                this.selectedFingoMode = 'custom';
+                if (State && typeof State.updateSettings === 'function') {
+                    State.updateSettings({
+                        strictCspEnabled: true,
+                        fingoCustomMode: true
+                    });
+                }
+                this.pendingFingoCustomEnter = true;
+                this._renderFingoSettingsPanel();
+            };
+
+            const keepDisabled = () => {
+                this.selectedFingoMode = 'local';
+                if (State && typeof State.updateSettings === 'function') {
+                    State.updateSettings({ fingoCustomMode: false });
+                }
+                this._renderFingoSettingsPanel();
+            };
+
+            if (State?.settings?.strictCspEnabled !== true) {
+                const title = this._fingoText(
+                    'settings.strict-csp-required-title',
+                    '需要先启用禁用内联脚本',
+                    'Enable Inline Script Blocking First'
+                );
+                const content = this._fingoText(
+                    'settings.strict-csp-required-content',
+                    '开启 API 自定义前，将自动启用「禁用内联脚本」增强安全性。点击确定继续。',
+                    'Before enabling custom API mode, "Disable Inline Scripts" will be turned on automatically for better security. Confirm to continue.'
+                );
+                if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Dialog === 'function') {
+                    FluentUI.Dialog({
+                        type: 'warning',
+                        title,
+                        content,
+                        buttons: [
+                            { text: this._fingoText('cancel', '取消', 'Cancel'), variant: 'secondary', value: 'cancel' },
+                            { text: this._fingoText('ok', '确定', 'OK'), variant: 'primary', value: 'confirm' }
+                        ],
+                        onClose: (result) => {
+                            if (result === 'confirm') {
+                                enableWithSecurity();
+                            } else {
+                                keepDisabled();
+                            }
+                        }
+                    });
+                } else if (window.confirm(content)) {
+                    enableWithSecurity();
+                } else {
+                    keepDisabled();
+                }
+                return;
             }
-            if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Toast === 'function') {
-                FluentUI.Toast({
-                    title: this._fingoText('settings.fingo', 'Fingo AI', 'Fingo AI'),
-                    message: this._langCode() === 'zh'
-                        ? '当前版本仅支持浏览器本地模式，云端 API 模式已禁用。'
-                        : 'This build supports local browser mode only. Cloud API mode is disabled.',
-                    type: 'info'
-                });
-            }
-            this._renderFingoSettingsPanel();
+
+            enableWithSecurity();
             return;
         }
 
@@ -1522,7 +1558,7 @@ const OOBE = {
         const updates = {
             theme: this.selectedTheme,
             autoEnterFullscreen: this.selectedAutoFullscreen,
-            fingoCustomMode: false,
+            fingoCustomMode: this.selectedFingoMode === 'custom',
             userName: name || fallbackName,
             userEmail: this._isValidEmail(email) ? email : fallbackEmail,
             userAvatar: avatar
@@ -1636,7 +1672,7 @@ const OOBE = {
             return pendingReply;
         }
 
-        const useCustomApi = false;
+        const useCustomApi = this.selectedFingoMode === 'custom' || State?.settings?.fingoCustomMode === true;
         if (useCustomApi && typeof Fingo !== 'undefined' && Fingo) {
             if (State?.settings?.strictCspEnabled !== true) {
                 return this._langCode() === 'zh'

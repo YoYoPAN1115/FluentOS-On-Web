@@ -2063,24 +2063,48 @@ const SettingsApp = {
                 onChange: (v) => {
                     if (this._fingoModeAnimating) return;
                     if (v && State.settings.strictCspEnabled !== true) {
-                        FluentUI.Dialog({
-                            type: 'warning',
-                            title: t('settings.strict-csp-required-title'),
-                            content: t('settings.strict-csp-required-content'),
-                            buttons: [
-                                { text: t('cancel'), variant: 'secondary', value: 'cancel' },
-                                { text: t('ok'), variant: 'primary', value: 'confirm' }
-                            ],
-                            onClose: (result) => {
-                                if (result === 'confirm') {
-                                    this.currentPage = 'privacy';
-                                    this.render();
-                                    this.highlightSettingByDataId('privacy-strict-csp', 1000);
-                                } else {
-                                    this.render();
+                        const enableWithSecurity = () => {
+                            State.updateSettings({
+                                strictCspEnabled: true,
+                                fingoCustomMode: true
+                            });
+                            this.addRecentSetting(t('settings.strict-csp'), t('settings.on'), 'privacy');
+                            this.addRecentSetting(t('settings.fingo-custom'), t('settings.on'), 'fingo');
+                            State.addNotification({
+                                title: t('settings.privacy-title'),
+                                message: t('settings.strict-csp-on'),
+                                type: 'info'
+                            });
+                            this._pendingFingoCustomEnter = true;
+                            this.render();
+                        };
+
+                        const keepDisabled = () => {
+                            this.render();
+                        };
+
+                        if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Dialog === 'function') {
+                            FluentUI.Dialog({
+                                type: 'warning',
+                                title: t('settings.strict-csp-required-title'),
+                                content: t('settings.strict-csp-required-content'),
+                                buttons: [
+                                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                                    { text: t('ok'), variant: 'primary', value: 'confirm' }
+                                ],
+                                onClose: (result) => {
+                                    if (result === 'confirm') {
+                                        enableWithSecurity();
+                                    } else {
+                                        keepDisabled();
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        } else if (window.confirm(t('settings.strict-csp-required-content'))) {
+                            enableWithSecurity();
+                        } else {
+                            keepDisabled();
+                        }
                         return;
                     }
 
