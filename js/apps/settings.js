@@ -1483,7 +1483,7 @@ const SettingsApp = {
         avatars.forEach((avatarPath, index) => {
             const avatarBtn = document.createElement('button');
             avatarBtn.className = `settings-user-avatar-item ${avatarPath === profile.avatar ? 'selected' : ''}`;
-            const thumbSrc = this.getAvatarThumbSrc(avatarPath, this._avatarPlaceholderSrc);
+            const thumbSrc = this.getAvatarThumbSrc(avatarPath, avatarPath);
             const avatarKey = encodeURIComponent(avatarPath);
             avatarBtn.innerHTML = `<img src="${thumbSrc}" data-avatar-key="${avatarKey}" alt="avatar-${index + 1}" loading="lazy" decoding="async">`;
             avatarBtn.addEventListener('click', () => {

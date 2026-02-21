@@ -600,7 +600,7 @@ const OOBE = {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = `oobe-avatar-item ${avatarPath === selected ? 'active' : ''}`;
-            const thumbSrc = this._getAvatarThumbSrc(avatarPath, /^data:image\//i.test(avatarPath) ? avatarPath : this.avatarPlaceholderSrc);
+            const thumbSrc = this._getAvatarThumbSrc(avatarPath, avatarPath);
             const avatarKey = encodeURIComponent(avatarPath);
             btn.innerHTML = `<img src="${thumbSrc}" data-avatar-key="${avatarKey}" alt="avatar-${index + 1}" loading="lazy" decoding="async">`;
             btn.addEventListener('click', () => {
@@ -922,7 +922,10 @@ const OOBE = {
         this.selectedLang = null;
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
         this.selectedAutoFullscreen = State?.settings?.autoEnterFullscreen !== false;
-        this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
+        this.selectedFingoMode = 'local';
+        if (State && typeof State.updateSettings === 'function' && State?.settings?.fingoCustomMode) {
+            State.updateSettings({ fingoCustomMode: false });
+        }
         const draft = this._getInitialUserProfileDraft();
         this.selectedUserName = draft.name;
         this.selectedUserEmail = draft.email;
@@ -1078,7 +1081,13 @@ const OOBE = {
                 if (State && typeof State.ensureFSIntegrity === 'function') {
                     State.ensureFSIntegrity();
                 }
-                if (BootScreen && typeof BootScreen._preloadResourcePackByPriority === 'function') {
+                if (State && typeof State.updateSettings === 'function') {
+                    // OOBE 阶段强制使用本地模式，禁止云端 API 依赖。
+                    State.updateSettings({ fingoCustomMode: false });
+                }
+                if (BootScreen && typeof BootScreen._preloadOobeDeferredResources === 'function') {
+                    await BootScreen._preloadOobeDeferredResources();
+                } else if (BootScreen && typeof BootScreen._preloadResourcePackByPriority === 'function') {
                     await BootScreen._preloadResourcePackByPriority();
                 }
                 if (BootScreen && BootScreen.CACHE_KEY) {
@@ -1224,32 +1233,20 @@ const OOBE = {
         this.tempFingoPendingAction = null;
 
         if (enableCustom) {
-            const zhGuardContent = '\u5f00\u542f\u81ea\u5b9a\u4e49 API \u6a21\u5f0f\u524d\uff0c\u9700\u8981\u5f00\u542f\u300c\u7981\u7528\u5185\u8054\u811a\u672c\u300d\u3002\u70b9\u51fb\u300c\u786e\u5b9a\u300d\u540e\u5c06\u81ea\u52a8\u542f\u7528\u8be5\u5b89\u5168\u9879\u5e76\u5f00\u542f\u81ea\u5b9a\u4e49\u6a21\u5f0f\u3002';
-            const enGuardContent = 'Before enabling custom API mode, "Disable Inline Scripts" must be enabled. Click "OK" to enable it and continue.';
-            FluentUI.Dialog({
-                type: 'warning',
-                title: this._fingoText('settings.strict-csp-required-title', 'Enable Custom API Mode', 'Enable Custom API Mode'),
-                content: this._langCode() === 'zh' ? zhGuardContent : enGuardContent,
-                buttons: [
-                    { text: this._fingoText('cancel', 'Cancel', 'Cancel'), variant: 'secondary', value: 'cancel' },
-                    { text: this._fingoText('ok', 'OK', 'OK'), variant: 'primary', value: 'confirm' }
-                ],
-                onClose: (result) => {
-                    if (result === 'confirm') {
-                        this.selectedFingoMode = 'custom';
-                        this.pendingFingoCustomEnter = true;
-                        if (State && typeof State.updateSettings === 'function') {
-                            State.updateSettings({
-                                strictCspEnabled: true,
-                                fingoCustomMode: true
-                            });
-                        }
-                    } else {
-                        this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
-                    }
-                    this._renderFingoSettingsPanel();
-                }
-            });
+            this.selectedFingoMode = 'local';
+            if (State && typeof State.updateSettings === 'function') {
+                State.updateSettings({ fingoCustomMode: false });
+            }
+            if (typeof FluentUI !== 'undefined' && FluentUI && typeof FluentUI.Toast === 'function') {
+                FluentUI.Toast({
+                    title: this._fingoText('settings.fingo', 'Fingo AI', 'Fingo AI'),
+                    message: this._langCode() === 'zh'
+                        ? '当前版本仅支持浏览器本地模式，云端 API 模式已禁用。'
+                        : 'This build supports local browser mode only. Cloud API mode is disabled.',
+                    type: 'info'
+                });
+            }
+            this._renderFingoSettingsPanel();
             return;
         }
 
@@ -1525,7 +1522,7 @@ const OOBE = {
         const updates = {
             theme: this.selectedTheme,
             autoEnterFullscreen: this.selectedAutoFullscreen,
-            fingoCustomMode: this.selectedFingoMode === 'custom',
+            fingoCustomMode: false,
             userName: name || fallbackName,
             userEmail: this._isValidEmail(email) ? email : fallbackEmail,
             userAvatar: avatar
@@ -1639,7 +1636,7 @@ const OOBE = {
             return pendingReply;
         }
 
-        const useCustomApi = this.selectedFingoMode === 'custom' || State?.settings?.fingoCustomMode === true;
+        const useCustomApi = false;
         if (useCustomApi && typeof Fingo !== 'undefined' && Fingo) {
             if (State?.settings?.strictCspEnabled !== true) {
                 return this._langCode() === 'zh'

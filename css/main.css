@@ -169,24 +169,23 @@ input {
 }
 
 .boot-first-hint {
-    max-height: 0;
-    overflow: hidden;
-    margin: 0;
+    min-height: 24px;
+    margin-top: -24px;
     opacity: 0;
-    transform: translateY(6px);
-    font-size: 12px;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.78);
-    letter-spacing: 0.2px;
-    transition: opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, margin 0.4s ease;
+    font-size: 15px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.86);
+    letter-spacing: 0.3px;
+    transition: opacity 0.45s ease;
     pointer-events: none;
 }
 
 .boot-first-hint.show {
-    max-height: 24px;
-    margin: -18px 0 -22px;
     opacity: 1;
-    transform: translateY(0);
+}
+
+.boot-first-hint.switching {
+    opacity: 0;
 }
 
 .boot-ring-arc {

@@ -1003,25 +1003,17 @@ const Fingo = {
             }
         }
 
-        // 自定义模式：全部走 API
+        // 强制本地模式：禁用云端 API 路径
         if (State.settings.fingoCustomMode) {
-            if (State.settings.strictCspEnabled !== true) {
-                const msg = this.lang() === 'zh'
-                    ? '启用自定义 API 前，请先在「设置 → 隐私」中开启「禁用内联脚本」。'
-                    : 'Enable "Disable Inline Scripts" in Settings → Privacy before using custom API mode.';
-                setTimeout(() => this.addMessage(msg, 'bot'), 400);
-                return;
+            if (typeof State.updateSettings === 'function') {
+                State.updateSettings({ fingoCustomMode: false });
+            } else {
+                State.settings.fingoCustomMode = false;
             }
-            const apiKey = await this.getApiKeyForRequest();
-            if (!apiKey) {
-                const msg = this.lang() === 'zh'
-                    ? 'API 错误，请检查 API Key 是否正确。\n请前往「设置 → Fingo AI」填入有效的 API Key。'
-                    : 'API error, please check your API Key.\nGo to Settings → Fingo AI to enter a valid key.';
-                setTimeout(() => this.addMessage(msg, 'bot'), 400);
-            }else {
-                this._callApi(text, apiKey);
-            }
-            return;
+            const msg = this.lang() === 'zh'
+                ? '当前版本仅支持浏览器本地模式，已自动关闭云端 API 模式。'
+                : 'This build runs in local browser mode only. Cloud API mode has been turned off.';
+            setTimeout(() => this.addMessage(msg, 'bot'), 260);
         }
 
         // 处理待确认操作
