@@ -82,32 +82,43 @@ const Desktop = {
     },
     
     handleFileDrop(data) {
-        const { id, source } = data;
-        const node = State.findNode(id);
-        if (!node) return;
+        const ids = Array.isArray(data?.ids) ? data.ids : [data?.id];
+        const dragIds = [...new Set(ids.filter(id => typeof id === 'string' && id))];
+        if (dragIds.length === 0) return;
         
         const desktop = State.findNode('desktop');
         if (!desktop) return;
-        
-        // 如果已经在桌面，不需要移动
-        const parent = State.findParentNode(id);
-        if (parent && parent.id === 'desktop') return;
-        
-        // 从原位置移除
-        if (parent && parent.children) {
-            const idx = parent.children.findIndex(c => c.id === id);
-            if (idx !== -1) {
-                parent.children.splice(idx, 1);
-            }
-        }
-        
-        // 添加到桌面
+
+        let movedCount = 0;
+        let firstMovedName = '';
         desktop.children = desktop.children || [];
-        desktop.children.push(node);
-        
+
+        dragIds.forEach((id) => {
+            const node = State.findNode(id);
+            if (!node) return;
+
+            // 如果已经在桌面，不需要移动
+            const parent = State.findParentNode(id);
+            if (!parent || parent.id === 'desktop') return;
+
+            // 从原位置移除
+            const idx = parent.children ? parent.children.findIndex(c => c.id === id) : -1;
+            if (idx === -1) return;
+            parent.children.splice(idx, 1);
+
+            // 添加到桌面
+            desktop.children.push(node);
+            movedCount++;
+            if (!firstMovedName) firstMovedName = node.name;
+        });
+
+        if (movedCount === 0) return;
         State.updateFS(State.fs);
-        
-        FluentUI.Toast({ title: '桌面', message: `已移动 "${node.name}" 到桌面`, type: 'success' });
+
+        const message = movedCount === 1
+            ? `已移动 "${firstMovedName}" 到桌面`
+            : `已移动 ${movedCount} 个项目到桌面`;
+        FluentUI.Toast({ title: t('files.desktop'), message, type: 'success' });
     },
     
     createSelectionBox() {
@@ -238,19 +249,34 @@ const Desktop = {
             el.style.top = `${y}px`;
             
             // 拖拽事件
+            let draggingIds = [node.id];
             el.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', node.id);
+                const multiSelectedIds = this.selectedIcons
+                    .map(iconEl => iconEl.dataset.nodeId)
+                    .filter(Boolean);
+                const useMultiSelection = el.classList.contains('selected') && multiSelectedIds.length > 1;
+                draggingIds = useMultiSelection ? [...new Set(multiSelectedIds)] : [node.id];
+
+                e.dataTransfer.setData('text/plain', draggingIds[0]);
                 e.dataTransfer.setData('application/fluent-file', JSON.stringify({
                     id: node.id,
+                    ids: draggingIds,
                     name: node.name,
                     type: node.type,
                     source: 'desktop'
                 }));
-                el.classList.add('dragging');
+                draggingIds.forEach((id) => {
+                    const iconEl = this.iconsContainer.querySelector(`.desktop-icon[data-node-id="${id}"]`);
+                    if (iconEl) iconEl.classList.add('dragging');
+                });
             });
             
             el.addEventListener('dragend', () => {
-                el.classList.remove('dragging');
+                draggingIds.forEach((id) => {
+                    const iconEl = this.iconsContainer.querySelector(`.desktop-icon[data-node-id="${id}"]`);
+                    if (iconEl) iconEl.classList.remove('dragging');
+                });
+                draggingIds = [node.id];
             });
             
             this.iconsContainer.appendChild(el);
@@ -262,6 +288,7 @@ const Desktop = {
     bindEvents() {
         // 鼠标按下开始框选
         this.element.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
             // 检查是否在UI元素上
             if (e.target.closest('.window') || 
                 e.target.closest('.taskbar') || 
@@ -272,6 +299,10 @@ const Desktop = {
                 e.target.closest('.desktop-icon')) {
                 return;
             }
+
+            if (!e.ctrlKey) {
+                this.deselectAll();
+            }
             
             // 开始框选
             this.isSelecting = true;
@@ -281,11 +312,6 @@ const Desktop = {
             this.selectionBox.style.width = '0px';
             this.selectionBox.style.height = '0px';
             this.selectionBox.style.display = 'block';
-            
-            // 不自动取消选择，保持之前的选择状态
-            // if (!e.ctrlKey) {
-            //     this.deselectAll();
-            // }
         });
         
         // 鼠标移动更新框选区域
@@ -474,18 +500,45 @@ const Desktop = {
         this.selectedIcons = [];
         this.selectedIcon = null;
     },
+
+    selectAllIcons() {
+        if (!this.iconsContainer) return;
+        const icons = Array.from(this.iconsContainer.querySelectorAll('.desktop-icon'));
+        if (icons.length === 0) return;
+        this.deselectAll();
+        icons.forEach((icon) => this.selectIcon(icon));
+    },
     
     bindKeyboardEvents() {
         // 监听键盘Delete键
         document.addEventListener('keydown', (e) => {
+            const target = e.target;
+            const isEditableTarget = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            );
+            if (isEditableTarget) return;
+            if (State.view !== 'desktop') return;
+
             // 只在桌面激活且没有窗口焦点时响应
+            const hasActiveWindow = document.querySelector('.window:not(.minimized)');
+            if (hasActiveWindow) return;
+
+            let key = String(e.key || '').toLowerCase();
+            if ((!key || !/^[a-z]$/.test(key)) && /^Key[A-Z]$/.test(String(e.code || ''))) {
+                key = String(e.code).slice(3).toLowerCase();
+            }
+
             if (e.key === 'Delete' && this.selectedIcons.length > 0) {
-                // 检查是否有窗口打开
-                const hasActiveWindow = document.querySelector('.window:not(.minimized)');
-                if (hasActiveWindow) return; // 有窗口打开时不响应
-                
                 e.preventDefault();
                 this.deleteSelectedIcons();
+                return;
+            }
+
+            if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'a') {
+                e.preventDefault();
+                this.selectAllIcons();
             }
         });
     },
@@ -546,6 +599,10 @@ const Desktop = {
 
     showContextMenu(x, y) {
         // 构建菜单：刷新、新建文件夹、新建文本、个性化
+        const totalIcons = this.iconsContainer ? this.iconsContainer.querySelectorAll('.desktop-icon').length : 0;
+        const allSelected = totalIcons > 0 && this.selectedIcons.length === totalIcons;
+        const selectAction = allSelected ? 'deselect-all' : 'select-all';
+        const selectLabel = allSelected ? t('desktop.menu.deselect-all') : t('desktop.menu.select-all');
         this.contextMenu.innerHTML = `
                 <div class="context-menu-item" data-action="refresh">
                     <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
@@ -559,6 +616,10 @@ const Desktop = {
                 <div class="context-menu-item" data-action="new-text">
                     <img src="Theme/Icon/Symbol_icon/stroke/File.svg" alt="">
                     <span>${t('desktop.menu.new-text')}</span>
+                </div>
+                <div class="context-menu-item" data-action="${selectAction}">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt="">
+                    <span>${selectLabel}</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" data-action="personalize">
@@ -578,6 +639,10 @@ const Desktop = {
         // 判断是否多选
         const isMultiSelect = this.selectedIcons.length > 1;
         const disabledClass = isMultiSelect ? ' disabled' : '';
+        const totalIcons = this.iconsContainer ? this.iconsContainer.querySelectorAll('.desktop-icon').length : 0;
+        const allSelected = totalIcons > 0 && this.selectedIcons.length === totalIcons;
+        const selectAction = allSelected ? 'deselect-all' : 'select-all';
+        const selectLabel = allSelected ? t('desktop.menu.deselect-all') : t('desktop.menu.select-all');
         
         // 多选时只有删除可用，其他选项禁用
         this.contextMenu.innerHTML = `
@@ -588,6 +653,10 @@ const Desktop = {
             <div class="context-menu-item" data-action="delete">
                 <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
                 <span>${t('desktop.menu.delete')}${isMultiSelect ? ` (${this.selectedIcons.length})` : ''}</span>
+            </div>
+            <div class="context-menu-item" data-action="${selectAction}">
+                <img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt="">
+                <span>${selectLabel}</span>
             </div>
             <div class="context-menu-separator"></div>
             <div class="context-menu-item${disabledClass}" data-action="properties">
@@ -627,6 +696,12 @@ const Desktop = {
                 State.updateFS(State.fs);
                 break;
             }
+            case 'select-all':
+                this.selectAllIcons();
+                break;
+            case 'deselect-all':
+                this.deselectAll();
+                break;
             case 'personalize':
                 this.openApp('settings');
                 break;

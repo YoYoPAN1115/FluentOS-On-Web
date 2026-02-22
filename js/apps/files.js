@@ -207,6 +207,8 @@ const FilesApp = {
             .sidebar-item:hover { background: rgba(0, 0, 0, 0.05); }
             .sidebar-item img { width: 16px; height: 16px; }
             .sidebar-item span { font-size: 13px; }
+            .files-sidebar-count { display: none; }
+            body.fluent-v2 .files-sidebar-count { display: block; }
             .files-content { flex: 1; overflow-y: auto; padding: 16px; position: relative; }
             .files-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; }
             .file-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border-radius: var(--radius-md); cursor: pointer; transition: background var(--transition-fast); }
@@ -275,12 +277,21 @@ const FilesApp = {
         }
 
         // 文件列表
-        const filesList = document.getElementById('files-list');
-        const filesContent = document.getElementById('files-content');
+        const filesList = this.container.querySelector('#files-list');
+        const filesContent = this.container.querySelector('#files-content');
+        const filesApp = this.container.querySelector('.files-app');
+        if (!filesList || !filesContent || !filesApp) {
+            console.error('[FilesApp] bindEvents: core elements not found');
+            return;
+        }
         
         // 框选功能
         filesContent.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
             if (e.target.closest('.file-item')) return; // 点击文件项时不启动框选
+            if (!e.ctrlKey) {
+                this.deselectAllItems();
+            }
             
             this.isSelecting = true;
             const rect = filesContent.getBoundingClientRect();
@@ -293,11 +304,6 @@ const FilesApp = {
             this.selectionBox.style.width = '0px';
             this.selectionBox.style.height = '0px';
             this.selectionBox.style.display = 'block';
-            
-            // 不自动取消选择，保持之前的选择状态
-            // if (!e.ctrlKey) {
-            //     this.deselectAllItems();
-            // }
         });
         
         filesContent.addEventListener('mousemove', (e) => {
@@ -369,7 +375,7 @@ const FilesApp = {
         this.bindKeyboardEvents();
         
         // 拖拽接收
-        this.bindDragDropEvents(filesContent);
+        this.bindDragDropEvents(filesApp, filesContent);
 
         // 文件列表右键（单个项）
         filesList.addEventListener('contextmenu', (e) => {
@@ -425,6 +431,11 @@ const FilesApp = {
     showContextMenu(x, y, hasTarget) {
         const menu = document.getElementById(`${this.windowId}-files-context-menu`);
         if (!menu) return;
+        const filesList = this.container ? this.container.querySelector('#files-list') : null;
+        const totalItems = filesList ? filesList.querySelectorAll('.file-item').length : 0;
+        const allSelected = totalItems > 0 && this.selectedItems.length === totalItems;
+        const selectAction = allSelected ? 'deselect-all' : 'select-all';
+        const selectLabel = allSelected ? t('files.deselect-all') : t('files.select-all');
         // 根据当前目录与是否选中项，动态构建菜单
         const inRecycle = this.currentNode && this.currentNode.id === 'recycle';
         if (inRecycle) {
@@ -437,10 +448,14 @@ const FilesApp = {
                     <div class="context-menu-item${disabledClass}" data-action="restore"><img src="Theme/Icon/Symbol_icon/stroke/Reload.svg" alt=""><span>${t('files.restore')}</span></div>
                     <div class="context-menu-item" data-action="delete-permanent"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>${t('files.delete-permanent')}${isMultiSelect ? ` (${this.selectedItems.length}${t('files.items-count', {count: ''})})` : ''}</span></div>
                     <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" data-action="${selectAction}"><img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt=""><span>${selectLabel}</span></div>
+                    <div class="context-menu-separator"></div>
                     <div class="context-menu-item${disabledClass}" data-action="properties"><img src="Theme/Icon/Symbol_icon/stroke/Information Circle.svg" alt=""><span>${t('files.properties')}</span></div>`;
             } else {
                 menu.innerHTML = `
                     <div class="context-menu-item" data-action="refresh"><img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt=""><span>${t('files.refresh')}</span></div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" data-action="${selectAction}"><img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt=""><span>${selectLabel}</span></div>
                     <div class="context-menu-separator"></div>
                     <div class="context-menu-item" data-action="restore-all"><img src="Theme/Icon/Symbol_icon/stroke/Reload.svg" alt=""><span>${t('files.restore-all')}</span></div>
                     <div class="context-menu-item" data-action="empty-recycle"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>${t('files.empty-recycle')}</span></div>`;
@@ -460,6 +475,8 @@ const FilesApp = {
                     <div class="context-menu-item${disabledClass}" data-action="rename"><img src="Theme/Icon/Symbol_icon/stroke/Edit.svg" alt=""><span>${t('files.rename')}</span></div>
                     <div class="context-menu-item" data-action="delete"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>${t('files.delete')}${isMultiSelect ? ` (${this.selectedItems.length})` : ''}</span></div>
                     <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" data-action="${selectAction}"><img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt=""><span>${selectLabel}</span></div>
+                    <div class="context-menu-separator"></div>
                     <div class="context-menu-item${disabledClass}" data-action="properties"><img src="Theme/Icon/Symbol_icon/stroke/Information Circle.svg" alt=""><span>${t('files.properties')}</span></div>`;
             } else {
                 const hasSelection = this.selectedItems.length > 0;
@@ -472,6 +489,8 @@ const FilesApp = {
                     <div class="context-menu-separator"></div>
                     <div class="context-menu-item" data-action="new-folder"><img src="Theme/Icon/Symbol_icon/stroke/Folder.svg" alt=""><span>${t('files.new-folder')}</span></div>
                     <div class="context-menu-item" data-action="new-text"><img src="Theme/Icon/Symbol_icon/stroke/File.svg" alt=""><span>${t('files.new-text')}</span></div>
+                    <div class="context-menu-separator"></div>
+                    <div class="context-menu-item" data-action="${selectAction}"><img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt=""><span>${selectLabel}</span></div>
                     ${hasSelection ? '<div class="context-menu-separator"></div><div class="context-menu-item" data-action="delete-selected"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>' + t('files.delete-selected') + ' (' + this.selectedItems.length + ')</span></div>' : ''}`;
             }
         }
@@ -515,6 +534,12 @@ const FilesApp = {
                 break;
             case 'new-text':
                 this.createTextFile();
+                break;
+            case 'select-all':
+                this.selectAllItems();
+                break;
+            case 'deselect-all':
+                this.deselectAllItems();
                 break;
             case 'rename':
                 if (this.contextTargetId) this.renameNode(this.contextTargetId);
@@ -706,6 +731,36 @@ const FilesApp = {
     renameNode(id) {
         const node = State.findNode(id);
         if (!node) return;
+
+        const splitFileExt = (name) => {
+            const text = String(name || '');
+            const dotIndex = text.lastIndexOf('.');
+            if (dotIndex <= 0 || dotIndex === text.length - 1) {
+                return {
+                    hasExt: false,
+                    base: dotIndex === text.length - 1 ? text.slice(0, -1) : text,
+                    ext: ''
+                };
+            }
+            return {
+                hasExt: true,
+                base: text.slice(0, dotIndex),
+                ext: text.slice(dotIndex + 1)
+            };
+        };
+
+        const applyRename = (nextName) => {
+            node.name = nextName;
+            node.modified = new Date().toISOString();
+            State.updateFS(State.fs);
+            
+            // 重新获取当前节点
+            const currentId = this.currentPath[this.currentPath.length - 1];
+            this.currentNode = State.findNode(currentId);
+            
+            this.renderFileList();
+            FluentUI.Toast({ title: t('files.rename-title'), message: t('files.renamed', {name: nextName}), type: 'success' });
+        };
         
         FluentUI.InputDialog({
             title: t('files.rename-title'),
@@ -717,16 +772,48 @@ const FilesApp = {
                 return true;
             },
             onConfirm: (newName) => {
-                node.name = newName;
-                node.modified = new Date().toISOString();
-                State.updateFS(State.fs);
-                
-                // 重新获取当前节点
-                const currentId = this.currentPath[this.currentPath.length - 1];
-                this.currentNode = State.findNode(currentId);
-                
-                this.renderFileList();
-                FluentUI.Toast({ title: t('files.rename-title'), message: t('files.renamed', {name: newName}), type: 'success' });
+                if (node.type !== 'file') {
+                    applyRename(newName);
+                    return;
+                }
+
+                const oldParts = splitFileExt(node.name);
+                const newParts = splitFileExt(newName);
+
+                // 原文件没有扩展名，不做扩展名策略限制
+                if (!oldParts.hasExt) {
+                    applyRename(newName);
+                    return;
+                }
+
+                // 用户把扩展名删掉：自动补回原扩展名
+                if (!newParts.hasExt) {
+                    const base = (newParts.base || oldParts.base || newName).replace(/\.+$/g, '') || oldParts.base || 'untitled';
+                    applyRename(`${base}.${oldParts.ext}`);
+                    return;
+                }
+
+                const oldExt = oldParts.ext.toLowerCase();
+                const nextExt = newParts.ext.toLowerCase();
+                if (oldExt !== nextExt) {
+                    FluentUI.Dialog({
+                        type: 'warning',
+                        title: t('files.rename-ext-confirm-title'),
+                        content: t('files.rename-ext-confirm-content'),
+                        buttons: [
+                            { text: t('cancel'), variant: 'secondary', value: false },
+                            { text: t('ok'), variant: 'primary', value: true }
+                        ],
+                        onClose: (confirmed) => {
+                            if (confirmed === true) {
+                                applyRename(newName);
+                            }
+                        }
+                    });
+                    return;
+                }
+
+                applyRename(newName);
             }
         });
     },
@@ -987,19 +1074,34 @@ const FilesApp = {
             `;
             
             // 拖拽事件
+            let draggingIds = [node.id];
             item.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', node.id);
+                const selectedIds = this.selectedItems
+                    .map(el => el.dataset.id)
+                    .filter(Boolean);
+                const useMultiSelection = item.classList.contains('selected') && selectedIds.length > 1;
+                draggingIds = useMultiSelection ? [...new Set(selectedIds)] : [node.id];
+
+                e.dataTransfer.setData('text/plain', draggingIds[0]);
                 e.dataTransfer.setData('application/fluent-file', JSON.stringify({
                     id: node.id,
+                    ids: draggingIds,
                     name: node.name,
                     type: node.type,
                     source: 'files'
                 }));
-                item.classList.add('dragging');
+                draggingIds.forEach((id) => {
+                    const itemEl = filesList.querySelector(`.file-item[data-id="${id}"]`);
+                    if (itemEl) itemEl.classList.add('dragging');
+                });
             });
             
             item.addEventListener('dragend', () => {
-                item.classList.remove('dragging');
+                draggingIds.forEach((id) => {
+                    const itemEl = filesList.querySelector(`.file-item[data-id="${id}"]`);
+                    if (itemEl) itemEl.classList.remove('dragging');
+                });
+                draggingIds = [node.id];
             });
 
             filesList.appendChild(item);
@@ -1174,6 +1276,15 @@ const FilesApp = {
         }
         this.selectedItems = [];
     },
+
+    selectAllItems() {
+        const filesList = document.getElementById('files-list');
+        if (!filesList) return;
+        const items = Array.from(filesList.querySelectorAll('.file-item'));
+        if (items.length === 0) return;
+        this.deselectAllItems();
+        items.forEach((item) => this.selectItem(item));
+    },
     
     updateFileSelection() {
         const boxRect = this.selectionBox.getBoundingClientRect();
@@ -1214,74 +1325,125 @@ const FilesApp = {
         });
     },
     
-    bindDragDropEvents(container) {
+    bindDragDropEvents(dropZone, highlightTarget = dropZone) {
+        const highlightEl = highlightTarget || dropZone;
+        const hasFluentPayload = (dataTransfer) => {
+            if (!dataTransfer || !dataTransfer.types) return false;
+            const types = Array.from(dataTransfer.types);
+            return types.includes('application/fluent-file') || types.includes('text/plain');
+        };
+        const parseDropData = (dataTransfer) => {
+            const fileData = dataTransfer?.getData('application/fluent-file');
+            if (fileData) {
+                try {
+                    return JSON.parse(fileData);
+                } catch (err) {
+                    console.error('[FilesApp] 拖拽数据解析失败:', err);
+                    return null;
+                }
+            }
+
+            const fallbackId = (dataTransfer?.getData('text/plain') || '').trim();
+            if (!fallbackId) return null;
+            const node = State.findNode(fallbackId);
+            if (!node) return null;
+            return {
+                id: node.id,
+                name: node.name,
+                type: node.type,
+                source: 'fallback'
+            };
+        };
+
         // 允许放置
-        container.addEventListener('dragover', (e) => {
+        dropZone.addEventListener('dragover', (e) => {
+            if (!hasFluentPayload(e.dataTransfer)) return;
             e.preventDefault();
+            e.stopPropagation();
             e.dataTransfer.dropEffect = 'move';
-            container.classList.add('drag-over');
+            highlightEl.classList.add('drag-over');
         });
         
-        container.addEventListener('dragleave', (e) => {
-            if (!container.contains(e.relatedTarget)) {
-                container.classList.remove('drag-over');
+        dropZone.addEventListener('dragleave', (e) => {
+            if (!dropZone.contains(e.relatedTarget)) {
+                highlightEl.classList.remove('drag-over');
             }
         });
         
-        container.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', (e) => {
+            if (!hasFluentPayload(e.dataTransfer)) return;
             e.preventDefault();
-            container.classList.remove('drag-over');
+            e.stopPropagation();
+            highlightEl.classList.remove('drag-over');
             
-            // 获取拖拽的文件数据
-            const fileData = e.dataTransfer.getData('application/fluent-file');
-            if (!fileData) return;
-            
-            try {
-                const data = JSON.parse(fileData);
-                this.handleFileDrop(data);
-            } catch (err) {
-                console.error('[FilesApp] 拖拽数据解析失败:', err);
-            }
+            const data = parseDropData(e.dataTransfer);
+            if (!data || (!data.id && !(Array.isArray(data.ids) && data.ids.length > 0))) return;
+            this.handleFileDrop(data);
+        });
+
+        dropZone.addEventListener('dragend', () => {
+            highlightEl.classList.remove('drag-over');
         });
     },
     
     handleFileDrop(data) {
-        const { id, source } = data;
-        const node = State.findNode(id);
-        if (!node) return;
-        
-        // 不能移动到当前目录自身
-        if (this.currentNode.id === id) return;
-        
-        // 不能移动到自己的子目录
-        if (node.type === 'folder' && this.isDescendant(node, this.currentNode)) {
-            FluentUI.Toast({ title: t('files.title'), message: t('files.move-error'), type: 'error' });
+        const ids = Array.isArray(data?.ids) ? data.ids : [data?.id];
+        const dragIds = [...new Set(ids.filter(id => typeof id === 'string' && id))];
+        if (dragIds.length === 0) return;
+
+        let movedCount = 0;
+        let firstMovedName = '';
+        let hasMoveError = false;
+        this.currentNode.children = this.currentNode.children || [];
+
+        dragIds.forEach((id) => {
+            const node = State.findNode(id);
+            if (!node) return;
+            
+            // 不能移动到当前目录自身
+            if (this.currentNode.id === id) return;
+            
+            // 不能移动到自己的子目录
+            if (node.type === 'folder' && this.isDescendant(node, this.currentNode)) {
+                hasMoveError = true;
+                return;
+            }
+            
+            // 找到原父节点
+            const parent = State.findParentNode(id);
+            if (!parent) return;
+            
+            // 如果已经在当前目录，不需要移动
+            if (parent.id === this.currentNode.id) return;
+            
+            // 从原位置移除
+            const idx = parent.children ? parent.children.findIndex(c => c.id === id) : -1;
+            if (idx === -1) return;
+            parent.children.splice(idx, 1);
+            
+            // 添加到当前目录
+            this.currentNode.children.push(node);
+            movedCount++;
+            if (!firstMovedName) firstMovedName = node.name;
+        });
+
+        if (movedCount === 0) {
+            if (hasMoveError) {
+                FluentUI.Toast({ title: t('files.title'), message: t('files.move-error'), type: 'error' });
+            }
             return;
         }
-        
-        // 找到原父节点
-        const parent = State.findParentNode(id);
-        if (!parent) return;
-        
-        // 如果已经在当前目录，不需要移动
-        if (parent.id === this.currentNode.id) return;
-        
-        // 从原位置移除
-        const idx = parent.children.findIndex(c => c.id === id);
-        if (idx !== -1) {
-            parent.children.splice(idx, 1);
-        }
-        
-        // 添加到当前目录
-        this.currentNode.children = this.currentNode.children || [];
-        this.currentNode.children.push(node);
-        
+
         State.updateFS(State.fs);
         
         // 刷新显示
         this.renderFileList();
         
-        FluentUI.Toast({ title: t('files.title'), message: t('files.moved', {name: node.name}), type: 'success' });
+        if (movedCount === 1) {
+            FluentUI.Toast({ title: t('files.title'), message: t('files.moved', {name: firstMovedName}), type: 'success' });
+        } else {
+            FluentUI.Toast({ title: t('files.title'), message: t('files.items', {count: movedCount}), type: 'success' });
+        }
     },
     
     isDescendant(parent, child) {
@@ -1298,27 +1460,50 @@ const FilesApp = {
             // 检查当前窗口是否是文件App
             const activeWindow = document.querySelector('.window:not(.minimized)');
             if (!activeWindow || !activeWindow.id.includes(this.windowId)) return;
+
+            const target = e.target;
+            const isEditableTarget = target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable
+            );
+            if (isEditableTarget) return;
+
+            let key = String(e.key || '').toLowerCase();
+            if ((!key || !/^[a-z]$/.test(key)) && /^Key[A-Z]$/.test(String(e.code || ''))) {
+                key = String(e.code).slice(3).toLowerCase();
+            }
             
             // Delete键删除
             if (e.key === 'Delete' && this.selectedItems.length > 0) {
                 e.preventDefault();
                 this.deleteSelectedItems();
+                return;
+            }
+
+            // Ctrl+A 全选
+            if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'a') {
+                e.preventDefault();
+                this.selectAllItems();
+                return;
             }
             
             // Ctrl+C 复制
-            if (e.ctrlKey && e.key === 'c' && this.selectedItems.length > 0) {
+            if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'c' && this.selectedItems.length > 0) {
                 e.preventDefault();
                 this.copyToClipboard();
+                return;
             }
             
             // Ctrl+X 剪切
-            if (e.ctrlKey && e.key === 'x' && this.selectedItems.length > 0) {
+            if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'x' && this.selectedItems.length > 0) {
                 e.preventDefault();
                 this.cutToClipboard();
+                return;
             }
             
             // Ctrl+V 粘贴
-            if (e.ctrlKey && e.key === 'v' && this.clipboard.items.length > 0) {
+            if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'v' && this.clipboard.items.length > 0) {
                 e.preventDefault();
                 this.pasteFromClipboard();
             }
@@ -1463,4 +1648,3 @@ const FilesApp = {
 if (typeof window !== 'undefined') {
     window.FilesApp = FilesApp;
 }
-

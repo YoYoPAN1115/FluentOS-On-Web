@@ -1068,6 +1068,8 @@ body.fluent-v2.dark-mode .control-center {
 }
 
 /* V2 模式下也遵循全局模糊开关 */
+body.fluent-v2.blur-disabled .taskbar,
+body.fluent-v2.blur-disabled .start-menu,
 body.fluent-v2.blur-disabled .control-center,
 body.fluent-v2.blur-disabled .notification-center {
     backdrop-filter: none !important;
@@ -1075,9 +1077,23 @@ body.fluent-v2.blur-disabled .notification-center {
     background: rgba(255, 255, 255, 0.95) !important;
 }
 
+body.fluent-v2.dark-mode.blur-disabled .taskbar,
+body.fluent-v2.dark-mode.blur-disabled .start-menu,
 body.fluent-v2.dark-mode.blur-disabled .control-center,
 body.fluent-v2.dark-mode.blur-disabled .notification-center {
     background: rgba(32, 32, 32, 0.95) !important;
+}
+
+/* V2 模式下关闭全局模糊时，窗口降级为低半透明且无模糊 */
+body.fluent-v2.blur-disabled.window-blur-enabled .window {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.86) !important;
+}
+
+body.fluent-v2.dark-mode.blur-disabled.window-blur-enabled .window {
+    background: rgba(32, 32, 32, 0.82) !important;
+    border-color: rgba(255, 255, 255, 0.10) !important;
 }
 
 /* V2 浏览器应用样式 */

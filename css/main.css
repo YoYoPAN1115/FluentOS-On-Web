@@ -463,6 +463,14 @@ body.animations-enabled .login-card.show {
     border-color: #d13438;
 }
 
+/* Hide browser-native password reveal/clear controls to avoid duplicate eye icon */
+.login-pin-input::-ms-reveal,
+.login-pin-input::-ms-clear {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
 .pin-toggle {
     position: absolute;
     right: 12px;

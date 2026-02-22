@@ -526,8 +526,8 @@ const FingoData = {
             ],
             action: 'none',
             response: {
-                zh: '当前可用快捷键如下（统一 Alt 系）：\n\n- Alt：打开/关闭开始菜单\n- Alt+F：打开 Fingo AI\n- Alt+I：快速打开设置\n- Alt+L：快速锁屏\n- Alt+E：打开文件 App\n- Alt+A：打开控制中心\n- Alt+D：一键最小化所有窗口\n- Alt+M：最小化当前置顶窗口\n- Alt+W：打开任务视图\n\n如果你只是想快速打开开始菜单，直接按一下 Alt 键即可。',
-                en: 'Current shortcuts (all Alt-based):\n\n- Alt: Open/close Start Menu\n- Alt+F: Open Fingo AI\n- Alt+I: Open Settings\n- Alt+L: Lock screen\n- Alt+E: Open Files\n- Alt+A: Open Control Center\n- Alt+D: Minimize all windows\n- Alt+M: Minimize topmost window\n- Alt+W: Open Task View\n\nIf you only want Start Menu, just press Alt once.'
+                zh: '当前可用快捷键如下：\n\n- Alt：打开/关闭开始菜单\n- Alt+F：打开 Fingo AI\n- Alt+I：快速打开设置\n- Alt+L：快速锁屏\n- Alt+E：打开文件 App\n- Alt+A：打开控制中心\n- Ctrl+A：在桌面/文件 App 中全选文件\n- Alt+D：一键最小化所有窗口\n- Alt+M：最小化当前置顶窗口\n- Alt+W：打开任务视图\n\n如果你只是想快速打开开始菜单，直接按一下 Alt 键即可。',
+                en: 'Current shortcuts:\n\n- Alt: Open/close Start Menu\n- Alt+F: Open Fingo AI\n- Alt+I: Open Settings\n- Alt+L: Lock screen\n- Alt+E: Open Files\n- Alt+A: Open Control Center\n- Ctrl+A: Select all files/icons in Desktop or Files\n- Alt+D: Minimize all windows\n- Alt+M: Minimize topmost window\n- Alt+W: Open Task View\n\nIf you only want Start Menu, just press Alt once.'
             }
         },
         // ===== 轻聊天增强 =====
