@@ -2,6 +2,15 @@
  * 文件管理器应用
  */
 const FilesApp = {
+    // 系统受保护的根级文件夹（不可删除/重命名）
+    SYSTEM_ROOT_FOLDERS: ['desktop', 'documents', 'pictures', 'downloads', 'recycle'],
+    // 风险扩展名：禁止通过重命名修改为/修改掉这些扩展名
+    EXECUTABLE_EXTENSIONS: [
+        'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
+        'html', 'htm', 'xhtml', 'svg', 'xml',
+        'bat', 'cmd', 'ps1', 'sh', 'vbs', 'wsf',
+        'exe', 'dll', 'com', 'scr', 'msi', 'jar', 'reg'
+    ],
     windowId: null,
     container: null,
     currentPath: ['root'],
@@ -54,6 +63,14 @@ const FilesApp = {
         this._langHandler = () => { this.render(); this.bindEvents(); };
         State.on('languageChange', this._langHandler);
 
+        // 监听实验室开关变化：动态显示/隐藏“上传”按钮与外部拖拽导入
+        this._settingsHandler = (updates) => {
+            if (updates && Object.prototype.hasOwnProperty.call(updates, 'enableExternalFileImport')) {
+                this.render();
+            }
+        };
+        State.on('settingsChange', this._settingsHandler);
+
         // 如果有传入文件ID，导航到该位置
         if (data.fileId) {
             setTimeout(() => this.navigateToId(data.fileId), 100);
@@ -77,6 +94,27 @@ const FilesApp = {
             id: 'files-search-input',
             onEnter: (query) => this.handleSearch(query.trim())
         });
+
+        const externalEnabled = !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+        let rightArea = searchBox;
+        if (externalEnabled) {
+            const rightWrap = document.createElement('div');
+            rightWrap.style.cssText = 'display:flex; align-items:center; gap:10px;';
+            const uploadBtn = FluentUI.IconButton
+                ? FluentUI.IconButton({
+                    icon: 'Upload',
+                    title: t('files.upload'),
+                    onClick: () => {
+                        if (window.FileImport && typeof FileImport.pickAndImportTo === 'function') {
+                            FileImport.pickAndImportTo(this.currentNode?.id || 'downloads');
+                        }
+                    }
+                })
+                : null;
+            if (uploadBtn) rightWrap.appendChild(uploadBtn);
+            rightWrap.appendChild(searchBox);
+            rightArea = rightWrap;
+        }
         
         const toolbar = FluentUI.NavigationBar({
             showBack: true,
@@ -86,7 +124,7 @@ const FilesApp = {
             onBack: () => this.goBack(),
             onForward: () => this.goForward(),
             center: '<div class="files-breadcrumb" id="files-breadcrumb"></div>',
-            right: searchBox
+            right: rightArea
         });
         toolbar.className = 'files-toolbar fluent-navbar';
         app.appendChild(toolbar);
@@ -102,7 +140,9 @@ const FilesApp = {
                 items: [
                     { id: 'desktop', label: t('files.desktop'), icon: 'Folder' },
                     { id: 'documents', label: t('files.documents'), icon: 'File' },
+                    { id: 'pictures', label: t('files.pictures'), icon: 'Image' },
                     { id: 'downloads', label: t('files.downloads'), icon: 'Download' },
+                    // 回收站固定在最后
                     { id: 'recycle', label: t('files.recycle'), icon: 'Trash' }
                 ]
             }],
@@ -244,6 +284,13 @@ const FilesApp = {
                 background: rgba(0, 120, 212, 0.1);
                 border: 2px dashed var(--accent);
                 border-radius: 8px;
+            }
+
+            /* 文件夹条目作为放置目标 */
+            .file-item.drag-over {
+                background: rgba(0, 120, 212, 0.12);
+                outline: 2px dashed var(--accent);
+                outline-offset: 2px;
             }
             
             /* 拖拽中的图标样式 */
@@ -400,6 +447,10 @@ const FilesApp = {
         menu.addEventListener('click', (e) => {
             const item = e.target.closest('.context-menu-item');
             if (!item) return;
+            if (item.classList.contains('disabled')) {
+                e.stopPropagation();
+                return;
+            }
             const action = item.dataset.action;
             this.handleContextAction(action);
             menu.classList.add('hidden');
@@ -466,14 +517,28 @@ const FilesApp = {
                 const isMultiSelect = this.selectedItems.length > 1;
                 const disabledClass = isMultiSelect ? ' disabled' : '';
                 
+                // 判断是否选中了受保护的根级系统文件夹
+                let protectRename = false;
+                let protectDelete = false;
+                if (this.currentNode && this.currentNode.id === 'root') {
+                    const selectedIds = this.selectedItems.map(el => el.dataset.id);
+                    const hasSystemFolder = selectedIds.some(id => this.SYSTEM_ROOT_FOLDERS.includes(id));
+                    if (hasSystemFolder) {
+                        protectRename = true;
+                        protectDelete = true;
+                    }
+                }
+                const renameClass = disabledClass + (protectRename ? ' disabled' : '');
+                const deleteClass = protectDelete ? ' disabled' : '';
+                
                 menu.innerHTML = `
                     <div class="context-menu-item${disabledClass}" data-action="open"><img src="Theme/Icon/Symbol_icon/stroke/Folder Open.svg" alt=""><span>${t('files.open')}</span></div>
                     <div class="context-menu-separator"></div>
                     <div class="context-menu-item" data-action="copy"><img src="Theme/Icon/Symbol_icon/stroke/Copy.svg" alt=""><span>${t('files.copy')}</span></div>
                     <div class="context-menu-item" data-action="cut"><img src="Theme/Icon/Symbol_icon/stroke/Scissors.svg" alt=""><span>${t('files.cut')}</span></div>
                     <div class="context-menu-separator"></div>
-                    <div class="context-menu-item${disabledClass}" data-action="rename"><img src="Theme/Icon/Symbol_icon/stroke/Edit.svg" alt=""><span>${t('files.rename')}</span></div>
-                    <div class="context-menu-item" data-action="delete"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>${t('files.delete')}${isMultiSelect ? ` (${this.selectedItems.length})` : ''}</span></div>
+                    <div class="context-menu-item${renameClass}" data-action="rename"><img src="Theme/Icon/Symbol_icon/stroke/Edit.svg" alt=""><span>${t('files.rename')}</span></div>
+                    <div class="context-menu-item${deleteClass}" data-action="delete"><img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt=""><span>${t('files.delete')}${isMultiSelect ? ` (${this.selectedItems.length})` : ''}</span></div>
                     <div class="context-menu-separator"></div>
                     <div class="context-menu-item" data-action="${selectAction}"><img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt=""><span>${selectLabel}</span></div>
                     <div class="context-menu-separator"></div>
@@ -779,9 +844,14 @@ const FilesApp = {
 
                 const oldParts = splitFileExt(node.name);
                 const newParts = splitFileExt(newName);
+                const isExecutableExt = (ext) => this.EXECUTABLE_EXTENSIONS.includes(String(ext || '').toLowerCase());
 
                 // 原文件没有扩展名，不做扩展名策略限制
                 if (!oldParts.hasExt) {
+                    if (newParts.hasExt && isExecutableExt(newParts.ext)) {
+                        FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-dangerous'), type: 'warning' });
+                        return;
+                    }
                     applyRename(newName);
                     return;
                 }
@@ -795,6 +865,17 @@ const FilesApp = {
 
                 const oldExt = oldParts.ext.toLowerCase();
                 const nextExt = newParts.ext.toLowerCase();
+
+                if (isExecutableExt(oldExt) && oldExt !== nextExt) {
+                    FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-locked'), type: 'warning' });
+                    return;
+                }
+
+                if (!isExecutableExt(oldExt) && oldExt !== nextExt && isExecutableExt(nextExt)) {
+                    FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-dangerous'), type: 'warning' });
+                    return;
+                }
+
                 if (oldExt !== nextExt) {
                     FluentUI.Dialog({
                         type: 'warning',
@@ -821,6 +902,12 @@ const FilesApp = {
     moveToRecycle(id) {
         const parent = this.currentNode;
         if (!parent || !parent.children) return;
+
+        // 根级系统文件夹不可删除
+        if (parent.id === 'root' && this.SYSTEM_ROOT_FOLDERS.includes(id)) {
+            return;
+        }
+
         const idx = parent.children.findIndex(c => c.id === id);
         if (idx === -1) return;
         const node = parent.children.splice(idx, 1)[0];
@@ -1020,7 +1107,7 @@ const FilesApp = {
         if (!sidebar) return;
         
         // 获取当前路径中的快速访问项目ID
-        const quickAccessIds = ['desktop', 'documents', 'downloads', 'recycle'];
+        const quickAccessIds = ['desktop', 'documents', 'pictures', 'downloads', 'recycle'];
         const currentId = this.currentPath.find(id => quickAccessIds.includes(id));
         
         // 移除所有 active 状态
@@ -1058,7 +1145,37 @@ const FilesApp = {
             return;
         }
 
-        this.currentNode.children.forEach(node => {
+        const getExternalFiles = (dataTransfer) => {
+            const files = dataTransfer && dataTransfer.files;
+            if (files && files.length > 0) return files;
+
+            const items = dataTransfer && dataTransfer.items;
+            if (items && items.length > 0) {
+                const out = [];
+                for (const it of Array.from(items)) {
+                    if (it && it.kind === 'file') {
+                        const f = it.getAsFile && it.getAsFile();
+                        if (f) out.push(f);
+                    }
+                }
+                return out.length ? out : null;
+            }
+            return null;
+        };
+        const hasExternalFiles = (dataTransfer) => {
+            const typeList = Array.from((dataTransfer && dataTransfer.types) || []).map((v) => String(v || ''));
+            return typeList.some((tp) => tp.toLowerCase().includes('file')) || !!getExternalFiles(dataTransfer);
+        };
+
+        const children = this.currentNode.children || [];
+        const displayChildren = (this.currentNode && this.currentNode.id === 'root')
+            ? [
+                ...children.filter(node => node && node.id !== 'recycle'),
+                ...children.filter(node => node && node.id === 'recycle')
+            ]
+            : children;
+
+        displayChildren.forEach(node => {
             const item = document.createElement('div');
             item.className = 'file-item';
             item.dataset.id = node.id;
@@ -1103,6 +1220,36 @@ const FilesApp = {
                 });
                 draggingIds = [node.id];
             });
+
+            // Lab: allow dropping external OS files onto a folder item
+            if (node.type === 'folder') {
+                const externalEnabled = () => !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+                item.addEventListener('dragover', (e) => {
+                    if (!externalEnabled()) return;
+                    if (!hasExternalFiles(e.dataTransfer)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                    item.classList.add('drag-over');
+                });
+                item.addEventListener('dragleave', (e) => {
+                    if (!item.contains(e.relatedTarget)) item.classList.remove('drag-over');
+                });
+                item.addEventListener('drop', (e) => {
+                    if (!externalEnabled()) return;
+                    const files = getExternalFiles(e.dataTransfer);
+                    if (!files || files.length === 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    item.classList.remove('drag-over');
+                    try {
+                        FileImport.importToFolder(node.id, files);
+                    } catch (err) {
+                        console.error('[FilesApp] 外部文件拖入目录失败:', err);
+                    }
+                });
+                item.addEventListener('dragend', () => item.classList.remove('drag-over'));
+            }
 
             filesList.appendChild(item);
         });
@@ -1152,7 +1299,7 @@ const FilesApp = {
             return;
         }
         
-        // 特殊处理：root 的直接子节点（desktop, documents, downloads, recycle）
+        // 特殊处理：root 的直接子节点（desktop, documents, pictures, downloads, recycle）
         const isRootChild = State.fs.root.children && State.fs.root.children.some(c => c.id === id);
         if (isRootChild) {
             this.currentPath = ['root', id];
@@ -1236,18 +1383,24 @@ const FilesApp = {
     },
 
     openFile(node) {
-        if (node.type === 'file') {
-            if (typeof NotesApp !== 'undefined' && NotesApp.openWithContent) {
-                NotesApp.openWithContent(node.name, node.content || '');
-            } else if (typeof WindowManager !== 'undefined') {
-                WindowManager.openApp('notes');
-                setTimeout(() => {
-                    if (typeof NotesApp !== 'undefined' && NotesApp.setDocument) {
-                        NotesApp.setDocument(node.name, node.content || '');
-                    }
-                }, 0);
-            }
-        }
+        this.openNodeWithDefaultApp(node);
+    },
+    
+    getFileExt(name) {
+        const text = String(name || '');
+        const dot = text.lastIndexOf('.');
+        if (dot <= 0 || dot === text.length - 1) return '';
+        return text.slice(dot + 1).toLowerCase();
+    },
+    
+    openNodeWithDefaultApp(node) {
+        if (!node || node.type !== 'file' || typeof WindowManager === 'undefined') return false;
+        const ext = this.getFileExt(node.name);
+        const officeExts = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
+
+        // Office 应用已下线，所有文件统一使用记事本打开
+        WindowManager.openApp('notes', { fileId: node.id });
+        return true;
     },
     
     // 选择相关方法
@@ -1329,8 +1482,29 @@ const FilesApp = {
         const highlightEl = highlightTarget || dropZone;
         const hasFluentPayload = (dataTransfer) => {
             if (!dataTransfer || !dataTransfer.types) return false;
-            const types = Array.from(dataTransfer.types);
-            return types.includes('application/fluent-file') || types.includes('text/plain');
+            const types = Array.from(dataTransfer.types).map((v) => String(v || ''));
+            return types.includes('application/fluent-file');
+        };
+        const externalEnabled = () => !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+        const getExternalFiles = (dataTransfer) => {
+            const files = dataTransfer && dataTransfer.files;
+            if (files && files.length > 0) return files;
+            const items = dataTransfer && dataTransfer.items;
+            if (items && items.length > 0) {
+                const out = [];
+                for (const it of Array.from(items)) {
+                    if (it && it.kind === 'file') {
+                        const f = it.getAsFile && it.getAsFile();
+                        if (f) out.push(f);
+                    }
+                }
+                return out.length ? out : null;
+            }
+            return null;
+        };
+        const hasExternalFiles = (dataTransfer) => {
+            const typeList = Array.from((dataTransfer && dataTransfer.types) || []).map((v) => String(v || ''));
+            return typeList.some((tp) => tp.toLowerCase().includes('file')) || !!getExternalFiles(dataTransfer);
         };
         const parseDropData = (dataTransfer) => {
             const fileData = dataTransfer?.getData('application/fluent-file');
@@ -1357,10 +1531,12 @@ const FilesApp = {
 
         // 允许放置
         dropZone.addEventListener('dragover', (e) => {
-            if (!hasFluentPayload(e.dataTransfer)) return;
+            const internal = hasFluentPayload(e.dataTransfer);
+            const external = externalEnabled() && (hasExternalFiles(e.dataTransfer) || !internal);
+            if (!internal && !external) return;
             e.preventDefault();
             e.stopPropagation();
-            e.dataTransfer.dropEffect = 'move';
+            e.dataTransfer.dropEffect = external ? 'copy' : 'move';
             highlightEl.classList.add('drag-over');
         });
         
@@ -1371,11 +1547,25 @@ const FilesApp = {
         });
         
         dropZone.addEventListener('drop', (e) => {
-            if (!hasFluentPayload(e.dataTransfer)) return;
+            const internal = hasFluentPayload(e.dataTransfer);
+            const external = externalEnabled() && (hasExternalFiles(e.dataTransfer) || !internal);
+            if (!internal && !external) return;
             e.preventDefault();
             e.stopPropagation();
             highlightEl.classList.remove('drag-over');
             
+            // Lab: external file import
+            if (external) {
+                const externalFiles = getExternalFiles(e.dataTransfer);
+                if (!externalFiles || externalFiles.length === 0) return;
+                try {
+                    FileImport.importToFolder(this.currentNode?.id || 'downloads', externalFiles);
+                } catch (err) {
+                    console.error('[FilesApp] 外部文件导入失败:', err);
+                }
+                return;
+            }
+
             const data = parseDropData(e.dataTransfer);
             if (!data || (!data.id && !(Array.isArray(data.ids) && data.ids.length > 0))) return;
             this.handleFileDrop(data);
@@ -1474,8 +1664,18 @@ const FilesApp = {
                 key = String(e.code).slice(3).toLowerCase();
             }
             
-            // Delete键删除
+            // Delete键删除（根级系统文件夹不允许删除）
             if (e.key === 'Delete' && this.selectedItems.length > 0) {
+                // 若当前在 root 且选中包含系统文件夹，则直接拦截
+                if (this.currentNode && this.currentNode.id === 'root') {
+                    const hasSystemFolder = this.selectedItems
+                        .map(el => el.dataset.id)
+                        .some(id => this.SYSTEM_ROOT_FOLDERS.includes(id));
+                    if (hasSystemFolder) {
+                        e.preventDefault();
+                        return;
+                    }
+                }
                 e.preventDefault();
                 this.deleteSelectedItems();
                 return;
@@ -1512,6 +1712,16 @@ const FilesApp = {
     
     deleteSelectedItems() {
         if (this.selectedItems.length === 0) return;
+        
+        // 根级系统文件夹不允许删除
+        if (this.currentNode && this.currentNode.id === 'root') {
+            const hasSystemFolder = this.selectedItems
+                .map(el => el.dataset.id)
+                .some(id => this.SYSTEM_ROOT_FOLDERS.includes(id));
+            if (hasSystemFolder) {
+                return;
+            }
+        }
         
         const recycle = State.findNode('recycle');
         if (!recycle) {

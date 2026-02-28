@@ -251,8 +251,12 @@ const StartMenu = {
                 const node = State.findNode(id);
                 if (!node) return;
                 if (node.type === 'file') {
-                    // 打开文件
-                    WindowManager.openApp('notes', { fileId: id });
+                    if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
+                        const opened = FilesApp.openNodeWithDefaultApp(node);
+                        if (!opened) WindowManager.openApp('notes', { fileId: id });
+                    } else {
+                        WindowManager.openApp('notes', { fileId: id });
+                    }
                     this.close();
                 } else if (node.type === 'folder') {
                     // 打开文件夹
@@ -328,8 +332,12 @@ const StartMenu = {
                 case 'open':
                     // 打开文件或文件夹（真正打开目标而不是固定欢迎页）
                     if (node.type === 'file') {
-                        // 直接用 Notes 打开文件内容
-                        WindowManager.openApp('notes', { fileId: id });
+                        if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
+                            const opened = FilesApp.openNodeWithDefaultApp(node);
+                            if (!opened) WindowManager.openApp('notes', { fileId: id });
+                        } else {
+                            WindowManager.openApp('notes', { fileId: id });
+                        }
                         this.close();
                     } else if (node.type === 'folder') {
                         WindowManager.openApp('files');

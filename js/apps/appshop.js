@@ -12,7 +12,7 @@ const AppShop = {
     searchQuery: '',
     currentCategory: 'all',
     
-    // PWA 应用数据（可从应用商店安装）
+    // 应用数据（可从应用商店安装）
     apps: [
         // 音乐类
         { 
@@ -272,7 +272,6 @@ const AppShop = {
             { id: 'social', name: t('appshop.cat-social'), icon: 'Message Dots' },
             { id: 'shopping', name: t('appshop.cat-shopping'), icon: 'Shopping Cart' },
             { id: 'tools', name: t('appshop.cat-tools'), icon: 'Wrench' },
-            { id: 'office', name: t('appshop.cat-office'), icon: 'Document' },
             { id: 'lifestyle', name: t('appshop.cat-lifestyle'), icon: 'Home' }
         ];
     },

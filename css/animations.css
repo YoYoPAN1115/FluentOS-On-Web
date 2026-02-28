@@ -100,6 +100,17 @@
     }
 }
 
+/* ============ Drag-drop file hint (animated border) ============ */
+@keyframes fileDragDash {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -64; }
+}
+
+@keyframes fileDragGlow {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+}
+
 @keyframes pulse {
     0%, 100% {
         opacity: 1;

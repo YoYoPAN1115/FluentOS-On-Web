@@ -219,6 +219,7 @@ function initModules() {
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
     Fingo.init();
     initGlobalShortcuts();
+    initGlobalFileDragOverlay();
 
     // Fingo 任务栏按钮
     const fingoBtn = document.getElementById('fingo-btn');
@@ -244,6 +245,101 @@ function initModules() {
     console.log('  - NotesApp:', typeof NotesApp !== 'undefined' ? '✓' : '✗');
     console.log('  - BrowserApp:', typeof BrowserApp !== 'undefined' ? '✓' : '✗');
     console.log('  - ClockApp:', typeof ClockApp !== 'undefined' ? '✓' : '✗');
+}
+
+/**
+ * 全局：当检测到拖拽外部文件进入浏览器窗口时，显示四周蓝色动态边框提示
+ * - 仅在 DataTransfer 中包含 Files 时触发（避免影响应用内部拖拽）
+ * - dragover 时 preventDefault，防止浏览器把文件当成“打开/导航”
+ */
+function initGlobalFileDragOverlay() {
+    if (document.getElementById('file-drag-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'file-drag-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+
+    // 纯 CSS 光晕（无任何线条/描边）：在网页四周显示动态蓝色光晕提示
+    const glow = document.createElement('div');
+    glow.className = 'file-drag-overlay-glow';
+    overlay.appendChild(glow);
+    document.body.appendChild(overlay);
+
+    let dragDepth = 0;
+    let hideTimer = null;
+
+    const clearHideTimer = () => {
+        if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+        }
+    };
+
+    const show = () => {
+        clearHideTimer();
+        if (!overlay.classList.contains('show')) {
+            overlay.classList.add('show');
+        }
+    };
+
+    const hideSoon = () => {
+        clearHideTimer();
+        hideTimer = setTimeout(() => {
+            hideTimer = null;
+            overlay.classList.remove('show');
+        }, 60);
+    };
+
+    const isOsFileDrag = (e) => {
+        const dt = e && e.dataTransfer;
+        if (!dt) return false;
+        const files = dt.files;
+        if (files && files.length > 0) return true;
+        const types = Array.from(dt.types || []).map((v) => String(v || '').toLowerCase());
+        return types.includes('files') || types.includes('application/x-moz-file');
+    };
+
+    const onDragEnter = (e) => {
+        if (!isOsFileDrag(e)) return;
+        dragDepth += 1;
+        show();
+    };
+
+    const onDragOver = (e) => {
+        if (!isOsFileDrag(e)) return;
+        // 关键：阻止默认行为，避免把拖入文件当成“打开文件导致离开系统”
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+        show();
+    };
+
+    const onDragLeave = (e) => {
+        // dragleave 在部分浏览器上拿不到 types/files，这里用“当前是否显示”来做降级
+        if (!overlay.classList.contains('show')) return;
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) hideSoon();
+    };
+
+    const onDrop = (e) => {
+        if (isOsFileDrag(e)) {
+            e.preventDefault();
+        }
+        dragDepth = 0;
+        clearHideTimer();
+        overlay.classList.remove('show');
+    };
+
+    // 捕获阶段：更早拿到事件，且仅对“外部文件拖拽”处理
+    document.addEventListener('dragenter', onDragEnter, true);
+    document.addEventListener('dragover', onDragOver, true);
+    document.addEventListener('dragleave', onDragLeave, true);
+    document.addEventListener('drop', onDrop, true);
+
+    window.addEventListener('blur', () => {
+        dragDepth = 0;
+        clearHideTimer();
+        overlay.classList.remove('show');
+    });
 }
 
 /**
@@ -661,10 +757,61 @@ document.addEventListener('cut', (e) => {
  * 阻止默认的拖拽行为
  */
 document.addEventListener('dragover', (e) => {
+    // Always prevent browser's default "open file" behavior on dragover
+    // (drop handling is routed to specific surfaces like Files app / Desktop).
     e.preventDefault();
+    const typeList = Array.from((e.dataTransfer && e.dataTransfer.types) || []).map((v) => String(v || ''));
+    const isInternalFluentDrag = typeList.includes('application/fluent-file');
+    const isFileLikeDrag = typeList.some((tp) => tp.toLowerCase().includes('file'));
+    if (!isInternalFluentDrag && isFileLikeDrag && e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+    }
 });
 
 document.addEventListener('drop', (e) => {
+    // Global fallback: if user drops OS files onto desktop (and nothing else handled it),
+    // import them into Desktop when Lab toggle is enabled.
+    const targetEl = (e && e.target instanceof Element) ? e.target : null;
+    const externalEnabled = !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+    const isDesktopView = !!(typeof State !== 'undefined' && State.view === 'desktop');
+    const inWindow = !!targetEl?.closest('.window');
+    const inTaskbar = !!targetEl?.closest('.taskbar');
+    const inStartMenu = !!targetEl?.closest('.start-menu');
+    const targetDesktopIcon = targetEl?.closest('.desktop-icon');
+
+    const getExternalFiles = (dataTransfer) => {
+        const files = dataTransfer && dataTransfer.files;
+        if (files && files.length > 0) return files;
+        const items = dataTransfer && dataTransfer.items;
+        if (items && items.length > 0) {
+            const out = [];
+            for (const it of Array.from(items)) {
+                if (it && it.kind === 'file') {
+                    const f = it.getAsFile && it.getAsFile();
+                    if (f) out.push(f);
+                }
+            }
+            return out.length ? out : null;
+        }
+        return null;
+    };
+
+    if (externalEnabled && isDesktopView && !inWindow && !inTaskbar && !inStartMenu) {
+        const externalFiles = getExternalFiles(e.dataTransfer);
+        if (externalFiles && externalFiles.length > 0) {
+            e.preventDefault();
+            try {
+                const targetNodeId = targetDesktopIcon?.dataset?.nodeId || '';
+                const targetNode = targetNodeId ? State.findNode(targetNodeId) : null;
+                const destFolderId = (targetNode && targetNode.type === 'folder') ? targetNode.id : 'desktop';
+                FileImport.importToFolder(destFolderId, externalFiles);
+            } catch (err) {
+                console.error('[Main] Desktop external import failed:', err);
+            }
+            return;
+        }
+    }
+
     e.preventDefault();
 });
 

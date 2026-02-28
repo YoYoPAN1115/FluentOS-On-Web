@@ -65,6 +65,7 @@ const Storage = {
                 enableBlur: true,
                 enableAnimation: true,
                 autoEnterFullscreen: true,
+                enableExternalFileImport: false,
                 enableWindowBlur: true,  // 窗口模糊效果
                 enableFluentV2: false,   // 新版实验性 UI
                 pin: '1234',
@@ -127,6 +128,12 @@ const Storage = {
                                     modified: new Date().toISOString()
                                 }
                             ]
+                        },
+                        {
+                            id: 'pictures',
+                            name: '图片',
+                            type: 'folder',
+                            children: []
                         },
                         {
                             id: 'downloads',

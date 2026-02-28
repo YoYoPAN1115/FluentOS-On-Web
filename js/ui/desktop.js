@@ -46,28 +46,98 @@ const Desktop = {
     },
     
     bindDragDropEvents() {
+        const getTargetEl = (e) => (e && e.target instanceof Element) ? e.target : null;
+        const hasFluentPayload = (dataTransfer) => {
+            if (!dataTransfer || !dataTransfer.types) return false;
+            const types = Array.from(dataTransfer.types).map((v) => String(v || ''));
+            return types.includes('application/fluent-file');
+        };
+        const getExternalFiles = (dataTransfer) => {
+            const files = dataTransfer && dataTransfer.files;
+            if (files && files.length > 0) return files;
+            const items = dataTransfer && dataTransfer.items;
+            if (items && items.length > 0) {
+                const out = [];
+                for (const it of Array.from(items)) {
+                    if (it && it.kind === 'file') {
+                        const f = it.getAsFile && it.getAsFile();
+                        if (f) out.push(f);
+                    }
+                }
+                return out.length ? out : null;
+            }
+            return null;
+        };
+        const hasOsFiles = (dataTransfer) => {
+            const typeList = Array.from((dataTransfer && dataTransfer.types) || []).map((v) => String(v || ''));
+            return typeList.some((tp) => tp.toLowerCase().includes('file')) || !!getExternalFiles(dataTransfer);
+        };
+
         // 桌面接收拖拽
         this.element.addEventListener('dragover', (e) => {
-            // 忽略桌面图标、窗口等UI元素（只在空白区域接收）
-            if (e.target.closest('.desktop-icon') || 
-                e.target.closest('.window') ||
-                e.target.closest('.taskbar') ||
-                e.target.closest('.start-menu')) {
+            const targetEl = getTargetEl(e);
+            if (targetEl?.closest('.window') ||
+                targetEl?.closest('.taskbar') ||
+                targetEl?.closest('.start-menu')) {
                 return;
             }
+
+            const internal = hasFluentPayload(e.dataTransfer);
+            const externalEnabled = !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+            const hasExternalFiles = externalEnabled && hasOsFiles(e.dataTransfer);
+            const treatAsExternalCandidate = externalEnabled && !internal;
+
+            // External drag candidate: allow drop on desktop blank area or folder icons.
+            if (hasExternalFiles || treatAsExternalCandidate) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+                this.element.classList.add('drag-over');
+                return;
+            }
+
+            // Internal fluent drag: only treat desktop blank area as move target.
+            if (targetEl?.closest('.desktop-icon')) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
         });
         
+        this.element.addEventListener('dragleave', (e) => {
+            if (!this.element.contains(e.relatedTarget)) {
+                this.element.classList.remove('drag-over');
+            }
+        });
+
         this.element.addEventListener('drop', (e) => {
-            // 忽略桌面图标、窗口等UI元素
-            if (e.target.closest('.desktop-icon') || 
-                e.target.closest('.window') ||
-                e.target.closest('.taskbar') ||
-                e.target.closest('.start-menu')) {
+            const targetEl = getTargetEl(e);
+            if (targetEl?.closest('.window') ||
+                targetEl?.closest('.taskbar') ||
+                targetEl?.closest('.start-menu')) {
                 return;
             }
+
+            // Lab: external file import from OS
+            const internal = hasFluentPayload(e.dataTransfer);
+            const externalEnabled = !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+            if (externalEnabled && !internal) {
+                const externalFiles = getExternalFiles(e.dataTransfer);
+                this.element.classList.remove('drag-over');
+                if (!externalFiles || externalFiles.length === 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const targetIcon = targetEl?.closest('.desktop-icon');
+                const targetNodeId = targetIcon?.dataset?.nodeId || '';
+                const targetNode = targetNodeId ? State.findNode(targetNodeId) : null;
+                const destFolderId = (targetNode && targetNode.type === 'folder') ? targetNode.id : 'desktop';
+                FileImport.importToFolder(destFolderId, externalFiles);
+                return;
+            }
+
+            // Ignore internal drops onto icon targets.
+            if (targetEl?.closest('.desktop-icon')) return;
+
             e.preventDefault();
+            this.element.classList.remove('drag-over');
             
             const fileData = e.dataTransfer.getData('application/fluent-file');
             if (!fileData) return;
@@ -206,12 +276,10 @@ const Desktop = {
         if (node.type === 'folder') {
             return 'Theme/Icon/Symbol_icon/colour/Folder.svg';
         }
-        // 根据文件扩展名选择彩色图标
+        // 根据文件扩展名选择彩色图标（不再依赖已移除的 Word 应用）
         const ext = node.name.split('.').pop().toLowerCase();
         const colourIcons = {
             'txt': 'Theme/Icon/Symbol_icon/colour/txt.svg',
-            'doc': 'Theme/Icon/Symbol_icon/colour/word.svg',
-            'docx': 'Theme/Icon/Symbol_icon/colour/word.svg',
             'xls': 'Theme/Icon/Symbol_icon/colour/excel.svg',
             'xlsx': 'Theme/Icon/Symbol_icon/colour/excel.svg',
             'ppt': 'Theme/Icon/Symbol_icon/colour/ppt.svg',
@@ -391,16 +459,11 @@ const Desktop = {
                         }
                     }, 0);
                 } else if (node.type === 'file') {
-                    if (typeof NotesApp !== 'undefined' && NotesApp.openWithContent) {
-                        NotesApp.openWithContent(node.name, node.content || '');
-                    } else {
-                        WindowManager.openApp('notes');
-                        setTimeout(() => {
-                            if (typeof NotesApp !== 'undefined' && NotesApp.setDocument) {
-                                NotesApp.setDocument(node.name, node.content || '');
-                            }
-                        }, 0);
+                    if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
+                        const opened = FilesApp.openNodeWithDefaultApp(node);
+                        if (opened) return;
                     }
+                    WindowManager.openApp('notes', { fileId: node.id });
                 }
             }
         });
@@ -603,6 +666,7 @@ const Desktop = {
         const allSelected = totalIcons > 0 && this.selectedIcons.length === totalIcons;
         const selectAction = allSelected ? 'deselect-all' : 'select-all';
         const selectLabel = allSelected ? t('desktop.menu.deselect-all') : t('desktop.menu.select-all');
+        const externalEnabled = !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
         this.contextMenu.innerHTML = `
                 <div class="context-menu-item" data-action="refresh">
                     <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
@@ -617,6 +681,11 @@ const Desktop = {
                     <img src="Theme/Icon/Symbol_icon/stroke/File.svg" alt="">
                     <span>${t('desktop.menu.new-text')}</span>
                 </div>
+                ${externalEnabled ? `
+                <div class="context-menu-item" data-action="upload">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Upload.svg" alt="">
+                    <span>${t('desktop.menu.upload')}</span>
+                </div>` : ''}
                 <div class="context-menu-item" data-action="${selectAction}">
                     <img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt="">
                     <span>${selectLabel}</span>
@@ -696,6 +765,12 @@ const Desktop = {
                 State.updateFS(State.fs);
                 break;
             }
+            case 'upload': {
+                if (window.FileImport && typeof FileImport.pickAndImportTo === 'function' && FileImport.enabled()) {
+                    FileImport.pickAndImportTo('desktop');
+                }
+                break;
+            }
             case 'select-all':
                 this.selectAllIcons();
                 break;
@@ -719,6 +794,53 @@ const Desktop = {
                         return true;
                     },
                     onConfirm: (newName) => {
+                        if (node.type === 'file') {
+                            const splitFileExt = (name) => {
+                                const text = String(name || '');
+                                const dotIndex = text.lastIndexOf('.');
+                                if (dotIndex <= 0 || dotIndex === text.length - 1) {
+                                    return {
+                                        hasExt: false,
+                                        base: dotIndex === text.length - 1 ? text.slice(0, -1) : text,
+                                        ext: ''
+                                    };
+                                }
+                                return {
+                                    hasExt: true,
+                                    base: text.slice(0, dotIndex),
+                                    ext: text.slice(dotIndex + 1)
+                                };
+                            };
+                            const extList = (Array.isArray(window.FilesApp?.EXECUTABLE_EXTENSIONS) && window.FilesApp.EXECUTABLE_EXTENSIONS.length > 0)
+                                ? window.FilesApp.EXECUTABLE_EXTENSIONS
+                                : ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'html', 'htm', 'xhtml', 'svg', 'xml', 'bat', 'cmd', 'ps1', 'sh', 'vbs', 'wsf', 'exe', 'dll', 'com', 'scr', 'msi', 'jar', 'reg'];
+                            const isExecutableExt = (ext) => extList.includes(String(ext || '').toLowerCase());
+
+                            const oldParts = splitFileExt(node.name);
+                            const newParts = splitFileExt(newName);
+
+                            if (!oldParts.hasExt) {
+                                if (newParts.hasExt && isExecutableExt(newParts.ext)) {
+                                    FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-dangerous'), type: 'warning' });
+                                    return;
+                                }
+                            } else if (!newParts.hasExt) {
+                                const base = (newParts.base || oldParts.base || newName).replace(/\.+$/g, '') || oldParts.base || 'untitled';
+                                newName = `${base}.${oldParts.ext}`;
+                            } else {
+                                const oldExt = oldParts.ext.toLowerCase();
+                                const nextExt = newParts.ext.toLowerCase();
+                                if (isExecutableExt(oldExt) && oldExt !== nextExt) {
+                                    FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-locked'), type: 'warning' });
+                                    return;
+                                }
+                                if (!isExecutableExt(oldExt) && oldExt !== nextExt && isExecutableExt(nextExt)) {
+                                    FluentUI.Toast({ title: t('files.rename-title'), message: t('files.rename-ext-dangerous'), type: 'warning' });
+                                    return;
+                                }
+                            }
+                        }
+
                         node.name = newName;
                         node.modified = new Date().toISOString();
                         State.updateFS(State.fs);
@@ -785,4 +907,3 @@ const Desktop = {
         return `${base} (${i})${ext}`;
     }
 };
-

@@ -2689,6 +2689,24 @@ const SettingsApp = {
                 }
             })
         }));
+
+        // 外部文件导入（拖拽/上传）开关
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.lab-file-import'),
+            description: t('settings.lab-file-import-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.enableExternalFileImport === true,
+                onChange: (v) => {
+                    State.updateSettings({ enableExternalFileImport: v });
+                    this.addRecentSetting(t('settings.lab-file-import'), v ? t('settings.on') : t('settings.off'), 'lab');
+                    State.addNotification({
+                        title: t('settings.lab-title'),
+                        message: `${t('settings.lab-file-import')}：${v ? t('settings.on') : t('settings.off')}`,
+                        type: 'info'
+                    });
+                }
+            })
+        }));
         
         // ========== 灵翼交互 ==========
         const lingyiSection = this.createSection(t('settings.lingyi'));

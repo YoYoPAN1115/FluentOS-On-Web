@@ -21,7 +21,7 @@ Object.assign(StartMenu, {
         const picturesBtn = document.getElementById('pictures-folder-btn');
         if (picturesBtn) {
             picturesBtn.addEventListener('click', () => {
-                this.openFolder('Pictures');
+                this.openFolder('pictures');
                 this.close();
             });
         }
@@ -30,7 +30,7 @@ Object.assign(StartMenu, {
         const downloadsBtn = document.getElementById('downloads-folder-btn');
         if (downloadsBtn) {
             downloadsBtn.addEventListener('click', () => {
-                this.openFolder('Downloads');
+                this.openFolder('downloads');
                 this.close();
             });
         }
@@ -137,16 +137,32 @@ Object.assign(StartMenu, {
         });
     },
     
-    // 打开文件夹
-    openFolder(folderName) {
-        // 打开文件管理器并导航到指定文件夹
+    // 打开文件夹（通过 FilesApp 导航到真正的文件系统目录）
+    openFolder(folderId) {
+        // 先打开文件管理器窗口
         WindowManager.openApp('files');
-        // TODO: 通知文件管理器导航到特定文件夹
-        State.addNotification({
-            title: '文件管理器',
-            message: `正在打开${folderName}文件夹`,
-            type: 'info'
-        });
+        
+        // 稍作延迟，等待 FilesApp 完成初始化后再导航
+        setTimeout(() => {
+            if (typeof FilesApp !== 'undefined' && typeof FilesApp.navigateToId === 'function') {
+                const node = State && typeof State.findNode === 'function'
+                    ? State.findNode(folderId)
+                    : null;
+                if (node && node.type === 'folder') {
+                    FilesApp.navigateToId(folderId);
+                    return;
+                }
+            }
+            
+            // 兜底：若导航失败，仅给出轻通知，避免点击无响应
+            if (typeof State !== 'undefined' && typeof State.addNotification === 'function') {
+                State.addNotification({
+                    title: '文件管理器',
+                    message: `正在打开 ${folderId} 文件夹`,
+                    type: 'info'
+                });
+            }
+        }, 120);
     },
     
     // 打开最近文件

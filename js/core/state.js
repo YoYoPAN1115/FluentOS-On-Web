@@ -87,6 +87,7 @@ const State = {
         };
         ensureFolder('desktop', '桌面');
         ensureFolder('documents', '文档');
+        ensureFolder('pictures', '图片');
         ensureFolder('downloads', '下载');
         ensureFolder('recycle', '回收站');
         // 保存修复结果
@@ -174,6 +175,7 @@ const State = {
             fingoApiStorageType: 'none',
             fingoApiSaveMode: 'temporary',
             autoEnterFullscreen: true,
+            enableExternalFileImport: false,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
@@ -365,6 +367,19 @@ const State = {
                 document.body.classList.remove('dark-mode');
             }
         }
+        // 广播系统主题变更事件，方便应用（如 Office）实时同步
+        try {
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            const payload = {
+                theme: isDarkMode ? 'dark' : 'light',
+                isDarkMode
+            };
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('systemThemeChanged', { detail: payload }));
+            }
+        } catch (e) {
+            // ignore
+        }
     },
 
     // 应用动画设置
@@ -537,4 +552,3 @@ const State = {
         this.setView('lock');
     }
 };
-
