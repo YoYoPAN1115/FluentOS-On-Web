@@ -276,27 +276,34 @@ body.window-blur-disabled .files-toolbar {
 .settings-app *::-webkit-scrollbar-thumb,
 .files-app *::-webkit-scrollbar-thumb,
 .appshop *::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.25);
+    background: transparent;
     border-radius: 6px;
     border: 1px solid transparent;
     background-clip: padding-box;
+    transition: background-color 180ms ease;
 }
 
-.dark-mode .settings-app *::-webkit-scrollbar-thumb,
-.dark-mode .files-app *::-webkit-scrollbar-thumb,
-.dark-mode .appshop *::-webkit-scrollbar-thumb {
+.settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.dark-mode .settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.dark-mode .files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.dark-mode .appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
 }
 
-.settings-app *::-webkit-scrollbar-thumb:hover,
-.files-app *::-webkit-scrollbar-thumb:hover,
-.appshop *::-webkit-scrollbar-thumb:hover {
+.settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.4);
 }
 
-.dark-mode .settings-app *::-webkit-scrollbar-thumb:hover,
-.dark-mode .files-app *::-webkit-scrollbar-thumb:hover,
-.dark-mode .appshop *::-webkit-scrollbar-thumb:hover {
+.dark-mode .settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.dark-mode .files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.dark-mode .appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.45);
 }
 
@@ -305,12 +312,18 @@ body.window-blur-disabled .files-toolbar {
 .files-app *,
 .appshop * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 180ms ease;
+}
+
+.settings-app .fluent-scrollbar-active,
+.files-app .fluent-scrollbar-active,
+.appshop .fluent-scrollbar-active {
     scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
 }
 
-.dark-mode .settings-app *,
-.dark-mode .files-app *,
-.dark-mode .appshop * {
+.dark-mode .settings-app .fluent-scrollbar-active,
+.dark-mode .files-app .fluent-scrollbar-active,
+.dark-mode .appshop .fluent-scrollbar-active {
     scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
 }
-

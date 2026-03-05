@@ -295,11 +295,21 @@ function initGlobalFileDragOverlay() {
         if (!dt) return false;
         const files = dt.files;
         if (files && files.length > 0) return true;
+        const items = dt.items;
+        if (items && items.length > 0) {
+            for (const item of Array.from(items)) {
+                if (item && item.kind === 'file') return true;
+            }
+        }
         const types = Array.from(dt.types || []).map((v) => String(v || '').toLowerCase());
         return types.includes('files') || types.includes('application/x-moz-file');
     };
+    const externalImportEnabled = () => {
+        return !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+    };
 
     const onDragEnter = (e) => {
+        if (!externalImportEnabled()) return;
         if (!isOsFileDrag(e)) return;
         dragDepth += 1;
         show();
@@ -307,6 +317,12 @@ function initGlobalFileDragOverlay() {
 
     const onDragOver = (e) => {
         if (!isOsFileDrag(e)) return;
+        if (!externalImportEnabled()) {
+            dragDepth = 0;
+            clearHideTimer();
+            overlay.classList.remove('show');
+            return;
+        }
         // 关键：阻止默认行为，避免把拖入文件当成“打开文件导致离开系统”
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';

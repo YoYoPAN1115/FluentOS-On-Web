@@ -16,6 +16,8 @@ const WindowManager = {
     MINIMIZE_DOCK_SCALE: 0.08,
     MINIMIZE_DURATION_MS: 460,
     RESTORE_DURATION_MS: 520,
+    UNSNAP_RESTORE_BLEND_MS: 240,
+    TOP_MAXIMIZE_DWELL_MS: 1500,
     TASKBAR_ICON_FEEDBACK_MS: 280,
     _taskbarAutoHideBound: false,
     _taskbarAutoHideTimer: null,
@@ -80,6 +82,10 @@ const WindowManager = {
 
     _isHoverSnapEnabled() {
         return State.settings.windowHoverSnapEnabled !== false;
+    },
+
+    _isTopEdgeMaximizeEnabled() {
+        return State.settings.windowTopMaximizeEnabled === true;
     },
 
     _getTaskbarElement() {
@@ -344,6 +350,7 @@ const WindowManager = {
         if (!windowData || !windowData.element || windowData.isMinimized) return;
         const el = windowData.element;
         this._clearWindowMotionTimers(windowData);
+        const wasMaximized = windowData.isMaximized === true;
 
         if (fromInterruptedRestore) {
             this._holdWindowCurrentVisualState(windowData);
@@ -368,6 +375,11 @@ const WindowManager = {
         windowData.isMinimized = false;
         el.classList.remove('restoring');
         el.classList.add('minimizing');
+
+        // Sync wallpaper blur transition with minimize motion for maximized windows.
+        if (wasMaximized) {
+            this.updateMaximizedWallpaperEffect();
+        }
 
         const duration = this._effectiveDuration(this.MINIMIZE_DURATION_MS);
         const dockPoint = this.getTaskbarButtonPosition(windowData.appId);
@@ -481,6 +493,16 @@ const WindowManager = {
         return { left, top, width, height };
     },
 
+    _captureWindowBounds(windowElement) {
+        if (!windowElement) return null;
+        return this._clampWindowBounds({
+            left: windowElement.offsetLeft,
+            top: windowElement.offsetTop,
+            width: windowElement.offsetWidth,
+            height: windowElement.offsetHeight
+        });
+    },
+
     _ensureDragSnapHint() {
         if (this._dragSnapHintEl && document.body.contains(this._dragSnapHintEl)) return this._dragSnapHintEl;
         if (!document.body) return null;
@@ -518,7 +540,7 @@ const WindowManager = {
         hint._hideTimer = setTimeout(() => hint.classList.remove('show'), 70);
     },
 
-    _getEdgeSnapLayout(clientX, clientY) {
+    _getEdgeSnapLayout(clientX, clientY, windowTop = null) {
         if (!this._isEdgeSnapEnabled()) return null;
 
         const trigger = this.EDGE_SNAP_TRIGGER;
@@ -529,11 +551,24 @@ const WindowManager = {
 
         const nearLeft = clientX <= trigger;
         const nearRight = clientX >= viewportWidth - trigger;
-        const nearTop = clientY <= cornerTrigger;
+        const maximizeTopTrigger = Math.max(cornerTrigger, Math.min(180, Math.round(viewportHeight * 0.18)));
+        const nearTopCorner = clientY <= cornerTrigger;
+        const nearTopMaximize = clientY <= maximizeTopTrigger;
         const nearBottom = clientY >= viewportHeight - cornerTrigger;
 
-        if (nearLeft && nearTop) return 'top-left';
-        if (nearRight && nearTop) return 'top-right';
+        if (nearLeft && nearTopCorner) return 'top-left';
+        if (nearRight && nearTopCorner) return 'top-right';
+        if (this._isTopEdgeMaximizeEnabled()) {
+            // Fallback for browsers/devices where pointer Y near the top edge is unstable:
+            // if the dragged window itself reaches the top band, keep corners, otherwise maximize.
+            if (Number.isFinite(windowTop) && windowTop <= trigger) {
+                if (nearLeft && nearTopCorner) return 'top-left';
+                if (nearRight && nearTopCorner) return 'top-right';
+                return 'maximize';
+            }
+            // Top edge maximize should work across a wider top area.
+            if (nearTopMaximize) return 'maximize';
+        }
         if (nearLeft && nearBottom) return 'bottom-left';
         if (nearRight && nearBottom) return 'bottom-right';
         if (nearLeft) return 'left-half';
@@ -557,21 +592,43 @@ const WindowManager = {
             width: config.width,
             height: config.height
         };
+        const fallbackBounds = this._clampWindowBounds(fallback);
 
         const rawStore = State.settings && State.settings[this.WINDOW_BOUNDS_KEY];
         const store = (rawStore && typeof rawStore === 'object' && !Array.isArray(rawStore)) ? rawStore : {};
         const saved = store[appId];
-        if (!saved) return { ...this._clampWindowBounds(fallback), snapLayout: null };
+        if (!saved) {
+            return { ...fallbackBounds, snapLayout: null, lastNormalBounds: { ...fallbackBounds } };
+        }
 
         const left = Number(saved.left);
         const top = Number(saved.top);
         const width = Number(saved.width);
         const height = Number(saved.height);
-        if (![left, top, width, height].every(v => Number.isFinite(v))) return { ...this._clampWindowBounds(fallback), snapLayout: null };
+        if (![left, top, width, height].every(v => Number.isFinite(v))) {
+            return { ...fallbackBounds, snapLayout: null, lastNormalBounds: { ...fallbackBounds } };
+        }
+
+        const snapLayout = typeof saved.snapLayout === 'string' ? saved.snapLayout : null;
+        const lastNormalLeft = Number(saved.lastNormalLeft);
+        const lastNormalTop = Number(saved.lastNormalTop);
+        const lastNormalWidth = Number(saved.lastNormalWidth);
+        const lastNormalHeight = Number(saved.lastNormalHeight);
+        const hasLastNormal = [lastNormalLeft, lastNormalTop, lastNormalWidth, lastNormalHeight].every(v => Number.isFinite(v));
+        const currentBounds = this._clampWindowBounds({ left, top, width, height });
+        const lastNormalBounds = hasLastNormal
+            ? this._clampWindowBounds({
+                left: lastNormalLeft,
+                top: lastNormalTop,
+                width: lastNormalWidth,
+                height: lastNormalHeight
+            })
+            : (snapLayout ? { ...fallbackBounds } : { ...currentBounds });
 
         return {
-            ...this._clampWindowBounds({ left, top, width, height }),
-            snapLayout: typeof saved.snapLayout === 'string' ? saved.snapLayout : null
+            ...currentBounds,
+            snapLayout,
+            lastNormalBounds
         };
     },
 
@@ -583,12 +640,14 @@ const WindowManager = {
         if (!windowData || !windowData.element || windowData.isMaximized || windowData.isMinimized) return;
         if (!State || !State.settings) return;
 
-        const bounds = this._clampWindowBounds({
-            left: windowData.element.offsetLeft,
-            top: windowData.element.offsetTop,
-            width: windowData.element.offsetWidth,
-            height: windowData.element.offsetHeight
-        });
+        const bounds = this._captureWindowBounds(windowData.element);
+        if (!bounds) return;
+        if (!windowData.snapLayout) {
+            windowData.lastNormalBounds = { ...bounds };
+        }
+        const lastNormal = windowData.lastNormalBounds
+            ? this._clampWindowBounds(windowData.lastNormalBounds)
+            : null;
 
         const rawStore = State.settings[this.WINDOW_BOUNDS_KEY];
         const prevStore = (rawStore && typeof rawStore === 'object' && !Array.isArray(rawStore)) ? rawStore : {};
@@ -598,7 +657,11 @@ const WindowManager = {
             Number(prev.top) === bounds.top &&
             Number(prev.width) === bounds.width &&
             Number(prev.height) === bounds.height &&
-            (prev.snapLayout || null) === (windowData.snapLayout || null);
+            (prev.snapLayout || null) === (windowData.snapLayout || null) &&
+            Number(prev.lastNormalLeft) === Number(lastNormal && lastNormal.left) &&
+            Number(prev.lastNormalTop) === Number(lastNormal && lastNormal.top) &&
+            Number(prev.lastNormalWidth) === Number(lastNormal && lastNormal.width) &&
+            Number(prev.lastNormalHeight) === Number(lastNormal && lastNormal.height);
         if (same) return;
 
         const nextStore = {
@@ -609,6 +672,10 @@ const WindowManager = {
                 width: bounds.width,
                 height: bounds.height,
                 snapLayout: windowData.snapLayout || null,
+                lastNormalLeft: lastNormal ? lastNormal.left : null,
+                lastNormalTop: lastNormal ? lastNormal.top : null,
+                lastNormalWidth: lastNormal ? lastNormal.width : null,
+                lastNormalHeight: lastNormal ? lastNormal.height : null,
                 updatedAt: Date.now()
             }
         };
@@ -698,6 +765,7 @@ const WindowManager = {
     _getSnapBounds(layoutId) {
         const viewportWidth = Math.max(420, globalThis.innerWidth || 420);
         const viewportHeight = Math.max(320, (globalThis.innerHeight || 320) - this._getTaskbarReservedHeight());
+        const fullscreenHeight = Math.max(320, globalThis.innerHeight || 320);
         const halfWidth = Math.round(viewportWidth / 2);
         const halfHeight = Math.round(viewportHeight / 2);
         const twoThirdWidth = Math.round(viewportWidth * 0.66);
@@ -719,6 +787,8 @@ const WindowManager = {
                 return { left: 0, top: halfHeight, width: halfWidth, height: viewportHeight - halfHeight };
             case 'bottom-right':
                 return { left: halfWidth, top: halfHeight, width: viewportWidth - halfWidth, height: viewportHeight - halfHeight };
+            case 'maximize':
+                return { left: 0, top: 0, width: viewportWidth, height: fullscreenHeight };
             default:
                 return null;
         }
@@ -728,8 +798,22 @@ const WindowManager = {
         const windowData = this._getWindowData(windowId);
         if (!windowData) return;
 
+        if (layoutId === 'maximize') {
+            this._hideSnapMenu(windowData.element, true);
+            this._hideDragSnapHint(true);
+            if (!windowData.isMaximized) {
+                this.toggleMaximize(windowId);
+            }
+            return;
+        }
+
         const bounds = this._getSnapBounds(layoutId);
         if (!bounds) return;
+
+        if (!windowData.isMaximized && !windowData.snapLayout) {
+            const currentBounds = this._captureWindowBounds(windowData.element);
+            if (currentBounds) windowData.lastNormalBounds = { ...currentBounds };
+        }
 
         windowData.element.classList.remove('maximizing', 'unmaximizing', 'maximized');
         windowData.isMaximized = false;
@@ -779,6 +863,9 @@ const WindowManager = {
         const windowId = `window-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
         const initialBounds = this._readWindowBounds(appId, config);
         const windowElement = this.createWindow(windowId, appId, config, initialBounds);
+        const initialLastNormalBounds = initialBounds.lastNormalBounds
+            ? this._clampWindowBounds(initialBounds.lastNormalBounds)
+            : (initialBounds.snapLayout ? null : this._clampWindowBounds(initialBounds));
         
         this.windows.push({
             id: windowId,
@@ -788,7 +875,8 @@ const WindowManager = {
             isMinimizing: false,
             isRestoring: false,
             isMaximized: false,
-            snapLayout: initialBounds.snapLayout || null
+            snapLayout: initialBounds.snapLayout || null,
+            lastNormalBounds: initialLastNormalBounds
         });
 
         this.container.appendChild(windowElement);
@@ -883,6 +971,28 @@ const WindowManager = {
         let initialX;
         let initialY;
         let dragSnapLayout = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let dragStartedFromSnap = false;
+        let dragUnsnapped = false;
+        let topMaximizeReady = false;
+        let topMaximizeTimer = null;
+        let unsnapBlendTimer = null;
+
+        const clearTopMaximizeDwell = () => {
+            if (topMaximizeTimer) {
+                clearTimeout(topMaximizeTimer);
+                topMaximizeTimer = null;
+            }
+            topMaximizeReady = false;
+        };
+
+        const clearUnsnapBlend = () => {
+            if (unsnapBlendTimer) {
+                clearTimeout(unsnapBlendTimer);
+                unsnapBlendTimer = null;
+            }
+        };
 
         // 绑定标题栏拖动事件 - Bind titlebar drag event
         titlebar.addEventListener('pointerdown', (e) => {
@@ -895,12 +1005,18 @@ const WindowManager = {
             this._hideAllSnapMenus(windowElement.id);
             this._hideDragSnapHint(true);
             dragSnapLayout = null;
+            clearTopMaximizeDwell();
+            clearUnsnapBlend();
             
             isDragging = true;
             dragPointerId = e.pointerId;
             dragMoved = false;
-            initialX = e.clientX - windowElement.offsetLeft;
-            initialY = e.clientY - windowElement.offsetTop;
+            dragOffsetX = e.clientX - windowElement.offsetLeft;
+            dragOffsetY = e.clientY - windowElement.offsetTop;
+            initialX = dragOffsetX;
+            initialY = dragOffsetY;
+            dragStartedFromSnap = !!(windowData && windowData.snapLayout);
+            dragUnsnapped = false;
             
             // 禁用过渡以实现平滑拖动 - Disable transition for smooth drag
             windowElement.style.transition = 'none';
@@ -922,6 +1038,53 @@ const WindowManager = {
             if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
             
             e.preventDefault();
+
+            const windowData = this._getWindowData(windowElement.id);
+            if (windowData && dragStartedFromSnap && !dragUnsnapped) {
+                const restoreBounds = windowData.lastNormalBounds
+                    ? this._clampWindowBounds(windowData.lastNormalBounds)
+                    : null;
+                if (restoreBounds) {
+                    clearUnsnapBlend();
+                    const blendMs = Math.max(0, this.UNSNAP_RESTORE_BLEND_MS || 0);
+                    if (blendMs > 0) {
+                        windowElement.style.transition = [
+                            `left ${blendMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                            `top ${blendMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                            `width ${blendMs}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+                            `height ${blendMs}ms cubic-bezier(0.22, 1, 0.36, 1)`
+                        ].join(', ');
+                    }
+                    const snappedWidth = Math.max(1, windowElement.offsetWidth || restoreBounds.width);
+                    const titlebarHeight = Math.max(30, titlebar.offsetHeight || 40);
+                    const ratioX = Math.max(0, Math.min(1, dragOffsetX / snappedWidth));
+                    initialX = Math.min(
+                        Math.max(Math.round(restoreBounds.width * ratioX), 48),
+                        Math.max(48, restoreBounds.width - 48)
+                    );
+                    initialY = Math.min(
+                        Math.max(dragOffsetY, 8),
+                        Math.max(18, titlebarHeight - 6)
+                    );
+                    const restorePlacement = this._clampWindowBounds({
+                        left: e.clientX - initialX,
+                        top: e.clientY - initialY,
+                        width: restoreBounds.width,
+                        height: restoreBounds.height
+                    });
+                    this._applyBoundsToWindow(windowElement, restorePlacement);
+
+                    if (blendMs > 0) {
+                        unsnapBlendTimer = setTimeout(() => {
+                            unsnapBlendTimer = null;
+                            if (isDragging) windowElement.style.transition = 'none';
+                        }, blendMs);
+                    }
+                }
+                windowData.snapLayout = null;
+                dragUnsnapped = true;
+            }
+
             currentX = e.clientX - initialX;
             currentY = e.clientY - initialY;
             dragMoved = true;
@@ -936,13 +1099,32 @@ const WindowManager = {
             windowElement.style.left = `${clamped.left}px`;
             windowElement.style.top = `${clamped.top}px`;
 
-            const edgeLayout = this._getEdgeSnapLayout(e.clientX, e.clientY);
+            const edgeLayout = this._getEdgeSnapLayout(e.clientX, e.clientY, clamped.top);
             if (edgeLayout) {
-                dragSnapLayout = edgeLayout;
-                this._showDragSnapHint(edgeLayout);
+                if (edgeLayout === 'maximize') {
+                    this._hideDragSnapHint(true);
+                    if (topMaximizeReady) {
+                        dragSnapLayout = 'maximize';
+                    } else {
+                        dragSnapLayout = null;
+                        if (!topMaximizeTimer) {
+                            topMaximizeTimer = setTimeout(() => {
+                                topMaximizeTimer = null;
+                                if (!isDragging) return;
+                                topMaximizeReady = true;
+                                dragSnapLayout = 'maximize';
+                            }, this.TOP_MAXIMIZE_DWELL_MS);
+                        }
+                    }
+                } else {
+                    clearTopMaximizeDwell();
+                    dragSnapLayout = edgeLayout;
+                    this._showDragSnapHint(edgeLayout);
+                }
             } else {
+                clearTopMaximizeDwell();
                 dragSnapLayout = null;
-                this._hideDragSnapHint();
+                this._hideDragSnapHint(true);
             }
         });
 
@@ -971,6 +1153,10 @@ const WindowManager = {
                     }
                 }
                 dragSnapLayout = null;
+                dragStartedFromSnap = false;
+                dragUnsnapped = false;
+                clearTopMaximizeDwell();
+                clearUnsnapBlend();
                 this._hideDragSnapHint();
             }
         };
@@ -1218,12 +1404,15 @@ const WindowManager = {
                 windowData.element.style.width = windowData.savedBounds.width;
                 windowData.element.style.height = windowData.savedBounds.height;
             }
+            const restoredBounds = this._captureWindowBounds(windowData.element);
+            if (restoredBounds) windowData.lastNormalBounds = { ...restoredBounds };
             
             setTimeout(() => {
                 windowData.element.classList.remove('unmaximizing');
             }, 550);
             
             windowData.isMaximized = false;
+            windowData.snapLayout = null;
             
             // 应用最大化样式 - Apply maximized styles
             requestAnimationFrame(() => {
@@ -1231,6 +1420,10 @@ const WindowManager = {
             });
             this._persistWindowBounds(windowData);
         } else {
+            const currentBounds = this._captureWindowBounds(windowData.element);
+            if (currentBounds && (!windowData.snapLayout || !windowData.lastNormalBounds)) {
+                windowData.lastNormalBounds = { ...currentBounds };
+            }
             windowData.savedBounds = {
                 left: windowData.element.style.left,
                 top: windowData.element.style.top,
@@ -1249,6 +1442,7 @@ const WindowManager = {
             }, 550);
             
             windowData.isMaximized = true;
+            windowData.snapLayout = null;
             
             // 更新壁纸效果 - Update wallpaper effect
             this.updateMaximizedWallpaperEffect();
@@ -1257,7 +1451,13 @@ const WindowManager = {
     
     // 更新最大化窗口的壁纸效果 - Update wallpaper effect for maximized windows
     updateMaximizedWallpaperEffect() {
-        const hasMaximized = this.windows.some(w => w.isMaximized && !w.isMinimized && w.element && w.element.style.display !== 'none');
+        const hasMaximized = this.windows.some(w =>
+            w.isMaximized &&
+            !w.isMinimized &&
+            !w.isMinimizing &&
+            w.element &&
+            w.element.style.display !== 'none'
+        );
         const taskbar = this._getTaskbarElement();
         
         if (hasMaximized) {
@@ -1334,12 +1534,24 @@ const WindowManager = {
     },
     
     getTaskbarButtonPosition(appId) {
+        const taskbar = this._getTaskbarElement();
         const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
         if (taskbarBtn) {
             const rect = taskbarBtn.getBoundingClientRect();
+            let y = rect.top + rect.height / 2;
+
+            // Compensate auto-hide translation so the trajectory points to the
+            // icon's visible resting position even when taskbar is hidden.
+            const taskbarHidden = !!(taskbar && (taskbar.classList.contains('hidden') || taskbar.classList.contains('hiding')));
+            if (taskbarHidden) {
+                const hiddenOffset = Math.max(0, (taskbar.offsetHeight || 0) + 30);
+                y -= hiddenOffset;
+                this._showTaskbarForAutoHide(taskbar);
+            }
+
             return {
                 x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2
+                y
             };
         }
         return this._getMinimizeDockPoint();

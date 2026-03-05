@@ -46,12 +46,271 @@ const FluentUI = {
     },
 
     // ============ 按钮 ============
+    _nativeScrollFxInitialized: false,
+    _nativeScrollHideTimers: new WeakMap(),
+    _nativeScrollBounceStates: new WeakMap(),
+    _nativeScrollUseTranslate: null,
+
+    initNativeScrollEffects() {
+        if (this._nativeScrollFxInitialized || typeof document === 'undefined') return;
+        this._nativeScrollFxInitialized = true;
+
+        const HOST_SELECTOR = '.window-content, .settings-app, .files-app, .appshop, .fluent-sidebar, .fluent-select-dropdown, .fluent-modal-content';
+        const HIDE_DELAY = 4000;
+        const BOUNCE_MAX_OFFSET = 22;
+        const BOUNCE_MAX_VELOCITY = 10;
+        const BOUNCE_IMPULSE_FACTOR = 0.022;
+        const BOUNCE_IMPULSE_MAX = 4.8;
+        const BOUNCE_SPRING = 0.17;
+        const BOUNCE_DAMPING = 0.8;
+        const BOUNCE_REST_OFFSET = 0.08;
+        const BOUNCE_REST_VELOCITY = 0.08;
+        this._nativeScrollUseTranslate = this._nativeScrollUseTranslate === null
+            ? ('translate' in document.documentElement.style)
+            : this._nativeScrollUseTranslate;
+        const useTranslate = this._nativeScrollUseTranslate === true;
+
+        const isScrollableElement = (el) => {
+            if (!(el instanceof HTMLElement)) return false;
+            const style = window.getComputedStyle(el);
+            const overflowY = style.overflowY;
+            const canScroll = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+            return canScroll && el.scrollHeight > el.clientHeight + 1;
+        };
+
+        const isInScope = (el) => {
+            if (!(el instanceof Element)) return false;
+            return el.matches(HOST_SELECTOR) || !!el.closest(HOST_SELECTOR);
+        };
+
+        const findScrollable = (start) => {
+            let current = start instanceof Element ? start : null;
+            while (current && current !== document.body) {
+                if (current.classList.contains('fluent-scroll-viewport')) return null;
+                if (isScrollableElement(current) && isInScope(current)) return current;
+                current = current.parentElement;
+            }
+            return null;
+        };
+
+        const markScrollableActive = (scrollable) => {
+            if (!scrollable || !isInScope(scrollable)) return;
+            const prevTimer = this._nativeScrollHideTimers.get(scrollable);
+            if (prevTimer) clearTimeout(prevTimer);
+            scrollable.classList.add('fluent-scrollbar-active');
+            const timer = setTimeout(() => {
+                scrollable.classList.remove('fluent-scrollbar-active');
+                this._nativeScrollHideTimers.delete(scrollable);
+            }, HIDE_DELAY);
+            this._nativeScrollHideTimers.set(scrollable, timer);
+        };
+
+        const collectTopLevelTargets = (scrollable) => {
+            if (!(scrollable instanceof Element)) return [];
+            const blocks = Array.from(scrollable.children)
+                .filter((el) => el instanceof HTMLElement)
+                .filter((el) => !el.classList.contains('window-edge-snap-hint'))
+                .filter((el) => !el.classList.contains('window-snap-layout-menu'));
+            return blocks;
+        };
+
+        const normalizeTargets = (targets, scrollable) => {
+            const targetList = Array.isArray(targets) ? targets : [];
+            if (targetList.length === 0) return [scrollable];
+            const unique = [];
+            const seen = new Set();
+            targetList.forEach((el) => {
+                if (!(el instanceof Element)) return;
+                if (!el.isConnected) return;
+                if (seen.has(el)) return;
+                seen.add(el);
+                unique.push(el);
+            });
+            if (unique.length === 0) return [scrollable];
+            return unique;
+        };
+
+        const getBounceTargets = (scrollable) => {
+            if (!(scrollable instanceof Element)) return [scrollable];
+            const isSettingsContent = scrollable.classList.contains('settings-content');
+            const isSidebar = scrollable.classList.contains('fluent-sidebar');
+            const isFilesContent = scrollable.classList.contains('files-content');
+            const isAppShopContent = scrollable.classList.contains('appshop-content');
+            const isWindowContent = scrollable.classList.contains('window-content');
+            const isModalContent = scrollable.classList.contains('fluent-modal-content');
+            const isSelectDropdown = scrollable.classList.contains('fluent-select-dropdown');
+
+            if (isSidebar) {
+                const sidebarTargets = Array.from(scrollable.querySelectorAll([
+                    '.fluent-sidebar-item',
+                    '.fluent-sidebar-section-title',
+                    '.fluent-sidebar-header > *'
+                ].join(', '))).filter((el) => el instanceof Element);
+                return normalizeTargets(sidebarTargets, scrollable);
+            }
+
+            if (isSettingsContent) {
+                const sections = collectTopLevelTargets(scrollable);
+                if (sections.length > 0) return normalizeTargets(sections, scrollable);
+                const settingsFallback = Array.from(scrollable.querySelectorAll([
+                    '.fluent-setting-item',
+                    '.settings-recommend-item',
+                    '.settings-recent-item',
+                    '.network-hero-card',
+                    '.network-option-item',
+                    '.network-expand-panel',
+                    '.app-list-item',
+                    '.wallpaper-item'
+                ].join(', '))).filter((el) => el instanceof Element);
+                return normalizeTargets(settingsFallback, scrollable);
+            }
+
+            if (isFilesContent || isAppShopContent || isModalContent || isSelectDropdown || isWindowContent) {
+                const topLevel = collectTopLevelTargets(scrollable);
+                return normalizeTargets(topLevel, scrollable);
+            }
+
+            const fallback = collectTopLevelTargets(scrollable);
+            return normalizeTargets(fallback, scrollable);
+        };
+
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+        const applyBounceOffset = (state) => {
+            if (!state || !state.targets || state.targets.length === 0) return;
+            if (Math.abs(state.offset) < 0.01) {
+                state.targets.forEach((el) => {
+                    if (useTranslate) {
+                        el.style.translate = '';
+                    } else {
+                        el.style.transform = '';
+                    }
+                    el.style.willChange = '';
+                });
+                return;
+            }
+            const translateValue = `0 ${state.offset.toFixed(3)}px`;
+            const transformValue = `translate3d(0, ${state.offset.toFixed(3)}px, 0)`;
+            state.targets.forEach((el) => {
+                el.style.willChange = 'transform';
+                if (useTranslate) {
+                    el.style.translate = translateValue;
+                } else {
+                    el.style.transform = transformValue;
+                }
+            });
+        };
+
+        const stopBounce = (state) => {
+            if (!state) return;
+            if (state.rafId) {
+                cancelAnimationFrame(state.rafId);
+                state.rafId = 0;
+            }
+            state.offset = 0;
+            state.velocity = 0;
+            applyBounceOffset(state);
+        };
+
+        const ensureBounceState = (scrollable) => {
+            let state = this._nativeScrollBounceStates.get(scrollable);
+            if (!state) {
+                state = {
+                    scrollable,
+                    targets: getBounceTargets(scrollable),
+                    offset: 0,
+                    velocity: 0,
+                    rafId: 0,
+                    lastTargetSyncAt: 0
+                };
+                this._nativeScrollBounceStates.set(scrollable, state);
+            }
+            const now = performance.now();
+            const needsRefresh = (now - state.lastTargetSyncAt) > 140 ||
+                !state.targets ||
+                state.targets.length === 0 ||
+                state.targets.some((el) => !el.isConnected);
+            if (needsRefresh) {
+                state.targets = getBounceTargets(scrollable);
+                state.lastTargetSyncAt = now;
+            }
+            return state;
+        };
+
+        const startBounceLoop = (state) => {
+            if (!state || state.rafId) return;
+            const tick = () => {
+                const host = state.scrollable;
+                if (!(host instanceof Element) || !host.isConnected) {
+                    stopBounce(state);
+                    return;
+                }
+
+                const prevOffset = state.offset;
+                state.velocity += (-state.offset) * BOUNCE_SPRING;
+                state.velocity *= BOUNCE_DAMPING;
+                const nextOffset = clamp(state.offset + state.velocity, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
+                const crossedZero = (prevOffset > 0 && nextOffset < 0) || (prevOffset < 0 && nextOffset > 0);
+                if (crossedZero) {
+                    stopBounce(state);
+                    return;
+                }
+                state.offset = nextOffset;
+                applyBounceOffset(state);
+
+                if (Math.abs(state.offset) <= BOUNCE_REST_OFFSET && Math.abs(state.velocity) <= BOUNCE_REST_VELOCITY) {
+                    stopBounce(state);
+                    return;
+                }
+
+                state.rafId = requestAnimationFrame(tick);
+            };
+            state.rafId = requestAnimationFrame(tick);
+        };
+
+        const pushBounceImpulse = (scrollable, deltaY) => {
+            if (!scrollable || !isInScope(scrollable)) return;
+            const state = ensureBounceState(scrollable);
+            const impulse = clamp(-deltaY * BOUNCE_IMPULSE_FACTOR, -BOUNCE_IMPULSE_MAX, BOUNCE_IMPULSE_MAX);
+            state.velocity = clamp(state.velocity + impulse, -BOUNCE_MAX_VELOCITY, BOUNCE_MAX_VELOCITY);
+            state.offset = clamp(state.offset + impulse * 0.55, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
+            applyBounceOffset(state);
+            startBounceLoop(state);
+        };
+
+        document.addEventListener('wheel', (e) => {
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            const scrollable = findScrollable(e.target);
+            if (!scrollable) return;
+
+            markScrollableActive(scrollable);
+            const maxScroll = Math.max(0, scrollable.scrollHeight - scrollable.clientHeight);
+            if (maxScroll <= 0) return;
+
+            const atTop = scrollable.scrollTop <= 0;
+            const atBottom = scrollable.scrollTop >= maxScroll - 1;
+            if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                e.preventDefault();
+                pushBounceImpulse(scrollable, e.deltaY);
+            }
+        }, { capture: true, passive: false });
+
+        document.addEventListener('scroll', (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+            if (!isScrollableElement(target) || !isInScope(target)) return;
+            if (target.classList.contains('fluent-scroll-viewport')) return;
+            markScrollableActive(target);
+        }, true);
+    },
+
     Button(opts = {}) {
         const { text = '', variant = 'secondary', size = 'medium', icon = null, iconPosition = 'left',
                 disabled = false, loading = false, onClick = null, id = null, className = '' } = opts;
         const btn = this._utils.createElement('button', {
             className: this._utils.classNames('fluent-btn', `fluent-btn-${variant}`, `fluent-btn-${size}`, loading && 'fluent-btn-loading', className),
-            id
+            id,
+            attrs: { type: 'button' }
         });
         btn.disabled = disabled || loading;
         let html = loading ? '<span class="fluent-btn-spinner"></span>' : '';
@@ -67,7 +326,7 @@ const FluentUI = {
         const { icon, title = '', size = 'medium', disabled = false, onClick = null, id = null, className = '' } = opts;
         const btn = this._utils.createElement('button', {
             className: this._utils.classNames('fluent-icon-btn', `fluent-icon-btn-${size}`, className),
-            id, attrs: { title }
+            id, attrs: { title, type: 'button' }
         });
         btn.disabled = disabled;
         btn.innerHTML = `<img src="${this._utils.getIconPath(icon)}" alt="${title}">`;
@@ -91,7 +350,7 @@ const FluentUI = {
             });
             let content = tab.icon ? `<img src="${this._utils.getIconPath(tab.icon)}" class="fluent-tab-icon" alt="">` : '';
             content += `<span class="fluent-tab-label">${tab.label}</span>`;
-            if (tab.closable !== false) content += `<button class="fluent-tab-close" data-tab-id="${tab.id}"><img src="${this._utils.getIconPath('Cancel')}" alt="关闭"></button>`;
+            if (tab.closable !== false) content += `<button type="button" class="fluent-tab-close" data-tab-id="${tab.id}"><img src="${this._utils.getIconPath('Cancel')}" alt="关闭"></button>`;
             tabEl.innerHTML = content;
             tabEl.addEventListener('click', e => { if (!e.target.closest('.fluent-tab-close') && onTabChange) onTabChange(tab.id); });
             const closeBtn = tabEl.querySelector('.fluent-tab-close');
@@ -219,7 +478,7 @@ const FluentUI = {
         input.addEventListener('keydown', e => { if (e.key === 'Enter' && onEnter) onEnter(input.value); });
         wrapper.appendChild(input);
         if (clearable) {
-            const clearBtn = this._utils.createElement('button', { className: 'fluent-input-clear', html: `<img src="${this._utils.getIconPath('Cancel')}" alt="清除">`, styles: { display: value ? 'flex' : 'none' } });
+            const clearBtn = this._utils.createElement('button', { className: 'fluent-input-clear', attrs: { type: 'button' }, html: `<img src="${this._utils.getIconPath('Cancel')}" alt="清除">`, styles: { display: value ? 'flex' : 'none' } });
             clearBtn.addEventListener('click', () => { input.value = ''; clearBtn.style.display = 'none'; onChange && onChange(''); input.focus(); });
             wrapper.appendChild(clearBtn);
         }
@@ -430,16 +689,96 @@ const FluentUI = {
         };
         appendContent(content);
 
+        const SCROLLBAR_HIDE_DELAY = 4000;
+        const BOUNCE_MAX_OFFSET = 22;
+        const BOUNCE_MAX_VELOCITY = 10;
+        const BOUNCE_IMPULSE_FACTOR = 0.022;
+        const BOUNCE_IMPULSE_MAX = 4.8;
+        const BOUNCE_SPRING = 0.17;
+        const BOUNCE_DAMPING = 0.8;
+        const BOUNCE_REST_OFFSET = 0.08;
+        const BOUNCE_REST_VELOCITY = 0.08;
+        const useTranslate = ('translate' in viewport.style);
+
         let hideTimer = null;
         let dragging = false;
         let dragStartY = 0;
         let dragStartScroll = 0;
+        let bounceOffset = 0;
+        let bounceVelocity = 0;
+        let bounceRafId = 0;
 
         const getMetrics = () => {
             const viewportHeight = viewport.clientHeight;
             const scrollHeight = viewport.scrollHeight;
             const maxScroll = Math.max(0, scrollHeight - viewportHeight);
             return { viewportHeight, scrollHeight, maxScroll };
+        };
+
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+        const applyBounceOffset = () => {
+            if (Math.abs(bounceOffset) < 0.01) {
+                if (useTranslate) {
+                    viewport.style.translate = '';
+                } else {
+                    viewport.style.transform = '';
+                }
+                viewport.style.willChange = '';
+                return;
+            }
+            viewport.style.willChange = 'transform';
+            if (useTranslate) {
+                viewport.style.translate = `0 ${bounceOffset.toFixed(3)}px`;
+            } else {
+                viewport.style.transform = `translate3d(0, ${bounceOffset.toFixed(3)}px, 0)`;
+            }
+        };
+
+        const stopBounce = () => {
+            if (bounceRafId) {
+                cancelAnimationFrame(bounceRafId);
+                bounceRafId = 0;
+            }
+            bounceOffset = 0;
+            bounceVelocity = 0;
+            applyBounceOffset();
+        };
+
+        const startBounceLoop = () => {
+            if (bounceRafId) return;
+            const tick = () => {
+                if (!viewport.isConnected) {
+                    stopBounce();
+                    return;
+                }
+                const prevOffset = bounceOffset;
+                bounceVelocity += (-bounceOffset) * BOUNCE_SPRING;
+                bounceVelocity *= BOUNCE_DAMPING;
+                const nextOffset = clamp(bounceOffset + bounceVelocity, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
+                const crossedZero = (prevOffset > 0 && nextOffset < 0) || (prevOffset < 0 && nextOffset > 0);
+                if (crossedZero) {
+                    stopBounce();
+                    return;
+                }
+                bounceOffset = nextOffset;
+                applyBounceOffset();
+
+                if (Math.abs(bounceOffset) <= BOUNCE_REST_OFFSET && Math.abs(bounceVelocity) <= BOUNCE_REST_VELOCITY) {
+                    stopBounce();
+                    return;
+                }
+                bounceRafId = requestAnimationFrame(tick);
+            };
+            bounceRafId = requestAnimationFrame(tick);
+        };
+
+        const pushBounceImpulse = (deltaY) => {
+            const impulse = clamp(-deltaY * BOUNCE_IMPULSE_FACTOR, -BOUNCE_IMPULSE_MAX, BOUNCE_IMPULSE_MAX);
+            bounceVelocity = clamp(bounceVelocity + impulse, -BOUNCE_MAX_VELOCITY, BOUNCE_MAX_VELOCITY);
+            bounceOffset = clamp(bounceOffset + impulse * 0.55, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
+            applyBounceOffset();
+            startBounceLoop();
         };
 
         const refresh = () => {
@@ -463,7 +802,8 @@ const FluentUI = {
         const markScrolling = () => {
             area.classList.add('scrolling');
             clearTimeout(hideTimer);
-            hideTimer = setTimeout(() => area.classList.remove('scrolling'), 460);
+            if (alwaysVisible) return;
+            hideTimer = setTimeout(() => area.classList.remove('scrolling'), SCROLLBAR_HIDE_DELAY);
         };
 
         const setScrollByThumbTop = (top) => {
@@ -510,6 +850,25 @@ const FluentUI = {
             setScrollByThumbTop(targetTop);
         });
 
+        const onWheel = (e) => {
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            const { maxScroll } = getMetrics();
+            if (maxScroll <= 0) return;
+
+            const atTop = viewport.scrollTop <= 0;
+            const atBottom = viewport.scrollTop >= maxScroll - 1;
+            if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                e.preventDefault();
+                pushBounceImpulse(e.deltaY);
+                markScrolling();
+                return;
+            }
+
+            markScrolling();
+        };
+
+        viewport.addEventListener('wheel', onWheel, { passive: false });
+
         viewport.addEventListener('scroll', () => {
             refresh();
             markScrolling();
@@ -543,6 +902,8 @@ const FluentUI = {
         area.destroy = () => {
             stopDrag();
             clearTimeout(hideTimer);
+            stopBounce();
+            viewport.removeEventListener('wheel', onWheel);
             window.removeEventListener('resize', onResize);
             if (resizeObserver) resizeObserver.disconnect();
             if (mutationObserver) mutationObserver.disconnect();
@@ -577,12 +938,12 @@ const FluentUI = {
         
         let html = '<div class="fluent-modal-header">';
         html += `<span class="fluent-modal-title">${title}</span>`;
-        if (closable) html += `<button class="fluent-modal-close"><img src="${this._utils.getIconPath('Cancel')}" alt="关闭"></button>`;
+        if (closable) html += `<button type="button" class="fluent-modal-close"><img src="${this._utils.getIconPath('Cancel')}" alt="关闭"></button>`;
         html += '</div>';
         html += `<div class="fluent-modal-content">${typeof content === 'string' ? content : ''}</div>`;
         if (buttons.length > 0) {
             html += '<div class="fluent-modal-footer">';
-            buttons.forEach((btn, i) => { html += `<button class="fluent-btn fluent-btn-${btn.variant || (i === buttons.length - 1 ? 'primary' : 'secondary')}" data-btn-idx="${i}">${btn.text}</button>`; });
+            buttons.forEach((btn, i) => { html += `<button type="button" class="fluent-btn fluent-btn-${btn.variant || (i === buttons.length - 1 ? 'primary' : 'secondary')}" data-btn-idx="${i}">${btn.text}</button>`; });
             html += '</div>';
         }
         modal.innerHTML = html;
@@ -936,7 +1297,7 @@ const FluentUI = {
                 ${title ? `<div class="fluent-toast-title">${title}</div>` : ''}
                 ${message ? `<div class="fluent-toast-message">${message}</div>` : ''}
             </div>
-            <button class="fluent-toast-close">
+            <button type="button" class="fluent-toast-close">
                 <img src="${this._utils.getIconPath('Cancel')}" alt="关闭">
             </button>
         `;
@@ -987,4 +1348,7 @@ const FluentUI = {
 };
 
 // 导出到全局
-if (typeof window !== 'undefined') window.FluentUI = FluentUI;
+if (typeof window !== 'undefined') {
+    window.FluentUI = FluentUI;
+    FluentUI.initNativeScrollEffects();
+}

@@ -5,9 +5,19 @@ const SettingsApp = {
     windowId: null,
     container: null,
     currentPage: 'overview',
+    _aboutDevTapCount: 0,
+    _developerModeVisible: false,
+    _pageScrollTop: {},
+    _scrollRestoreRaf: null,
+    _scrollRestoreTimer: null,
+    _lastRestoredScrollKey: '',
+    _lastScrollRestoreAt: 0,
+    _sidebarScrollTop: 0,
+    _sidebarScrollRestoreRaf: null,
+    _sidebarScrollRestoreTimer: null,
 
     getPages() {
-        return [
+        const pages = [
             { id: 'overview', label: 'settings.overview', icon: 'Home', desc: t('settings.overview-desc') },
             { id: 'user', label: 'settings.user', icon: 'User Circle', desc: t('settings.user-desc') },
             { id: 'network', label: 'settings.network', icon: 'Globe', desc: t('settings.network-desc') },
@@ -20,6 +30,15 @@ const SettingsApp = {
             { id: 'lab', label: 'settings.lab', icon: 'Tube', desc: t('settings.lab-desc') },
             { id: 'about', label: 'settings.about', icon: 'Information Circle', desc: t('settings.about-desc') }
         ];
+        if (this._developerModeVisible === true) {
+            pages.push({
+                id: 'developer',
+                label: 'settings.developer',
+                icon: 'Tube',
+                desc: t('settings.developer-desc')
+            });
+        }
+        return pages;
     },
     
     // 应用大小缓存（随机生成一次后保持不变）
@@ -52,6 +71,28 @@ const SettingsApp = {
         this.container = document.getElementById(`${this.windowId}-content`);
         // 默认打开概览页
         this.currentPage = 'overview';
+        this._aboutDevTapCount = 0;
+        this._developerModeVisible = false;
+        this._pageScrollTop = {};
+        this._sidebarScrollTop = 0;
+        if (this._scrollRestoreRaf) {
+            cancelAnimationFrame(this._scrollRestoreRaf);
+            this._scrollRestoreRaf = null;
+        }
+        if (this._scrollRestoreTimer) {
+            clearTimeout(this._scrollRestoreTimer);
+            this._scrollRestoreTimer = null;
+        }
+        this._lastRestoredScrollKey = '';
+        this._lastScrollRestoreAt = 0;
+        if (this._sidebarScrollRestoreRaf) {
+            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
+            this._sidebarScrollRestoreRaf = null;
+        }
+        if (this._sidebarScrollRestoreTimer) {
+            clearTimeout(this._sidebarScrollRestoreTimer);
+            this._sidebarScrollRestoreTimer = null;
+        }
         this.render();
         
         // 监听语言切换事件
@@ -77,8 +118,150 @@ const SettingsApp = {
         }
     },
 
+    _getScrollRouteKey(content = null) {
+        const pageId = (content && content.dataset && content.dataset.pageId) || this.currentPage || 'overview';
+        if (pageId === 'app-detail') {
+            const appId = (content && content.dataset && content.dataset.detailAppId) ||
+                (this.currentAppDetail && this.currentAppDetail.id) ||
+                'unknown';
+            return `app-detail:${appId}`;
+        }
+        return pageId;
+    },
+
+    _saveCurrentScrollPosition() {
+        if (!this.container) return;
+        const content = this.container.querySelector('.settings-content');
+        if (!content) return;
+        const scrollKey = this._getScrollRouteKey(content);
+        const prevTop = this._pageScrollTop[scrollKey];
+        const nextTop = content.scrollTop;
+        const restoreGap = performance.now() - this._lastScrollRestoreAt;
+        const isTransientReset = scrollKey === this._lastRestoredScrollKey &&
+            restoreGap < 260 &&
+            Number.isFinite(prevTop) &&
+            prevTop > 2 &&
+            nextTop <= 1;
+        if (isTransientReset) return;
+        this._pageScrollTop[scrollKey] = nextTop;
+    },
+
+    _restoreScrollPosition(content) {
+        if (!content) return;
+        const scrollKey = this._getScrollRouteKey(content);
+        const savedTop = this._pageScrollTop[scrollKey];
+        if (!Number.isFinite(savedTop)) return;
+        if (this._scrollRestoreRaf) {
+            cancelAnimationFrame(this._scrollRestoreRaf);
+        }
+        if (this._scrollRestoreTimer) {
+            clearTimeout(this._scrollRestoreTimer);
+            this._scrollRestoreTimer = null;
+        }
+
+        let frameCount = 0;
+        const maxFrames = 8;
+        const applyRestore = () => {
+            if (!content.isConnected) {
+                this._scrollRestoreRaf = null;
+                return;
+            }
+
+            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
+            const targetTop = Math.min(savedTop, maxScroll);
+            if (Math.abs(content.scrollTop - targetTop) > 1) {
+                content.scrollTop = targetTop;
+            }
+
+            frameCount += 1;
+            const stillGrowing = savedTop > maxScroll + 1 && frameCount < maxFrames;
+            if (stillGrowing) {
+                this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
+                return;
+            }
+
+            this._lastRestoredScrollKey = scrollKey;
+            this._lastScrollRestoreAt = performance.now();
+            this._scrollRestoreRaf = null;
+        };
+        this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
+
+        this._scrollRestoreTimer = setTimeout(() => {
+            if (!content.isConnected) return;
+            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
+            const targetTop = Math.min(savedTop, maxScroll);
+            if (Math.abs(content.scrollTop - targetTop) > 1) {
+                content.scrollTop = targetTop;
+            }
+            this._lastRestoredScrollKey = scrollKey;
+            this._lastScrollRestoreAt = performance.now();
+            this._scrollRestoreTimer = null;
+        }, 140);
+    },
+
+    _bindScrollTracking(content) {
+        if (!content) return;
+        const scrollKey = this._getScrollRouteKey(content);
+        content.addEventListener('scroll', () => {
+            this._pageScrollTop[scrollKey] = content.scrollTop;
+        }, { passive: true });
+    },
+
+    _saveSidebarScrollPosition() {
+        if (!this.container) return;
+        const sidebar = this.container.querySelector('.settings-app > .fluent-sidebar');
+        if (!sidebar) return;
+        this._sidebarScrollTop = sidebar.scrollTop;
+    },
+
+    _restoreSidebarScrollPosition(sidebar) {
+        if (!sidebar) return;
+        const savedTop = this._sidebarScrollTop;
+        if (!Number.isFinite(savedTop) || savedTop <= 0) return;
+
+        if (this._sidebarScrollRestoreRaf) {
+            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
+            this._sidebarScrollRestoreRaf = null;
+        }
+        if (this._sidebarScrollRestoreTimer) {
+            clearTimeout(this._sidebarScrollRestoreTimer);
+            this._sidebarScrollRestoreTimer = null;
+        }
+
+        this._sidebarScrollRestoreRaf = requestAnimationFrame(() => {
+            if (!sidebar.isConnected) {
+                this._sidebarScrollRestoreRaf = null;
+                return;
+            }
+            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
+            sidebar.scrollTop = Math.min(savedTop, maxScroll);
+            this._sidebarScrollRestoreRaf = null;
+        });
+
+        this._sidebarScrollRestoreTimer = setTimeout(() => {
+            if (!sidebar.isConnected) return;
+            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
+            sidebar.scrollTop = Math.min(savedTop, maxScroll);
+            this._sidebarScrollRestoreTimer = null;
+        }, 120);
+    },
+
+    _bindSidebarScrollTracking(sidebar) {
+        if (!sidebar) return;
+        sidebar.addEventListener('scroll', () => {
+            this._sidebarScrollTop = sidebar.scrollTop;
+        }, { passive: true });
+    },
+
     render() {
+        this._saveCurrentScrollPosition();
+        this._saveSidebarScrollPosition();
+        if (this.container) this.container.style.overflow = 'hidden';
         this.container.innerHTML = '';
+        if (this.currentPage !== 'developer' && this._developerModeVisible) {
+            this._developerModeVisible = false;
+            this._aboutDevTapCount = 0;
+        }
         
         const app = document.createElement('div');
         app.className = 'settings-app';
@@ -88,6 +271,10 @@ const SettingsApp = {
             items: this.getPages().map(p => ({ id: p.id, label: t(p.label), icon: p.icon })),
             activeItem: this.currentPage,
             onItemClick: (pageId) => {
+                if (this.currentPage === 'developer' && pageId !== 'developer') {
+                    this._developerModeVisible = false;
+                    this._aboutDevTapCount = 0;
+                }
                 this.currentPage = pageId;
                 this.render();
             }
@@ -97,7 +284,17 @@ const SettingsApp = {
         const content = document.createElement('div');
         content.className = 'settings-content';
         content.id = 'settings-content';
+        content.dataset.pageId = this.currentPage;
+        if (this.currentPage === 'app-detail' && this.currentAppDetail && this.currentAppDetail.id) {
+            content.dataset.detailAppId = this.currentAppDetail.id;
+        } else {
+            delete content.dataset.detailAppId;
+        }
         this.renderPage(content);
+        this._bindScrollTracking(content);
+        this._restoreScrollPosition(content);
+        this._bindSidebarScrollTracking(sidebar);
+        this._restoreSidebarScrollPosition(sidebar);
         
         app.appendChild(sidebar);
         app.appendChild(content);
@@ -112,8 +309,9 @@ const SettingsApp = {
         const style = document.createElement('style');
         style.id = 'settings-app-styles';
         style.textContent = `
-            .settings-app { display: flex; height: 100%; }
-            .settings-content { flex: 1; overflow-y: auto; padding: 32px; }
+            .settings-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
+            .settings-app > .fluent-sidebar { min-height: 0; }
+            .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
             .wallpaper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 200px)); gap: 12px; justify-content: start; transition: all 0.3s ease; }
@@ -1140,6 +1338,12 @@ const SettingsApp = {
             case 'about':
                 this.renderAbout(container);
                 break;
+            case 'developer':
+                this.renderDeveloper(container);
+                break;
+            default:
+                this.renderOverview(container);
+                break;
         }
     },
     
@@ -1207,8 +1411,49 @@ const SettingsApp = {
     },
     
     // 概览页面
+    getDeviceName() {
+        const fallbackName = 'Fluent OS';
+        const raw = String(State?.settings?.deviceName || '').trim();
+        return raw || fallbackName;
+    },
+
+    _normalizeDeviceName(value) {
+        return String(value || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    },
+
+    _promptRenameDevice() {
+        const currentName = this.getDeviceName();
+        FluentUI.InputDialog({
+            title: t('rename'),
+            placeholder: t('settings.user.name-placeholder'),
+            defaultValue: currentName,
+            maxLength: 32,
+            validateFn: (value) => {
+                const nextName = this._normalizeDeviceName(value);
+                if (!nextName) return t('files.rename-empty');
+                return true;
+            },
+            confirmText: t('ok'),
+            cancelText: t('cancel'),
+            onConfirm: (value) => {
+                const nextName = this._normalizeDeviceName(value);
+                if (!nextName) return;
+                State.updateSettings({ deviceName: nextName });
+                this.addRecentSetting(t('rename'), nextName, 'overview');
+                FluentUI.Toast({
+                    title: t('settings.title'),
+                    message: `${t('rename')}: ${nextName}`,
+                    type: 'success'
+                });
+                this.render();
+            }
+        });
+    },
     renderOverview(container) {
         container.className = 'settings-content settings-overview';
+        const deviceName = this.getDeviceName();
         
         // 设备信息头部（显示壁纸和电脑名称）
         const header = document.createElement('div');
@@ -1220,14 +1465,18 @@ const SettingsApp = {
                     <img src="${wallpaper}" alt="壁纸">
                 </div>
                 <div class="settings-overview-device-info">
-                    <h2>Fluent OS</h2>
+                    <h2>${deviceName}</h2>
                     <p>${t('settings.vm-device')}</p>
                     <span class="settings-overview-rename">${t('rename')}</span>
                 </div>
             </div>
         `;
         container.appendChild(header);
-        
+        const renameBtn = header.querySelector('.settings-overview-rename');
+        if (renameBtn) {
+            renameBtn.addEventListener('click', () => this._promptRenameDevice());
+        }
+
         // 推荐设置
         const recommendSection = document.createElement('div');
         recommendSection.className = 'settings-section';
@@ -1963,6 +2212,26 @@ const SettingsApp = {
                     });
                     if (!v && typeof WindowManager !== 'undefined' && typeof WindowManager._hideAllSnapMenus === 'function') {
                         WindowManager._hideAllSnapMenus();
+                    }
+                }
+            })
+        }));
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.multitask-top-maximize'),
+            description: t('settings.multitask-top-maximize-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.windowTopMaximizeEnabled === true,
+                onChange: (v) => {
+                    State.updateSettings({ windowTopMaximizeEnabled: v });
+                    this.addRecentSetting(t('settings.multitask-top-maximize'), v ? t('settings.on') : t('settings.off'), 'multitask');
+                    State.addNotification({
+                        title: t('settings.multitask-title'),
+                        message: v ? t('settings.multitask-top-maximize-on') : t('settings.multitask-top-maximize-off'),
+                        type: 'info'
+                    });
+                    if (!v && typeof WindowManager !== 'undefined' && typeof WindowManager._hideDragSnapHint === 'function') {
+                        WindowManager._hideDragSnapHint(true);
                     }
                 }
             })
@@ -3054,7 +3323,7 @@ const SettingsApp = {
         storageCard.innerHTML = `
             <div class="storage-card-content">
                 <div class="storage-header">
-                    <span class="storage-title">Fluent OS</span>
+                    <span class="storage-title">${this.getDeviceName()}</span>
                     <span class="storage-usage">${(usedStorage / 1024).toFixed(2)} GB / 10 GB</span>
                 </div>
                 <div class="storage-bar-wrapper">
@@ -3438,6 +3707,14 @@ const SettingsApp = {
             </div>
         `;
         section.appendChild(heroCard);
+        const aboutTitleEl = section.querySelector('.settings-section-title');
+        const bindDevTap = (el) => {
+            if (!el) return;
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', () => this._handleAboutDeveloperTap());
+        };
+        bindDevTap(aboutTitleEl);
+        bindDevTap(heroCard);
 
         const projectUrl = 'https://github.com/YoYoPAN1115/FluentOS-On-Web';
         const metaCard = document.createElement('div');
@@ -3458,6 +3735,61 @@ const SettingsApp = {
             ]
         });
         section.appendChild(list);
+        container.appendChild(section);
+    },
+
+    _handleAboutDeveloperTap() {
+        if (this._developerModeVisible === true) {
+            this.currentPage = 'developer';
+            this.render();
+            return;
+        }
+
+        this._aboutDevTapCount += 1;
+
+        const remain = 10 - this._aboutDevTapCount;
+        if (remain > 0 && remain <= 3) {
+            State.addNotification({
+                title: t('settings.developer-title'),
+                message: t('settings.developer-unlock-remaining', { count: remain }),
+                type: 'info'
+            });
+        }
+        if (this._aboutDevTapCount < 10) return;
+
+        this._aboutDevTapCount = 0;
+        this._developerModeVisible = true;
+        State.addNotification({
+            title: t('settings.developer-title'),
+            message: t('settings.developer-unlocked'),
+            type: 'success'
+        });
+
+        this.currentPage = 'developer';
+        this.render();
+    },
+
+    renderDeveloper(container) {
+        container.className = 'settings-content';
+        const section = this.createSection(t('settings.developer-title'));
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.debug-mode'),
+            description: t('settings.debug-mode-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.debugModeEnabled === true,
+                onChange: (v) => {
+                    State.updateSettings({ debugModeEnabled: v });
+                    this.addRecentSetting(t('settings.debug-mode'), v ? t('settings.on') : t('settings.off'), 'developer');
+                    State.addNotification({
+                        title: t('settings.developer-title'),
+                        message: v ? t('settings.debug-mode-on') : t('settings.debug-mode-off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
         container.appendChild(section);
     },
     

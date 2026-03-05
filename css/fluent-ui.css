@@ -195,6 +195,72 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 
 .fluent-select-disabled { opacity: 0.5; pointer-events: none; }
 
+.fluent-sidebar,
+.fluent-select-dropdown,
+.fluent-modal-content {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.fluent-sidebar::-webkit-scrollbar,
+.fluent-select-dropdown::-webkit-scrollbar,
+.fluent-modal-content::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.fluent-sidebar::-webkit-scrollbar-track,
+.fluent-select-dropdown::-webkit-scrollbar-track,
+.fluent-modal-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fluent-sidebar::-webkit-scrollbar-thumb,
+.fluent-select-dropdown::-webkit-scrollbar-thumb,
+.fluent-modal-content::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 180ms ease;
+}
+
+.fluent-sidebar.fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.fluent-select-dropdown.fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.fluent-modal-content.fluent-scrollbar-active::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.dark-mode .fluent-sidebar.fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.dark-mode .fluent-select-dropdown.fluent-scrollbar-active::-webkit-scrollbar-thumb,
+.dark-mode .fluent-modal-content.fluent-scrollbar-active::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.fluent-sidebar.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.fluent-select-dropdown.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.fluent-modal-content.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .fluent-sidebar.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.dark-mode .fluent-select-dropdown.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
+.dark-mode .fluent-modal-content.fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.fluent-sidebar.fluent-scrollbar-active,
+.fluent-select-dropdown.fluent-scrollbar-active,
+.fluent-modal-content.fluent-scrollbar-active {
+    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
+}
+
+.dark-mode .fluent-sidebar.fluent-scrollbar-active,
+.dark-mode .fluent-select-dropdown.fluent-scrollbar-active,
+.dark-mode .fluent-modal-content.fluent-scrollbar-active {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
 /* ============ 自渲染滚动容器 ============ */
 .fluent-scroll-area {
     position: relative;
@@ -267,6 +333,32 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 .fluent-scroll-area.no-scroll .fluent-scroll-rail {
     opacity: 0 !important;
     pointer-events: none !important;
+}
+
+.fluent-edge-bounce-top {
+    animation: fluent-edge-bounce-top 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+.fluent-edge-bounce-bottom {
+    animation: fluent-edge-bounce-bottom 420ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+
+@keyframes fluent-edge-bounce-top {
+    0% { transform: translateY(0); }
+    34% { transform: translateY(14px); }
+    58% { transform: translateY(-4px); }
+    76% { transform: translateY(2px); }
+    100% { transform: translateY(0); }
+}
+
+@keyframes fluent-edge-bounce-bottom {
+    0% { transform: translateY(0); }
+    34% { transform: translateY(-14px); }
+    58% { transform: translateY(4px); }
+    76% { transform: translateY(-2px); }
+    100% { transform: translateY(0); }
 }
 
 /* ============ 开关/滑块 ============ */
@@ -1008,6 +1100,39 @@ body.fluent-v2 .window-content {
 }
 
 /* V2 任务栏样式 */
+/* Keep window control button feedback in V2 mode. */
+body.fluent-v2 .window .window-control-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+body.fluent-v2.dark-mode .window .window-control-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.fluent-v2 .window .window-control-btn:focus-visible {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+body.fluent-v2.dark-mode .window .window-control-btn:focus-visible {
+    background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+body.fluent-v2 .window .window-control-btn:active {
+    background-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+body.fluent-v2.dark-mode .window .window-control-btn:active {
+    background-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+body.fluent-v2 .window .window-control-btn.close:hover {
+    background-color: #d13438 !important;
+}
+
+body.fluent-v2 .window .window-control-btn.close:active {
+    background-color: #b62f33 !important;
+}
+
 body.fluent-v2 .taskbar {
     background: rgba(255, 255, 255, 0.45);
     backdrop-filter: blur(var(--v2-blur)) saturate(180%);

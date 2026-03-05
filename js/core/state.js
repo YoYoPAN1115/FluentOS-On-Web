@@ -181,6 +181,9 @@ const State = {
             userAvatar: this.getDefaultUserAvatar(),
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
+            windowTopMaximizeEnabled: false,
+            developerModeUnlocked: false,
+            debugModeEnabled: false,
             windowBoundsMemory: {}
         };
 

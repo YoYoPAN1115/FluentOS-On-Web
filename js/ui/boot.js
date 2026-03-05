@@ -537,20 +537,24 @@ const BootScreen = {
         const shouldGoOobe = typeof OOBE !== 'undefined'
             && typeof OOBE.shouldShowOnFirstLaunch === 'function'
             && OOBE.shouldShowOnFirstLaunch();
+        const shouldGoDesktop = !shouldGoOobe
+            && !!(typeof State !== 'undefined' && State.settings && State.settings.debugModeEnabled === true);
 
         const bootLogoEl = this.element ? this.element.querySelector('.boot-logo') : null;
         if (shouldGoOobe && typeof OOBE.show === 'function') {
             OOBE.show({ bootLogoEl });
+        } else if (shouldGoDesktop && typeof Desktop !== 'undefined' && typeof Desktop.show === 'function') {
+            Desktop.show();
         } else {
             LockScreen.show();
         }
 
         const targetEl = shouldGoOobe
             ? document.getElementById('oobe-screen')
-            : document.getElementById('lock-screen');
+            : (shouldGoDesktop ? document.getElementById('desktop-screen') : document.getElementById('lock-screen'));
 
         if (!targetEl) {
-            State.view = shouldGoOobe ? 'oobe' : 'lock';
+            State.view = shouldGoOobe ? 'oobe' : (shouldGoDesktop ? 'desktop' : 'lock');
             return;
         }
 
@@ -568,7 +572,7 @@ const BootScreen = {
             this.element.style.opacity = '';
             targetEl.style.transition = '';
             targetEl.style.opacity = '';
-            State.view = shouldGoOobe ? 'oobe' : 'lock';
+            State.view = shouldGoOobe ? 'oobe' : (shouldGoDesktop ? 'desktop' : 'lock');
         }, 800);
     },
 
