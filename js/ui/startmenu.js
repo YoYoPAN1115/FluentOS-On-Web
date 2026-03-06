@@ -669,7 +669,10 @@ const StartMenu = {
                         onClose: (result) => {
                             if (result === 'uninstall') {
                                 if (typeof AppShop !== 'undefined' && AppShop.uninstallApp) {
-                                    AppShop.uninstallApp(appId);
+                                    AppShop.uninstallApp(appId, {
+                                        skipConfirm: true,
+                                        skipRunningCheck: true
+                                    });
                                 }
                             }
                         }

@@ -2284,6 +2284,20 @@ body:not(.blur-disabled):not(.has-maximized-window) .desktop-wallpaper {
 }
 
 /* ============ 响应式设计 ============ */
+body.fullscreen-close-sync:not(.blur-disabled):not(.has-maximized-window) .desktop-wallpaper {
+    filter: none;
+    transform: scale(1);
+    transition: filter 250ms cubic-bezier(0.4, 0, 1, 1),
+                transform 250ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+body.fullscreen-unmaximize-sync:not(.blur-disabled):not(.has-maximized-window) .desktop-wallpaper {
+    filter: none;
+    transform: scale(1);
+    transition: filter 550ms cubic-bezier(0.36, 0, 0.66, -0.56),
+                transform 550ms cubic-bezier(0.36, 0, 0.66, -0.56);
+}
+
 @media (max-width: 1024px) {
     .start-menu {
         width: 90%;

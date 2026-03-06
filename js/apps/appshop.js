@@ -678,12 +678,18 @@ const AppShop = {
     },
 
     // 卸载应用（带确认弹窗 + 运行检测）
-    uninstallApp(appId) {
+    uninstallApp(appId, options = {}) {
         const app = this.apps.find(a => a.id === appId);
         if (!app) return;
         const appName = app.name || appId;
+        const { skipConfirm = false, skipRunningCheck = false } = options;
 
         const doConfirmAndUninstall = () => {
+            if (skipConfirm) {
+                this._doUninstall(appId);
+                return;
+            }
+
             FluentUI.Dialog({
                 title: t('appshop.confirm-uninstall'),
                 content: t('appshop.confirm-uninstall-desc', { name: appName }),
@@ -701,7 +707,8 @@ const AppShop = {
         };
 
         // 检查应用是否正在运行
-        const isRunning = typeof WindowManager !== 'undefined' &&
+        const isRunning = !skipRunningCheck &&
+            typeof WindowManager !== 'undefined' &&
             WindowManager.windows.some(w => w.appId === appId);
 
         if (isRunning) {

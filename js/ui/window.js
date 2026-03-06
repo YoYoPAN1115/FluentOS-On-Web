@@ -16,12 +16,16 @@ const WindowManager = {
     MINIMIZE_DOCK_SCALE: 0.08,
     MINIMIZE_DURATION_MS: 460,
     RESTORE_DURATION_MS: 520,
+    MAXIMIZE_TOGGLE_DURATION_MS: 550,
+    CLOSE_DURATION_MS: 250,
     UNSNAP_RESTORE_BLEND_MS: 240,
     TOP_MAXIMIZE_DWELL_MS: 1500,
     TASKBAR_ICON_FEEDBACK_MS: 280,
     _taskbarAutoHideBound: false,
     _taskbarAutoHideTimer: null,
     _taskbarHideAnimTimer: null,
+    _fullscreenUnmaximizeSyncTimer: null,
+    _fullscreenCloseSyncTimer: null,
     SNAP_LAYOUTS: [
         { id: 'left-half', previewClass: 'preview-left-half', size: 'large' },
         { id: 'right-half', previewClass: 'preview-right-half', size: 'large' },
@@ -105,6 +109,44 @@ const WindowManager = {
         clearTimeout(this._taskbarHideAnimTimer);
         this._taskbarAutoHideTimer = null;
         this._taskbarHideAnimTimer = null;
+    },
+
+    _setFullscreenCloseSync(active, duration = 0) {
+        if (!document.body) return;
+        clearTimeout(this._fullscreenCloseSyncTimer);
+        this._fullscreenCloseSyncTimer = null;
+
+        if (!active) {
+            document.body.classList.remove('fullscreen-close-sync');
+            return;
+        }
+
+        document.body.classList.add('fullscreen-close-sync');
+        if (duration > 0) {
+            this._fullscreenCloseSyncTimer = setTimeout(() => {
+                document.body.classList.remove('fullscreen-close-sync');
+                this._fullscreenCloseSyncTimer = null;
+            }, duration);
+        }
+    },
+
+    _setFullscreenUnmaximizeSync(active, duration = 0) {
+        if (!document.body) return;
+        clearTimeout(this._fullscreenUnmaximizeSyncTimer);
+        this._fullscreenUnmaximizeSyncTimer = null;
+
+        if (!active) {
+            document.body.classList.remove('fullscreen-unmaximize-sync');
+            return;
+        }
+
+        document.body.classList.add('fullscreen-unmaximize-sync');
+        if (duration > 0) {
+            this._fullscreenUnmaximizeSyncTimer = setTimeout(() => {
+                document.body.classList.remove('fullscreen-unmaximize-sync');
+                this._fullscreenUnmaximizeSyncTimer = null;
+            }, duration);
+        }
     },
 
     _showTaskbarForAutoHide(taskbar, withBounce = false) {
@@ -1392,6 +1434,7 @@ const WindowManager = {
         this._hideDragSnapHint(true);
 
         if (windowData.isMaximized) {
+            const unmaximizeDuration = this._effectiveDuration(this.MAXIMIZE_TOGGLE_DURATION_MS);
             // 取消最大化动画 - Unmaximize animation
             windowData.element.classList.add('unmaximizing');
             windowData.element.classList.remove('maximized');
@@ -1409,10 +1452,11 @@ const WindowManager = {
             
             setTimeout(() => {
                 windowData.element.classList.remove('unmaximizing');
-            }, 550);
+            }, unmaximizeDuration);
             
             windowData.isMaximized = false;
             windowData.snapLayout = null;
+            this._setFullscreenUnmaximizeSync(unmaximizeDuration > 0, unmaximizeDuration);
             
             // 应用最大化样式 - Apply maximized styles
             requestAnimationFrame(() => {
@@ -1420,6 +1464,7 @@ const WindowManager = {
             });
             this._persistWindowBounds(windowData);
         } else {
+            const maximizeDuration = this._effectiveDuration(this.MAXIMIZE_TOGGLE_DURATION_MS);
             const currentBounds = this._captureWindowBounds(windowData.element);
             if (currentBounds && (!windowData.snapLayout || !windowData.lastNormalBounds)) {
                 windowData.lastNormalBounds = { ...currentBounds };
@@ -1439,7 +1484,7 @@ const WindowManager = {
             
             setTimeout(() => {
                 windowData.element.classList.remove('maximizing');
-            }, 550);
+            }, maximizeDuration);
             
             windowData.isMaximized = true;
             windowData.snapLayout = null;
@@ -1456,11 +1501,14 @@ const WindowManager = {
             !w.isMinimized &&
             !w.isMinimizing &&
             w.element &&
+            !w.element.classList.contains('closing') &&
             w.element.style.display !== 'none'
         );
         const taskbar = this._getTaskbarElement();
         
         if (hasMaximized) {
+            this._setFullscreenUnmaximizeSync(false);
+            this._setFullscreenCloseSync(false);
             document.body.classList.add('has-maximized-window');
             if (taskbar) {
                 taskbar.classList.add('auto-hide-active');
@@ -1490,6 +1538,8 @@ const WindowManager = {
         this._persistWindowBounds(windowData);
 
         const proceedClose = () => {
+            const closeDuration = this._effectiveDuration(this.CLOSE_DURATION_MS);
+            const shouldSyncFullscreenClose = windowData.isMaximized === true;
             this._clearWindowMotionTimers(windowData);
             windowData.isMinimizing = false;
             windowData.isRestoring = false;
@@ -1500,6 +1550,9 @@ const WindowManager = {
             windowData.element.style.willChange = '';
             windowData.element.style.opacity = '';
             windowData.element.classList.add('closing');
+            this._setFullscreenCloseSync(shouldSyncFullscreenClose && closeDuration > 0, closeDuration);
+            // Start wallpaper/taskbar transition together with the close motion.
+            this.updateMaximizedWallpaperEffect();
             setTimeout(() => {
                 windowData.element.remove();
                 this.windows = this.windows.filter(w => w.id !== windowId);
@@ -1509,7 +1562,7 @@ const WindowManager = {
                 }
                 // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
-            }, 250);
+            }, closeDuration);
         };
 
         // 调用组件的beforeClose钩子 - Call component beforeClose hook
