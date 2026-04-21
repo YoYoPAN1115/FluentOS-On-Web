@@ -1041,6 +1041,7 @@ const WindowManager = {
             if (typeof e.button === 'number' && e.button !== 0) return;
             if (e.isPrimary === false) return;
             if (e.target.closest('.window-controls')) return;
+            if (e.target.closest('[data-no-window-drag="true"]')) return;
 
             const windowData = this._getWindowData(windowElement.id);
             if (windowData && windowData.isMaximized) return;
