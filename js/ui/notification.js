@@ -74,6 +74,7 @@ const NotificationCenter = {
         const item = document.createElement('div');
         item.className = 'notification-item';
         item.dataset.id = notification.id;
+        if (notification.onClickAction) item.classList.add('notification-item-actionable');
 
         const timeStr = this.formatTime(notification.time);
 
@@ -83,7 +84,7 @@ const NotificationCenter = {
                     <div class="notification-item-title">${notification.title}</div>
                     <div class="notification-item-time">${timeStr}</div>
                 </div>
-                <button class="notification-item-close">
+                <button class="notification-item-close" ${notification.persistent ? 'style="display:none;"' : ''}>
                     <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="关闭">
                 </button>
             </div>
@@ -96,7 +97,26 @@ const NotificationCenter = {
             State.removeNotification(notification.id);
         });
 
+        if (notification.onClickAction) {
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.notification-item-close')) return;
+                this.handleNotificationAction(notification);
+            });
+        }
+
         return item;
+    },
+
+    handleNotificationAction(notification) {
+        const action = notification.onClickAction;
+        if (!action) return;
+        if (action.type === 'openApp' && action.appId && typeof WindowManager !== 'undefined') {
+            WindowManager.openApp(action.appId, action.data || null);
+        }
+        if (notification.dismissOnClick !== false) {
+            State.removeNotification(notification.id);
+        }
+        this.close();
     },
 
     formatTime(timeStr) {
@@ -192,4 +212,3 @@ const NotificationCenter = {
 function notify(title, message, type = 'info') {
     State.addNotification({ title, message, type });
 }
-

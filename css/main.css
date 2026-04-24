@@ -2263,6 +2263,46 @@ body.desktop-unblur #desktop-screen {
     transition: opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+body.desktop-to-lock-blur .desktop-wallpaper {
+    filter: blur(35px) brightness(0.65);
+    transform: scale(1.1);
+    transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 350ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.desktop-to-lock-blur .desktop-icons {
+    filter: blur(18px);
+    opacity: 0.3;
+    transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 350ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.lock-blur-in .lock-wallpaper {
+    filter: blur(35px) brightness(0.65);
+    transform: scale(1.1);
+}
+
+body.lock-blur-in .lock-time-container,
+body.lock-blur-in .lock-hint {
+    filter: blur(20px);
+    opacity: 0.2;
+}
+
+body.lock-unblur .lock-wallpaper {
+    filter: none;
+    transform: scale(1);
+    transition: filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body.lock-unblur .lock-time-container,
+body.lock-unblur .lock-hint {
+    filter: none;
+    opacity: 1;
+    transition: filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 /* ============ 窗口全屏时壁纸景深放大+非线性模糊效果 ============ */
 /* 仅在开启模糊效果时生效 */
 body:not(.blur-disabled).has-maximized-window .desktop-wallpaper {

@@ -6,6 +6,7 @@ const ClockApp = {
     windowId: null,
     container: null,
     currentTab: 'timer',
+    timerNotificationId: null,
     
     // 倒计时状态
     timerRemaining: 0,
@@ -49,6 +50,13 @@ const ClockApp = {
         // 监听语言切换
         this._langHandler = () => { this.render(); };
         State.on('languageChange', this._langHandler);
+    },
+
+    openData(data = null) {
+        if (data && data.tab) {
+            this.currentTab = data.tab;
+        }
+        this.render();
     },
     
     loadData() {
@@ -123,11 +131,7 @@ const ClockApp = {
             .arrow.up { border-bottom: 7px solid var(--text-secondary); }
             .arrow.down { border-top: 7px solid var(--text-secondary); }
             .timer-controls { display: flex; gap: 12px; }
-            .timer-btn { padding: 12px 32px; border-radius: var(--radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: all var(--transition-fast); }
-            .timer-btn.primary { background: var(--accent); color: white; }
-            .timer-btn.primary:hover { background: var(--accent-hover); }
-            .timer-btn.secondary { background: var(--bg-tertiary); color: var(--text-primary); }
-            .timer-btn.secondary:hover { background: rgba(0, 0, 0, 0.1); }
+            .timer-btn { min-width: 132px; justify-content: center; }
             .timer-progress { width: 300px; height: 8px; background: var(--bg-tertiary); border-radius: 4px; margin: 24px 0; overflow: hidden; }
             .timer-progress-bar { height: 100%; background: var(--accent); transition: width 0.3s ease; }
             
@@ -177,7 +181,6 @@ const ClockApp = {
             
             /* 暗色模式 */
             .dark-mode .clock-nav-item:hover { background: rgba(255, 255, 255, 0.1); }
-            .dark-mode .timer-btn.secondary:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .calendar-day:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .calendar-nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
             
@@ -188,6 +191,7 @@ const ClockApp = {
             .clock-app *::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
             /* Firefox */
             .clock-app * { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
+            body.fluent-v2 .clock-app .timer-btn.fluent-btn { min-width: 148px; }
         `;
         document.head.appendChild(style);
     },
@@ -255,11 +259,11 @@ const ClockApp = {
             `}
             <div class="timer-controls">
                 ${this.timerInterval ? `
-                    <button class="timer-btn secondary" id="timer-pause">${t('clock.pause')}</button>
-                    <button class="timer-btn secondary" id="timer-reset">${t('clock.reset')}</button>
+                    <button class="fluent-btn fluent-btn-secondary fluent-btn-large timer-btn" id="timer-pause">${t('clock.pause')}</button>
+                    <button class="fluent-btn fluent-btn-secondary fluent-btn-large timer-btn" id="timer-reset">${t('clock.reset')}</button>
                 ` : `
-                    <button class="timer-btn primary" id="timer-start">${this.timerRemaining > 0 ? t('clock.continue') : t('clock.start')}</button>
-                    ${this.timerRemaining > 0 ? `<button class="timer-btn secondary" id="timer-reset">${t('clock.reset')}</button>` : ''}
+                    <button class="fluent-btn fluent-btn-primary fluent-btn-large timer-btn" id="timer-start">${this.timerRemaining > 0 ? t('clock.continue') : t('clock.start')}</button>
+                    ${this.timerRemaining > 0 ? `<button class="fluent-btn fluent-btn-secondary fluent-btn-large timer-btn" id="timer-reset">${t('clock.reset')}</button>` : ''}
                 `}
             </div>
         `;
@@ -276,11 +280,11 @@ const ClockApp = {
             <div class="stopwatch-display">${this.formatTime(hours, minutes, seconds)}.${String(Math.floor(ms / 10)).padStart(2, '0')}</div>
             <div class="stopwatch-controls">
                 ${this.stopwatchInterval ? `
-                    <button class="timer-btn secondary" id="stopwatch-lap">${t('clock.lap')}</button>
-                    <button class="timer-btn primary" id="stopwatch-pause">${t('clock.pause')}</button>
+                    <button class="fluent-btn fluent-btn-secondary fluent-btn-large timer-btn" id="stopwatch-lap">${t('clock.lap')}</button>
+                    <button class="fluent-btn fluent-btn-primary fluent-btn-large timer-btn" id="stopwatch-pause">${t('clock.pause')}</button>
                 ` : `
-                    <button class="timer-btn primary" id="stopwatch-start">${this.stopwatchTime > 0 ? t('clock.continue') : t('clock.start')}</button>
-                    ${this.stopwatchTime > 0 ? `<button class="timer-btn secondary" id="stopwatch-reset">${t('clock.reset')}</button>` : ''}
+                    <button class="fluent-btn fluent-btn-primary fluent-btn-large timer-btn" id="stopwatch-start">${this.stopwatchTime > 0 ? t('clock.continue') : t('clock.start')}</button>
+                    ${this.stopwatchTime > 0 ? `<button class="fluent-btn fluent-btn-secondary fluent-btn-large timer-btn" id="stopwatch-reset">${t('clock.reset')}</button>` : ''}
                 `}
             </div>
             ${this.stopwatchLaps.length > 0 ? `
@@ -493,6 +497,7 @@ const ClockApp = {
 
     // 倒计时方法
     startTimer() {
+        this.clearTimerNotification();
         if (this.timerRemaining === 0) {
             const hours = parseInt(document.getElementById('timer-hours').value) || 0;
             const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
@@ -528,6 +533,7 @@ const ClockApp = {
         this.timerInterval = null;
         this.timerRemaining = 0;
         this.timerTotal = 0;
+        this.clearTimerNotification();
         this.render();
     },
 
@@ -545,7 +551,25 @@ const ClockApp = {
     },
 
     timerCompleted() {
-        State.addNotification(t('clock.timer-done'), t('clock.timer-done-msg'));
+        this.clearTimerNotification();
+        this.timerNotificationId = State.addNotification({
+            title: t('clock.timer-done'),
+            message: t('clock.timer-done-msg'),
+            type: 'info',
+            persistent: true,
+            dismissOnClick: true,
+            onClickAction: {
+                type: 'openApp',
+                appId: 'clock',
+                data: { tab: 'timer' }
+            }
+        });
+    },
+
+    clearTimerNotification() {
+        if (!this.timerNotificationId) return;
+        State.removeNotification(this.timerNotificationId);
+        this.timerNotificationId = null;
     },
 
     // 秒表方法

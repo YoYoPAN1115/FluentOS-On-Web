@@ -109,6 +109,7 @@ const CalculatorApp = {
         this.addStyles();
         this.bindEvents();
         this.updateDisplay();
+        this.syncFluidLayout();
     },
 
     addStyles() {
@@ -118,52 +119,80 @@ const CalculatorApp = {
         style.id = 'calculator-app-styles';
         style.textContent = `
             .calculator-app {
+                --calc-app-padding: 20px;
+                --calc-section-gap: 16px;
+                --calc-display-height: 156px;
+                --calc-display-radius: 28px;
+                --calc-display-pad-y: 20px;
+                --calc-display-pad-x: 24px;
+                --calc-button-gap: 12px;
+                --calc-button-height: 56px;
+                --calc-scientific-height: 48px;
+                --calc-button-radius: 18px;
+                --calc-button-font-size: 20px;
+                --calc-scientific-font-size: 15px;
+                --calc-result-font-size: 42px;
+                --calc-expression-font-size: 14px;
+                --calc-mode-font-size: 12px;
+                --calc-mode-pad-y: 4px;
+                --calc-mode-pad-x: 10px;
                 display: flex;
                 flex-direction: column;
                 height: 100%;
-                padding: 20px;
-                gap: 16px;
+                min-height: 0;
+                padding: var(--calc-app-padding);
+                gap: var(--calc-section-gap);
                 background: var(--bg-primary);
+                overflow: hidden;
+                box-sizing: border-box;
             }
 
             .calculator-display {
                 background: var(--bg-tertiary);
-                border-radius: var(--radius-lg);
-                padding: 20px 24px 24px;
+                border-radius: var(--calc-display-radius);
+                padding: var(--calc-display-pad-y) var(--calc-display-pad-x);
+                min-height: var(--calc-display-height);
                 text-align: right;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
+                box-sizing: border-box;
             }
 
             .calculator-mode-indicator {
                 display: inline-flex;
                 align-self: flex-end;
                 margin-bottom: 12px;
-                padding: 4px 10px;
+                padding: var(--calc-mode-pad-y) var(--calc-mode-pad-x);
                 border-radius: 999px;
                 background: rgba(0, 120, 212, 0.12);
                 color: var(--accent);
-                font-size: 12px;
+                font-size: var(--calc-mode-font-size);
                 font-weight: 600;
                 letter-spacing: 0.02em;
             }
 
             .calculator-expression {
-                font-size: 14px;
+                font-size: var(--calc-expression-font-size);
                 color: var(--text-secondary);
                 min-height: 20px;
                 margin-bottom: 8px;
             }
 
             .calculator-result {
-                font-size: 42px;
+                font-size: var(--calc-result-font-size);
                 font-weight: 300;
                 color: var(--text-primary);
                 word-break: break-all;
+                line-height: 1;
             }
 
             .calculator-scientific-buttons {
                 display: none;
                 grid-template-columns: repeat(6, minmax(0, 1fr));
-                gap: 10px;
+                gap: var(--calc-button-gap);
+                grid-auto-rows: var(--calc-scientific-height);
+                flex: 0 0 auto;
             }
 
             .calculator-mode-scientific .calculator-scientific-buttons {
@@ -173,25 +202,29 @@ const CalculatorApp = {
             .calculator-buttons {
                 display: grid;
                 grid-template-columns: repeat(4, minmax(0, 1fr));
-                gap: 12px;
-                flex: 1;
+                gap: var(--calc-button-gap);
+                grid-auto-rows: var(--calc-button-height);
+                align-content: end;
+                flex: 1 1 auto;
+                min-height: 0;
             }
 
             .calc-btn {
-                min-height: 56px;
-                border-radius: var(--radius-md);
+                min-height: 0;
+                height: 100%;
+                border-radius: var(--calc-button-radius);
                 background: var(--bg-tertiary);
-                font-size: 20px;
+                font-size: var(--calc-button-font-size);
                 font-weight: 400;
                 cursor: pointer;
                 transition: all var(--transition-fast);
                 border: none;
                 color: var(--text-primary);
+                box-sizing: border-box;
             }
 
             .calculator-scientific-buttons .calc-btn {
-                min-height: 48px;
-                font-size: 15px;
+                font-size: var(--calc-scientific-font-size);
                 font-weight: 500;
             }
 
@@ -248,17 +281,6 @@ const CalculatorApp = {
 
             .dark-mode .calc-btn-operator:hover {
                 background: rgba(96, 205, 255, 0.3);
-            }
-
-            @media (max-width: 520px) {
-                .calculator-app {
-                    padding: 16px;
-                    gap: 12px;
-                }
-
-                .calc-btn {
-                    min-height: 50px;
-                }
             }
         `;
         document.head.appendChild(style);
@@ -334,6 +356,7 @@ const CalculatorApp = {
 
         this.resizeObserver = new ResizeObserver(() => {
             this.updateModeFromWindowSize();
+            this.syncFluidLayout();
         });
         this.resizeObserver.observe(target);
     },
@@ -349,6 +372,59 @@ const CalculatorApp = {
         if (nextMode === this.mode) return;
         this.mode = nextMode;
         this.render();
+    },
+
+    syncFluidLayout() {
+        const app = this.container?.querySelector('.calculator-app');
+        if (!app) return;
+
+        const width = app.clientWidth || this.container?.clientWidth || 0;
+        const height = app.clientHeight || this.container?.clientHeight || 0;
+        if (!width || !height) return;
+
+        const scientificMode = this.mode === 'scientific';
+        const baseSize = Math.min(width, height);
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+        const appPadding = Math.round(clamp(baseSize * 0.04, 12, 22));
+        const sectionGap = Math.round(clamp(baseSize * 0.028, 8, 16));
+        const displayHeight = Math.round(clamp(height * (scientificMode ? 0.28 : 0.32), scientificMode ? 116 : 128, scientificMode ? 210 : 230));
+        const scientificHeight = scientificMode ? Math.round(clamp(height * 0.07, 34, 52)) : 0;
+
+        const reservedHeight = appPadding * 2
+            + displayHeight
+            + (scientificMode ? (scientificHeight * 2) + sectionGap * 2 + sectionGap : sectionGap);
+        const buttonHeight = Math.round(clamp((height - reservedHeight - sectionGap * 4) / 5, scientificMode ? 36 : 40, scientificMode ? 72 : 82));
+
+        const buttonRadius = Math.round(clamp(buttonHeight * 0.34, 14, 24));
+        const buttonFontSize = Math.round(clamp(buttonHeight * 0.35, 18, 30));
+        const scientificFontSize = Math.round(clamp((scientificHeight || buttonHeight) * 0.32, 12, 17));
+        const resultFontSize = Math.round(clamp(Math.min(width * 0.15, height * 0.14), scientificMode ? 38 : 42, scientificMode ? 74 : 88));
+        const expressionFontSize = Math.round(clamp(baseSize * 0.032, 12, 16));
+        const modeFontSize = Math.round(clamp(baseSize * 0.028, 11, 13));
+        const modePadY = Math.round(clamp(buttonHeight * 0.08, 4, 6));
+        const modePadX = Math.round(clamp(width * 0.025, 10, 14));
+        const displayPadY = Math.round(clamp(displayHeight * 0.16, 16, 24));
+        const displayPadX = Math.round(clamp(width * 0.055, 18, 30));
+        const displayRadius = Math.round(clamp(buttonRadius * 1.35, 18, 32));
+
+        app.style.setProperty('--calc-app-padding', `${appPadding}px`);
+        app.style.setProperty('--calc-section-gap', `${sectionGap}px`);
+        app.style.setProperty('--calc-display-height', `${displayHeight}px`);
+        app.style.setProperty('--calc-display-radius', `${displayRadius}px`);
+        app.style.setProperty('--calc-display-pad-y', `${displayPadY}px`);
+        app.style.setProperty('--calc-display-pad-x', `${displayPadX}px`);
+        app.style.setProperty('--calc-button-gap', `${sectionGap}px`);
+        app.style.setProperty('--calc-button-height', `${buttonHeight}px`);
+        app.style.setProperty('--calc-scientific-height', `${scientificHeight || Math.round(buttonHeight * 0.82)}px`);
+        app.style.setProperty('--calc-button-radius', `${buttonRadius}px`);
+        app.style.setProperty('--calc-button-font-size', `${buttonFontSize}px`);
+        app.style.setProperty('--calc-scientific-font-size', `${scientificFontSize}px`);
+        app.style.setProperty('--calc-result-font-size', `${resultFontSize}px`);
+        app.style.setProperty('--calc-expression-font-size', `${expressionFontSize}px`);
+        app.style.setProperty('--calc-mode-font-size', `${modeFontSize}px`);
+        app.style.setProperty('--calc-mode-pad-y', `${modePadY}px`);
+        app.style.setProperty('--calc-mode-pad-x', `${modePadX}px`);
     },
 
     inputNumber(num) {

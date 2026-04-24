@@ -41,7 +41,7 @@ const WindowManager = {
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
-        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 400, height: 550, component: 'CalculatorApp' },
+        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 400, height: 550, minHeight: 550, component: 'CalculatorApp' },
         notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 700, height: 500, component: 'NotesApp' },
         browser: { titleKey: 'browser.title', icon: 'Theme/Icon/App_icon/browser.png', width: 1000, height: 700, component: 'BrowserApp' },
         clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/system_clock.png', width: 900, height: 650, component: 'ClockApp' },
@@ -525,9 +525,28 @@ const WindowManager = {
         };
     },
 
-    _clampWindowBounds(bounds) {
-        const minWidth = 400;
-        const minHeight = 300;
+    _getWindowMinBounds(appOrId = null) {
+        const fallback = { minWidth: 400, minHeight: 300 };
+        let appId = null;
+
+        if (typeof appOrId === 'string') {
+            appId = appOrId;
+        } else if (appOrId && typeof appOrId === 'object') {
+            appId = appOrId.dataset?.appId || appOrId.appId || null;
+        }
+
+        if (!appId) return fallback;
+        const config = this.appConfigs[appId];
+        if (!config) return fallback;
+
+        return {
+            minWidth: Math.max(fallback.minWidth, Math.round(config.minWidth || fallback.minWidth)),
+            minHeight: Math.max(fallback.minHeight, Math.round(config.minHeight || fallback.minHeight))
+        };
+    },
+
+    _clampWindowBounds(bounds, appOrId = null) {
+        const { minWidth, minHeight } = this._getWindowMinBounds(appOrId);
         const width = Math.max(minWidth, Math.round(bounds.width || minWidth));
         const height = Math.max(minHeight, Math.round(bounds.height || minHeight));
         const left = Math.round(Number.isFinite(bounds.left) ? bounds.left : 0);
@@ -542,7 +561,7 @@ const WindowManager = {
             top: windowElement.offsetTop,
             width: windowElement.offsetWidth,
             height: windowElement.offsetHeight
-        });
+        }, windowElement);
     },
 
     _ensureDragSnapHint() {
@@ -634,7 +653,7 @@ const WindowManager = {
             width: config.width,
             height: config.height
         };
-        const fallbackBounds = this._clampWindowBounds(fallback);
+        const fallbackBounds = this._clampWindowBounds(fallback, appId);
 
         const rawStore = State.settings && State.settings[this.WINDOW_BOUNDS_KEY];
         const store = (rawStore && typeof rawStore === 'object' && !Array.isArray(rawStore)) ? rawStore : {};
@@ -657,14 +676,14 @@ const WindowManager = {
         const lastNormalWidth = Number(saved.lastNormalWidth);
         const lastNormalHeight = Number(saved.lastNormalHeight);
         const hasLastNormal = [lastNormalLeft, lastNormalTop, lastNormalWidth, lastNormalHeight].every(v => Number.isFinite(v));
-        const currentBounds = this._clampWindowBounds({ left, top, width, height });
+        const currentBounds = this._clampWindowBounds({ left, top, width, height }, appId);
         const lastNormalBounds = hasLastNormal
             ? this._clampWindowBounds({
                 left: lastNormalLeft,
                 top: lastNormalTop,
                 width: lastNormalWidth,
                 height: lastNormalHeight
-            })
+            }, appId)
             : (snapLayout ? { ...fallbackBounds } : { ...currentBounds });
 
         return {
@@ -688,7 +707,7 @@ const WindowManager = {
             windowData.lastNormalBounds = { ...bounds };
         }
         const lastNormal = windowData.lastNormalBounds
-            ? this._clampWindowBounds(windowData.lastNormalBounds)
+            ? this._clampWindowBounds(windowData.lastNormalBounds, windowData.appId)
             : null;
 
         const rawStore = State.settings[this.WINDOW_BOUNDS_KEY];
@@ -895,6 +914,8 @@ const WindowManager = {
             if (data && config.component && globalThis[config.component]) {
                 if (data.fileId && globalThis[config.component].loadFile) {
                     globalThis[config.component].loadFile(data.fileId);
+                } else if (globalThis[config.component].openData) {
+                    globalThis[config.component].openData(data);
                 }
             }
             return;
@@ -906,8 +927,8 @@ const WindowManager = {
         const initialBounds = this._readWindowBounds(appId, config);
         const windowElement = this.createWindow(windowId, appId, config, initialBounds);
         const initialLastNormalBounds = initialBounds.lastNormalBounds
-            ? this._clampWindowBounds(initialBounds.lastNormalBounds)
-            : (initialBounds.snapLayout ? null : this._clampWindowBounds(initialBounds));
+            ? this._clampWindowBounds(initialBounds.lastNormalBounds, appId)
+            : (initialBounds.snapLayout ? null : this._clampWindowBounds(initialBounds, appId));
         
         this.windows.push({
             id: windowId,
@@ -932,6 +953,10 @@ const WindowManager = {
             if (data && data.fileId && globalThis[config.component].loadFile) {
                 setTimeout(() => {
                     globalThis[config.component].loadFile(data.fileId);
+                }, 0);
+            } else if (data && globalThis[config.component].openData) {
+                setTimeout(() => {
+                    globalThis[config.component].openData(data);
                 }, 0);
             }
         } else {
@@ -1085,7 +1110,7 @@ const WindowManager = {
             const windowData = this._getWindowData(windowElement.id);
             if (windowData && dragStartedFromSnap && !dragUnsnapped) {
                 const restoreBounds = windowData.lastNormalBounds
-                    ? this._clampWindowBounds(windowData.lastNormalBounds)
+                    ? this._clampWindowBounds(windowData.lastNormalBounds, windowData.appId)
                     : null;
                 if (restoreBounds) {
                     clearUnsnapBlend();
@@ -1114,7 +1139,7 @@ const WindowManager = {
                         top: e.clientY - initialY,
                         width: restoreBounds.width,
                         height: restoreBounds.height
-                    });
+                    }, windowData.appId);
                     this._applyBoundsToWindow(windowElement, restorePlacement);
 
                     if (blendMs > 0) {
@@ -1137,7 +1162,7 @@ const WindowManager = {
                 top: currentY,
                 width: windowElement.offsetWidth,
                 height: windowElement.offsetHeight
-            });
+            }, windowElement);
             
             windowElement.style.left = `${clamped.left}px`;
             windowElement.style.top = `${clamped.top}px`;
@@ -1315,6 +1340,7 @@ const WindowManager = {
 
             const deltaX = e.clientX - startX;
             const deltaY = e.clientY - startY;
+            const { minWidth, minHeight } = this._getWindowMinBounds(windowElement);
 
             let newWidth = startWidth;
             let newHeight = startHeight;
@@ -1322,17 +1348,17 @@ const WindowManager = {
             let newTop = startTop;
 
             if (resizeDirection.includes('e')) {
-                newWidth = Math.max(400, startWidth + deltaX);
+                newWidth = Math.max(minWidth, startWidth + deltaX);
             }
             if (resizeDirection.includes('w')) {
-                newWidth = Math.max(400, startWidth - deltaX);
+                newWidth = Math.max(minWidth, startWidth - deltaX);
                 newLeft = startLeft + (startWidth - newWidth);
             }
             if (resizeDirection.includes('s')) {
-                newHeight = Math.max(300, startHeight + deltaY);
+                newHeight = Math.max(minHeight, startHeight + deltaY);
             }
             if (resizeDirection.includes('n')) {
-                newHeight = Math.max(300, startHeight - deltaY);
+                newHeight = Math.max(minHeight, startHeight - deltaY);
                 newTop = startTop + (startHeight - newHeight);
             }
 
@@ -1341,7 +1367,7 @@ const WindowManager = {
                 if (resizeDirection.includes('n')) {
                     const bottom = newTop + newHeight;
                     newTop = 0;
-                    newHeight = Math.max(300, bottom);
+                    newHeight = Math.max(minHeight, bottom);
                 } else {
                     newTop = 0;
                 }

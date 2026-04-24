@@ -478,6 +478,11 @@ function handleViewChange({ oldView, newView }) {
         return;
     }
 
+    if (oldView === 'desktop' && newView === 'lock') {
+        handleDesktopToLock();
+        return;
+    }
+
     // 其他情况：直接切换
     hideAllViews();
     switch (newView) {
@@ -566,6 +571,30 @@ function getLoginScreenCard() {
     return loginScreen ? loginScreen.querySelector('.login-card') : null;
 }
 
+function resetLockDesktopTransitionState() {
+    const lockScreen = document.getElementById('lock-screen');
+    const desktopScreen = document.getElementById('desktop-screen');
+
+    document.body.classList.remove(
+        'login-to-desktop-blur',
+        'desktop-blur-in',
+        'desktop-unblur',
+        'desktop-to-lock-blur',
+        'lock-blur-in',
+        'lock-unblur'
+    );
+
+    if (lockScreen) {
+        lockScreen.style.transition = '';
+        lockScreen.style.opacity = '';
+    }
+
+    if (desktopScreen) {
+        desktopScreen.style.transition = '';
+        desktopScreen.style.opacity = '';
+    }
+}
+
 /**
  * 锁屏 → 登录动画（锁屏元素保持模糊状态，密码卡片在上方弹入）
  */
@@ -649,11 +678,59 @@ window.handleLoginToLock = function() {
 /**
  * 登录 → 桌面动画（加深模糊、淡化切换、变清晰同步进行）
  */
+function handleDesktopToLock() {
+    const lockScreen = document.getElementById('lock-screen');
+    const desktopScreen = document.getElementById('desktop-screen');
+
+    resetLockDesktopTransitionState();
+    LockScreen.show();
+
+    if (!lockScreen || !desktopScreen) {
+        hideAllViews();
+        LockScreen.show();
+        return;
+    }
+
+    lockScreen.style.transition = 'none';
+    lockScreen.style.opacity = '0';
+    desktopScreen.style.transition = '';
+    desktopScreen.style.opacity = '1';
+
+    document.body.classList.add('desktop-to-lock-blur', 'lock-blur-in');
+
+    void lockScreen.offsetHeight;
+
+    setTimeout(() => {
+        lockScreen.style.transition = 'opacity 400ms ease-in';
+        lockScreen.style.opacity = '1';
+        desktopScreen.style.transition = 'opacity 400ms ease-out';
+        desktopScreen.style.opacity = '0';
+    }, 100);
+
+    setTimeout(() => {
+        document.body.classList.remove('lock-blur-in');
+        document.body.classList.add('lock-unblur');
+    }, 200);
+
+    setTimeout(() => {
+        Desktop.hide();
+        desktopScreen.style.transition = '';
+        desktopScreen.style.opacity = '';
+    }, 500);
+
+    setTimeout(() => {
+        document.body.classList.remove('desktop-to-lock-blur', 'lock-unblur');
+        lockScreen.style.transition = '';
+        lockScreen.style.opacity = '';
+    }, 800);
+}
+
 function handleLoginToDesktop() {
     const loginCard = getLoginScreenCard();
     const lockScreen = document.getElementById('lock-screen');
     const loginScreen = document.getElementById('login-screen');
     const desktopScreen = document.getElementById('desktop-screen');
+    resetLockDesktopTransitionState();
     
     // 1. 密码卡片退出 + 全局加深模糊（同步开始）
     if (loginCard) {
