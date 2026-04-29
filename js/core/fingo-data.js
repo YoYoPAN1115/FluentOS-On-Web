@@ -3,7 +3,7 @@
  */
 const FingoData = {
     // 系统级应用（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos'],
+    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
 
     // 用户确认关键词
     confirmYes: [

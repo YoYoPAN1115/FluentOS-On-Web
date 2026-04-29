@@ -548,7 +548,7 @@ const StartMenu = {
     },
 
     // 系统内置应用列表（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
+    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'media'],
     
     showAppContextMenu(event, appId) {
         const app = Desktop.apps.find(a => a.id === appId);

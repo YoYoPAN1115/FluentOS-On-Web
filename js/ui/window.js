@@ -47,7 +47,8 @@ const WindowManager = {
         clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/system_clock.png', width: 900, height: 650, component: 'ClockApp' },
         weather: { titleKey: 'weather.title', icon: 'Theme/Icon/App_icon/weather.png', width: 920, height: 640, component: 'WeatherApp' },
         appshop: { titleKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png', width: 1000, height: 700, component: 'AppShop' },
-        photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/gallery.png', width: 1000, height: 700, component: 'PhotosApp' }
+        photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/gallery.png', width: 1000, height: 700, component: 'PhotosApp' },
+        media: { title: '\u591a\u5a92\u4f53', icon: 'Theme/Icon/App_icon/system_music.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' }
     },
 
     // 获取应用配置 - Get application configuration

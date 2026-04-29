@@ -183,8 +183,15 @@ const CalculatorApp = {
                 font-size: var(--calc-result-font-size);
                 font-weight: 300;
                 color: var(--text-primary);
-                word-break: break-all;
+                align-self: stretch;
                 line-height: 1;
+                max-width: 100%;
+                min-height: 1em;
+                overflow: hidden;
+                text-align: right;
+                text-overflow: clip;
+                white-space: nowrap;
+                word-break: normal;
             }
 
             .calculator-scientific-buttons {
@@ -425,6 +432,51 @@ const CalculatorApp = {
         app.style.setProperty('--calc-mode-font-size', `${modeFontSize}px`);
         app.style.setProperty('--calc-mode-pad-y', `${modePadY}px`);
         app.style.setProperty('--calc-mode-pad-x', `${modePadX}px`);
+        this.fitResultFont();
+    },
+
+    fitResultFont(resultElement = this.container?.querySelector('#calc-result')) {
+        if (!resultElement) return;
+
+        const displayElement = resultElement.closest('.calculator-display');
+        const appElement = resultElement.closest('.calculator-app');
+        if (!displayElement || !appElement) return;
+
+        resultElement.style.fontSize = '';
+
+        const appStyle = getComputedStyle(appElement);
+        const resultStyle = getComputedStyle(resultElement);
+        const maxFontSize = Number.parseFloat(appStyle.getPropertyValue('--calc-result-font-size'))
+            || Number.parseFloat(resultStyle.fontSize)
+            || 42;
+        const minFontSize = Math.min(maxFontSize, 24);
+
+        resultElement.style.fontSize = `${maxFontSize}px`;
+
+        const availableWidth = Math.max(1, resultElement.clientWidth || displayElement.clientWidth);
+        const overflowWidth = Math.max(1, resultElement.scrollWidth);
+
+        const modeElement = displayElement.querySelector('.calculator-mode-indicator');
+        const expressionElement = displayElement.querySelector('.calculator-expression');
+        const reservedHeight = [modeElement, expressionElement].reduce((total, element) => {
+            if (!element) return total;
+            const style = getComputedStyle(element);
+            return total
+                + element.offsetHeight
+                + Number.parseFloat(style.marginTop || '0')
+                + Number.parseFloat(style.marginBottom || '0');
+        }, 0);
+        const availableHeight = Math.max(1, displayElement.clientHeight - reservedHeight - 8);
+        const overflowHeight = Math.max(1, resultElement.scrollHeight);
+
+        const widthScale = availableWidth < overflowWidth ? availableWidth / overflowWidth : 1;
+        const heightScale = availableHeight < overflowHeight ? availableHeight / overflowHeight : 1;
+        const nextFontSize = Math.max(
+            minFontSize,
+            Math.floor(maxFontSize * Math.min(widthScale, heightScale))
+        );
+
+        resultElement.style.fontSize = `${nextFontSize}px`;
     },
 
     inputNumber(num) {
@@ -581,6 +633,7 @@ const CalculatorApp = {
 
         if (resultElement) {
             resultElement.textContent = this.currentValue;
+            this.fitResultFont(resultElement);
         }
 
         if (expressionElement) {

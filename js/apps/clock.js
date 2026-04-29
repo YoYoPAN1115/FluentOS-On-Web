@@ -192,6 +192,32 @@ const ClockApp = {
             /* Firefox */
             .clock-app * { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
             body.fluent-v2 .clock-app .timer-btn.fluent-btn { min-width: 148px; }
+            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn {
+                color: #111111 !important;
+                -webkit-text-fill-color: #111111;
+                background-clip: border-box;
+                -webkit-background-clip: border-box;
+                background-image: none !important;
+            }
+            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff;
+                background-clip: border-box;
+                -webkit-background-clip: border-box;
+                background-image: none !important;
+            }
+            body.fluent-v2:not(.dark-mode) .clock-app .fluent-sidebar-item {
+                color: #111111;
+            }
+            body.fluent-v2.dark-mode .clock-app .fluent-sidebar-item {
+                color: #ffffff;
+            }
+            body.fluent-v2:not(.dark-mode) .clock-app .fluent-sidebar-item img {
+                filter: brightness(0);
+            }
+            body.fluent-v2.dark-mode .clock-app .fluent-sidebar-item img {
+                filter: brightness(0) invert(1);
+            }
         `;
         document.head.appendChild(style);
     },

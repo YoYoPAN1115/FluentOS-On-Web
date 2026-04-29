@@ -3255,7 +3255,7 @@ const SettingsApp = {
     appSortOrder: 'desc', // 'desc' 或 'asc'
     
     // 系统应用列表（不可卸载）
-    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos'],
+    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
 
     // 应用描述
     getAppDescription(appId) {
@@ -3268,7 +3268,8 @@ const SettingsApp = {
             'clock': 'settings.app-desc-clock',
             'weather': 'settings.app-desc-weather',
             'appshop': 'settings.app-desc-appshop',
-            'photos': 'settings.app-desc-photos'
+            'photos': 'settings.app-desc-photos',
+            'media': 'settings.app-desc-default'
         };
         return descKeys[appId] ? t(descKeys[appId]) : t('settings.app-desc-default');
     },
@@ -3291,7 +3292,8 @@ const SettingsApp = {
             { id: 'clock', name: t('settings.app-clock'), icon: 'Theme/Icon/App_icon/system_clock.png' },
             { id: 'weather', name: t('settings.app-weather'), icon: 'Theme/Icon/App_icon/weather.png' },
             { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' },
-            { id: 'photos', name: t('settings.app-photos'), icon: 'Theme/Icon/App_icon/gallery.png' }
+            { id: 'photos', name: t('settings.app-photos'), icon: 'Theme/Icon/App_icon/gallery.png' },
+            { id: 'media', name: '\u591a\u5a92\u4f53', icon: 'Theme/Icon/App_icon/system_music.png' }
         ];
         
         // 获取已安装的 PWA 应用（实时检测）

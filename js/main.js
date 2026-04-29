@@ -978,7 +978,7 @@ const ResourceMonitor = {
         if (clean.endsWith('.css')) return 'style';
         if (/\.(png|jpg|jpeg|gif|webp|bmp|svg|ico|avif)$/.test(clean)) return 'image';
         if (/\.(woff|woff2|ttf|otf|eot)$/.test(clean)) return 'font';
-        if (/\.(mp4|webm|mp3|wav|ogg)$/.test(clean)) return 'media';
+        if (/\.(mp4|webm|ogv|mov|m4v|mkv|mp3|m4a|aac|wav|flac|ogg|oga|opus)$/.test(clean)) return 'media';
         if (/\.(json|xml|txt|csv)$/.test(clean)) return 'data';
         return fallback;
     },
