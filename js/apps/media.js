@@ -20,6 +20,8 @@ const MediaApp = {
     volume: 0.72,
     muted: false,
     playerExpanded: false,
+    expandTransitionTimer: null,
+    collapseShrinkTimer: null,
     mediaStorageKey: 'fluentos.media.library.v1',
     mediaDbName: 'FluentOSMediaLibrary',
     mediaDbStore: 'files',
@@ -114,7 +116,14 @@ const MediaApp = {
             all: zh ? '全部' : 'All',
             speed: zh ? '倍速' : 'Speed',
             volume: zh ? '音量' : 'Volume',
-            fullscreen: zh ? '全屏' : 'Fullscreen'
+            fullscreen: zh ? '全屏' : 'Fullscreen',
+            frequent: zh ? '\u9ad8\u9891\u64ad\u653e' : 'Frequent plays',
+            forYou: zh ? '\u731c\u4f60\u559c\u6b22' : 'For You',
+            settings: zh ? '\u8bbe\u7f6e' : 'Settings',
+            importSong: zh ? '\u5bfc\u5165\u65b0\u7684\u6b4c\u66f2' : 'Import new songs',
+            importFolder: zh ? '\u5bfc\u5165\u65b0\u7684\u6587\u4ef6\u5939' : 'Import new folder',
+            clearLibrary: zh ? '\u6e05\u7a7a\u5df2\u5bfc\u5165\u7684\u6b4c\u66f2' : 'Clear imported songs',
+            clearLibraryDesc: zh ? '\u79fb\u9664\u5f53\u524d\u5a92\u4f53\u5e93\u91cc\u4fdd\u5b58\u7684\u6240\u6709\u672c\u5730\u6b4c\u66f2\u548c\u89c6\u9891\u8bb0\u5f55\u3002' : 'Remove all imported local songs and videos from the media library.'
         };
         return text[key] || key;
     },
@@ -123,8 +132,9 @@ const MediaApp = {
         const playbackState = this.capturePlaybackState();
         const current = this.activeItem;
         const filteredItems = this.getFilteredItems();
+        const preservedAudio = this.detachReusableAudio(current);
         this.container.innerHTML = `
-            <div class="media-app">
+            <div class="media-app ${this.playerExpanded ? 'player-expanded' : ''}">
                 <aside class="media-sidebar">
                     <label class="media-search">
                         <input id="media-search-input" type="search" value="${this.escapeAttr(this.searchQuery)}" placeholder="${this.localText('search')}">
@@ -136,9 +146,8 @@ const MediaApp = {
                         ${this.renderNavItem('now', 'Media Reel V.svg', this.localText('now'))}
                         ${this.renderNavItem('playlist', 'Playlist.svg', this.localText('playlist'))}
                     </nav>
-                    <div class="media-actions">
-                        <button class="media-action-primary" data-action="open-files">${this.localText('openFiles')}</button>
-                        <button class="media-action-secondary" data-action="open-folder">${this.localText('openFolder')}</button>
+                    <div class="media-sidebar-bottom">
+                        ${this.renderNavItem('settings', 'Settings.svg', this.localText('settings'))}
                     </div>
                 </aside>
 
@@ -174,10 +183,32 @@ const MediaApp = {
             </div>
         `;
         this.applyFluentScrollAreas();
+        this.attachReusableAudio(preservedAudio);
         this.bindEvents();
         this.loadCurrentMedia(false);
-        this.restorePlaybackState(playbackState);
+        if (!preservedAudio) {
+            this.restorePlaybackState(playbackState);
+        }
         this.updateProgressUi();
+        if (this.playerExpanded) {
+            requestAnimationFrame(() => this.updateExpandedAnimationOrigin());
+        }
+    },
+
+    detachReusableAudio(current) {
+        const media = this.mediaElement;
+        if (!media || media.tagName !== 'AUDIO' || current?.type !== 'audio' || media.dataset.itemId !== current.id) {
+            return null;
+        }
+        media.remove();
+        return media;
+    },
+
+    attachReusableAudio(media) {
+        if (!media || !this.container) return;
+        media.className = 'media-audio-hidden';
+        const host = this.container.querySelector('.media-page-shell') || this.container.querySelector('.media-app') || this.container;
+        host.appendChild(media);
     },
 
     capturePlaybackState() {
@@ -199,7 +230,7 @@ const MediaApp = {
             if (Number.isFinite(state.currentTime) && Number.isFinite(media.duration)) {
                 media.currentTime = Math.min(Math.max(0, state.currentTime), media.duration || state.currentTime);
             }
-            if (state.wasPlaying) this.playMedia(media);
+            if (state.wasPlaying) this.playMedia(media, false);
             this.updateProgressUi();
         };
 
@@ -216,7 +247,7 @@ const MediaApp = {
     },
 
     renderNavItem(view, icon, label) {
-        return `<button class="media-nav-item ${this.activeView === view ? 'active' : ''}" data-view="${view}"><span>${this.symbolIcon(icon)}</span>${label}</button>`;
+        return `<button class="media-nav-item ${this.activeView === view ? 'active' : ''}" data-view="${view}"><span class="media-nav-icon">${this.symbolIcon(icon)}</span><span class="media-nav-label">${this.escapeHtml(label)}</span></button>`;
     },
 
     renderFilterButton(view, label) {
@@ -225,6 +256,7 @@ const MediaApp = {
     },
 
     renderMainContent(filteredItems, current) {
+        if (this.activeView === 'settings') return this.renderSettingsPage();
         if (!this.library.length) return this.renderImportEmptyPage();
         if (this.activeView === 'recent') return this.renderRecentPage(current);
         if (this.activeView === 'playlist') return this.renderPlaylistPage(filteredItems, current);
@@ -233,6 +265,7 @@ const MediaApp = {
 
     renderLibraryPage(filteredItems, current) {
         const recommended = this.getRecommendedItems(filteredItems, 10);
+        const playInsight = this.getPlayInsightItems(filteredItems, 3);
         return `
             <section class="media-home media-page-shell">
                 <div class="media-home-head">
@@ -251,6 +284,12 @@ const MediaApp = {
                 <div class="media-feature-row">
                     ${this.renderHomeCards(recommended, current, true)}
                 </div>
+                ${playInsight.items.length ? `
+                    <div class="media-section-title">${this.localText(playInsight.hasHistory ? 'frequent' : 'forYou')}</div>
+                    <div class="media-frequency-row">
+                        ${this.renderHomeCards(playInsight.items, current, false)}
+                    </div>
+                ` : ''}
             </section>
         `;
     },
@@ -266,6 +305,34 @@ const MediaApp = {
                         <button class="media-action-primary" data-action="open-files">${this.localText('openFiles')}</button>
                         <button class="media-action-secondary" data-action="open-folder">${this.localText('openFolder')}</button>
                     </div>
+                </div>
+            </section>
+        `;
+    },
+
+    renderSettingsPage() {
+        return `
+            <section class="media-settings-page media-page-shell">
+                <div class="media-home-head">
+                    <div>
+                        <p>${this.localText('app')}</p>
+                        <h1>${this.localText('settings')}</h1>
+                    </div>
+                </div>
+                <div class="media-settings-panel">
+                    <button class="media-settings-option" data-action="open-files">
+                        <span>${this.symbolIcon('Music.svg')}</span>
+                        <strong>${this.localText('importSong')}</strong>
+                    </button>
+                    <button class="media-settings-option" data-action="open-folder">
+                        <span>${this.symbolIcon('Folder.svg')}</span>
+                        <strong>${this.localText('importFolder')}</strong>
+                    </button>
+                    <button class="media-settings-option media-settings-danger" data-action="clear-library">
+                        <span>${this.symbolIcon('Trash.svg')}</span>
+                        <strong>${this.localText('clearLibrary')}</strong>
+                        <small>${this.localText('clearLibraryDesc')}</small>
+                    </button>
                 </div>
             </section>
         `;
@@ -391,6 +458,27 @@ const MediaApp = {
                 return (b.recommendRank || 0) - (a.recommendRank || 0);
             })
             .slice(0, Math.min(limit, items.length));
+    },
+
+    getPlayInsightItems(items, limit = 3) {
+        const source = (items.length ? items : this.library).filter((item) => item.type === 'audio');
+        if (!source.length) return { hasHistory: false, items: [] };
+
+        const frequent = source
+            .filter((item) => Number(item.playCount || 0) > 0)
+            .sort((a, b) => {
+                const plays = Number(b.playCount || 0) - Number(a.playCount || 0);
+                if (plays) return plays;
+                return Number(b.lastPlayed || 0) - Number(a.lastPlayed || 0);
+            })
+            .slice(0, limit);
+
+        if (frequent.length) return { hasHistory: true, items: frequent };
+
+        const fallback = [...source]
+            .sort((a, b) => (b.recommendRank || 0) - (a.recommendRank || 0))
+            .slice(0, limit);
+        return { hasHistory: false, items: fallback };
     },
 
     getItemGradient(item) {
@@ -545,7 +633,8 @@ const MediaApp = {
                 lastModified: item.lastModified || item.file?.lastModified || Date.now(),
                 gradientIndex: item.gradientIndex,
                 duration: item.duration || 0,
-                lastPlayed: item.lastPlayed || 0
+                lastPlayed: item.lastPlayed || 0,
+                playCount: item.playCount || 0
             }));
             localStorage.setItem(this.mediaStorageKey, JSON.stringify(manifest));
         } catch (_) {
@@ -845,13 +934,19 @@ const MediaApp = {
 
         const media = this.mediaElement;
         if (media) {
-            media.addEventListener('loadedmetadata', () => this.handleLoadedMetadata());
-            media.addEventListener('timeupdate', () => this.updateProgressUi());
-            media.addEventListener('play', () => this.updatePlayButton());
-            media.addEventListener('pause', () => this.updatePlayButton());
-            media.addEventListener('ended', () => this.handleEnded());
-            media.addEventListener('error', () => this.markCurrentError());
+            this.bindMediaElementEvents(media);
         }
+    },
+
+    bindMediaElementEvents(media) {
+        if (!media || media.dataset.mediaEventsBound === '1') return;
+        media.dataset.mediaEventsBound = '1';
+        media.addEventListener('loadedmetadata', () => this.handleLoadedMetadata());
+        media.addEventListener('timeupdate', () => this.updateProgressUi());
+        media.addEventListener('play', () => this.updatePlayButton());
+        media.addEventListener('pause', () => this.updatePlayButton());
+        media.addEventListener('ended', () => this.handleEnded());
+        media.addEventListener('error', () => this.markCurrentError());
     },
 
     async handleAction(action) {
@@ -861,6 +956,9 @@ const MediaApp = {
                 break;
             case 'open-folder':
                 await this.openFolder();
+                break;
+            case 'clear-library':
+                await this.clearLibrary();
                 break;
             case 'play-toggle':
                 await this.togglePlay();
@@ -906,15 +1004,63 @@ const MediaApp = {
     },
 
     setExpandedPlayer(active) {
-        this.playerExpanded = Boolean(active);
         const expanded = this.container?.querySelector('.media-expanded');
         const app = this.container?.querySelector('.media-app');
         if (!expanded || !app) {
+            this.playerExpanded = Boolean(active);
             this.render();
             return;
         }
-        app.classList.toggle('player-expanded', this.playerExpanded);
-        expanded.classList.toggle('active', this.playerExpanded);
+
+        clearTimeout(this.expandTransitionTimer);
+        clearTimeout(this.collapseShrinkTimer);
+        this.updateExpandedAnimationOrigin();
+
+        if (active) {
+            this.playerExpanded = true;
+            app.classList.remove('player-collapsing');
+            app.classList.add('player-expanded');
+            requestAnimationFrame(() => {
+                expanded.classList.add('active');
+            });
+            return;
+        }
+
+        this.playerExpanded = false;
+        app.classList.remove('player-expanded');
+        app.classList.add('player-collapsing');
+
+        this.collapseShrinkTimer = setTimeout(() => {
+            expanded.classList.remove('active');
+        }, 300);
+        this.expandTransitionTimer = setTimeout(() => {
+            app.classList.remove('player-collapsing');
+        }, 800);
+    },
+
+    updateExpandedAnimationOrigin() {
+        const expanded = this.container?.querySelector('.media-expanded');
+        const app = this.container?.querySelector('.media-app');
+        const bar = this.container?.querySelector('.media-player-bar:not(.is-hidden)');
+        if (!expanded || !app || !bar) return;
+
+        const appRect = app.getBoundingClientRect();
+        const barRect = bar.getBoundingClientRect();
+        if (!appRect.width || !appRect.height || !barRect.width || !barRect.height) return;
+
+        const left = Math.max(0, Math.min(appRect.width, barRect.left - appRect.left));
+        const top = Math.max(0, Math.min(appRect.height, barRect.top - appRect.top));
+        const right = Math.max(0, Math.min(appRect.width, appRect.right - barRect.right));
+        const bottom = Math.max(0, Math.min(appRect.height, appRect.bottom - barRect.bottom));
+        const centerX = left + (barRect.width / 2);
+        const centerY = top + (barRect.height / 2);
+
+        expanded.style.setProperty('--media-origin-x', `${centerX}px`);
+        expanded.style.setProperty('--media-origin-y', `${centerY}px`);
+        expanded.style.setProperty('--media-collapse-top', `${top}px`);
+        expanded.style.setProperty('--media-collapse-right', `${right}px`);
+        expanded.style.setProperty('--media-collapse-bottom', `${bottom}px`);
+        expanded.style.setProperty('--media-collapse-left', `${left}px`);
     },
 
     async openFiles() {
@@ -950,6 +1096,26 @@ const MediaApp = {
             }
         }
         this.container.querySelector('#media-folder-input')?.click();
+    },
+
+    async clearLibrary() {
+        const media = this.mediaElement;
+        if (media) {
+            media.pause();
+            media.removeAttribute('src');
+            media.load();
+        }
+        this.revokeObjectUrls();
+        this.library = [];
+        this.currentIndex = -1;
+        this.playerExpanded = false;
+        try { localStorage.removeItem(this.mediaStorageKey); } catch (_) {}
+        try {
+            await this.withMediaStore('readwrite', (store) => {
+                if (typeof store.clear === 'function') store.clear();
+            });
+        } catch (_) {}
+        this.render();
     },
 
     async collectDirectoryFiles(directoryHandle) {
@@ -1018,6 +1184,7 @@ const MediaApp = {
             lastModified: file.lastModified || Date.now(),
             duration: 0,
             lastPlayed: 0,
+            playCount: 0,
             error: false
         };
         await this.applyThemeColors(item);
@@ -1043,7 +1210,8 @@ const MediaApp = {
             gradientIndex: Number.isInteger(record.gradientIndex) ? record.gradientIndex : item.gradientIndex,
             recommendRank: Math.random(),
             duration: Number(record.duration || item.duration || 0),
-            lastPlayed: Number(record.lastPlayed || 0)
+            lastPlayed: Number(record.lastPlayed || 0),
+            playCount: Number(record.playCount || 0)
         };
     },
 
@@ -1205,12 +1373,7 @@ const MediaApp = {
             media.preload = 'metadata';
             media.className = 'media-audio-hidden';
             (this.container.querySelector('.media-home') || this.container).appendChild(media);
-            media.addEventListener('loadedmetadata', () => this.handleLoadedMetadata());
-            media.addEventListener('timeupdate', () => this.updateProgressUi());
-            media.addEventListener('play', () => this.updatePlayButton());
-            media.addEventListener('pause', () => this.updatePlayButton());
-            media.addEventListener('ended', () => this.handleEnded());
-            media.addEventListener('error', () => this.markCurrentError());
+            this.bindMediaElementEvents(media);
         }
         if (!media) return;
 
@@ -1239,12 +1402,15 @@ const MediaApp = {
         }
     },
 
-    async playMedia(media) {
+    async playMedia(media, countPlay = true) {
         try {
             await media.play();
             const current = this.activeItem;
             if (current) {
                 current.lastPlayed = Date.now();
+                if (countPlay) {
+                    current.playCount = Number(current.playCount || 0) + 1;
+                }
                 this.updateMediaSession(current);
                 this.saveLibraryManifest();
             }
@@ -1506,7 +1672,7 @@ const MediaApp = {
                 text-align: left;
                 transition: background 260ms var(--media-ease), color 260ms var(--media-ease), transform 260ms var(--media-ease);
             }
-            .media-nav-item span { width: 20px; text-align: center; font-size: 21px; }
+            .media-nav-icon { width: 20px; text-align: center; font-size: 21px; }
             .media-nav-item:hover { background: rgba(255,255,255,0.1); transform: translateX(2px); }
             .media-nav-item.active {
                 background: linear-gradient(90deg, rgba(80,190,255,0.24), rgba(80,190,255,0.02));
@@ -1526,7 +1692,7 @@ const MediaApp = {
                 justify-content: center;
                 padding: 0;
             }
-            .media-app.sidebar-collapsed .media-nav-item span {
+            .media-app.sidebar-collapsed .media-nav-icon {
                 width: auto;
             }
             .media-actions { margin-top: auto; display: grid; gap: 10px; }
@@ -1875,7 +2041,7 @@ const MediaApp = {
                     justify-content: center;
                     padding: 0;
                 }
-                .media-nav-item span { font-size: 24px; }
+                .media-nav-icon { font-size: 24px; }
                 .media-main {
                     grid-template-columns: 1fr;
                     grid-template-rows: minmax(260px, 1fr) 280px;
@@ -3901,7 +4067,7 @@ const MediaApp = {
                     justify-content: center !important;
                     padding: 0 !important;
                 }
-                .media-nav-item span {
+                .media-nav-icon {
                     width: auto !important;
                 }
                 .media-main-scroll .fluent-scroll-viewport {
@@ -4316,9 +4482,11 @@ const MediaApp = {
             .media-app:has(.media-expanded.active) .media-player-bar {
                 opacity: 0 !important;
                 pointer-events: none !important;
+                filter: blur(12px) saturate(0.92) !important;
                 transform: translateX(-50%) translateY(22px) scale(0.86) !important;
                 transition:
                     opacity 360ms cubic-bezier(0.16, 1, 0.3, 1),
+                    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
                     transform 520ms cubic-bezier(0.16, 1, 0.3, 1) !important;
             }
             .media-expanded {
@@ -4392,6 +4560,632 @@ const MediaApp = {
             body.dark-mode .media-expanded::before {
                 opacity: 0.44 !important;
                 filter: blur(42px) saturate(1.12) brightness(0.74) !important;
+            }
+            .media-app,
+            body.fluent-v2 .media-app {
+                --media-sidebar-width: clamp(68px, 23%, 232px);
+                grid-template-columns: var(--media-sidebar-width) minmax(0, 1fr) !important;
+                transition:
+                    grid-template-columns 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    background 260ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-player-bar,
+            body.fluent-v2 .media-player-bar,
+            body:not(.fluent-v2) .media-player-bar,
+            .media-app.sidebar-collapsed .media-player-bar {
+                left: calc(var(--media-sidebar-width) + ((100% - var(--media-sidebar-width)) / 2)) !important;
+                width: min(760px, calc(100% - var(--media-sidebar-width) - 36px)) !important;
+                transform: translateX(-50%) !important;
+                transition:
+                    left 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    width 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    opacity 360ms cubic-bezier(0.16, 1, 0.3, 1),
+                    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
+                    transform 520ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-frequency-row {
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 14px !important;
+                padding: 2px 2px 10px !important;
+            }
+            .media-frequency-row .media-home-card {
+                min-height: 132px !important;
+                width: 100% !important;
+            }
+            .media-home-card,
+            .media-home-card.active,
+            .media-home-card.no-cover,
+            .media-home-card:not(.no-cover):not(.is-empty),
+            body.fluent-v2 .media-home-card,
+            body.fluent-v2 .media-home-card.no-cover,
+            body.dark-mode .media-home-card,
+            body.fluent-v2.dark-mode .media-home-card {
+                border: 0 !important;
+                outline: 0 !important;
+            }
+            .media-sidebar,
+            .media-nav-item,
+            .media-nav-icon,
+            .media-nav-label,
+            .media-nav-item .media-symbol,
+            .media-search,
+            .media-actions,
+            .media-sidebar-bottom {
+                transition:
+                    width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    min-width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    max-width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+                    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    padding 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    margin 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    border-radius 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    background 260ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-sidebar-bottom {
+                margin-top: auto !important;
+                display: grid !important;
+                gap: 8px !important;
+            }
+            .media-sidebar-bottom .media-nav-item {
+                margin-bottom: 0 !important;
+            }
+            .media-main-scroll .fluent-scroll-viewport {
+                transition: padding 430ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-settings-panel {
+                width: min(620px, 100%) !important;
+                display: grid !important;
+                gap: 12px !important;
+                padding: 18px !important;
+                border-radius: 18px !important;
+                background: var(--media-native-pane, rgba(255,255,255,0.42)) !important;
+                color: var(--media-native-text, var(--text-primary)) !important;
+            }
+            .media-settings-option {
+                min-height: 68px !important;
+                display: grid !important;
+                grid-template-columns: 40px minmax(0, 1fr) !important;
+                align-items: center !important;
+                gap: 14px !important;
+                padding: 14px 16px !important;
+                border-radius: 14px !important;
+                text-align: left !important;
+                color: inherit !important;
+                background: rgba(255, 255, 255, 0.36) !important;
+                transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-settings-option:hover {
+                transform: translateY(-1px) !important;
+                background: rgba(255, 255, 255, 0.52) !important;
+            }
+            .media-settings-option > span {
+                width: 40px !important;
+                height: 40px !important;
+                display: grid !important;
+                place-items: center !important;
+                border-radius: 12px !important;
+                background: rgba(0, 120, 212, 0.12) !important;
+            }
+            .media-settings-option strong {
+                min-width: 0 !important;
+                font-size: 15px !important;
+            }
+            .media-settings-option small {
+                grid-column: 2 !important;
+                color: var(--media-native-muted, var(--text-secondary)) !important;
+                line-height: 1.45 !important;
+            }
+            .media-settings-danger > span {
+                background: rgba(220, 38, 38, 0.12) !important;
+            }
+            body.dark-mode .media-settings-panel,
+            body.dark-mode .media-settings-option {
+                background: rgba(255, 255, 255, 0.08) !important;
+            }
+            .media-expanded {
+                transform-origin: var(--media-origin-x, 50%) var(--media-origin-y, calc(100% - 54px)) !important;
+                transform: scale(0.18) !important;
+                clip-path: inset(
+                    var(--media-collapse-top, calc(100% - 90px))
+                    var(--media-collapse-right, 24%)
+                    var(--media-collapse-bottom, 18px)
+                    var(--media-collapse-left, 24%)
+                    round 999px
+                ) !important;
+                opacity: 0 !important;
+                border-radius: 999px !important;
+                overflow: hidden !important;
+                background:
+                    radial-gradient(circle at 22% 14%, color-mix(in srgb, var(--media-theme-c, #d8f3ff) 54%, transparent), transparent 36%),
+                    color-mix(in srgb, var(--media-theme-a, #5ac8fa) 16%, rgba(248, 249, 255, 0.48)) !important;
+                transition:
+                    opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+                    transform 660ms cubic-bezier(0.16, 1, 0.3, 1),
+                    border-radius 660ms cubic-bezier(0.16, 1, 0.3, 1),
+                    clip-path 660ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .media-expanded.active {
+                transform: scale(1) !important;
+                clip-path: inset(0 0 0 0 round 0) !important;
+                opacity: 1 !important;
+                border-radius: 0 !important;
+            }
+            .media-expanded::before {
+                z-index: 0 !important;
+                inset: -46% !important;
+                opacity: 0.86 !important;
+                background:
+                    radial-gradient(circle at 18% 24%, color-mix(in srgb, var(--media-theme-a, #5ac8fa) 86%, transparent), transparent 31%),
+                    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--media-theme-b, #0078d4) 76%, transparent), transparent 34%),
+                    radial-gradient(circle at 62% 78%, color-mix(in srgb, var(--media-theme-c, #d8f3ff) 82%, transparent), transparent 36%),
+                    radial-gradient(circle at 30% 90%, color-mix(in srgb, var(--media-theme-b, #0078d4) 38%, transparent), transparent 32%),
+                    linear-gradient(145deg, var(--media-theme-a, #5ac8fa), var(--media-theme-b, #0078d4) 54%, var(--media-theme-c, #d8f3ff)) !important;
+                filter: blur(54px) saturate(1.36) brightness(1.04) !important;
+                animation: mediaThemeDrift 18s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate !important;
+            }
+            .media-expanded::after {
+                content: "" !important;
+                position: absolute !important;
+                inset: 0 !important;
+                z-index: 1 !important;
+                pointer-events: none !important;
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,0.36), rgba(255,255,255,0.12) 42%, rgba(255,255,255,0.28)),
+                    radial-gradient(circle at 50% 8%, rgba(255,255,255,0.46), transparent 38%) !important;
+            }
+            body.dark-mode .media-expanded::before {
+                opacity: 0.64 !important;
+                filter: blur(58px) saturate(1.24) brightness(0.82) !important;
+            }
+            body.dark-mode .media-expanded::after {
+                background:
+                    linear-gradient(180deg, rgba(10,12,18,0.28), rgba(10,12,18,0.46)),
+                    radial-gradient(circle at 50% 8%, rgba(255,255,255,0.12), transparent 38%) !important;
+            }
+            .media-expanded-bg {
+                z-index: 0 !important;
+                opacity: 0.28 !important;
+                filter: blur(62px) saturate(1.28) !important;
+                transform: scale(1.22) !important;
+            }
+            .media-expanded-bg::after {
+                background: transparent !important;
+            }
+            .media-collapse-btn,
+            .media-expanded-art,
+            .media-expanded-info,
+            .media-expanded-progress-row,
+            .media-expanded-controls,
+            .media-expanded-aux {
+                position: relative !important;
+                z-index: 2 !important;
+            }
+            .media-expanded-info h2 {
+                letter-spacing: 0 !important;
+            }
+            .media-app.player-expanded .media-player-bar,
+            .media-app.player-collapsing .media-player-bar,
+            .media-app:has(.media-expanded.active) .media-player-bar {
+                opacity: 0 !important;
+                pointer-events: none !important;
+                filter: blur(12px) saturate(0.92) !important;
+                transform: translateX(-50%) scale(0.94) !important;
+            }
+            .media-app.player-collapsing:has(.media-expanded.active) .media-player-bar,
+            .media-app.player-collapsing .media-player-bar {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                filter: blur(0) saturate(1) !important;
+                transform: translateX(-50%) !important;
+                z-index: 120 !important;
+            }
+            .media-app.player-collapsing .media-expanded {
+                pointer-events: none !important;
+                z-index: 10 !important;
+            }
+            .media-app.player-collapsing:has(.media-expanded.active) .media-expanded {
+                opacity: 0.92 !important;
+            }
+            .media-app.player-collapsing .media-expanded:not(.active) {
+                opacity: 0 !important;
+                transition:
+                    opacity 300ms cubic-bezier(0.5, 0, 0.2, 1),
+                    transform 660ms cubic-bezier(0.16, 1, 0.3, 1),
+                    border-radius 660ms cubic-bezier(0.16, 1, 0.3, 1),
+                    clip-path 660ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            @container (max-width: 760px) {
+                .media-app,
+                body.fluent-v2 .media-app {
+                    --media-sidebar-width: 68px;
+                }
+                .media-sidebar {
+                    width: 68px !important;
+                    min-width: 68px !important;
+                    margin: 8px 0 8px 8px !important;
+                    padding: 10px 6px !important;
+                    border-radius: 12px !important;
+                }
+                .media-search,
+                .media-actions {
+                    opacity: 0 !important;
+                    max-height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                    pointer-events: none !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                }
+                .media-nav-item {
+                    display: flex !important;
+                    width: 46px !important;
+                    min-width: 46px !important;
+                    height: 46px !important;
+                    min-height: 46px !important;
+                    justify-content: center !important;
+                    padding: 0 !important;
+                    gap: 0 !important;
+                    color: transparent !important;
+                    overflow: hidden !important;
+                }
+                .media-nav-icon,
+                .media-nav-item span.media-nav-icon {
+                    width: 18px !important;
+                    min-width: 18px !important;
+                    height: 18px !important;
+                    display: grid !important;
+                    place-items: center !important;
+                    color: var(--media-native-text, var(--text-primary)) !important;
+                    opacity: 1 !important;
+                    transform: none !important;
+                }
+                .media-nav-item .media-nav-label,
+                .media-nav-item span.media-nav-label {
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    max-width: 0 !important;
+                    height: auto !important;
+                    opacity: 0 !important;
+                    overflow: hidden !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                    pointer-events: none !important;
+                }
+                .media-nav-item .media-symbol {
+                    width: 18px !important;
+                    height: 18px !important;
+                    display: block !important;
+                    opacity: 1 !important;
+                    filter: none !important;
+                }
+                body.dark-mode .media-nav-item .media-symbol {
+                    filter: brightness(0) invert(1) !important;
+                }
+                .media-sidebar-bottom {
+                    margin-top: auto !important;
+                    justify-items: center !important;
+                }
+                .media-main-scroll .fluent-scroll-viewport {
+                    padding: 18px 16px 88px !important;
+                }
+                .media-home-head {
+                    flex-direction: column !important;
+                    gap: 12px !important;
+                }
+                .media-home-head h1 {
+                    font-size: 30px !important;
+                    letter-spacing: 0 !important;
+                }
+                .media-filter-group {
+                    width: 100% !important;
+                    overflow-x: auto !important;
+                    padding-bottom: 2px !important;
+                }
+                .media-feature-row {
+                    grid-auto-columns: minmax(172px, 72%) !important;
+                }
+                .media-home-card.is-featured {
+                    min-height: 164px !important;
+                }
+                .media-frequency-row {
+                    grid-template-columns: 1fr !important;
+                }
+                .media-player-bar {
+                    left: 50% !important;
+                    width: calc(100% - 24px) !important;
+                    bottom: 12px !important;
+                    grid-template-columns: minmax(0, 1fr) auto !important;
+                    padding: 8px 10px !important;
+                }
+                .media-options {
+                    display: none !important;
+                }
+                .media-controls {
+                    min-width: 132px !important;
+                }
+            }
+            @container (max-width: 680px) {
+                .media-expanded {
+                    grid-template-columns: minmax(0, 1fr) !important;
+                    grid-template-rows: auto auto auto auto auto !important;
+                    align-content: center !important;
+                    gap: 10px !important;
+                    padding: 16px !important;
+                    overflow: auto !important;
+                    text-align: center !important;
+                }
+                .media-collapse-btn {
+                    top: 12px !important;
+                    left: 12px !important;
+                    width: 42px !important;
+                    height: 42px !important;
+                }
+                .media-expanded-art {
+                    width: min(58cqw, 32cqh, 240px) !important;
+                    min-width: 112px !important;
+                    justify-self: center !important;
+                    grid-row: 2 !important;
+                    grid-column: 1 !important;
+                }
+                .media-expanded-info {
+                    grid-template-columns: 1fr !important;
+                    justify-items: center !important;
+                    gap: 10px !important;
+                }
+                .media-expanded-info h2 {
+                    font-size: clamp(20px, 7cqw, 30px) !important;
+                    line-height: 1.08 !important;
+                }
+                .media-expanded-info p {
+                    font-size: 14px !important;
+                    margin-top: 4px !important;
+                }
+                .media-expanded-meta {
+                    justify-content: center !important;
+                }
+                .media-expanded-controls {
+                    gap: 8px !important;
+                }
+                .media-expanded-controls button {
+                    width: 38px !important;
+                    min-width: 38px !important;
+                    height: 38px !important;
+                }
+                .media-expanded-play {
+                    width: 54px !important;
+                    min-width: 54px !important;
+                    height: 54px !important;
+                }
+                .media-expanded-aux {
+                    grid-template-columns: 1fr !important;
+                    gap: 10px !important;
+                }
+            }
+            @container (max-height: 520px) {
+                .media-expanded {
+                    grid-template-columns: minmax(112px, 30cqw) minmax(0, 1fr) !important;
+                    grid-template-rows: auto auto auto auto !important;
+                    align-content: center !important;
+                    column-gap: 18px !important;
+                    row-gap: 10px !important;
+                    padding: 16px 18px !important;
+                }
+                .media-expanded-art {
+                    grid-row: 1 / 5 !important;
+                    grid-column: 1 !important;
+                    width: min(28cqw, 48cqh, 210px) !important;
+                    min-width: 108px !important;
+                }
+                .media-expanded-info {
+                    grid-row: 1 !important;
+                    grid-column: 2 !important;
+                }
+                .media-expanded-progress-row {
+                    grid-row: 2 !important;
+                    grid-column: 2 !important;
+                }
+                .media-expanded-controls {
+                    grid-row: 3 !important;
+                    grid-column: 2 !important;
+                }
+                .media-expanded-aux {
+                    grid-row: 4 !important;
+                    grid-column: 2 !important;
+                }
+                .media-expanded-info h2 {
+                    font-size: clamp(20px, 7cqh, 30px) !important;
+                    line-height: 1.06 !important;
+                }
+                .media-expanded-info p {
+                    font-size: 14px !important;
+                    margin-top: 4px !important;
+                }
+                .media-expanded-meta button,
+                .media-expanded-controls button {
+                    width: 38px !important;
+                    min-width: 38px !important;
+                    height: 38px !important;
+                }
+                .media-expanded-play {
+                    width: 54px !important;
+                    min-width: 54px !important;
+                    height: 54px !important;
+                }
+            }
+            @container (max-height: 410px) {
+                .media-expanded {
+                    row-gap: 8px !important;
+                }
+                .media-expanded-meta,
+                .media-expanded-aux {
+                    display: none !important;
+                }
+                .media-expanded-art {
+                    width: min(26cqw, 42cqh, 160px) !important;
+                }
+                .media-expanded-controls button {
+                    width: 34px !important;
+                    min-width: 34px !important;
+                    height: 34px !important;
+                }
+                .media-expanded-play {
+                    width: 48px !important;
+                    min-width: 48px !important;
+                    height: 48px !important;
+                }
+            }
+            .media-nav-icon {
+                flex: 0 0 auto !important;
+                display: grid !important;
+                place-items: center !important;
+                width: 18px !important;
+                height: 18px !important;
+            }
+            .media-nav-label {
+                flex: 1 1 auto !important;
+                width: auto !important;
+                max-width: 156px !important;
+                min-width: 0 !important;
+                opacity: 1 !important;
+                overflow: hidden !important;
+                white-space: nowrap !important;
+                text-overflow: ellipsis !important;
+                transition:
+                    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+                    max-width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+                    transform 420ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            body:not(.fluent-v2) .media-sidebar {
+                background: rgba(244, 246, 250, 0.72) !important;
+                border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            body:not(.fluent-v2).dark-mode .media-sidebar {
+                background: rgba(36, 38, 42, 0.78) !important;
+                border-right-color: rgba(255, 255, 255, 0.08) !important;
+            }
+            @container (max-width: 900px) {
+                .media-app,
+                body.fluent-v2 .media-app,
+                body:not(.fluent-v2) .media-app {
+                    --media-sidebar-width: 68px !important;
+                    grid-template-columns: var(--media-sidebar-width) minmax(0, 1fr) !important;
+                }
+                .media-sidebar,
+                body.fluent-v2 .media-sidebar,
+                body:not(.fluent-v2) .media-sidebar {
+                    width: 68px !important;
+                    min-width: 68px !important;
+                    max-width: 68px !important;
+                    margin: 8px 0 8px 8px !important;
+                    padding: 10px 6px !important;
+                    border-radius: 12px !important;
+                    overflow: hidden !important;
+                }
+                body:not(.fluent-v2) .media-sidebar {
+                    background: rgba(244, 246, 250, 0.72) !important;
+                    border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+                }
+                body:not(.fluent-v2).dark-mode .media-sidebar {
+                    background: rgba(36, 38, 42, 0.78) !important;
+                    border-right-color: rgba(255, 255, 255, 0.08) !important;
+                }
+                .media-nav {
+                    align-items: center !important;
+                    gap: 6px !important;
+                }
+                .media-nav-item,
+                .media-nav-item:not(.active),
+                body.fluent-v2 .media-nav-item,
+                body.fluent-v2 .media-nav-item:not(.active),
+                body:not(.fluent-v2) .media-nav-item,
+                body:not(.fluent-v2) .media-nav-item:not(.active) {
+                    display: flex !important;
+                    width: 46px !important;
+                    min-width: 46px !important;
+                    max-width: 46px !important;
+                    height: 46px !important;
+                    min-height: 46px !important;
+                    margin: 0 auto !important;
+                    padding: 0 !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    gap: 0 !important;
+                    overflow: hidden !important;
+                    font-size: 0 !important;
+                    line-height: 1 !important;
+                    color: transparent !important;
+                }
+                .media-nav-item.active {
+                    color: transparent !important;
+                }
+                .media-nav-icon,
+                .media-nav-item span.media-nav-icon {
+                    display: grid !important;
+                    place-items: center !important;
+                    width: 18px !important;
+                    min-width: 18px !important;
+                    height: 18px !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    opacity: 1 !important;
+                    transform: none !important;
+                    color: var(--media-native-text, var(--text-primary, #202020)) !important;
+                }
+                .media-nav-item .media-nav-label,
+                .media-nav-item span.media-nav-label {
+                    width: 0 !important;
+                    min-width: 0 !important;
+                    max-width: 0 !important;
+                    height: auto !important;
+                    opacity: 0 !important;
+                    overflow: hidden !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                    pointer-events: none !important;
+                }
+                .media-nav-item .media-symbol,
+                .media-nav-icon .media-symbol {
+                    display: block !important;
+                    width: 18px !important;
+                    height: 18px !important;
+                    min-width: 18px !important;
+                    opacity: 1 !important;
+                    margin: 0 !important;
+                    filter: none !important;
+                }
+                body.dark-mode .media-nav-item .media-symbol,
+                body.dark-mode .media-nav-icon .media-symbol {
+                    filter: brightness(0) invert(1) !important;
+                }
+                .media-search,
+                .media-actions {
+                    display: grid !important;
+                    opacity: 0 !important;
+                    max-height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                    pointer-events: none !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                }
+                .media-sidebar-bottom {
+                    display: grid !important;
+                    margin-top: auto !important;
+                    justify-items: center !important;
+                }
+                .media-sidebar-bottom .media-nav-item {
+                    display: flex !important;
+                }
+                .media-player-bar,
+                body.fluent-v2 .media-player-bar,
+                body:not(.fluent-v2) .media-player-bar {
+                    left: calc(68px + ((100% - 68px) / 2)) !important;
+                    width: min(760px, calc(100% - 68px - 36px)) !important;
+                    transform: translateX(-50%) !important;
+                }
             }
             @keyframes mediaThemeDrift {
                 0% {

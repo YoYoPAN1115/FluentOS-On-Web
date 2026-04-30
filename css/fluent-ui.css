@@ -721,6 +721,185 @@ body.fluent-v2.dark-mode .notes-sidebar-item.active img {
 }
 
 /* V2 毛玻璃设置项 - 统一透明度（在 settings.js 中使用 !important 覆盖） */
+/* Unified responsive system sidebars for Fluent v1/v2. */
+.settings-app,
+.files-app,
+.clock-app,
+.weather-app,
+.browser-app,
+.notes-app,
+.media-app {
+    container-type: inline-size;
+    --system-sidebar-width: clamp(68px, 24cqw, 232px);
+    --system-sidebar-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-app .fluent-sidebar,
+.files-app .fluent-sidebar,
+.clock-app .fluent-sidebar,
+.weather-app .fluent-sidebar,
+.browser-app .fluent-sidebar,
+.notes-app .fluent-sidebar,
+.files-sidebar,
+.clock-sidebar,
+.weather-sidebar,
+.browser-sidebar,
+.notes-sidebar {
+    width: var(--system-sidebar-width, 200px) !important;
+    min-width: var(--system-sidebar-width, 200px) !important;
+    flex: 0 0 var(--system-sidebar-width, 200px) !important;
+    overflow-x: hidden !important;
+    transition:
+        width 430ms var(--system-sidebar-ease),
+        min-width 430ms var(--system-sidebar-ease),
+        flex-basis 430ms var(--system-sidebar-ease),
+        padding 430ms var(--system-sidebar-ease),
+        margin 430ms var(--system-sidebar-ease),
+        border-radius 430ms var(--system-sidebar-ease),
+        background 260ms var(--system-sidebar-ease) !important;
+}
+
+.fluent-sidebar-header,
+.fluent-sidebar-section-title,
+.fluent-sidebar-item-label,
+.sidebar-item span,
+.files-sidebar-count {
+    transition:
+        opacity 240ms var(--system-sidebar-ease),
+        max-width 430ms var(--system-sidebar-ease),
+        transform 430ms var(--system-sidebar-ease),
+        margin 430ms var(--system-sidebar-ease),
+        padding 430ms var(--system-sidebar-ease) !important;
+}
+
+.fluent-sidebar-item,
+.sidebar-item,
+.clock-sidebar-item,
+.files-sidebar-item,
+.weather-sidebar-item,
+.browser-sidebar-item,
+.notes-sidebar-item {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    transition:
+        gap 430ms var(--system-sidebar-ease),
+        padding 430ms var(--system-sidebar-ease),
+        margin 430ms var(--system-sidebar-ease),
+        border-radius 430ms var(--system-sidebar-ease),
+        background 260ms var(--system-sidebar-ease),
+        color 180ms var(--system-sidebar-ease),
+        font-size 430ms var(--system-sidebar-ease) !important;
+}
+
+@container (max-width: 760px) {
+    .settings-app,
+    .files-app,
+    .clock-app,
+    .weather-app,
+    .browser-app,
+    .notes-app,
+    .media-app {
+        --system-sidebar-width: 68px;
+    }
+
+    .settings-app .fluent-sidebar,
+    .files-app .fluent-sidebar,
+    .clock-app .fluent-sidebar,
+    .weather-app .fluent-sidebar,
+    .browser-app .fluent-sidebar,
+    .notes-app .fluent-sidebar,
+    .files-sidebar,
+    .clock-sidebar,
+    .weather-sidebar,
+    .browser-sidebar,
+    .notes-sidebar {
+        width: 68px !important;
+        min-width: 68px !important;
+        flex-basis: 68px !important;
+        padding: 10px 6px !important;
+        margin: 8px 0 8px 8px !important;
+        border-radius: 12px !important;
+    }
+
+    .fluent-sidebar-header,
+    .fluent-sidebar-section-title,
+    .files-sidebar-count {
+        opacity: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
+        transform: translateX(-8px) scale(0.96) !important;
+    }
+
+    .fluent-sidebar-item,
+    .sidebar-item,
+    .clock-sidebar-item,
+    .files-sidebar-item,
+    .weather-sidebar-item,
+    .browser-sidebar-item,
+    .notes-sidebar-item {
+        height: 44px !important;
+        min-height: 44px !important;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        font-size: 0 !important;
+    }
+
+    .fluent-sidebar-item-label {
+        opacity: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        transform: translateX(-8px) scale(0.96) !important;
+        pointer-events: none !important;
+    }
+
+    .sidebar-item span {
+        opacity: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        transform: translateX(-8px) scale(0.96) !important;
+        pointer-events: none !important;
+    }
+
+    .fluent-sidebar-item-icon,
+    .fluent-sidebar-item img,
+    .sidebar-item img,
+    .clock-sidebar-item img,
+    .files-sidebar-item img,
+    .weather-sidebar-item img,
+    .browser-sidebar-item img,
+    .notes-sidebar-item img {
+        margin: 0 !important;
+        flex: 0 0 auto !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .settings-app .fluent-sidebar,
+    .files-app .fluent-sidebar,
+    .clock-app .fluent-sidebar,
+    .weather-app .fluent-sidebar,
+    .browser-app .fluent-sidebar,
+    .notes-app .fluent-sidebar,
+    .files-sidebar,
+    .clock-sidebar,
+    .weather-sidebar,
+    .browser-sidebar,
+    .notes-sidebar {
+        width: 68px !important;
+        min-width: 68px !important;
+        flex-basis: 68px !important;
+    }
+}
+
 body.fluent-v2 .fluent-setting-item {
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(20px) saturate(150%);
