@@ -431,6 +431,7 @@ const I18n = {
             'clock.title': '时钟',
             'weather.title': '天气',
             'photos.title': '照片',
+            'media.title': '多媒体',
             'appshop.title': 'App Shop',
 
             // 时钟应用
@@ -774,6 +775,7 @@ const I18n = {
             'settings.app-desc-weather': '查看实时天气信息和天气预报。',
             'settings.app-desc-appshop': '发现和安装更多精彩应用程序。',
             'settings.app-desc-photos': '查看和编辑图片，浏览 Bing 每日精选壁纸。',
+            'settings.app-desc-media': '播放本地音乐和视频，支持文件与文件夹导入。',
             'settings.app-name-files': '文件管理器',
             'settings.app-name-settings': '设置',
             'settings.app-name-calculator': '计算器',
@@ -783,6 +785,7 @@ const I18n = {
             'settings.app-name-weather': '天气',
             'settings.app-name-appshop': 'App Shop',
             'settings.app-name-photos': '照片',
+            'settings.app-media': '多媒体',
             'settings.personalization-title': '个性化',
             'settings.lock-wallpaper-title': '锁屏壁纸',
             'settings.error': '错误',
@@ -1300,6 +1303,7 @@ const I18n = {
             'clock.title': 'Clock',
             'weather.title': 'Weather',
             'photos.title': 'Photos',
+            'media.title': 'Multimedia',
             'appshop.title': 'App Shop',
 
             // Clock
@@ -1644,6 +1648,7 @@ const I18n = {
             'settings.app-desc-weather': 'View real-time weather information and forecasts.',
             'settings.app-desc-appshop': 'Discover and install more great apps.',
             'settings.app-desc-photos': 'View and edit images, browse Bing daily featured wallpapers.',
+            'settings.app-desc-media': 'Play local music and videos with file and folder imports.',
             'settings.app-name-files': 'File Manager',
             'settings.app-name-settings': 'Settings',
             'settings.app-name-calculator': 'Calculator',
@@ -1653,6 +1658,7 @@ const I18n = {
             'settings.app-name-weather': 'Weather',
             'settings.app-name-appshop': 'App Shop',
             'settings.app-name-photos': 'Photos',
+            'settings.app-media': 'Multimedia',
             'settings.personalization-title': 'Personalization',
             'settings.lock-wallpaper-title': 'Lock Screen Wallpaper',
             'settings.error': 'Error',

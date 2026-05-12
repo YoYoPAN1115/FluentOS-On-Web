@@ -22,6 +22,8 @@ const MediaApp = {
     playerExpanded: false,
     expandTransitionTimer: null,
     collapseShrinkTimer: null,
+    _languageListenerBound: false,
+    _langHandler: null,
     mediaStorageKey: 'fluentos.media.library.v1',
     mediaDbName: 'FluentOSMediaLibrary',
     mediaDbStore: 'files',
@@ -53,6 +55,17 @@ const MediaApp = {
         this.render();
         this.startProgressLoop();
         this.restoreLibraryFromStorage();
+
+        if (!this._languageListenerBound && typeof State !== 'undefined' && typeof State.on === 'function') {
+            this._langHandler = () => {
+                if (!this.container || !this.container.isConnected) return;
+                this.refreshLocalizedLibrary();
+                this.render();
+                if (this.activeItem) this.updateMediaSession(this.activeItem);
+            };
+            State.on('languageChange', this._langHandler);
+            this._languageListenerBound = true;
+        }
     },
 
     destroy() {
@@ -93,39 +106,138 @@ const MediaApp = {
         return dot >= 0 ? String(name).slice(dot + 1).toLowerCase() : '';
     },
 
+    getLanguage() {
+        const lang = String(
+            (typeof I18n !== 'undefined' && I18n.currentLang) ||
+            (typeof State !== 'undefined' && State.settings && State.settings.language) ||
+            document.documentElement.lang ||
+            'zh'
+        ).toLowerCase();
+        return lang.startsWith('en') ? 'en' : 'zh';
+    },
+
     localText(key) {
-        const zh = (document.documentElement.lang || '').toLowerCase().startsWith('zh');
+        const i18nKey = key === 'app' ? 'media.title' : `media.${key}`;
+        if (typeof t === 'function') {
+            const translated = t(i18nKey);
+            if (translated && translated !== i18nKey) return translated;
+        }
+
         const text = {
-            app: zh ? '多媒体' : 'Multimedia',
-            search: zh ? '搜索' : 'Search',
-            library: zh ? '我的媒体' : 'Library',
-            recent: zh ? '最近播放的内容' : 'Recently played',
-            now: zh ? '正在播放' : 'Now playing',
-            playlist: zh ? '播放列表' : 'Playlist',
-            openFiles: zh ? '打开文件' : 'Open files',
-            openFolder: zh ? '导入文件夹' : 'Import folder',
-            emptyTitle: zh ? '打开本地音乐或视频' : 'Open local music or video',
-            emptyDesc: zh ? '支持单个文件和文件夹导入，音乐会自动读取可用的封面与歌手信息。' : 'Import files or a folder. Music artwork and artist tags are read when available.',
-            unsupportedFolder: zh ? '当前浏览器不支持直接选择文件夹，请使用文件夹导入兼容模式。' : 'This browser cannot open folders directly. Use the compatible folder picker.',
-            noMatch: zh ? '没有匹配的媒体' : 'No matching media',
-            unknownArtist: zh ? '未知艺术家' : 'Unknown artist',
-            unknownAlbum: zh ? '未知专辑' : 'Unknown album',
-            unknownTitle: zh ? '未命名媒体' : 'Untitled media',
-            audio: zh ? '音乐' : 'Music',
-            video: zh ? '视频' : 'Video',
-            all: zh ? '全部' : 'All',
-            speed: zh ? '倍速' : 'Speed',
-            volume: zh ? '音量' : 'Volume',
-            fullscreen: zh ? '全屏' : 'Fullscreen',
-            frequent: zh ? '\u9ad8\u9891\u64ad\u653e' : 'Frequent plays',
-            forYou: zh ? '\u731c\u4f60\u559c\u6b22' : 'For You',
-            settings: zh ? '\u8bbe\u7f6e' : 'Settings',
-            importSong: zh ? '\u5bfc\u5165\u65b0\u7684\u6b4c\u66f2' : 'Import new songs',
-            importFolder: zh ? '\u5bfc\u5165\u65b0\u7684\u6587\u4ef6\u5939' : 'Import new folder',
-            clearLibrary: zh ? '\u6e05\u7a7a\u5df2\u5bfc\u5165\u7684\u6b4c\u66f2' : 'Clear imported songs',
-            clearLibraryDesc: zh ? '\u79fb\u9664\u5f53\u524d\u5a92\u4f53\u5e93\u91cc\u4fdd\u5b58\u7684\u6240\u6709\u672c\u5730\u6b4c\u66f2\u548c\u89c6\u9891\u8bb0\u5f55\u3002' : 'Remove all imported local songs and videos from the media library.'
+            zh: {
+                app: '多媒体',
+                search: '搜索',
+                library: '我的媒体',
+                recent: '最近播放的内容',
+                now: '正在播放',
+                playlist: '播放列表',
+                openFiles: '打开文件',
+                openFolder: '导入文件夹',
+                emptyTitle: '打开本地音乐或视频',
+                emptyDesc: '支持单个文件和文件夹导入，音乐会自动读取可用的封面与歌手信息。',
+                unsupportedFolder: '当前浏览器不支持直接选择文件夹，请使用文件夹导入兼容模式。',
+                noMatch: '没有匹配的媒体',
+                unknownArtist: '未知艺术家',
+                unknownAlbum: '未知专辑',
+                unknownTitle: '未命名媒体',
+                audio: '音乐',
+                video: '视频',
+                all: '全部',
+                speed: '倍速',
+                volume: '音量',
+                fullscreen: '全屏',
+                frequent: '高频播放',
+                forYou: '猜你喜欢',
+                settings: '设置',
+                importSong: '导入新的歌曲',
+                importFolder: '导入新的文件夹',
+                clearLibrary: '清空已导入的歌曲',
+                clearLibraryDesc: '移除当前媒体库里保存的所有本地歌曲和视频记录。',
+                recommended: '推荐播放',
+                recentEmptyTitle: '暂无播放记录',
+                recentEmptyDesc: '播放过的音乐和视频会出现在这里。',
+                madeForYou: '为你推荐',
+                previous: '上一首',
+                next: '下一首',
+                play: '播放',
+                shuffle: '随机播放',
+                repeat: '循环播放',
+                expand: '展开播放界面',
+                collapse: '收起播放界面',
+                skipBack: '后退 10 秒',
+                skipForward: '前进 10 秒'
+            },
+            en: {
+                app: 'Multimedia',
+                search: 'Search',
+                library: 'Library',
+                recent: 'Recently played',
+                now: 'Now playing',
+                playlist: 'Playlist',
+                openFiles: 'Open files',
+                openFolder: 'Import folder',
+                emptyTitle: 'Open local music or video',
+                emptyDesc: 'Import files or a folder. Music artwork and artist tags are read when available.',
+                unsupportedFolder: 'This browser cannot open folders directly. Use the compatible folder picker.',
+                noMatch: 'No matching media',
+                unknownArtist: 'Unknown artist',
+                unknownAlbum: 'Unknown album',
+                unknownTitle: 'Untitled media',
+                audio: 'Music',
+                video: 'Video',
+                all: 'All',
+                speed: 'Speed',
+                volume: 'Volume',
+                fullscreen: 'Fullscreen',
+                frequent: 'Frequent plays',
+                forYou: 'For You',
+                settings: 'Settings',
+                importSong: 'Import new songs',
+                importFolder: 'Import new folder',
+                clearLibrary: 'Clear imported songs',
+                clearLibraryDesc: 'Remove all imported local songs and videos from the media library.',
+                recommended: 'Recommended',
+                recentEmptyTitle: 'No playback history yet',
+                recentEmptyDesc: 'Music and videos you play will appear here.',
+                madeForYou: 'Made for You',
+                previous: 'Previous',
+                next: 'Next',
+                play: 'Play',
+                shuffle: 'Shuffle',
+                repeat: 'Repeat',
+                expand: 'Expand player',
+                collapse: 'Collapse player',
+                skipBack: 'Back 10 seconds',
+                skipForward: 'Forward 10 seconds'
+            }
         };
-        return text[key] || key;
+        const lang = this.getLanguage();
+        return text[lang]?.[key] || text.zh[key] || key;
+    },
+
+    isUnknownArtistLabel(value) {
+        const text = String(value || '').trim();
+        return text === '未知艺术家' || text === 'Unknown artist';
+    },
+
+    getTypeLabel(itemOrType) {
+        const type = typeof itemOrType === 'string' ? itemOrType : itemOrType?.type;
+        return type === 'video' ? this.localText('video') : this.localText('audio');
+    },
+
+    getItemSubtitle(item, fallbackToType = false) {
+        if (!item) return fallbackToType ? this.getTypeLabel('audio') : this.localText('unknownArtist');
+        const artist = String(item.artist || '').trim();
+        if (artist && !this.isUnknownArtistLabel(artist)) return artist;
+        if (item.album) return item.album;
+        return fallbackToType ? this.getTypeLabel(item) : this.localText('unknownArtist');
+    },
+
+    refreshLocalizedLibrary() {
+        this.library.forEach((item) => {
+            item.typeLabel = this.getTypeLabel(item);
+            if (this.isUnknownArtistLabel(item.artist)) item.artist = this.localText('unknownArtist');
+        });
     },
 
     render() {
@@ -162,19 +274,19 @@ const MediaApp = {
                         ${this.renderSmallArt(current)}
                         <div>
                             <strong>${this.escapeHtml(current?.title || this.localText('emptyTitle'))}</strong>
-                            <span>${this.escapeHtml(current?.artist || current?.typeLabel || this.localText('unknownArtist'))}</span>
+                            <span>${this.escapeHtml(this.getItemSubtitle(current, true))}</span>
                         </div>
                     </div>
                     <div class="media-controls">
                         <div class="media-button-row">
-                            <button data-action="previous" title="Previous">${this.symbolIcon('Previous.svg')}</button>
-                            <button class="media-play-btn" data-action="play-toggle" title="Play">${this.symbolIcon('Play.svg')}</button>
-                            <button data-action="next" title="Next">${this.symbolIcon('Next.svg')}</button>
+                            <button data-action="previous" title="${this.localText('previous')}">${this.symbolIcon('Previous.svg')}</button>
+                            <button class="media-play-btn" data-action="play-toggle" title="${this.localText('play')}">${this.symbolIcon('Play.svg')}</button>
+                            <button data-action="next" title="${this.localText('next')}">${this.symbolIcon('Next.svg')}</button>
                         </div>
                     </div>
                     <div class="media-options">
-                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="Shuffle">${this.symbolIcon('Exchange A.svg')}</button>
-                        <button data-action="expand-player" title="Expand">${this.symbolIcon('Playlist.svg')}</button>
+                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="${this.localText('shuffle')}">${this.symbolIcon('Exchange A.svg')}</button>
+                        <button data-action="expand-player" title="${this.localText('expand')}">${this.symbolIcon('Playlist.svg')}</button>
                     </div>
 
                     <input class="media-hidden-input" id="media-file-input" type="file" multiple accept="audio/*,video/*">
@@ -280,7 +392,7 @@ const MediaApp = {
                     </div>
                 </div>
                 ${current?.type === 'video' ? `<div class="media-video-shell">${this.renderVideoStage(current)}</div>` : ''}
-                <div class="media-section-title">\u63a8\u8350\u64ad\u653e</div>
+                <div class="media-section-title">${this.localText('recommended')}</div>
                 <div class="media-feature-row">
                     ${this.renderHomeCards(recommended, current, true)}
                 </div>
@@ -353,7 +465,7 @@ const MediaApp = {
                         ${this.renderHomeCards(recent, current, true)}
                     </div>
                     ${this.renderListPanel(recent, current, this.localText('recent'))}
-                ` : this.renderEmptyState('\u6682\u65e0\u64ad\u653e\u8bb0\u5f55', '\u64ad\u653e\u8fc7\u7684\u97f3\u4e50\u548c\u89c6\u9891\u4f1a\u51fa\u73b0\u5728\u8fd9\u91cc\u3002')}
+                ` : this.renderEmptyState(this.localText('recentEmptyTitle'), this.localText('recentEmptyDesc'))}
             </section>
         `;
     },
@@ -371,9 +483,9 @@ const MediaApp = {
                     <div class="media-now-hero">
                         ${this.renderLargeArt(current)}
                         <div>
-                            <p>${this.escapeHtml(current.typeLabel || '')}</p>
+                            <p>${this.escapeHtml(this.getTypeLabel(current))}</p>
                             <h2>${this.escapeHtml(current.title)}</h2>
-                            <span>${this.escapeHtml(current.artist || current.album || this.localText('unknownArtist'))}</span>
+                            <span>${this.escapeHtml(this.getItemSubtitle(current))}</span>
                         </div>
                     </div>
                     ${this.renderListPanel([current], current, this.localText('now'))}
@@ -435,9 +547,9 @@ const MediaApp = {
                         ${hasCover ? '' : this.symbolIcon(item.type === 'video' ? 'Video Player.svg' : 'Music.svg', 'media-card-placeholder-icon')}
                     </span>
                     <span class="media-card-shade"></span>
-                    <span class="media-card-label">${featured ? (index === 0 ? 'Made for You' : item.typeLabel) : item.typeLabel}</span>
+                    <span class="media-card-label">${featured ? (index === 0 ? this.localText('madeForYou') : this.getTypeLabel(item)) : this.getTypeLabel(item)}</span>
                     <strong>${this.escapeHtml(item.title)}</strong>
-                    <small>${this.escapeHtml(item.artist || item.album || item.typeLabel)}</small>
+                    <small>${this.escapeHtml(this.getItemSubtitle(item, true))}</small>
                 </button>
             `;
         }).join('');
@@ -739,18 +851,18 @@ const MediaApp = {
         return `
             <section class="media-expanded ${this.playerExpanded ? 'active' : ''}" style="${this.getExpandedThemeStyle(item)}">
                 <div class="media-expanded-bg" style="${coverStyle}"></div>
-                <button class="media-collapse-btn" data-action="collapse-player" title="Collapse">${this.symbolIcon('Chevron Down.svg')}</button>
+                <button class="media-collapse-btn" data-action="collapse-player" title="${this.localText('collapse')}">${this.symbolIcon('Chevron Down.svg')}</button>
                 <div class="media-expanded-art" style="${coverStyle}">
                     ${item?.coverUrl ? '' : this.symbolIcon(item?.type === 'video' ? 'Video Player.svg' : 'Music.svg', 'media-expanded-placeholder-icon')}
                 </div>
                 <div class="media-expanded-info">
                     <div>
                         <h2>${this.escapeHtml(item?.title || this.localText('emptyTitle'))}</h2>
-                        <p>${this.escapeHtml(item?.artist || item?.album || this.localText('unknownArtist'))}</p>
+                        <p>${this.escapeHtml(this.getItemSubtitle(item))}</p>
                     </div>
                     <div class="media-expanded-meta">
-                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="Shuffle">${this.symbolIcon('Exchange A.svg')}</button>
-                        <button data-action="repeat" class="${this.repeatMode !== 'none' ? 'active' : ''}" title="Repeat">${this.symbolIcon(this.repeatMode === 'one' ? 'Reload Reverse.svg' : 'Reload.svg')}</button>
+                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="${this.localText('shuffle')}">${this.symbolIcon('Exchange A.svg')}</button>
+                        <button data-action="repeat" class="${this.repeatMode !== 'none' ? 'active' : ''}" title="${this.localText('repeat')}">${this.symbolIcon(this.repeatMode === 'one' ? 'Reload Reverse.svg' : 'Reload.svg')}</button>
                         <button data-action="fullscreen" title="${this.localText('fullscreen')}">${this.symbolIcon('Maximize.svg')}</button>
                     </div>
                 </div>
@@ -762,11 +874,11 @@ const MediaApp = {
                     </div>
                 </div>
                 <div class="media-expanded-controls">
-                    <button data-action="skip-back" title="-10s">${this.symbolIcon('Fast Forward Back.svg')}</button>
-                    <button data-action="previous" title="Previous">${this.symbolIcon('Previous.svg')}</button>
-                    <button class="media-play-btn media-expanded-play" data-action="play-toggle" title="Play">${this.symbolIcon('Play.svg')}</button>
-                    <button data-action="next" title="Next">${this.symbolIcon('Next.svg')}</button>
-                    <button data-action="skip-forward" title="+10s">${this.symbolIcon('Fast Forward.svg')}</button>
+                    <button data-action="skip-back" title="${this.localText('skipBack')}">${this.symbolIcon('Fast Forward Back.svg')}</button>
+                    <button data-action="previous" title="${this.localText('previous')}">${this.symbolIcon('Previous.svg')}</button>
+                    <button class="media-play-btn media-expanded-play" data-action="play-toggle" title="${this.localText('play')}">${this.symbolIcon('Play.svg')}</button>
+                    <button data-action="next" title="${this.localText('next')}">${this.symbolIcon('Next.svg')}</button>
+                    <button data-action="skip-forward" title="${this.localText('skipForward')}">${this.symbolIcon('Fast Forward.svg')}</button>
                 </div>
                 <div class="media-expanded-aux">
                     <label class="media-volume">
@@ -790,7 +902,7 @@ const MediaApp = {
                 ${this.renderLargeArt(item)}
                 <div class="media-title-block">
                     <h1>${this.escapeHtml(item?.title || this.localText('emptyTitle'))}</h1>
-                    <p>${this.escapeHtml(item?.artist || this.localText('unknownArtist'))}${item?.album ? ` - ${this.escapeHtml(item.album)}` : ''}</p>
+                    <p>${this.escapeHtml(this.getItemSubtitle(item))}</p>
                 </div>
             </div>
         `;
@@ -801,7 +913,7 @@ const MediaApp = {
             <video id="media-player-element" class="media-video" playsinline preload="metadata"></video>
             <div class="media-video-title">
                 <strong>${this.escapeHtml(item.title)}</strong>
-                <span>${this.escapeHtml(item.artist || item.typeLabel)}</span>
+                <span>${this.escapeHtml(this.getItemSubtitle(item, true))}</span>
             </div>
         `;
     },
@@ -828,9 +940,9 @@ const MediaApp = {
                 <span class="media-track-index">${this.library.indexOf(item) + 1}</span>
                 <span class="media-track-main">
                     <strong>${this.escapeHtml(item.title)}</strong>
-                    <em>${this.escapeHtml(item.artist || item.typeLabel)}</em>
+                    <em>${this.escapeHtml(this.getItemSubtitle(item, true))}</em>
                 </span>
-                <span class="media-track-type">${item.typeLabel}</span>
+                <span class="media-track-type">${this.getTypeLabel(item)}</span>
                 <span class="media-track-duration">${this.formatTime(item.duration || 0)}</span>
             </button>
         `;
@@ -1029,10 +1141,7 @@ const MediaApp = {
         this.playerExpanded = false;
         app.classList.remove('player-expanded');
         app.classList.add('player-collapsing');
-
-        this.collapseShrinkTimer = setTimeout(() => {
-            expanded.classList.remove('active');
-        }, 300);
+        expanded.classList.remove('active');
         this.expandTransitionTimer = setTimeout(() => {
             app.classList.remove('player-collapsing');
         }, 800);
@@ -1171,10 +1280,10 @@ const MediaApp = {
             file,
             url,
             type,
-            typeLabel: type === 'video' ? this.localText('video') : this.localText('audio'),
+            typeLabel: this.getTypeLabel(type),
             name: file.name,
             title: metadata.title || base || this.localText('unknownTitle'),
-            artist: metadata.artist || (type === 'audio' ? this.localText('unknownArtist') : ''),
+            artist: metadata.artist || '',
             album: metadata.album || '',
             coverUrl: metadata.coverUrl || '',
             gradientIndex: Math.floor(Math.random() * this.gradients.length),
@@ -1206,7 +1315,7 @@ const MediaApp = {
             artist: record.artist || item.artist,
             album: record.album || item.album,
             themeColors: Array.isArray(record.themeColors) ? record.themeColors : item.themeColors,
-            typeLabel: item.type === 'video' ? this.localText('video') : this.localText('audio'),
+            typeLabel: this.getTypeLabel(item),
             gradientIndex: Number.isInteger(record.gradientIndex) ? record.gradientIndex : item.gradientIndex,
             recommendRank: Math.random(),
             duration: Number(record.duration || item.duration || 0),
@@ -1560,7 +1669,7 @@ const MediaApp = {
         if (!('mediaSession' in navigator) || !item) return;
         navigator.mediaSession.metadata = new MediaMetadata({
             title: item.title,
-            artist: item.artist || this.localText('unknownArtist'),
+            artist: this.getItemSubtitle(item),
             album: item.album || this.localText('unknownAlbum'),
             artwork: item.coverUrl ? [{ src: item.coverUrl, sizes: '512x512', type: 'image/jpeg' }] : []
         });
@@ -4766,20 +4875,11 @@ const MediaApp = {
                 letter-spacing: 0 !important;
             }
             .media-app.player-expanded .media-player-bar,
-            .media-app.player-collapsing .media-player-bar,
             .media-app:has(.media-expanded.active) .media-player-bar {
                 opacity: 0 !important;
                 pointer-events: none !important;
                 filter: blur(12px) saturate(0.92) !important;
                 transform: translateX(-50%) scale(0.94) !important;
-            }
-            .media-app.player-collapsing:has(.media-expanded.active) .media-player-bar,
-            .media-app.player-collapsing .media-player-bar {
-                opacity: 1 !important;
-                pointer-events: auto !important;
-                filter: blur(0) saturate(1) !important;
-                transform: translateX(-50%) !important;
-                z-index: 120 !important;
             }
             .media-app.player-collapsing .media-expanded {
                 pointer-events: none !important;

@@ -118,6 +118,26 @@ const SettingsApp = {
         }
     },
 
+    beforeClose() {
+        if (this._sidebarScrollRestoreRaf) {
+            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
+            this._sidebarScrollRestoreRaf = null;
+        }
+        if (this._sidebarScrollRestoreTimer) {
+            clearTimeout(this._sidebarScrollRestoreTimer);
+            this._sidebarScrollRestoreTimer = null;
+        }
+        if (this._scrollRestoreRaf) {
+            cancelAnimationFrame(this._scrollRestoreRaf);
+            this._scrollRestoreRaf = null;
+        }
+        if (this._scrollRestoreTimer) {
+            clearTimeout(this._scrollRestoreTimer);
+            this._scrollRestoreTimer = null;
+        }
+        return true;
+    },
+
     _getScrollRouteKey(content = null) {
         const pageId = (content && content.dataset && content.dataset.pageId) || this.currentPage || 'overview';
         if (pageId === 'app-detail') {
@@ -310,7 +330,24 @@ const SettingsApp = {
         style.id = 'settings-app-styles';
         style.textContent = `
             .settings-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
-            .settings-app > .fluent-sidebar { min-height: 0; }
+            .settings-app > .fluent-sidebar {
+                min-height: 0;
+            }
+            .settings-app > .fluent-sidebar .fluent-sidebar-item {
+                box-sizing: border-box !important;
+                min-height: 44px !important;
+                margin-bottom: 6px !important;
+                transition:
+                    gap 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    padding 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    margin 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    font-size 430ms cubic-bezier(0.16, 1, 0.3, 1),
+                    background 260ms cubic-bezier(0.16, 1, 0.3, 1),
+                    color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            .settings-app > .fluent-sidebar .fluent-sidebar-item:last-child {
+                margin-bottom: 0 !important;
+            }
             .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
@@ -3269,7 +3306,7 @@ const SettingsApp = {
             'weather': 'settings.app-desc-weather',
             'appshop': 'settings.app-desc-appshop',
             'photos': 'settings.app-desc-photos',
-            'media': 'settings.app-desc-default'
+            'media': 'settings.app-desc-media'
         };
         return descKeys[appId] ? t(descKeys[appId]) : t('settings.app-desc-default');
     },
@@ -3293,7 +3330,7 @@ const SettingsApp = {
             { id: 'weather', name: t('settings.app-weather'), icon: 'Theme/Icon/App_icon/weather.png' },
             { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' },
             { id: 'photos', name: t('settings.app-photos'), icon: 'Theme/Icon/App_icon/gallery.png' },
-            { id: 'media', name: '\u591a\u5a92\u4f53', icon: 'Theme/Icon/App_icon/system_music.png' }
+            { id: 'media', name: t('settings.app-media'), icon: 'Theme/Icon/App_icon/system_music.png' }
         ];
         
         // 获取已安装的 PWA 应用（实时检测）
