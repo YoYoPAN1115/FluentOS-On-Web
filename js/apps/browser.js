@@ -1,7 +1,6 @@
 /**
  * Browser application
  */
-console.log('[BrowserApp] loading');
 
 const BrowserApp = {
     container: null,
@@ -1057,8 +1056,6 @@ const BrowserApp = {
         document.head.appendChild(style);
     }
 };
-
-console.log('[BrowserApp] defined');
 
 if (typeof window !== 'undefined') {
     window.BrowserApp = BrowserApp;

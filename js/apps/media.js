@@ -540,7 +540,7 @@ const MediaApp = {
         return source.slice(0, featured ? 10 : 8).map((item, index) => {
             const active = current?.id === item.id;
             const hasCover = Boolean(item.coverUrl);
-            const coverStyle = hasCover ? `background-image:url('${item.coverUrl}')` : `background:${this.getItemGradient(item)}`;
+            const coverStyle = hasCover ? `background-image:${this.getArtBackgroundValue(item)}` : `background:${this.getItemGradient(item)}`;
             return `
                 <button class="media-home-card ${featured ? 'is-featured' : ''} ${active ? 'active' : ''} ${hasCover ? '' : 'no-cover'}" data-id="${item.id}" style="${hasCover ? '' : `--media-card-gradient:${this.getItemGradient(item)}`}">
                     <span class="media-card-art" style="${coverStyle}">
@@ -618,7 +618,11 @@ const MediaApp = {
 
     getArtBackgroundValue(item) {
         if (item?.coverUrl) {
-            return `url("${String(item.coverUrl).replace(/"/g, '\\"')}")`;
+            const safeUrl = String(item.coverUrl)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/[\r\n\f]/g, '');
+            return `url('${safeUrl}')`;
         }
         return this.getItemGradient(item);
     },

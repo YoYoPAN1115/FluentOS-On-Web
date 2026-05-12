@@ -25,6 +25,9 @@ const State = {
     
     // 运行的应用
     runningApps: new Set(),
+
+    // 应用使用记录
+    appUsage: {},
     
     // 事件监听器
     listeners: {},
@@ -36,6 +39,7 @@ const State = {
         this.session = Storage.get(Storage.keys.SESSION);
         this.fs = Storage.get(Storage.keys.FS);
         this.desktopLayout = Storage.get(Storage.keys.DESKTOP_LAYOUT);
+        this.appUsage = Storage.get(Storage.keys.APP_USAGE) || {};
         this.notifications = Storage.get(Storage.keys.NOTIFICATIONS) || [];
         this.ensureSettingsDefaults();
         this.restoreStrictCspOnStartup();
@@ -518,6 +522,23 @@ const State = {
     addRunningApp(appId) {
         this.runningApps.add(appId);
         this.emit('appStart', appId);
+    },
+
+    recordAppUsage(appId, timestamp = Date.now()) {
+        if (!appId) return;
+        if (!this.appUsage || typeof this.appUsage !== 'object') {
+            this.appUsage = {};
+        }
+        this.appUsage[appId] = timestamp;
+        Storage.set(Storage.keys.APP_USAGE, this.appUsage);
+        this.emit('appUsageChange', { appId, lastUsed: timestamp });
+    },
+
+    getAppLastUsed(appId) {
+        const value = this.appUsage && this.appUsage[appId];
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
     },
 
     // 从运行列表移除应用

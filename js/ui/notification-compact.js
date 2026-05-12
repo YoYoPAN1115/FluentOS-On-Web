@@ -30,7 +30,6 @@ const NotificationCenter = {
             this.updateLanguage();
         });
         
-        console.log('[NotificationCenter] 初始化完成');
     },
     
     updateLanguage() {
@@ -157,8 +156,6 @@ const NotificationCenter = {
     },
 
     open() {
-        console.log('[NotificationCenter] 打开通知中心');
-        
         const btn = document.getElementById('notification-btn');
         const taskbar = document.getElementById('taskbar');
         if (!btn || !taskbar) return;
@@ -179,14 +176,6 @@ const NotificationCenter = {
 
         // 强制紧贴任务栏：面板底部对齐任务栏顶部（增加1px间距）
         const bottomDistance = window.innerHeight - taskbarRect.top - 1; // 视觉贴合，向下压 1px
-
-        console.log('[NotificationCenter] 定位信息:', {
-            windowHeight: window.innerHeight,
-            taskbarTop: taskbarRect.top,
-            bottomDistance: bottomDistance,
-            panelHeight: panelRect.height,
-            计算公式: `${window.innerHeight} - ${taskbarRect.top}- 1 = ${bottomDistance}`
-        });
 
         this.element.style.bottom = `${bottomDistance}px`;
         this.element.style.left = `${btnCenterX - panelRect.width / 2}px`;
@@ -249,7 +238,6 @@ const CalendarWidget = {
     clockInterval: null,
     
     init() {
-        console.log('[Calendar] 初始化日历组件');
         this.render();
         this.bindEvents();
         this.startClock();
@@ -298,7 +286,6 @@ const CalendarWidget = {
     },
     
     expand() {
-        console.log('[Calendar] 展开日历');
         this.isExpanded = true;
         
         const tile = document.getElementById('calendar-tile');
@@ -318,7 +305,6 @@ const CalendarWidget = {
     },
     
     collapse() {
-        console.log('[Calendar] 收起日历');
         this.isExpanded = false;
         
         const tile = document.getElementById('calendar-tile');
@@ -494,5 +480,3 @@ const CalendarWidget = {
 function notify(title, message, type = 'info') {
     State.addNotification({ title, message, type });
 }
-
-console.log('[NotificationCenter] 模块已加载');

@@ -56,7 +56,6 @@ Object.assign(StartMenu, {
         }
         
         // 搜索输入 - 结合文件搜索
-        const originalInput = this.searchInput.oninput;
         this.searchInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             if (query) {
@@ -197,6 +196,4 @@ Object.assign(StartMenu, {
         this.renderRecentFiles();
     }
 });
-
-console.log('[StartMenu] 最近文件功能已加载');
 

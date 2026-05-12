@@ -727,9 +727,6 @@ const ClockApp = {
     }
 };
 
-// 调试：确认 ClockApp 已加载
-console.log('[ClockApp] 时钟应用模块已加载', ClockApp);
-
 // 将应用暴露到全局，供 WindowManager 调用
 window.ClockApp = ClockApp;
 

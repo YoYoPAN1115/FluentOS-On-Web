@@ -155,7 +155,7 @@ Fluent OS 3.0/
 │   │   ├── taskbar.js     # 任务栏
 │   │   ├── startmenu.js   # 开始菜单
 │   │   ├── controlcenter.js # 控制中心
-│   │   ├── notification.js  # 通知中心
+│   │   ├── notification-compact.js  # 通知中心
 │   │   └── window.js      # 窗口管理
 │   ├── apps/
 │   │   ├── files.js       # 文件管理器

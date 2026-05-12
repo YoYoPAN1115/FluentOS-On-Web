@@ -108,6 +108,15 @@ const SettingsApp = {
             });
         }
 
+        if (!this._appUsageListener) {
+            this._appUsageListener = true;
+            State.on('appUsageChange', () => {
+                if (this.currentPage === 'applications' && this.container) {
+                    this.render();
+                }
+            });
+        }
+
         if (!this._fingoApiListener) {
             this._fingoApiListener = true;
             State.on('fingoApiKeyReady', () => {
@@ -3423,15 +3432,6 @@ const SettingsApp = {
         // 排序
         allApps.sort((a, b) => this.appSortOrder === 'desc' ? b.size - a.size : a.size - b.size);
         
-        // 生成最后使用时间（缓存）
-        if (!this.appLastUsed) {
-            this.appLastUsed = {};
-            const options = [t('settings.last-today'), t('settings.last-yesterday'), t('settings.last-2days'), t('settings.last-3days'), t('settings.last-week')];
-            allApps.forEach(app => {
-                this.appLastUsed[app.id] = options[Math.floor(Math.random() * options.length)];
-            });
-        }
-        
         container.innerHTML = allApps.map(app => `
             <div class="app-list-item" data-app-id="${app.id}" data-is-pwa="${app.isPWA}">
                 <div class="app-icon">
@@ -3439,7 +3439,7 @@ const SettingsApp = {
                 </div>
                 <div class="app-info">
                     <div class="app-name">${app.name}</div>
-                    <div class="app-meta">${t('settings.last-used')}: ${this.appLastUsed[app.id] || t('settings.last-today')}</div>
+                    <div class="app-meta">${t('settings.last-used', { time: this.formatAppLastUsed(app.id) })}</div>
                 </div>
                 <div class="app-size">${app.size} MB</div>
                 <div class="app-arrow">
@@ -3458,6 +3458,29 @@ const SettingsApp = {
                     this.showAppDetail(app);
                 }
             });
+        });
+    },
+
+    formatAppLastUsed(appId) {
+        const lastUsed = typeof State.getAppLastUsed === 'function' ? State.getAppLastUsed(appId) : null;
+        if (!lastUsed) return t('settings.last-used-never');
+
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const usedDay = new Date(lastUsed.getFullYear(), lastUsed.getMonth(), lastUsed.getDate());
+        const diffDays = Math.floor((today - usedDay) / 86400000);
+
+        if (diffDays <= 0) return t('settings.last-used-today');
+        if (diffDays === 1) return t('settings.last-used-yesterday');
+        if (diffDays === 2) return t('settings.last-used-2days');
+        if (diffDays === 3) return t('settings.last-used-3days');
+        if (diffDays < 7) return t('settings.last-used-days-ago', { days: diffDays });
+
+        const lang = I18n.currentLang === 'en' ? 'en-US' : 'zh-CN';
+        return lastUsed.toLocaleDateString(lang, {
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric'
         });
     },
     

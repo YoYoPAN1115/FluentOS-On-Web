@@ -1386,17 +1386,8 @@ const FilesApp = {
         this.openNodeWithDefaultApp(node);
     },
     
-    getFileExt(name) {
-        const text = String(name || '');
-        const dot = text.lastIndexOf('.');
-        if (dot <= 0 || dot === text.length - 1) return '';
-        return text.slice(dot + 1).toLowerCase();
-    },
-    
     openNodeWithDefaultApp(node) {
         if (!node || node.type !== 'file' || typeof WindowManager === 'undefined') return false;
-        const ext = this.getFileExt(node.name);
-        const officeExts = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
 
         // Office 应用已下线，所有文件统一使用记事本打开
         WindowManager.openApp('notes', { fileId: node.id });

@@ -907,6 +907,10 @@ const WindowManager = {
             return;
         }
 
+        if (typeof State !== 'undefined' && typeof State.recordAppUsage === 'function') {
+            State.recordAppUsage(appId);
+        }
+
         // 检查是否已经打开该应用窗口 - Check if app window already exists
         const existingWindow = this.windows.find(w => w.appId === appId);
         if (existingWindow) {

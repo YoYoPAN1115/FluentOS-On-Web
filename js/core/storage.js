@@ -7,6 +7,7 @@ const Storage = {
         SESSION: 'fluentos.session',
         FS: 'fluentos.fs',
         DESKTOP_LAYOUT: 'fluentos.desktopLayout',
+        APP_USAGE: 'fluentos.appUsage',
         NOTIFICATIONS: 'fluentos.notifications'
     },
 
