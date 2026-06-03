@@ -344,8 +344,6 @@ const SettingsApp = {
             }
             .settings-app > .fluent-sidebar .fluent-sidebar-item {
                 box-sizing: border-box !important;
-                min-height: 44px !important;
-                margin-bottom: 6px !important;
                 transition:
                     gap 430ms cubic-bezier(0.16, 1, 0.3, 1),
                     padding 430ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -354,7 +352,11 @@ const SettingsApp = {
                     background 260ms cubic-bezier(0.16, 1, 0.3, 1),
                     color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
             }
-            .settings-app > .fluent-sidebar .fluent-sidebar-item:last-child {
+            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item {
+                min-height: 44px !important;
+                margin-bottom: 6px !important;
+            }
+            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item:last-child {
                 margin-bottom: 0 !important;
             }
             .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
@@ -552,6 +554,37 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .network-option-item:hover,
             body.fluent-v2.dark-mode .fluent-setting-item:hover {
                 background: rgba(255, 255, 255, 0.18) !important;
+            }
+
+            body.fluent-v2.window-blur-disabled .settings-app,
+            body.fluent-v2.window-blur-disabled .settings-content {
+                background: var(--bg-primary) !important;
+                background-color: var(--bg-primary) !important;
+            }
+
+            body.fluent-v2.window-blur-disabled .settings-section,
+            body.fluent-v2.window-blur-disabled .settings-content > div:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper),
+            body.fluent-v2.window-blur-disabled .wallpaper-grid {
+                background: transparent !important;
+                background-color: transparent !important;
+            }
+
+            body.fluent-v2.window-blur-disabled .settings-recommend-item,
+            body.fluent-v2.window-blur-disabled .settings-recent-item,
+            body.fluent-v2.window-blur-disabled .network-hero-card,
+            body.fluent-v2.window-blur-disabled .network-option-item,
+            body.fluent-v2.window-blur-disabled .fluent-setting-item {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                background: var(--bg-secondary) !important;
+                border-color: var(--border-color) !important;
+            }
+
+            body.fluent-v2.window-blur-disabled .settings-recommend-item:hover,
+            body.fluent-v2.window-blur-disabled .settings-recent-item:hover,
+            body.fluent-v2.window-blur-disabled .network-option-item:hover,
+            body.fluent-v2.window-blur-disabled .fluent-setting-item:hover {
+                background: var(--bg-hover) !important;
             }
             
             /* V2模式下统一卡片间距 */
@@ -2935,24 +2968,24 @@ const SettingsApp = {
             })
         }));
         
-        // 窗口模糊
         appearanceSection.appendChild(FluentUI.SettingItem({
             label: t('settings.window-blur'),
             description: t('settings.window-blur.desc'),
-            control: FluentUI.Select({
-                options: [
-                    { value: 'true', label: t('settings.window-blur.glass') },
-                    { value: 'false', label: t('settings.window-blur.solid') }
-                ],
-                value: String(State.settings.enableWindowBlur),
+            control: FluentUI.Toggle({
+                checked: State.settings.enableWindowBlur === true,
                 onChange: (v) => {
-                    State.updateSettings({ enableWindowBlur: v === 'true' });
-                    this.addRecentSetting(t('settings.window-blur'), v === 'true' ? t('settings.window-blur.glass') : t('settings.window-blur.solid'), 'personalization');
-                    State.addNotification({ title: t('settings.window-blur'), message: t('settings.window-blur-changed', { mode: v === 'true' ? t('settings.window-blur.glass') : t('settings.window-blur.solid') }), type: 'success' });
+                    State.updateSettings({ enableWindowBlur: v });
+                    const mode = v ? t('settings.window-blur.glass') : t('settings.window-blur.solid');
+                    this.addRecentSetting(t('settings.window-blur'), mode, 'personalization');
+                    State.addNotification({
+                        title: t('settings.window-blur'),
+                        message: t('settings.window-blur-changed', { mode }),
+                        type: 'success'
+                    });
                 }
             })
         }));
-
+        
         appearanceSection.appendChild(FluentUI.SettingItem({
             label: t('settings.auto-fullscreen'),
             description: t('settings.auto-fullscreen.desc'),
@@ -2987,24 +3020,6 @@ const SettingsApp = {
         notice.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(255, 180, 0, 0.1); border-radius: var(--radius-md); margin-bottom: 16px;';
         section.appendChild(notice);
         
-        // 新版外观开关
-        section.appendChild(FluentUI.SettingItem({
-            label: t('settings.lab-fluent-v2'),
-            description: t('settings.lab-fluent-v2-desc'),
-            control: FluentUI.Toggle({
-                checked: State.settings.enableFluentV2,
-                onChange: (v) => {
-                    State.updateSettings({ enableFluentV2: v });
-                    this.addRecentSetting(t('settings.lab-fluent-v2'), v ? t('settings.on') : t('settings.off'), 'lab');
-                    State.addNotification({
-                        title: t('settings.lab-title'),
-                        message: v ? t('settings.fluent-v2-on') : t('settings.fluent-v2-off'),
-                        type: 'info'
-                    });
-                }
-            })
-        }));
-
         // 外部文件导入（拖拽/上传）开关
         section.appendChild(FluentUI.SettingItem({
             label: t('settings.lab-file-import'),

@@ -60,7 +60,7 @@ const FingoData = {
         windowBlurOn: {
             keywords: ['开启窗口模糊', '窗口毛玻璃', 'window blur on', 'enable window blur'],
             action: 'setWindowBlur:true',
-            response: { zh: '窗口模糊效果已开启 🪟', en: 'Window blur enabled 🪟' }
+            response: { zh: '窗口全局模糊已开启。', en: 'Global window blur enabled.' }
         },
         windowBlurOff: {
             keywords: ['关闭窗口模糊', 'window blur off', 'disable window blur'],
@@ -259,7 +259,7 @@ const FingoData = {
             action: 'none',
             response: {
                 zh: '你可以这样恢复默认外观：\n1. 主题设为浅色（Light）\n2. 开启动画\n3. 开启模糊与窗口模糊\n4. 关闭新版外观（V2）\n\n如果你希望我直接执行，回复「重置主题和动效」。',
-                en: 'To restore default appearance:\n1. Set theme to Light\n2. Enable animation\n3. Enable blur and window blur\n4. Disable Fluent V2\n\nIf you want me to apply it now, reply "reset theme and effects".'
+                en: 'To restore default appearance:\n1. Set theme to Light\n2. Enable animation\n3. Keep Fluent V2 enabled\n4. Keep solid window backgrounds\n\nIf you want me to apply it now, reply "reset theme and effects".'
             }
         },
         resetThemeEffectsNow: {
@@ -474,14 +474,136 @@ const FingoData = {
         },
         // ===== 亮度 =====
         brightnessUp: {
-            keywords: ['调高亮度', '亮度调高', '增加亮度', 'brightness up', 'brighter'],
+            keywords: [
+                '调高亮度', '亮度调高', '增加亮度', '提高亮度', '升高亮度', '亮一点', '亮一些', '更亮一点', '屏幕亮一点', '屏幕太暗', '把亮度调高', '帮我调高亮度',
+                'brightness up', 'brighter', 'increase brightness', 'raise brightness', 'turn up brightness', 'make screen brighter', 'screen brighter'
+            ],
             action: 'brightness:up',
-            response: { zh: '亮度已调高 🔆', en: 'Brightness increased 🔆' }
+            response: { zh: '亮度已调高。', en: 'Brightness increased.' }
         },
         brightnessDown: {
-            keywords: ['调低亮度', '亮度调低', '降低亮度', 'brightness down', 'dimmer'],
+            keywords: [
+                '调低亮度', '亮度调低', '降低亮度', '减少亮度', '亮度小一点', '暗一点', '暗一些', '更暗一点', '屏幕暗一点', '屏幕太亮', '把亮度调低', '帮我调低亮度',
+                'brightness down', 'dimmer', 'decrease brightness', 'lower brightness', 'turn down brightness', 'make screen dimmer', 'screen dimmer'
+            ],
             action: 'brightness:down',
-            response: { zh: '亮度已调低 🔅', en: 'Brightness decreased 🔅' }
+            response: { zh: '亮度已调低。', en: 'Brightness decreased.' }
+        },
+        brightnessSet: {
+            keywords: [
+                '设置亮度', '调节亮度', '调整亮度', '亮度调到', '亮度设为', '亮度设置为', '把亮度调到', '把亮度设置为', '屏幕亮度', '亮度百分之',
+                '调高亮度', '亮度调高', '增加亮度', '提高亮度', '升高亮度', '亮一点', '亮一些', '更亮一点', '屏幕亮一点', '屏幕太暗',
+                '调低亮度', '亮度调低', '降低亮度', '减少亮度', '亮度小一点', '暗一点', '暗一些', '更暗一点', '屏幕暗一点', '屏幕太亮',
+                'set brightness', 'brightness', 'brightness level', 'change brightness to', 'adjust brightness', 'screen brightness', 'set screen brightness'
+            ],
+            action: 'brightness:set',
+            response: { zh: '正在调整亮度。', en: 'Adjusting brightness.' }
+        },
+        // ===== 声音 / 音量 =====
+        volumeUp: {
+            keywords: [
+                '调高音量', '音量调高', '提高音量', '增加音量', '声音调大', '声音大一点', '大声一点', '音量大一点', '把声音调大', '把音量调高', '太小声了',
+                'volume up', 'turn up volume', 'increase volume', 'raise volume', 'louder', 'make it louder', 'sound louder'
+            ],
+            action: 'volume:up',
+            response: { zh: '音量已调高。', en: 'Volume increased.' }
+        },
+        volumeDown: {
+            keywords: [
+                '调低音量', '音量调低', '降低音量', '减少音量', '声音调小', '声音小一点', '小声一点', '音量小一点', '把声音调小', '把音量调低', '太大声了',
+                'volume down', 'turn down volume', 'decrease volume', 'lower volume', 'quieter', 'make it quieter', 'sound quieter'
+            ],
+            action: 'volume:down',
+            response: { zh: '音量已调低。', en: 'Volume decreased.' }
+        },
+        volumeUnmute: {
+            keywords: [
+                '取消静音', '解除静音', '恢复声音', '打开声音', '打开音量', '不要静音', '取消静音模式',
+                'unmute', 'sound on', 'volume on', 'turn sound on', 'restore sound'
+            ],
+            action: 'volume:unmute',
+            response: { zh: '已恢复声音。', en: 'Sound restored.' }
+        },
+        volumeMute: {
+            keywords: [
+                '静音', '设为静音', '进入静音', '关闭声音', '关掉声音', '关闭音量', '把声音关掉', '把音量关掉',
+                'mute', 'mute volume', 'mute sound', 'sound off', 'volume off', 'turn off sound'
+            ],
+            action: 'volume:mute',
+            response: { zh: '已静音。', en: 'Muted.' }
+        },
+        volumeSet: {
+            keywords: [
+                '设置音量', '调节音量', '调整音量', '音量调到', '音量设为', '音量设置为', '把音量调到', '把音量设置为', '声音调到', '声音设为', '声音大小', '音量大小', '音量百分之',
+                'set volume', 'volume level', 'change volume to', 'adjust volume', 'sound level', 'set sound volume', 'volume'
+            ],
+            action: 'volume:set',
+            response: { zh: '正在调整音量。', en: 'Adjusting volume.' }
+        },
+        // ===== 音乐播放 =====
+        mediaShufflePlay: {
+            keywords: [
+                '随机播放音乐', '随机播放歌曲', '随机放歌', '随机来首歌', '随机播放一首', '随机播放', '打乱播放', '洗牌播放', '随便放首歌', '随便来首歌', '来首随机音乐',
+                'shuffle music', 'shuffle play', 'play random music', 'play a random song', 'random song', 'random music', 'shuffle songs'
+            ],
+            action: 'media:shufflePlay',
+            response: { zh: '已开启随机播放。', en: 'Shuffle play is on.' }
+        },
+        mediaPlay: {
+            keywords: [
+                '播放音乐', '播放歌曲', '开始播放音乐', '开始播放歌曲', '放音乐', '放歌', '来点音乐', '来首歌', '播歌', '继续播放音乐', '继续播放', '播放多媒体',
+                'play music', 'start music', 'start playing music', 'resume music', 'resume playback', 'play media'
+            ],
+            action: 'media:play',
+            response: { zh: '正在播放音乐。', en: 'Playing music.' }
+        },
+        mediaNext: {
+            keywords: [
+                '下一首歌', '下一首', '下一曲', '播放下一首', '播放下一首歌', '切到下一首', '换下一首', '下一首音乐', '跳到下一首', '下首歌',
+                'next song', 'next track', 'next music', 'play next song', 'play next track', 'skip song', 'skip to next'
+            ],
+            action: 'media:next',
+            response: { zh: '正在播放下一首。', en: 'Playing the next track.' }
+        },
+        mediaPrevious: {
+            keywords: [
+                '上一首歌', '上一首', '上一曲', '播放上一首', '播放上一首歌', '切到上一首', '换上一首', '上一首音乐', '跳到上一首', '上首歌',
+                'previous song', 'previous track', 'last song', 'last track', 'play previous song', 'play previous track', 'go back a song'
+            ],
+            action: 'media:previous',
+            response: { zh: '正在播放上一首。', en: 'Playing the previous track.' }
+        },
+        mediaRepeatAll: {
+            keywords: [
+                '列表循环播放', '列表循环', '歌单循环', '播放列表循环', '循环播放列表', '全部循环', '循环所有歌曲', '开启列表循环', '设置列表循环',
+                'repeat playlist', 'playlist repeat', 'repeat all', 'loop playlist', 'loop all songs', 'list loop'
+            ],
+            action: 'media:repeatAll',
+            response: { zh: '已开启列表循环播放。', en: 'Playlist repeat is on.' }
+        },
+        mediaRepeatOneOff: {
+            keywords: [
+                '退出单曲循环', '关闭单曲循环', '取消单曲循环', '不要单曲循环', '停止单曲循环', '解除单曲循环', '单曲循环关掉',
+                'exit single repeat', 'turn off single repeat', 'disable single repeat', 'stop repeat one', 'repeat one off', 'single repeat off'
+            ],
+            action: 'media:repeatOneOff',
+            response: { zh: '已退出单曲循环。', en: 'Single-track repeat is off.' }
+        },
+        mediaRepeatOne: {
+            keywords: [
+                '单曲循环', '单曲循环播放', '只循环这一首', '循环这一首', '循环当前歌曲', '当前歌曲循环', '重复当前歌曲', '开启单曲循环', '设置单曲循环',
+                'repeat one', 'single repeat', 'repeat current song', 'loop this song', 'loop current track', 'repeat this track'
+            ],
+            action: 'media:repeatOne',
+            response: { zh: '已开启单曲循环。', en: 'Single-track repeat is on.' }
+        },
+        mediaRepeatOff: {
+            keywords: [
+                '关闭循环播放', '取消循环播放', '停止循环播放', '不要循环', '关闭列表循环', '取消列表循环',
+                'turn off repeat', 'disable repeat', 'repeat off', 'stop looping', 'loop off'
+            ],
+            action: 'media:repeatOff',
+            response: { zh: '已关闭循环播放。', en: 'Repeat is off.' }
         },
         // ===== Fluent V2 =====
         v2On: {
@@ -491,8 +613,8 @@ const FingoData = {
         },
         v2Off: {
             keywords: ['经典外观', '关闭v2', 'classic ui', 'disable v2', '旧版外观'],
-            action: 'setFluentV2:false',
-            response: { zh: '已恢复经典外观', en: 'Switched to classic UI' }
+            action: 'setFluentV2:true',
+            response: { zh: 'Fluent V2 已固定启用，经典外观不再可用。', en: 'Fluent V2 is fixed on; classic UI is no longer available.' }
         },
         // ===== 问候/帮助 =====
         greet: {

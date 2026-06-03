@@ -146,7 +146,7 @@ const ControlCenter = {
         volumeSlider.addEventListener('input', (e) => {
             const value = e.target.value;
             volumeValue.textContent = value;
-            State.updateSettings({ volume: parseInt(value) });
+            State.updateSettings({ volume: parseInt(value, 10) });
         });
 
         // 亮度滑块

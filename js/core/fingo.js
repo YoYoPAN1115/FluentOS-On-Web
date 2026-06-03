@@ -702,6 +702,16 @@ const Fingo = {
 
         const variants = new Set([base]);
         const zhGroups = [
+            ['调高', '提高', '增加', '升高', '调大', '大一点'],
+            ['调低', '降低', '减少', '调小', '小一点'],
+            ['音量', '声音', '系统音量', '音量大小'],
+            ['亮度', '屏幕亮度'],
+            ['音乐', '歌曲', '歌', '多媒体'],
+            ['随机播放', '打乱播放', '洗牌播放'],
+            ['下一首', '下一曲', '下首歌'],
+            ['上一首', '上一曲', '上首歌'],
+            ['列表循环', '歌单循环', '播放列表循环', '全部循环'],
+            ['单曲循环', '循环当前歌曲', '重复当前歌曲'],
             ['开启', '打开', '启用', '开', '启动'],
             ['关闭', '关掉', '禁用', '停用', '关'],
             ['切换', '改成', '换成', '调整为', '设为'],
@@ -732,6 +742,16 @@ const Fingo = {
             ['设置', '系统设置', '偏好设置']
         ];
         const enGroups = [
+            ['turn up', 'increase', 'raise'],
+            ['turn down', 'decrease', 'lower'],
+            ['volume', 'sound', 'audio volume'],
+            ['brightness', 'screen brightness'],
+            ['play music', 'play songs', 'start music', 'resume music'],
+            ['shuffle', 'random', 'shuffle play'],
+            ['next song', 'next track', 'skip to next'],
+            ['previous song', 'previous track', 'last song', 'last track'],
+            ['repeat playlist', 'repeat all', 'loop playlist'],
+            ['repeat one', 'single repeat', 'loop current track'],
             ['turn on', 'enable', 'open', 'start'],
             ['turn off', 'disable', 'close', 'stop'],
             ['switch to', 'change to', 'set to'],
@@ -1046,6 +1066,11 @@ const Fingo = {
             const cmd = cmds[key];
             for (const kw of cmd.keywords) {
                 if (this._keywordMatched(lower, normalized, compact, kw)) {
+                    const handler = this['_handle_' + key];
+                    if (typeof handler === 'function') {
+                        handler.call(this, text, lower);
+                        return;
+                    }
                     this._executeAction(cmd.action);
                     const botReply = this._resolveResponse(cmd.response);
                     if (botReply) {
@@ -1378,6 +1403,238 @@ const Fingo = {
         }
     },
 
+    _extractPercentValue(text) {
+        const raw = String(text || '').toLowerCase();
+        const percentMatch = raw.match(/(?:百分之|percent|percentage|音量|声音|亮度|volume|sound|brightness|level|到|为|设为|调到|调成|set(?:\s+to)?|change(?:\s+to)?|make(?:\s+it)?|turn(?:\s+to)?)\s*(\d{1,3})(?:\s*%|\s*percent)?/i)
+            || raw.match(/(\d{1,3})\s*(?:%|percent|音量|声音|亮度|volume|sound|brightness)?/i);
+        if (percentMatch) {
+            const value = Number(percentMatch[1]);
+            if (Number.isFinite(value)) return Math.min(100, Math.max(0, Math.round(value)));
+        }
+
+        const zhDigits = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+        const parseZhNumber = (input) => {
+            const s = String(input || '');
+            if (!s) return null;
+            if (s === '十') return 10;
+            const tenIndex = s.indexOf('十');
+            if (tenIndex >= 0) {
+                const left = s.slice(0, tenIndex);
+                const right = s.slice(tenIndex + 1);
+                const tens = left ? zhDigits[left] : 1;
+                const ones = right ? zhDigits[right] : 0;
+                if (Number.isFinite(tens) && Number.isFinite(ones)) return tens * 10 + ones;
+            }
+            if (s.length === 1 && Number.isFinite(zhDigits[s])) return zhDigits[s];
+            return null;
+        };
+
+        const zhMatch = raw.match(/(?:百分之|音量|声音|亮度|到|为|设为|调到|调成)\s*([零一二两三四五六七八九十]{1,3})/);
+        if (zhMatch) {
+            const value = parseZhNumber(zhMatch[1]);
+            if (Number.isFinite(value)) return Math.min(100, Math.max(0, value));
+        }
+        return null;
+    },
+
+    _syncControlCenterSliders() {
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeValue = document.getElementById('volume-value');
+        if (volumeSlider && volumeValue) {
+            volumeSlider.value = State.settings.volume || 50;
+            volumeValue.textContent = State.settings.volume || 50;
+        }
+        const brightnessSlider = document.getElementById('brightness-slider');
+        const brightnessValue = document.getElementById('brightness-value');
+        if (brightnessSlider && brightnessValue) {
+            brightnessSlider.value = State.settings.brightness || 100;
+            brightnessValue.textContent = State.settings.brightness || 100;
+        }
+        if (typeof ControlCenter !== 'undefined' && typeof ControlCenter.updateTiles === 'function') {
+            try {
+                ControlCenter.updateTiles();
+            } catch (_) {
+                // Control center UI may not be mounted while Fingo is running.
+            }
+        }
+    },
+
+    _setSystemVolume(value) {
+        const next = Math.min(100, Math.max(0, Math.round(Number(value))));
+        State.updateSettings({ volume: next });
+        this._syncControlCenterSliders();
+        return next;
+    },
+
+    _changeSystemVolume(delta) {
+        const current = Number(State.settings.volume ?? 50);
+        return this._setSystemVolume(current + delta);
+    },
+
+    _setSystemBrightness(value) {
+        const next = Math.min(100, Math.max(20, Math.round(Number(value))));
+        State.updateSettings({ brightness: next });
+        this._syncControlCenterSliders();
+        return next;
+    },
+
+    _changeSystemBrightness(delta) {
+        const current = Number(State.settings.brightness ?? 100);
+        return this._setSystemBrightness(current + delta);
+    },
+
+    _replyLater(message, delay = 300) {
+        setTimeout(() => this.addMessage(message, 'bot'), delay);
+    },
+
+    _replyControlValue(kind, value) {
+        const lang = this.lang();
+        const label = kind === 'brightness'
+            ? (lang === 'zh' ? '亮度' : 'Brightness')
+            : (lang === 'zh' ? '音量' : 'Volume');
+        this._replyLater(lang === 'zh' ? `${label}已调到 ${value}%` : `${label} set to ${value}%`);
+    },
+
+    '_handle_volumeUp'() {
+        this._replyControlValue('volume', this._changeSystemVolume(10));
+    },
+
+    '_handle_volumeDown'() {
+        this._replyControlValue('volume', this._changeSystemVolume(-10));
+    },
+
+    '_handle_volumeSet'(text) {
+        const value = this._extractPercentValue(text);
+        if (value === null) {
+            this._replyLater(this.lang() === 'zh' ? '请告诉我要把音量调到多少，比如“音量 50”。' : 'Tell me the target volume, for example "volume 50".');
+            return;
+        }
+        this._replyControlValue('volume', this._setSystemVolume(value));
+    },
+
+    '_handle_volumeMute'() {
+        this._replyControlValue('volume', this._setSystemVolume(0));
+    },
+
+    '_handle_volumeUnmute'() {
+        const lastMediaVolume = typeof MediaApp !== 'undefined' && MediaApp.lastNonZeroVolume
+            ? Math.round(MediaApp.lastNonZeroVolume * 100)
+            : 50;
+        const value = Math.max(30, Number(State.settings.volume) || lastMediaVolume);
+        this._replyControlValue('volume', this._setSystemVolume(value));
+    },
+
+    '_handle_brightnessUp'() {
+        this._replyControlValue('brightness', this._changeSystemBrightness(10));
+    },
+
+    '_handle_brightnessDown'() {
+        this._replyControlValue('brightness', this._changeSystemBrightness(-10));
+    },
+
+    '_handle_brightnessSet'(text) {
+        const value = this._extractPercentValue(text);
+        if (value === null) {
+            this._replyLater(this.lang() === 'zh' ? '请告诉我要把亮度调到多少，比如“亮度 70”。' : 'Tell me the target brightness, for example "brightness 70".');
+            return;
+        }
+        this._replyControlValue('brightness', this._setSystemBrightness(value));
+    },
+
+    _ensureMediaReady(callback, attempt = 0) {
+        if (typeof MediaApp === 'undefined') {
+            callback(false);
+            return;
+        }
+        if (!MediaApp.container && typeof WindowManager !== 'undefined') {
+            WindowManager.openApp('media');
+        }
+        const ready = MediaApp.container && Array.isArray(MediaApp.library) && MediaApp.library.length > 0;
+        if (ready) {
+            callback(true);
+            return;
+        }
+        if (attempt < 16) {
+            setTimeout(() => this._ensureMediaReady(callback, attempt + 1), 160);
+            return;
+        }
+        callback(false);
+    },
+
+    _replyMediaResult(action) {
+        this._ensureMediaReady((ok) => {
+            if (!ok) {
+                this._replyLater(this.lang() === 'zh'
+                    ? '媒体库里还没有可播放的音乐，请先在多媒体 App 导入歌曲。'
+                    : 'There is no playable music in the media library. Import songs in Multimedia first.');
+                return;
+            }
+            action();
+        });
+    },
+
+    '_handle_mediaPlay'() {
+        this._replyMediaResult(() => {
+            MediaApp.isShuffle = false;
+            MediaApp.togglePlay(true);
+            this._replyLater(this.lang() === 'zh' ? '正在播放音乐。' : 'Playing music.');
+        });
+    },
+
+    '_handle_mediaShufflePlay'() {
+        this._replyMediaResult(() => {
+            MediaApp.isShuffle = true;
+            MediaApp.playNext();
+            this._replyLater(this.lang() === 'zh' ? '已开启随机播放。' : 'Shuffle play is on.');
+        });
+    },
+
+    '_handle_mediaNext'() {
+        this._replyMediaResult(() => {
+            MediaApp.playNext();
+            this._replyLater(this.lang() === 'zh' ? '正在播放下一首。' : 'Playing the next track.');
+        });
+    },
+
+    '_handle_mediaPrevious'() {
+        this._replyMediaResult(() => {
+            MediaApp.playPrevious();
+            this._replyLater(this.lang() === 'zh' ? '正在播放上一首。' : 'Playing the previous track.');
+        });
+    },
+
+    '_handle_mediaRepeatAll'() {
+        this._replyMediaResult(() => {
+            MediaApp.repeatMode = 'all';
+            if (typeof MediaApp.render === 'function') MediaApp.render();
+            this._replyLater(this.lang() === 'zh' ? '已开启列表循环播放。' : 'Playlist repeat is on.');
+        });
+    },
+
+    '_handle_mediaRepeatOneOff'() {
+        this._replyMediaResult(() => {
+            MediaApp.repeatMode = 'none';
+            if (typeof MediaApp.render === 'function') MediaApp.render();
+            this._replyLater(this.lang() === 'zh' ? '已退出单曲循环。' : 'Single-track repeat is off.');
+        });
+    },
+
+    '_handle_mediaRepeatOne'() {
+        this._replyMediaResult(() => {
+            MediaApp.repeatMode = 'one';
+            if (typeof MediaApp.render === 'function') MediaApp.render();
+            this._replyLater(this.lang() === 'zh' ? '已开启单曲循环。' : 'Single-track repeat is on.');
+        });
+    },
+
+    '_handle_mediaRepeatOff'() {
+        this._replyMediaResult(() => {
+            MediaApp.repeatMode = 'none';
+            if (typeof MediaApp.render === 'function') MediaApp.render();
+            this._replyLater(this.lang() === 'zh' ? '已关闭循环播放。' : 'Repeat is off.');
+        });
+    },
+
     _executeAction(action) {
         if (action === 'none' || action === 'suggestCustom') return;
         const [type, value] = action.split(':');
@@ -1389,7 +1646,7 @@ const Fingo = {
             case 'setBlur': State.updateSettings({ enableBlur: value === 'true' }); break;
             case 'setAnimation': State.updateSettings({ enableAnimation: value === 'true' }); break;
             case 'setWindowBlur': State.updateSettings({ enableWindowBlur: value === 'true' }); break;
-            case 'setFluentV2': State.updateSettings({ enableFluentV2: value === 'true' }); break;
+            case 'setFluentV2': State.updateSettings({ enableFluentV2: true }); break;
             case 'setAutoFullscreen':
                 State.updateSettings({ autoEnterFullscreen: value === 'true' });
                 if (value !== 'true') {
@@ -1405,8 +1662,8 @@ const Fingo = {
                     theme: 'light',
                     enableBlur: true,
                     enableAnimation: true,
-                    enableWindowBlur: true,
-                    enableFluentV2: false
+                    enableWindowBlur: false,
+                    enableFluentV2: true
                 });
                 break;
             case 'confirmAutoFullscreen':
@@ -1476,8 +1733,9 @@ const Fingo = {
             }
             case 'brightness': {
                 let b = State.settings.brightness || 100;
-                b = value === 'up' ? Math.min(150, b + 15) : Math.max(30, b - 15);
+                b = value === 'up' ? Math.min(100, b + 10) : Math.max(20, b - 10);
                 State.updateSettings({ brightness: b });
+                this._syncControlCenterSliders();
                 break;
             }
             case 'power':

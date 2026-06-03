@@ -1400,6 +1400,25 @@ body.fluent-v2.dark-mode.blur-disabled.window-blur-enabled .window {
     border-color: rgba(255, 255, 255, 0.10) !important;
 }
 
+body.fluent-v2.window-blur-disabled .window {
+    background: var(--bg-primary) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.fluent-v2.window-blur-disabled .window-content {
+    background: var(--bg-primary) !important;
+}
+
+body.fluent-v2.window-blur-disabled .window-titlebar {
+    background: var(--bg-secondary) !important;
+}
+
+body.fluent-v2.dark-mode.window-blur-disabled .window {
+    background: var(--bg-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
 /* V2 浏览器应用样式 */
 body.fluent-v2 .browser-app {
     background: transparent;

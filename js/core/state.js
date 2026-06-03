@@ -71,6 +71,7 @@ const State = {
         
         // 应用亮度设置
         this.applyBrightness();
+        this.applyVolume();
     },
 
     // 确保文件系统关键目录存在
@@ -180,6 +181,8 @@ const State = {
             fingoApiSaveMode: 'temporary',
             autoEnterFullscreen: true,
             enableExternalFileImport: false,
+            enableWindowBlur: false,
+            enableFluentV2: true,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
@@ -197,6 +200,11 @@ const State = {
                 changed = true;
             }
         });
+
+        if (this.settings.enableFluentV2 !== true) {
+            this.settings.enableFluentV2 = true;
+            changed = true;
+        }
 
         // Migration: remember prior "enabled" state for startup auto-restore.
         if (this.settings.strictCspEnabled === true && this.settings.strictCspLastEnabled !== true) {
@@ -288,6 +296,9 @@ const State = {
     // 更新设置
     updateSettings(updates) {
         const safeUpdates = { ...(updates || {}) };
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'enableFluentV2')) {
+            safeUpdates.enableFluentV2 = true;
+        }
         const turningOffCustomMode = safeUpdates.fingoCustomMode === false
             && this.settings
             && this.settings.fingoCustomMode === true;
@@ -339,6 +350,9 @@ const State = {
         }
         if (safeUpdates.brightness !== undefined) {
             this.applyBrightness();
+        }
+        if (safeUpdates.volume !== undefined) {
+            this.applyVolume();
         }
         if (safeUpdates.enableWindowBlur !== undefined) {
             this.applyWindowBlurSetting();
@@ -417,9 +431,24 @@ const State = {
         document.body.style.filter = `brightness(${brightness}%)`;
     },
 
+    // 应用音量设置
+    applyVolume() {
+        const rawVolume = Number(this.settings.volume ?? 50);
+        const volume = Math.min(100, Math.max(0, Number.isFinite(rawVolume) ? rawVolume : 50));
+
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeValue = document.getElementById('volume-value');
+        if (volumeSlider) volumeSlider.value = String(volume);
+        if (volumeValue) volumeValue.textContent = String(volume);
+
+        if (typeof MediaApp !== 'undefined' && typeof MediaApp.syncVolumeFromState === 'function') {
+            MediaApp.syncVolumeFromState();
+        }
+    },
+
     // 应用窗口模糊设置
     applyWindowBlurSetting() {
-        if (this.settings.enableWindowBlur) {
+        if (this.settings.enableWindowBlur === true) {
             document.body.classList.add('window-blur-enabled');
             document.body.classList.remove('window-blur-disabled');
         } else {
@@ -430,11 +459,8 @@ const State = {
 
     // 应用新版 UI 设置
     applyFluentV2Setting() {
-        if (this.settings.enableFluentV2) {
-            document.body.classList.add('fluent-v2');
-        } else {
-            document.body.classList.remove('fluent-v2');
-        }
+        this.settings.enableFluentV2 = true;
+        document.body.classList.add('fluent-v2');
     },
 
     applyStrictCspSetting() {

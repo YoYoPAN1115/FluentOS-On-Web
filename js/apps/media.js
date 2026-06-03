@@ -17,11 +17,13 @@ const MediaApp = {
     isShuffle: false,
     repeatMode: 'none',
     playbackRate: 1,
-    volume: 0.72,
+    volume: 0.5,
+    lastNonZeroVolume: 0.5,
     muted: false,
     playerExpanded: false,
     expandTransitionTimer: null,
     collapseShrinkTimer: null,
+    _rateClickAwayHandler: null,
     _languageListenerBound: false,
     _langHandler: null,
     mediaStorageKey: 'fluentos.media.library.v1',
@@ -52,6 +54,7 @@ const MediaApp = {
         if (!this.container) return;
 
         this.addStyles();
+        this.syncVolumeFromState();
         this.render();
         this.startProgressLoop();
         this.restoreLibraryFromStorage();
@@ -616,6 +619,32 @@ const MediaApp = {
         return `--media-theme-a:${a};--media-theme-b:${b};--media-theme-c:${c};--media-expanded-art-bg:${this.getArtBackgroundValue(item)};`;
     },
 
+    renderRangeControl({ id, className = '', inputClass = '', min = 0, max = 100, step = null, value = 0, label = '' }) {
+        const stepAttr = step === null || step === undefined ? '' : ` step="${this.escapeAttr(String(step))}"`;
+        const idAttr = id ? ` id="${this.escapeAttr(id)}"` : '';
+        const labelAttr = label ? ` aria-label="${this.escapeAttr(label)}"` : '';
+        return `<input${idAttr} class="media-native-range ${className} ${inputClass}" type="range" min="${this.escapeAttr(String(min))}" max="${this.escapeAttr(String(max))}"${stepAttr} value="${this.escapeAttr(String(value))}"${labelAttr}>`;
+    },
+
+    renderRateControl() {
+        const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
+        const current = Number(this.playbackRate || 1);
+        const options = rates.map((rate) => `
+            <button class="media-rate-option ${rate === current ? 'active' : ''}" type="button" data-rate="${rate}" role="option" aria-selected="${rate === current ? 'true' : 'false'}">${rate}x</button>
+        `).join('');
+        return `
+            <div class="media-rate-picker">
+                <button class="media-rate-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="media-rate-value">${current}x</span>
+                    <span class="media-rate-chevron" aria-hidden="true">${this.symbolIcon('Chevron Down.svg')}</span>
+                </button>
+                <div class="media-rate-menu" role="listbox" aria-label="${this.escapeAttr(this.localText('speed'))}">
+                    ${options}
+                </div>
+            </div>
+        `;
+    },
+
     getArtBackgroundValue(item) {
         if (item?.coverUrl) {
             const safeUrl = String(item.coverUrl)
@@ -871,7 +900,15 @@ const MediaApp = {
                     </div>
                 </div>
                 <div class="media-expanded-progress-row">
-                    <input class="media-expanded-progress media-seek" id="media-expanded-progress" type="range" min="0" max="1000" value="0">
+                    ${this.renderRangeControl({
+                        id: 'media-expanded-progress',
+                        className: 'media-expanded-progress',
+                        inputClass: 'media-seek',
+                        min: 0,
+                        max: 1000,
+                        value: 0,
+                        label: 'Playback progress'
+                    })}
                     <div class="media-time-row">
                         <span class="media-current-time">0:00</span>
                         <span class="media-duration">0:00</span>
@@ -887,14 +924,20 @@ const MediaApp = {
                 <div class="media-expanded-aux">
                     <label class="media-volume">
                         <button data-action="mute" title="${this.localText('volume')}">${this.symbolIcon(this.muted ? 'Volume Mute.svg' : 'Volume Up.svg')}</button>
-                        <input id="media-volume" type="range" min="0" max="1" step="0.01" value="${this.volume}">
+                        ${this.renderRangeControl({
+                            id: 'media-volume',
+                            className: 'media-volume-slider',
+                            min: 0,
+                            max: 1,
+                            step: 0.01,
+                            value: this.volume,
+                            label: this.localText('volume')
+                        })}
                     </label>
-                    <label class="media-rate-control">
+                    <div class="media-rate-control">
                         <span>${this.localText('speed')}</span>
-                        <select id="media-rate">
-                            ${[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => `<option value="${rate}" ${rate === this.playbackRate ? 'selected' : ''}>${rate}x</option>`).join('')}
-                        </select>
-                    </label>
+                        ${this.renderRateControl()}
+                    </div>
                 </div>
             </section>
         `;
@@ -1025,33 +1068,92 @@ const MediaApp = {
         }
 
         this.container.querySelectorAll('.media-seek').forEach((progress) => {
-            progress.addEventListener('pointerdown', () => { this.isSeeking = true; });
-            progress.addEventListener('input', () => this.previewSeek(Number(progress.value || 0)));
+            progress.addEventListener('pointerdown', () => {
+                this.isSeeking = true;
+                this.syncRangeControl(progress);
+            });
+            progress.addEventListener('input', () => {
+                this.syncRangeControl(progress);
+                this.previewSeek(Number(progress.value || 0));
+            });
             progress.addEventListener('change', () => this.commitSeek(Number(progress.value || 0)));
             progress.addEventListener('pointerup', () => this.commitSeek(Number(progress.value || 0)));
+            progress.addEventListener('pointercancel', () => {
+                this.isSeeking = false;
+                this.updateProgressUi();
+            });
         });
 
         const volume = this.container.querySelector('#media-volume');
         if (volume) {
+            this.syncRangeControl(volume);
             volume.addEventListener('input', () => {
-                this.volume = Number(volume.value || 0);
-                this.muted = this.volume === 0;
-                this.applyMediaSettings();
+                const value = Math.round(Number(volume.value || 0) * 100);
+                State.updateSettings({ volume: Math.min(100, Math.max(0, value)) });
+                this.syncRangeControl(volume);
             });
         }
 
-        const rate = this.container.querySelector('#media-rate');
-        if (rate) {
-            rate.addEventListener('change', () => {
-                this.playbackRate = Number(rate.value || 1);
-                this.applyMediaSettings();
-            });
-        }
+        this.bindRateControl();
 
         const media = this.mediaElement;
         if (media) {
             this.bindMediaElementEvents(media);
         }
+    },
+
+    bindRateControl() {
+        const picker = this.container?.querySelector('.media-rate-picker');
+        if (!picker) return;
+
+        const button = picker.querySelector('.media-rate-button');
+        const valueLabel = picker.querySelector('.media-rate-value');
+        const close = () => {
+            picker.classList.remove('is-open');
+            button?.setAttribute('aria-expanded', 'false');
+        };
+        const open = () => {
+            picker.classList.add('is-open');
+            button?.setAttribute('aria-expanded', 'true');
+        };
+
+        button?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (picker.classList.contains('is-open')) {
+                close();
+            } else {
+                open();
+            }
+        });
+
+        picker.querySelectorAll('.media-rate-option').forEach((option) => {
+            option.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const rate = Number(option.dataset.rate || 1);
+                if (!Number.isFinite(rate)) return;
+                this.playbackRate = rate;
+                this.applyMediaSettings();
+                if (valueLabel) valueLabel.textContent = `${rate}x`;
+                picker.querySelectorAll('.media-rate-option').forEach((item) => {
+                    const active = Number(item.dataset.rate || 0) === rate;
+                    item.classList.toggle('active', active);
+                    item.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+                close();
+            });
+        });
+
+        picker.addEventListener('focusout', (event) => {
+            if (!picker.contains(event.relatedTarget)) close();
+        });
+
+        if (this._rateClickAwayHandler) {
+            this.container.removeEventListener('click', this._rateClickAwayHandler);
+        }
+        this._rateClickAwayHandler = (event) => {
+            if (!picker.contains(event.target)) close();
+        };
+        this.container?.addEventListener('click', this._rateClickAwayHandler);
     },
 
     bindMediaElementEvents(media) {
@@ -1100,8 +1202,11 @@ const MediaApp = {
                 this.render();
                 break;
             case 'mute':
-                this.muted = !this.muted;
-                this.applyMediaSettings();
+                if (this.muted || Number(State.settings.volume ?? 50) <= 0) {
+                    State.updateSettings({ volume: Math.round((this.lastNonZeroVolume || 0.5) * 100) });
+                } else {
+                    State.updateSettings({ volume: 0 });
+                }
                 this.render();
                 break;
             case 'fullscreen':
@@ -1532,6 +1637,21 @@ const MediaApp = {
         }
     },
 
+    syncVolumeFromState() {
+        const rawVolume = typeof State !== 'undefined' ? Number(State.settings.volume ?? 50) : 50;
+        const percent = Math.min(100, Math.max(0, Number.isFinite(rawVolume) ? rawVolume : 50));
+        this.volume = percent / 100;
+        this.muted = percent <= 0;
+        if (this.volume > 0) this.lastNonZeroVolume = this.volume;
+        this.applyMediaSettings();
+        if (this.container) {
+            this.container.querySelectorAll('#media-volume').forEach((volume) => this.syncRangeControl(volume, String(this.volume)));
+            this.container.querySelectorAll('[data-action="mute"]').forEach((button) => {
+                button.innerHTML = this.symbolIcon(this.muted ? 'Volume Mute.svg' : 'Volume Up.svg');
+            });
+        }
+    },
+
     applyMediaSettings() {
         const media = this.mediaElement;
         if (!media) return;
@@ -1570,6 +1690,10 @@ const MediaApp = {
     previewSeek(value) {
         const media = this.mediaElement;
         if (!media || !Number.isFinite(media.duration)) return;
+        this.container.querySelectorAll('.media-seek').forEach((progress) => {
+            progress.value = String(value);
+            this.syncRangeControl(progress);
+        });
         const seconds = media.duration * (value / 1000);
         this.container.querySelectorAll('#media-current-time, .media-current-time').forEach((currentTime) => {
             currentTime.textContent = this.formatTime(seconds);
@@ -1578,10 +1702,18 @@ const MediaApp = {
 
     commitSeek(value) {
         const media = this.mediaElement;
-        if (!media || !Number.isFinite(media.duration)) return;
-        media.currentTime = media.duration * (value / 1000);
         this.isSeeking = false;
+        if (!media || !Number.isFinite(media.duration)) {
+            this.updateProgressUi();
+            return;
+        }
+        media.currentTime = media.duration * (value / 1000);
         this.updateProgressUi();
+    },
+
+    syncRangeControl(input, value = input?.value) {
+        if (!input) return;
+        if (value !== undefined && value !== null) input.value = String(value);
     },
 
     handleLoadedMetadata() {
@@ -1633,9 +1765,10 @@ const MediaApp = {
         const dur = media && Number.isFinite(media.duration) ? media.duration : (this.activeItem?.duration || 0);
         if (!this.isSeeking) {
             this.container.querySelectorAll('.media-seek').forEach((progress) => {
-                progress.value = dur ? String(Math.round((cur / dur) * 1000)) : '0';
+                this.syncRangeControl(progress, dur ? String(Math.round((cur / dur) * 1000)) : '0');
             });
         }
+        this.container.querySelectorAll('#media-volume').forEach((volume) => this.syncRangeControl(volume));
         this.container.querySelectorAll('#media-current-time, .media-current-time').forEach((currentTime) => {
             currentTime.textContent = this.formatTime(cur);
         });
@@ -1647,8 +1780,20 @@ const MediaApp = {
 
     updatePlayButton() {
         const media = this.mediaElement;
+        const isPlaying = Boolean(media && !media.paused);
         this.container?.querySelectorAll('.media-play-btn').forEach((button) => {
-            button.innerHTML = this.symbolIcon(media && !media.paused ? 'Pause.svg' : 'Play.svg');
+            button.innerHTML = this.symbolIcon(isPlaying ? 'Pause.svg' : 'Play.svg');
+        });
+        this.updatePlaybackVisualState(isPlaying);
+    },
+
+    updatePlaybackVisualState(isPlaying = false) {
+        const app = this.container?.querySelector('.media-app');
+        const expanded = this.container?.querySelector('.media-expanded');
+        [app, expanded].forEach((element) => {
+            if (!element) return;
+            element.classList.toggle('is-playing', isPlaying);
+            element.classList.toggle('is-paused', !isPlaying);
         });
     },
 
@@ -2068,7 +2213,18 @@ const MediaApp = {
             .media-progress,
             .media-volume input {
                 width: 100%;
-                accent-color: #2f8cff;
+                cursor: pointer;
+            }
+            .media-native-range {
+                display: block;
+                min-width: 0;
+                width: 100%;
+            }
+            .media-expanded-progress {
+                width: 100%;
+            }
+            .media-volume-slider {
+                width: 100%;
             }
             .media-time-row {
                 display: flex;
@@ -2392,7 +2548,6 @@ const MediaApp = {
             }
             .media-progress {
                 height: 4px;
-                accent-color: #ff2d55;
             }
             .media-time-row { display: none; }
             .media-button-row {
@@ -2541,7 +2696,6 @@ const MediaApp = {
                 width: auto;
                 height: 3px;
                 opacity: 0.72;
-                accent-color: var(--media-accent);
             }
             .media-button-row {
                 margin: 0;
@@ -2704,7 +2858,6 @@ const MediaApp = {
             }
             .media-expanded-progress {
                 width: 100%;
-                accent-color: var(--media-accent);
             }
             .media-expanded .media-time-row {
                 display: flex;
@@ -2730,23 +2883,96 @@ const MediaApp = {
                 flex: 1;
                 min-width: 0;
             }
-            .media-expanded-aux input { accent-color: var(--media-accent); }
+            .media-expanded-aux input { width: 100%; }
             .media-rate-control {
                 display: flex;
                 align-items: center;
                 gap: 10px;
                 color: var(--media-muted);
+                position: relative;
             }
-            .media-rate-control select {
+            .media-rate-picker {
+                position: relative;
+                width: 88px;
+            }
+            .media-rate-button {
+                width: 100%;
                 height: 38px;
                 border: 0;
                 border-radius: 999px;
-                padding: 0 14px;
+                padding: 0 12px 0 16px;
                 color: var(--media-fg);
                 background: rgba(255,255,255,0.34);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                cursor: pointer;
             }
-            .dark-mode .media-rate-control select,
-            body.dark-mode .media-rate-control select { background: rgba(255,255,255,0.08); color: white; }
+            .media-rate-chevron {
+                width: 14px;
+                height: 14px;
+                display: grid;
+                place-items: center;
+                transition: transform 180ms var(--media-ease);
+            }
+            .media-rate-chevron .media-symbol {
+                width: 14px;
+                height: 14px;
+            }
+            .media-rate-menu {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: calc(100% + 6px);
+                z-index: 20;
+                display: grid;
+                overflow: hidden;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.96);
+                box-shadow: 0 12px 28px rgba(18, 32, 48, 0.18);
+                opacity: 0;
+                max-height: 0;
+                transform: translateY(6px) scaleY(0.96);
+                transform-origin: bottom;
+                pointer-events: none;
+                transition:
+                    opacity 160ms var(--media-ease),
+                    max-height 220ms var(--media-ease),
+                    transform 220ms var(--media-ease);
+            }
+            .media-rate-picker.is-open .media-rate-menu {
+                opacity: 1;
+                max-height: 220px;
+                transform: translateY(0) scaleY(1);
+                pointer-events: auto;
+            }
+            .media-rate-picker.is-open .media-rate-chevron {
+                transform: rotate(180deg);
+            }
+            .media-rate-option {
+                height: 34px;
+                padding: 0 14px;
+                text-align: left;
+                color: #111;
+                background: transparent;
+                border: 0;
+                cursor: pointer;
+            }
+            .media-rate-option:hover,
+            .media-rate-option.active {
+                background: rgba(0,0,0,0.12);
+            }
+            .dark-mode .media-rate-button,
+            body.dark-mode .media-rate-button { background: rgba(255,255,255,0.08); color: white; }
+            .dark-mode .media-rate-menu,
+            body.dark-mode .media-rate-menu { background: rgba(34, 38, 44, 0.98); box-shadow: 0 12px 28px rgba(0,0,0,0.34); }
+            .dark-mode .media-rate-option,
+            body.dark-mode .media-rate-option { color: white; }
+            .dark-mode .media-rate-option:hover,
+            .dark-mode .media-rate-option.active,
+            body.dark-mode .media-rate-option:hover,
+            body.dark-mode .media-rate-option.active { background: rgba(255,255,255,0.14); }
             @container (max-aspect-ratio: 0.9) {
                 .media-expanded {
                     grid-template-columns: 1fr;
@@ -3590,7 +3816,6 @@ const MediaApp = {
             }
             .media-expanded-progress {
                 width: 100% !important;
-                accent-color: var(--media-accent, #0078d4) !important;
             }
             .media-expanded .media-time-row {
                 display: flex !important;
@@ -3638,7 +3863,6 @@ const MediaApp = {
             }
             .media-expanded-aux input {
                 width: 100% !important;
-                accent-color: var(--media-accent, #0078d4) !important;
             }
             .media-rate-control {
                 display: flex !important;
@@ -3646,15 +3870,19 @@ const MediaApp = {
                 gap: 10px !important;
                 white-space: nowrap !important;
             }
-            .media-rate-control select {
+            .media-rate-picker {
+                width: 88px !important;
+            }
+            .media-rate-button {
+                width: 100% !important;
                 height: 36px !important;
                 border-radius: 999px !important;
                 border: 0 !important;
-                padding: 0 12px !important;
+                padding: 0 12px 0 16px !important;
                 color: inherit !important;
                 background: rgba(255, 255, 255, 0.34) !important;
             }
-            body.dark-mode .media-rate-control select {
+            body.dark-mode .media-rate-button {
                 background: rgba(255, 255, 255, 0.1) !important;
             }
             @container (max-height: 560px) {
@@ -4131,11 +4359,15 @@ const MediaApp = {
             }
             .media-expanded-meta button,
             .media-expanded-controls button,
-            .media-rate-control select {
+            .media-rate-button,
+            .media-rate-menu {
                 background: var(--media-native-pane-strong) !important;
                 color: var(--media-native-text) !important;
                 border: 1px solid var(--media-native-line) !important;
                 box-shadow: none !important;
+            }
+            .media-rate-option {
+                color: var(--media-native-text) !important;
             }
             .media-expanded-progress-row {
                 grid-column: 2 !important;
@@ -4524,13 +4756,17 @@ const MediaApp = {
             body.fluent-v2 .media-options button,
             body.fluent-v2 .media-expanded-meta button,
             body.fluent-v2 .media-expanded-controls button,
-            body.fluent-v2 .media-rate-control select {
+            body.fluent-v2 .media-rate-button,
+            body.fluent-v2 .media-rate-menu {
                 background: var(--media-native-pane-strong) !important;
                 color: var(--media-native-text) !important;
                 border: 1px solid var(--media-native-line) !important;
                 box-shadow: none !important;
                 backdrop-filter: blur(18px) saturate(145%) !important;
                 -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
+            }
+            body.fluent-v2 .media-rate-option {
+                color: var(--media-native-text) !important;
             }
             body.fluent-v2 .media-action-primary:hover,
             body.fluent-v2 .media-action-secondary:hover,
@@ -4828,15 +5064,29 @@ const MediaApp = {
             .media-expanded::before {
                 z-index: 0 !important;
                 inset: -46% !important;
-                opacity: 0.86 !important;
+                opacity: 0.96 !important;
                 background:
-                    radial-gradient(circle at 18% 24%, color-mix(in srgb, var(--media-theme-a, #5ac8fa) 86%, transparent), transparent 31%),
-                    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--media-theme-b, #0078d4) 76%, transparent), transparent 34%),
-                    radial-gradient(circle at 62% 78%, color-mix(in srgb, var(--media-theme-c, #d8f3ff) 82%, transparent), transparent 36%),
-                    radial-gradient(circle at 30% 90%, color-mix(in srgb, var(--media-theme-b, #0078d4) 38%, transparent), transparent 32%),
-                    linear-gradient(145deg, var(--media-theme-a, #5ac8fa), var(--media-theme-b, #0078d4) 54%, var(--media-theme-c, #d8f3ff)) !important;
-                filter: blur(54px) saturate(1.36) brightness(1.04) !important;
-                animation: mediaThemeDrift 18s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate !important;
+                    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--media-theme-a, #5ac8fa) 96%, transparent), transparent 28%),
+                    radial-gradient(circle at 86% 14%, color-mix(in srgb, var(--media-theme-b, #0078d4) 90%, transparent), transparent 32%),
+                    radial-gradient(circle at 66% 84%, color-mix(in srgb, var(--media-theme-c, #d8f3ff) 94%, transparent), transparent 35%),
+                    radial-gradient(circle at 24% 92%, color-mix(in srgb, var(--media-theme-b, #0078d4) 58%, transparent), transparent 31%),
+                    linear-gradient(145deg, var(--media-theme-a, #5ac8fa), var(--media-theme-b, #0078d4) 48%, var(--media-theme-c, #d8f3ff)) !important;
+                background-size: 180% 180% !important;
+                filter: blur(50px) saturate(1.62) brightness(1.1) !important;
+                transition:
+                    opacity 2600ms cubic-bezier(0.16, 1, 0.3, 1),
+                    filter 2600ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+                animation: mediaThemeDrift 14s cubic-bezier(0.45, 0, 0.2, 1) infinite alternate !important;
+            }
+            .media-expanded.is-playing::before {
+                opacity: 1 !important;
+                filter: blur(48px) saturate(1.72) brightness(1.12) !important;
+                animation-duration: 12s !important;
+            }
+            .media-expanded.is-paused::before {
+                opacity: 0.68 !important;
+                filter: blur(58px) saturate(1.08) brightness(0.98) !important;
+                animation-duration: 180s !important;
             }
             .media-expanded::after {
                 content: "" !important;
@@ -4849,8 +5099,16 @@ const MediaApp = {
                     radial-gradient(circle at 50% 8%, rgba(255,255,255,0.46), transparent 38%) !important;
             }
             body.dark-mode .media-expanded::before {
-                opacity: 0.64 !important;
-                filter: blur(58px) saturate(1.24) brightness(0.82) !important;
+                opacity: 0.78 !important;
+                filter: blur(58px) saturate(1.46) brightness(0.9) !important;
+            }
+            body.dark-mode .media-expanded.is-playing::before {
+                opacity: 0.86 !important;
+                filter: blur(56px) saturate(1.56) brightness(0.94) !important;
+            }
+            body.dark-mode .media-expanded.is-paused::before {
+                opacity: 0.48 !important;
+                filter: blur(62px) saturate(1.04) brightness(0.78) !important;
             }
             body.dark-mode .media-expanded::after {
                 background:
@@ -5291,22 +5549,66 @@ const MediaApp = {
                     transform: translateX(-50%) !important;
                 }
             }
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"],
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"] .window-content,
+            body.fluent-v2.window-blur-disabled .media-app {
+                background: var(--bg-primary) !important;
+                background-image: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"] .window-titlebar,
+            body.fluent-v2.window-blur-disabled .media-sidebar,
+            body.fluent-v2.window-blur-disabled .media-player-bar {
+                background: var(--bg-secondary) !important;
+                background-image: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                border-color: var(--border-color) !important;
+            }
+            body.fluent-v2.window-blur-disabled .media-app {
+                --media-native-bg: var(--bg-primary);
+                --media-native-pane: var(--bg-secondary);
+                --media-native-pane-strong: var(--bg-tertiary);
+                --media-native-line: var(--border-color);
+                --media-native-hover: var(--bg-hover);
+            }
+            body.fluent-v2.window-blur-disabled .media-expanded {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            body.fluent-v2.window-blur-disabled .media-library-panel,
+            body.fluent-v2.window-blur-disabled .media-import-empty-card,
+            body.fluent-v2.window-blur-disabled .media-rate-button,
+            body.fluent-v2.window-blur-disabled .media-rate-menu,
+            body.fluent-v2.window-blur-disabled .media-action-secondary,
+            body.fluent-v2.window-blur-disabled .media-button-row button,
+            body.fluent-v2.window-blur-disabled .media-options button,
+            body.fluent-v2.window-blur-disabled .media-expanded-meta button,
+            body.fluent-v2.window-blur-disabled .media-expanded-controls button {
+                background: var(--bg-tertiary) !important;
+                background-image: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                border-color: var(--border-color) !important;
+                box-shadow: none !important;
+            }
             @keyframes mediaThemeDrift {
                 0% {
-                    transform: translate3d(-5%, -3%, 0) scale(1.08) rotate(0deg);
-                    background-position: 0% 42%;
+                    transform: translate3d(-9%, -6%, 0) scale(1.12) rotate(-2deg);
+                    background-position: 0% 34%;
                 }
                 35% {
-                    transform: translate3d(4%, -6%, 0) scale(1.12) rotate(4deg);
-                    background-position: 42% 18%;
+                    transform: translate3d(7%, -10%, 0) scale(1.18) rotate(7deg);
+                    background-position: 56% 10%;
                 }
                 70% {
-                    transform: translate3d(6%, 5%, 0) scale(1.1) rotate(-3deg);
-                    background-position: 78% 70%;
+                    transform: translate3d(10%, 8%, 0) scale(1.15) rotate(-6deg);
+                    background-position: 92% 84%;
                 }
                 100% {
-                    transform: translate3d(-3%, 7%, 0) scale(1.14) rotate(2deg);
-                    background-position: 100% 48%;
+                    transform: translate3d(-7%, 11%, 0) scale(1.2) rotate(4deg);
+                    background-position: 18% 100%;
                 }
             }
         `;

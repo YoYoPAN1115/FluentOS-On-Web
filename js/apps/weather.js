@@ -111,10 +111,38 @@ const WeatherApp = {
         const style = document.createElement('style');
         style.id = 'weather-app-styles';
         style.textContent = `
-            .weather-app { display: flex; height: 100%; }
+            .weather-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
+            .weather-app > .fluent-sidebar {
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 0 0 200px !important;
+                width: 200px !important;
+                min-width: 200px !important;
+                min-height: 0 !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+            .weather-app > .fluent-sidebar .fluent-sidebar-header {
+                flex: 0 0 auto !important;
+            }
+            .weather-app > .fluent-sidebar .fluent-sidebar-item {
+                box-sizing: border-box !important;
+                flex: 0 0 36px !important;
+                height: 36px !important;
+                min-height: 36px !important;
+                max-height: 36px !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
+            body.fluent-v2 .weather-app > .fluent-sidebar .fluent-sidebar-item {
+                flex-basis: 44px !important;
+                height: 44px !important;
+                min-height: 44px !important;
+                max-height: 44px !important;
+            }
             .saved-item:hover { background: rgba(0,0,0,0.05); }
 
-            .weather-content { flex: 1; overflow-y: auto; padding: 24px 32px; }
+            .weather-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 24px 32px; }
             .weather-widget { margin-bottom: 16px; }
             .weather-hero { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, #4b7cff 0%, #6790ff 100%); border-radius: 24px; padding: 20px 24px; color: white; box-shadow: 0 10px 30px rgba(75,124,255,0.25); }
             .dark-mode .weather-hero { background: linear-gradient(180deg, #2a2f3a 0%, #3c4252 100%); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }

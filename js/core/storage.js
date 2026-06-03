@@ -67,8 +67,8 @@ const Storage = {
                 enableAnimation: true,
                 autoEnterFullscreen: true,
                 enableExternalFileImport: false,
-                enableWindowBlur: true,  // 窗口模糊效果
-                enableFluentV2: false,   // 新版实验性 UI
+                enableWindowBlur: false, // 窗口纯色底模式
+                enableFluentV2: true,    // 强制 Fluent V2 UI
                 pin: '1234',
                 userName: 'Owner',
                 userEmail: 'owner@sample.com',
