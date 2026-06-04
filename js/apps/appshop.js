@@ -663,6 +663,11 @@ const AppShop = {
         }
 
         // 刷新开始菜单
+        const startPinnedApps = State.settings.startPinnedApps || [];
+        if (startPinnedApps.includes(appId)) {
+            State.updateSettings({ startPinnedApps: startPinnedApps.filter(id => id !== appId) });
+        }
+
         if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
             StartMenu.renderApps();
         }

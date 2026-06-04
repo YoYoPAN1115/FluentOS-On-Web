@@ -1313,6 +1313,10 @@ const Fingo = {
             if (pinned.includes(app.id)) Taskbar.unpinApp(app.id);
             Taskbar.renderApps();
         }
+        const startPinned = State.settings.startPinnedApps || [];
+        if (startPinned.includes(app.id)) {
+            State.updateSettings({ startPinnedApps: startPinned.filter(id => id !== app.id) });
+        }
         if (typeof StartMenu !== 'undefined') StartMenu.renderApps();
         setTimeout(() => this.addMessage(FingoData.commands.uninstall.response[lang].replace('{app}', appName), 'bot'), 400);
     },

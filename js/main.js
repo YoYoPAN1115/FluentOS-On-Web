@@ -386,6 +386,266 @@ function minimizeTopDesktopWindow() {
     return true;
 }
 
+const AppSwitcher = {
+    overlay: null,
+    listEl: null,
+    entries: [],
+    selectedIndex: 0,
+    isOpen: false,
+    commitTimer: null,
+    KEYUP_COMMIT_DELAY_MS: 80,
+
+    init() {
+        if (this.overlay) return;
+
+        this.overlay = document.createElement('div');
+        this.overlay.id = 'app-switcher-overlay';
+        this.overlay.className = 'app-switcher hidden';
+        this.overlay.innerHTML = `
+            <div class="app-switcher-panel" role="listbox" aria-label="App switcher">
+                <div class="app-switcher-list"></div>
+            </div>
+        `;
+        document.body.appendChild(this.overlay);
+        this.listEl = this.overlay.querySelector('.app-switcher-list');
+
+        this.overlay.addEventListener('pointerdown', (e) => {
+            const item = e.target.closest('.app-switcher-item');
+            if (!item) return;
+            const index = Number(item.dataset.index);
+            if (!Number.isFinite(index)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.selectedIndex = index;
+            this.render();
+            this.commit(0);
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (!this.isOpen) return;
+            if (e.key === 'Alt' || !e.altKey) {
+                this.commit(this.KEYUP_COMMIT_DELAY_MS);
+            }
+        }, true);
+
+        document.addEventListener('keydown', (e) => {
+            if (!this.isOpen) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.close(false);
+            }
+        }, true);
+    },
+
+    _getSwitchableWindows() {
+        if (typeof WindowManager === 'undefined' || !Array.isArray(WindowManager.windows)) return [];
+        return WindowManager.windows
+            .filter((w) => w && w.element && !w.element.classList.contains('closing'))
+            .sort((a, b) => (Number(b.element.style.zIndex) || 0) - (Number(a.element.style.zIndex) || 0));
+    },
+
+    _getWindowTitle(windowData) {
+        const title = windowData.element?.querySelector('.window-title')?.textContent?.trim();
+        if (title) return title;
+        const config = WindowManager.getAppConfig ? WindowManager.getAppConfig(windowData.appId) : null;
+        return config?.title || windowData.appId || 'App';
+    },
+
+    _getWindowIcon(windowData) {
+        const config = WindowManager.getAppConfig ? WindowManager.getAppConfig(windowData.appId) : null;
+        return config?.icon || windowData.element?.querySelector('.window-icon')?.getAttribute('src') || '';
+    },
+
+    _readPixel(value, fallback) {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) && parsed > 1 ? parsed : fallback;
+    },
+
+    _getPreviewBounds(windowData) {
+        const el = windowData.element;
+        const rect = el.getBoundingClientRect();
+        const saved = windowData.savedPosition || {};
+        const width = this._readPixel(el.style.width, this._readPixel(saved.width, rect.width || 900));
+        const height = this._readPixel(el.style.height, this._readPixel(saved.height, rect.height || 600));
+        return {
+            width: Math.max(320, Math.round(width || 900)),
+            height: Math.max(220, Math.round(height || 600))
+        };
+    },
+
+    _stripCloneIds(root) {
+        if (!root) return;
+        if (root.removeAttribute) root.removeAttribute('id');
+        root.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+    },
+
+    _neutralizeCloneEmbeds(root, item) {
+        if (!root) return;
+        root.querySelectorAll('iframe').forEach((frame) => {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'app-switcher-embed-placeholder';
+            placeholder.innerHTML = `
+                ${item.icon ? `<img src="${this._escapeHtml(item.icon)}" alt="">` : ''}
+                <span>${this._escapeHtml(item.title)}</span>
+            `;
+            frame.replaceWith(placeholder);
+        });
+    },
+
+    _createEntry(windowData) {
+        return {
+            id: windowData.id,
+            appId: windowData.appId,
+            windowData,
+            title: this._getWindowTitle(windowData),
+            icon: this._getWindowIcon(windowData),
+            bounds: this._getPreviewBounds(windowData)
+        };
+    },
+
+    _escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    _buildPreview(item, index) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `app-switcher-item${index === this.selectedIndex ? ' selected' : ''}`;
+        card.dataset.index = String(index);
+        card.setAttribute('role', 'option');
+        card.setAttribute('aria-selected', index === this.selectedIndex ? 'true' : 'false');
+
+        const preview = document.createElement('div');
+        preview.className = 'app-switcher-preview';
+        const frame = document.createElement('div');
+        frame.className = 'app-switcher-preview-frame';
+
+        const clone = item.windowData.element.cloneNode(true);
+        this._stripCloneIds(clone);
+        this._neutralizeCloneEmbeds(clone, item);
+        clone.classList.remove('opening', 'closing', 'minimizing', 'restoring', 'maximizing', 'unmaximizing', 'maximized');
+        clone.classList.add('app-switcher-window-clone');
+        clone.style.position = 'absolute';
+        clone.style.left = '0';
+        clone.style.top = '0';
+        clone.style.width = `${item.bounds.width}px`;
+        clone.style.height = `${item.bounds.height}px`;
+        clone.style.minWidth = '0';
+        clone.style.minHeight = '0';
+        clone.style.display = 'flex';
+        clone.style.transformOrigin = 'top left';
+        clone.style.transition = 'none';
+        clone.style.pointerEvents = 'none';
+        clone.style.zIndex = '1';
+        clone.style.opacity = '1';
+
+        const maxWidth = 218;
+        const maxHeight = 132;
+        const scale = Math.min(maxWidth / item.bounds.width, maxHeight / item.bounds.height, 1);
+        clone.style.transform = `scale(${Number(scale.toFixed(4))})`;
+        frame.style.width = `${Math.round(item.bounds.width * scale)}px`;
+        frame.style.height = `${Math.round(item.bounds.height * scale)}px`;
+        frame.appendChild(clone);
+        preview.appendChild(frame);
+
+        const label = document.createElement('div');
+        label.className = 'app-switcher-label';
+        label.innerHTML = `
+            ${item.icon ? `<img src="${this._escapeHtml(item.icon)}" alt="">` : ''}
+            <span>${this._escapeHtml(item.title)}</span>
+        `;
+
+        card.appendChild(preview);
+        card.appendChild(label);
+        return card;
+    },
+
+    render() {
+        if (!this.listEl) return;
+        this.listEl.innerHTML = '';
+        this.entries.forEach((item, index) => {
+            this.listEl.appendChild(this._buildPreview(item, index));
+        });
+        const selected = this.listEl.querySelector('.app-switcher-item.selected');
+        if (selected) {
+            selected.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    },
+
+    openOrCycle() {
+        this.init();
+        const windows = this._getSwitchableWindows();
+        if (windows.length === 0) {
+            this.close(false);
+            return false;
+        }
+
+        if (!this.isOpen) {
+            if (typeof TaskView !== 'undefined' && TaskView.isOpen && typeof TaskView.close === 'function') {
+                TaskView.close();
+            }
+            this.entries = windows.map((windowData) => this._createEntry(windowData));
+            this.selectedIndex = this.entries.length > 1 ? 1 : 0;
+            this.overlay.classList.remove('hidden');
+            document.body.classList.add('in-app-switcher');
+            this.isOpen = true;
+        } else {
+            this.entries = this.entries.filter((entry) =>
+                (WindowManager.windows || []).some((w) => w && w.id === entry.id && w.element && !w.element.classList.contains('closing'))
+            );
+            if (this.entries.length === 0) {
+                this.close(false);
+                return false;
+            }
+            this.selectedIndex = (this.selectedIndex + 1) % this.entries.length;
+        }
+
+        this.render();
+        return true;
+    },
+
+    commit(delay = 0) {
+        clearTimeout(this.commitTimer);
+        this.commitTimer = null;
+        const run = () => {
+            const target = this.entries[this.selectedIndex];
+            this.close(false);
+            if (target && typeof WindowManager !== 'undefined' && typeof WindowManager.focusWindow === 'function') {
+                WindowManager.focusWindow(target.id);
+            }
+        };
+        if (delay > 0) {
+            this.commitTimer = setTimeout(run, delay);
+        } else {
+            run();
+        }
+    },
+
+    close(shouldFocus = false) {
+        clearTimeout(this.commitTimer);
+        this.commitTimer = null;
+        const target = shouldFocus ? this.entries[this.selectedIndex] : null;
+        this.isOpen = false;
+        this.entries = [];
+        this.selectedIndex = 0;
+        if (this.listEl) this.listEl.innerHTML = '';
+        if (this.overlay) this.overlay.classList.add('hidden');
+        document.body.classList.remove('in-app-switcher');
+        if (target && typeof WindowManager !== 'undefined' && typeof WindowManager.focusWindow === 'function') {
+            WindowManager.focusWindow(target.id);
+        }
+    }
+};
+
+if (typeof window !== 'undefined') {
+    window.AppSwitcher = AppSwitcher;
+}
+
 function initGlobalShortcuts() {
     if (window.__fluentGlobalShortcutsBound) return;
     window.__fluentGlobalShortcutsBound = true;
@@ -431,6 +691,15 @@ function initGlobalShortcuts() {
                 if (typeof ControlCenter !== 'undefined' && typeof ControlCenter.toggle === 'function') {
                     ControlCenter.toggle();
                     handled = true;
+                }
+                break;
+            case 'c':
+                if (
+                    State.settings.quickWindowSwitchEnabled !== false
+                    && typeof AppSwitcher !== 'undefined'
+                    && typeof AppSwitcher.openOrCycle === 'function'
+                ) {
+                    handled = AppSwitcher.openOrCycle();
                 }
                 break;
             case 'd':

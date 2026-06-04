@@ -127,6 +127,33 @@ const SettingsApp = {
         }
     },
 
+    openData(data) {
+        if (!data || data.page !== 'app-detail' || !data.appId) return;
+        const app = this.getAppDetailData(data.appId);
+        if (!app) return;
+        this.currentAppDetail = app;
+        this.currentPage = 'app-detail';
+        this.render();
+    },
+
+    getAppDetailData(appId) {
+        const desktopApp = typeof Desktop !== 'undefined'
+            ? Desktop.apps.find(app => app.id === appId)
+            : null;
+        if (!desktopApp) return null;
+        const isPWA = desktopApp.isPWA === true;
+        return {
+            id: desktopApp.id,
+            name: Desktop.getAppName(desktopApp),
+            icon: desktopApp.icon,
+            isPWA,
+            size: this.getAppSize(desktopApp.id, isPWA),
+            desc: isPWA
+                ? ((typeof PWALoader !== 'undefined' && PWALoader.apps[desktopApp.id]?.description) || t('settings.app-desc-default'))
+                : this.getAppDescription(desktopApp.id)
+        };
+    },
+
     beforeClose() {
         if (this._sidebarScrollRestoreRaf) {
             cancelAnimationFrame(this._sidebarScrollRestoreRaf);
@@ -2257,6 +2284,26 @@ const SettingsApp = {
         const section = this.createSection(t('settings.multitask-title'));
 
         section.appendChild(FluentUI.SettingItem({
+            label: t('settings.multitask-quick-switch'),
+            description: t('settings.multitask-quick-switch-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.quickWindowSwitchEnabled !== false,
+                onChange: (v) => {
+                    State.updateSettings({ quickWindowSwitchEnabled: v });
+                    this.addRecentSetting(t('settings.multitask-quick-switch'), v ? t('settings.on') : t('settings.off'), 'multitask');
+                    State.addNotification({
+                        title: t('settings.multitask-title'),
+                        message: v ? t('settings.multitask-quick-switch-on') : t('settings.multitask-quick-switch-off'),
+                        type: 'info'
+                    });
+                    if (!v && typeof AppSwitcher !== 'undefined' && typeof AppSwitcher.close === 'function') {
+                        AppSwitcher.close(false);
+                    }
+                }
+            })
+        }));
+
+        section.appendChild(FluentUI.SettingItem({
             label: t('settings.multitask-edge-snap'),
             description: t('settings.multitask-edge-snap-desc'),
             control: FluentUI.Toggle({
@@ -3658,6 +3705,11 @@ const SettingsApp = {
                                 }
 
                                 // 刷新开始菜单
+                                const startPinned = State.settings.startPinnedApps || [];
+                                if (startPinned.includes(app.id)) {
+                                    State.updateSettings({ startPinnedApps: startPinned.filter(id => id !== app.id) });
+                                }
+
                                 if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
                                     StartMenu.renderApps();
                                 }
@@ -3806,7 +3858,7 @@ const SettingsApp = {
 
         const list = FluentUI.List({
             items: [
-                { id: 'version', title: t('settings.version'), description: '1.0.0 MVP', icon: 'Information Circle' },
+                { id: 'version', title: t('settings.version'), description: '1.5.0 MVP', icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
             ]
