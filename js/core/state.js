@@ -186,9 +186,11 @@ const State = {
             userName: 'Owner',
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
+            quickWindowSwitchEnabled: true,
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
+            startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
             windowBoundsMemory: {}

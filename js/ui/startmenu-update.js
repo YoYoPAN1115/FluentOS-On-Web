@@ -39,6 +39,8 @@ Object.assign(StartMenu, {
         const allAppsBtn = document.getElementById('all-apps-btn');
         if (allAppsBtn) {
             allAppsBtn.addEventListener('click', () => {
+                this.showAllAppsView();
+                return;
                 State.addNotification({
                     title: '开始菜单',
                     message: '所有应用视图即将推出',
@@ -57,11 +59,10 @@ Object.assign(StartMenu, {
         
         // 搜索输入 - 结合文件搜索
         this.searchInput.addEventListener('input', (e) => {
+            if (!this.isSearchMode) return;
             const query = e.target.value.toLowerCase();
             if (query) {
                 this.searchFiles(query);
-            } else {
-                this.renderRecentFiles();
             }
         });
     },
