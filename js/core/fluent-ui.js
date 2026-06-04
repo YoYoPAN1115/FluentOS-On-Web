@@ -55,7 +55,7 @@ const FluentUI = {
         if (this._nativeScrollFxInitialized || typeof document === 'undefined') return;
         this._nativeScrollFxInitialized = true;
 
-        const HOST_SELECTOR = '.window-content, .settings-app, .files-app, .appshop, .start-menu, .fluent-sidebar, .fluent-select-dropdown, .fluent-modal-content';
+        const HOST_SELECTOR = '.window-content, .settings-app, .files-app, .appshop, .fluent-sidebar, .fluent-select-dropdown, .fluent-modal-content';
         const HIDE_DELAY = 4000;
         const BOUNCE_MAX_OFFSET = 22;
         const BOUNCE_MAX_VELOCITY = 10;

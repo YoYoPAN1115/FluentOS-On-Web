@@ -9,9 +9,6 @@ const StartMenu = {
     powerMenu: null,
     isOpen: false,
     recentContainer: null,
-    currentView: 'home',
-    isSearchMode: false,
-    searchResultsContainer: null,
 
     init() {
         this.element = document.getElementById('start-menu');
@@ -48,7 +45,7 @@ const StartMenu = {
     
     // 更新应用修复状态
     updateAppRepairState(appId, isRepairing) {
-        const appEl = this.element.querySelector(`.start-app[data-app-id="${appId}"]`);
+        const appEl = this.appsGrid.querySelector(`.start-app[data-app-id="${appId}"]`);
         if (appEl) {
             if (isRepairing) {
                 appEl.classList.add('repairing');
@@ -88,12 +85,6 @@ const StartMenu = {
         
         const downloadsText = document.getElementById('start-downloads-text');
         if (downloadsText) downloadsText.textContent = t('start.downloads');
-
-        const allAppsBackText = document.getElementById('start-all-apps-back-text');
-        if (allAppsBackText) allAppsBackText.textContent = t('start.pinned');
-
-        const allAppsTitle = document.getElementById('start-all-apps-title');
-        if (allAppsTitle) allAppsTitle.textContent = t('start.all-apps');
         
         // 更新电源菜单
         const lockText = document.getElementById('power-lock-text');
@@ -113,16 +104,9 @@ const StartMenu = {
 
     renderApps() {
         this.appsGrid.innerHTML = '';
-        const pinnedApps = this.getStartPinnedApps()
-            .map(appId => Desktop.apps.find(app => app.id === appId))
-            .filter(Boolean);
-        if (pinnedApps.length === 0) {
-            this.appsGrid.innerHTML = `<div class="start-empty">${t('start.pinned-empty')}</div>`;
-            return;
-        }
         
         // 渲染所有应用
-        pinnedApps.forEach(app => {
+        Desktop.apps.forEach(app => {
             const appElement = document.createElement('div');
             appElement.className = 'start-app';
             appElement.dataset.appId = app.id;
@@ -133,276 +117,6 @@ const StartMenu = {
             `;
             this.appsGrid.appendChild(appElement);
         });
-        if (this.currentView === 'allApps') this.renderAllApps();
-        if (this.isSearchMode) this.renderSearchResults(this.searchInput?.value || '');
-    },
-
-    getStartPinnedApps() {
-        const saved = Array.isArray(State.settings.startPinnedApps) ? State.settings.startPinnedApps : [];
-        return saved.filter(appId => Desktop.apps.some(app => app.id === appId));
-    },
-
-    setStartPinnedApps(appIds) {
-        const unique = [...new Set((appIds || []).filter(appId => Desktop.apps.some(app => app.id === appId)))];
-        State.updateSettings({ startPinnedApps: unique });
-        this.renderApps();
-        if (this.currentView === 'allApps') this.renderAllApps();
-        if (this.isSearchMode) this.renderSearchResults(this.searchInput?.value || '');
-    },
-
-    pinToStart(appId) {
-        const pinned = this.getStartPinnedApps();
-        if (!pinned.includes(appId)) {
-            pinned.push(appId);
-            this.setStartPinnedApps(pinned);
-        }
-    },
-
-    unpinFromStart(appId) {
-        this.setStartPinnedApps(this.getStartPinnedApps().filter(id => id !== appId));
-    },
-
-    isStartPinned(appId) {
-        return this.getStartPinnedApps().includes(appId);
-    },
-
-    getAllAppsSorted() {
-        const collator = new Intl.Collator(I18n.currentLang === 'en' ? 'en-US' : 'zh-CN', {
-            numeric: true,
-            sensitivity: 'base'
-        });
-        return (Desktop.apps || [])
-            .slice()
-            .sort((a, b) => {
-                const groupCompare = collator.compare(this.getAppGroupKey(a), this.getAppGroupKey(b));
-                if (groupCompare !== 0) return groupCompare;
-                return collator.compare(Desktop.getAppName(a), Desktop.getAppName(b));
-            });
-    },
-
-    getAppGroupKey(app) {
-        const idInitials = {
-            alipay: 'Z',
-            amap: 'G',
-            appshop: 'A',
-            'baidu-netdisk': 'B',
-            bilibili: 'B',
-            browser: 'L',
-            calculator: 'J',
-            clock: 'S',
-            coolapk: 'K',
-            dingding: 'D',
-            douyu: 'D',
-            'ele-me': 'E',
-            files: 'W',
-            jd: 'J',
-            media: 'D',
-            meituan: 'M',
-            'netease-music': 'W',
-            notes: 'J',
-            pdd: 'P',
-            photos: 'Z',
-            'qq-mail': 'Q',
-            'qq-music': 'Q',
-            settings: 'S',
-            taobao: 'T',
-            'tencent-video': 'T',
-            weather: 'T',
-            wecom: 'Q',
-            weibo: 'W'
-        };
-        if (idInitials[app.id]) return idInitials[app.id];
-        const name = Desktop.getAppName(app).trim();
-        const latin = name.match(/[A-Za-z]/);
-        if (latin) return latin[0].toUpperCase();
-        const pinyinInitials = {
-            '哔': 'B', '百': 'B', '浏': 'L', '文': 'W', '设': 'S', '计': 'J', '记': 'J',
-            '时': 'S', '天': 'T', '照': 'Z', '多': 'D', '网': 'W', '腾': 'T', '斗': 'D',
-            '微': 'W', '淘': 'T', '京': 'J', '拼': 'P', '支': 'Z', '美': 'M', '饿': 'E',
-            '高': 'G', '钉': 'D', '企': 'Q', '酷': 'K'
-        };
-        return pinyinInitials[name[0]] || '#';
-    },
-
-    ensureAllAppsView() {
-        let view = document.getElementById('start-all-apps-view');
-        if (view) return view;
-        view = document.createElement('div');
-        view.id = 'start-all-apps-view';
-        view.className = 'start-all-apps-view hidden';
-        view.innerHTML = `
-            <div class="start-all-apps-header">
-                <span id="start-all-apps-title">${t('start.all-apps')}</span>
-                <button class="start-all-apps-back" id="start-all-apps-back" type="button">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Chevron Left.svg" alt="">
-                    <span id="start-all-apps-back-text">${t('start.pinned')}</span>
-                </button>
-            </div>
-            <div class="start-all-apps-list" id="start-all-apps-list"></div>
-        `;
-        const footer = this.element.querySelector('.start-footer');
-        this.element.insertBefore(view, footer);
-        view.querySelector('#start-all-apps-back')?.addEventListener('click', () => this.showHomeView());
-        return view;
-    },
-
-    ensureSearchResultsView() {
-        if (this.searchResultsContainer && document.body.contains(this.searchResultsContainer)) return this.searchResultsContainer;
-        const section = document.createElement('div');
-        section.id = 'start-search-results-view';
-        section.className = 'start-search-results-view hidden';
-        section.innerHTML = `<div class="start-all-apps-list" id="start-search-results-list"></div>`;
-        const footer = this.element.querySelector('.start-footer');
-        this.element.insertBefore(section, footer);
-        this.searchResultsContainer = section;
-        return section;
-    },
-
-    getHomeSections() {
-        return Array.from(this.element.querySelectorAll('.start-section'));
-    },
-
-    showHomeView() {
-        this.currentView = 'home';
-        this.isSearchMode = false;
-        const allAppsView = this.ensureAllAppsView();
-        const searchView = this.ensureSearchResultsView();
-        const wasOverlayView = this.element.classList.contains('start-all-apps-mode') ||
-            this.element.classList.contains('start-search-mode');
-        if (wasOverlayView) this.element.classList.add('start-returning-home');
-        if (!wasOverlayView) this.clearStartMenuSyncedHeight();
-        this.getHomeSections().forEach(section => section.classList.remove('hidden'));
-        this.element.classList.remove('start-all-apps-mode', 'start-search-mode');
-        this.renderApps();
-        if (typeof this.renderRecentFiles === 'function') {
-            this.renderRecentFiles();
-        } else {
-            this.renderRecent();
-        }
-        setTimeout(() => {
-            if (this.currentView !== 'home') return;
-            allAppsView.classList.add('hidden');
-            searchView.classList.add('hidden');
-            this.element.classList.remove('start-returning-home');
-            this.clearStartMenuSyncedHeight();
-        }, 220);
-    },
-
-    showAllAppsView() {
-        this.currentView = 'allApps';
-        this.isSearchMode = false;
-        this.syncStartMenuHomeHeight();
-        this.getHomeSections().forEach(section => section.classList.remove('hidden'));
-        this.ensureSearchResultsView().classList.add('hidden');
-        const view = this.ensureAllAppsView();
-        view.classList.remove('hidden');
-        this.element.classList.remove('start-returning-home');
-        this.renderAllApps(true);
-        this.syncAllAppsListHeight();
-        void view.offsetHeight;
-        this.element.classList.remove('start-search-mode');
-        this.element.classList.add('start-all-apps-mode');
-        requestAnimationFrame(() => this.syncAllAppsListHeight());
-    },
-
-    enterSearchMode() {
-        this.currentView = 'search';
-        this.isSearchMode = true;
-        this.getHomeSections().forEach(section => section.classList.remove('hidden'));
-        this.ensureAllAppsView().classList.add('hidden');
-        const view = this.ensureSearchResultsView();
-        view.classList.remove('hidden');
-        this.element.classList.remove('start-returning-home');
-        this.renderSearchResults(this.searchInput.value || '');
-        void view.offsetHeight;
-        this.element.classList.remove('start-all-apps-mode');
-        this.element.classList.add('start-search-mode');
-    },
-
-    renderAllApps(resetScroll = false) {
-        const list = this.ensureAllAppsView().querySelector('#start-all-apps-list');
-        if (!list) return;
-        const scrollTop = list.scrollTop;
-        list.innerHTML = this.renderAppList(this.getAllAppsSorted(), true);
-        list.scrollTop = resetScroll ? 0 : scrollTop;
-        if (this.currentView === 'allApps') this.syncAllAppsListHeight();
-    },
-
-    renderSearchResults(query) {
-        const view = this.ensureSearchResultsView();
-        const list = view.querySelector('#start-search-results-list');
-        if (!list) return;
-        const q = String(query || '').trim().toLowerCase();
-        const apps = this.getAllAppsSorted().filter(app => {
-            const name = Desktop.getAppName(app).toLowerCase();
-            return !q || name.includes(q) || String(app.id || '').toLowerCase().includes(q);
-        });
-        list.innerHTML = this.renderAppList(apps, false);
-    },
-
-    syncStartMenuHomeHeight() {
-        if (!this.element || this.element.classList.contains('hidden')) return;
-        this.clearStartMenuSyncedHeight();
-        const height = Math.ceil(this.element.getBoundingClientRect().height);
-        if (height > 0) {
-            this.element.style.height = `${height}px`;
-            this.element.style.setProperty('--start-menu-synced-height', `${height}px`);
-        }
-    },
-
-    clearStartMenuSyncedHeight() {
-        if (!this.element) return;
-        this.element.style.height = '';
-        this.element.style.removeProperty('--start-menu-synced-height');
-        this.element.style.removeProperty('--start-apps-list-height');
-    },
-
-    getOuterHeight(el) {
-        if (!(el instanceof HTMLElement)) return 0;
-        const styles = window.getComputedStyle(el);
-        return el.offsetHeight +
-            (parseFloat(styles.marginTop) || 0) +
-            (parseFloat(styles.marginBottom) || 0);
-    },
-
-    syncAllAppsListHeight() {
-        if (!this.element || this.currentView !== 'allApps') return;
-        const view = this.ensureAllAppsView();
-        const list = view.querySelector('#start-all-apps-list');
-        const header = view.querySelector('.start-all-apps-header');
-        if (!list || !header) return;
-        const menuStyles = window.getComputedStyle(this.element);
-        const viewStyles = window.getComputedStyle(view);
-        const menuHeight = this.element.getBoundingClientRect().height;
-        const verticalPadding = (parseFloat(menuStyles.paddingTop) || 0) + (parseFloat(menuStyles.paddingBottom) || 0);
-        const viewMargins = (parseFloat(viewStyles.marginTop) || 0) + (parseFloat(viewStyles.marginBottom) || 0);
-        const searchHeight = this.getOuterHeight(this.searchContainer);
-        const headerHeight = this.getOuterHeight(header);
-        const available = Math.floor(menuHeight - verticalPadding - viewMargins - searchHeight - headerHeight);
-        const listHeight = Math.max(180, available);
-        this.element.style.setProperty('--start-apps-list-height', `${listHeight}px`);
-    },
-
-    renderAppList(apps, grouped = true) {
-        if (!apps || apps.length === 0) {
-            return `<div class="start-empty">${t('start.no-results')}</div>`;
-        }
-        let lastGroup = '';
-        return apps.map(app => {
-            const name = Desktop.getAppName(app);
-            const group = this.getAppGroupKey(app);
-            const header = grouped && group !== lastGroup
-                ? `<div class="start-app-group">${group}</div>`
-                : '';
-            lastGroup = group;
-            return `
-                ${header}
-                <div class="start-all-app-row start-app" data-app-id="${app.id}">
-                    <img src="${app.icon}" alt="${name}">
-                    <span>${name}</span>
-                </div>
-            `;
-        }).join('');
     },
 
     bindEvents() {
@@ -439,19 +153,9 @@ const StartMenu = {
         });
 
         // 搜索功能
-        this.searchInput.addEventListener('focus', () => {
-            this.enterSearchMode();
-        });
-
         this.searchInput.addEventListener('input', (e) => {
-            this.enterSearchMode();
-            this.renderSearchResults(e.target.value || '');
-        });
-
-        window.addEventListener('resize', () => {
-            if (this.isOpen && this.currentView === 'allApps') {
-                this.syncAllAppsListHeight();
-            }
+            const query = e.target.value.toLowerCase();
+            this.filterApps(query);
         });
 
         // 电源按钮 - 左键
@@ -516,29 +220,6 @@ const StartMenu = {
         });
 
         // 点击外部关闭
-        this.element.addEventListener('click', (e) => {
-            const appEl = e.target.closest('.start-all-app-row');
-            if (!appEl || this.appsGrid.contains(appEl)) return;
-            const appId = appEl.dataset.appId;
-            if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId)) {
-                FluentUI.Toast({
-                    title: t('start.ctx.app-repairing'),
-                    message: t('start.ctx.app-repairing-msg'),
-                    type: 'warning'
-                });
-                return;
-            }
-            WindowManager.openApp(appId);
-            this.close();
-        });
-
-        this.element.addEventListener('contextmenu', (e) => {
-            const app = e.target.closest('.start-all-app-row');
-            if (!app || this.appsGrid.contains(app)) return;
-            e.preventDefault();
-            this.showAppContextMenu(e, app.dataset.appId);
-        });
-
         document.addEventListener('click', (e) => {
             if (!this.element.contains(e.target) &&
                 !e.target.closest('#start-btn')) {
@@ -747,7 +428,7 @@ const StartMenu = {
         this.element.classList.remove('hidden');
         this.element.classList.remove('closing');
         this.isOpen = true;
-        this.showHomeView();
+        this.searchInput.focus();
 
         // 切换开始按钮图标为fill - Switch start button icon to fill
         const startBtn = document.getElementById('start-btn');
@@ -778,8 +459,7 @@ const StartMenu = {
 
         this.isOpen = false;
         this.searchInput.value = '';
-        this.searchInput.blur();
-        this.showHomeView();
+        this.filterApps('');
 
         // 切换开始按钮图标回stroke - Switch start button icon back to stroke
         const startBtn = document.getElementById('start-btn');
@@ -868,14 +548,13 @@ const StartMenu = {
     },
 
     // 系统内置应用列表（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'media'],
     
     showAppContextMenu(event, appId) {
         const app = Desktop.apps.find(a => a.id === appId);
         if (!app) return;
 
-        const isTaskbarPinned = (State.settings.pinnedApps || []).includes(appId);
-        const isStartPinned = this.isStartPinned(appId);
+        const isPinned = (State.settings.pinnedApps || []).includes(appId);
         const isSystemApp = this.systemApps.includes(appId);
         const isPWA = app.isPWA === true;
         const isRepairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId);
@@ -899,18 +578,18 @@ const StartMenu = {
             </div>
         `;
 
-        if (isStartPinned) {
+        if (isPinned) {
             menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="unpin-start" data-app-id="${appId}">
+                <div class="context-menu-item${disabledClass}" data-action="unpin" data-app-id="${appId}">
                     <img src="Theme/Icon/Symbol_icon/fill/Pin.svg" alt="">
-                    <span>${t('start.ctx.unpin-start')}</span>
+                    <span>${t('start.ctx.unpin')}</span>
                 </div>
             `;
         } else {
             menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="pin-start" data-app-id="${appId}">
+                <div class="context-menu-item${disabledClass}" data-action="pin" data-app-id="${appId}">
                     <img src="Theme/Icon/Symbol_icon/stroke/Pin.svg" alt="">
-                    <span>${t('start.ctx.pin-start')}</span>
+                    <span>${t('start.ctx.pin')}</span>
                 </div>
             `;
         }
@@ -918,28 +597,8 @@ const StartMenu = {
         // 分隔线
         menuHTML += `<div class="context-menu-separator"></div>`;
         
-        if (isTaskbarPinned) {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="unpin-taskbar" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/fill/Pin.svg" alt="">
-                    <span>${t('start.ctx.unpin-taskbar')}</span>
-                </div>
-            `;
-        } else {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="pin-taskbar" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Pin.svg" alt="">
-                    <span>${t('start.ctx.pin-taskbar')}</span>
-                </div>
-            `;
-        }
-
         const uninstallDisabled = (isSystemApp || isRepairing) ? ' disabled' : '';
         menuHTML += `
-            <div class="context-menu-item${disabledClass}" data-action="settings" data-app-id="${appId}">
-                <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="">
-                <span>${t('start.ctx.app-settings')}</span>
-            </div>
             <div class="context-menu-item${uninstallDisabled}" data-action="uninstall" data-app-id="${appId}">
                 <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
                 <span>${t('start.ctx.uninstall')}</span>
@@ -972,16 +631,6 @@ const StartMenu = {
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
     },
 
-    openAppSettings(appId) {
-        const app = Desktop.apps.find(a => a.id === appId);
-        if (!app) return;
-        WindowManager.openApp('settings', { page: 'app-detail', appId });
-        if (typeof SettingsApp !== 'undefined' && typeof SettingsApp.openData === 'function') {
-            setTimeout(() => SettingsApp.openData({ page: 'app-detail', appId }), 0);
-        }
-        this.close();
-    },
-
     handleAppContextMenuAction(action, appId) {
         switch (action) {
             case 'open':
@@ -994,20 +643,11 @@ const StartMenu = {
                 }
                 this.close();
                 break;
-            case 'pin-start':
-                this.pinToStart(appId);
-                break;
-            case 'unpin-start':
-                this.unpinFromStart(appId);
-                break;
-            case 'pin-taskbar':
+            case 'pin':
                 Taskbar.pinApp(appId);
                 break;
-            case 'unpin-taskbar':
+            case 'unpin':
                 Taskbar.unpinApp(appId);
-                break;
-            case 'settings':
-                this.openAppSettings(appId);
                 break;
             case 'uninstall': {
                 const targetApp = Desktop.apps.find(a => a.id === appId);

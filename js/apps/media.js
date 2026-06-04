@@ -23,7 +23,6 @@ const MediaApp = {
     playerExpanded: false,
     expandTransitionTimer: null,
     collapseShrinkTimer: null,
-    responsiveResizeObserver: null,
     _rateClickAwayHandler: null,
     _languageListenerBound: false,
     _langHandler: null,
@@ -76,10 +75,6 @@ const MediaApp = {
         const media = this.mediaElement;
         if (media) media.pause();
         this.stopProgressLoop();
-        if (this.responsiveResizeObserver) {
-            this.responsiveResizeObserver.disconnect();
-            this.responsiveResizeObserver = null;
-        }
         this.revokeObjectUrls();
     },
 
@@ -302,7 +297,6 @@ const MediaApp = {
                 </footer>
             </div>
         `;
-        this.observeResponsiveShell();
         this.applyFluentScrollAreas();
         this.attachReusableAudio(preservedAudio);
         this.bindEvents();
@@ -393,6 +387,11 @@ const MediaApp = {
                     <div>
                         <p>${this.localText('library')}</p>
                         <h1>${this.localText('library')}</h1>
+                    </div>
+                    <div class="media-filter-group">
+                        ${this.renderFilterButton('library', this.localText('all'))}
+                        ${this.renderFilterButton('music', this.localText('audio'))}
+                        ${this.renderFilterButton('video', this.localText('video'))}
                     </div>
                 </div>
                 ${current?.type === 'video' ? `<div class="media-video-shell">${this.renderVideoStage(current)}</div>` : ''}
@@ -1018,29 +1017,6 @@ const MediaApp = {
             className: 'media-main-scroll'
         });
         main.appendChild(scrollArea);
-    },
-
-    observeResponsiveShell() {
-        if (this.responsiveResizeObserver) {
-            this.responsiveResizeObserver.disconnect();
-            this.responsiveResizeObserver = null;
-        }
-        const app = this.container?.querySelector('.media-app');
-        if (!app) return;
-        const update = () => this.updateResponsiveShellClass(app);
-        update();
-        if (typeof ResizeObserver !== 'undefined') {
-            this.responsiveResizeObserver = new ResizeObserver(update);
-            this.responsiveResizeObserver.observe(app);
-        } else {
-            window.requestAnimationFrame(update);
-        }
-    },
-
-    updateResponsiveShellClass(app = this.container?.querySelector('.media-app')) {
-        if (!app) return;
-        const width = app.getBoundingClientRect().width || app.clientWidth || 0;
-        app.classList.toggle('media-compact-width', width > 0 && width <= 900);
     },
 
     bindEvents() {
@@ -5572,45 +5548,6 @@ const MediaApp = {
                     width: min(760px, calc(100% - 68px - 36px)) !important;
                     transform: translateX(-50%) !important;
                 }
-            }
-            .media-app.sidebar-collapsed,
-            .media-app.media-compact-width,
-            body.fluent-v2 .media-app.sidebar-collapsed,
-            body.fluent-v2 .media-app.media-compact-width,
-            body:not(.fluent-v2) .media-app.sidebar-collapsed,
-            body:not(.fluent-v2) .media-app.media-compact-width {
-                --media-sidebar-width: 68px !important;
-                grid-template-columns: var(--media-sidebar-width) minmax(0, 1fr) !important;
-            }
-            .media-app.sidebar-collapsed .media-main,
-            .media-app.media-compact-width .media-main {
-                grid-column: 2 !important;
-                width: 100% !important;
-                min-width: 0 !important;
-            }
-            .media-app.sidebar-collapsed .media-sidebar,
-            .media-app.media-compact-width .media-sidebar,
-            body.fluent-v2 .media-app.sidebar-collapsed .media-sidebar,
-            body.fluent-v2 .media-app.media-compact-width .media-sidebar,
-            body:not(.fluent-v2) .media-app.sidebar-collapsed .media-sidebar,
-            body:not(.fluent-v2) .media-app.media-compact-width .media-sidebar {
-                width: 68px !important;
-                min-width: 68px !important;
-                max-width: 68px !important;
-            }
-            .media-app.sidebar-collapsed .media-player-bar,
-            .media-app.media-compact-width .media-player-bar,
-            body.fluent-v2 .media-app.sidebar-collapsed .media-player-bar,
-            body.fluent-v2 .media-app.media-compact-width .media-player-bar,
-            body:not(.fluent-v2) .media-app.sidebar-collapsed .media-player-bar,
-            body:not(.fluent-v2) .media-app.media-compact-width .media-player-bar {
-                left: calc(var(--media-sidebar-width) + ((100% - var(--media-sidebar-width)) / 2)) !important;
-                width: min(760px, calc(100% - var(--media-sidebar-width) - 36px)) !important;
-                transform: translateX(-50%) !important;
-            }
-            .media-app.media-compact-width .media-main-scroll .fluent-scroll-viewport {
-                padding-left: 34px !important;
-                padding-right: 30px !important;
             }
             body.fluent-v2.window-blur-disabled .window[data-app-id="media"],
             body.fluent-v2.window-blur-disabled .window[data-app-id="media"] .window-content,
