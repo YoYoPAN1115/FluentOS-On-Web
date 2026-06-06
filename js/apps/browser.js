@@ -738,6 +738,8 @@ const BrowserApp = {
 
             body.fluent-v2 .window[data-app-id="browser"] {
                 --browser-float-radius: var(--radius-xl);
+                border-radius: var(--browser-float-radius);
+                overflow: hidden;
             }
 
             body.fluent-v2 .window[data-app-id="browser"] .browser-app {

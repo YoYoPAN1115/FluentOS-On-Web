@@ -11,6 +11,7 @@ const AppShop = {
     container: null,
     searchQuery: '',
     currentCategory: 'all',
+    _contentScrollRestoreRaf: null,
     
     // 应用数据（可从应用商店安装）
     apps: [
@@ -302,10 +303,14 @@ const AppShop = {
         
         // 监听语言和主题变化
         State.on('languageChange', () => this.render());
-        State.on('settingsChange', () => this.render());
+        State.on('settingsChange', () => this.render({ preserveScroll: true }));
     },
 
-    render() {
+    render(options = {}) {
+        const preserveScroll = options.preserveScroll === true;
+        const previousScrollTop = preserveScroll
+            ? (this.container?.querySelector('.appshop-content')?.scrollTop || 0)
+            : 0;
         const featuredApps = this.apps.filter(app => app.featured);
         const bannerApp = this.apps.find(app => app.banner);
         const categories = this.getCategories();
@@ -418,6 +423,19 @@ const AppShop = {
         `;
 
         this.bindEvents();
+
+        if (preserveScroll && previousScrollTop > 0) {
+            if (this._contentScrollRestoreRaf) {
+                cancelAnimationFrame(this._contentScrollRestoreRaf);
+            }
+            this._contentScrollRestoreRaf = requestAnimationFrame(() => {
+                const content = this.container?.querySelector('.appshop-content');
+                if (!content) return;
+                const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
+                content.scrollTop = Math.min(previousScrollTop, maxScroll);
+                this._contentScrollRestoreRaf = null;
+            });
+        }
     },
 
     // 只更新应用列表（不重新渲染搜索框）
@@ -618,7 +636,7 @@ const AppShop = {
                 });
                 
                 // 刷新当前视图
-                this.render();
+                this.updateAppsList();
             }, remaining);
         };
         script.onerror = () => {

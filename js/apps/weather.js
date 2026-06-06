@@ -115,9 +115,9 @@ const WeatherApp = {
             .weather-app > .fluent-sidebar {
                 display: flex !important;
                 flex-direction: column !important;
-                flex: 0 0 200px !important;
-                width: 200px !important;
-                min-width: 200px !important;
+                flex: 0 0 var(--system-sidebar-width, 200px) !important;
+                width: var(--system-sidebar-width, 200px) !important;
+                min-width: var(--system-sidebar-width, 200px) !important;
                 min-height: 0 !important;
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
@@ -174,6 +174,52 @@ const WeatherApp = {
             .weather-app *::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 3px; }
             .weather-app *::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
             .weather-app * { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
+            @container (max-width: 760px) {
+                .weather-app {
+                    --system-sidebar-width: 68px;
+                }
+                .weather-app > .fluent-sidebar {
+                    width: 68px !important;
+                    min-width: 68px !important;
+                    flex-basis: 68px !important;
+                    padding: 10px 6px !important;
+                    margin: 8px 0 8px 8px !important;
+                    border-radius: 12px !important;
+                }
+                .weather-app > .fluent-sidebar .fluent-sidebar-header {
+                    opacity: 0 !important;
+                    max-height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                    pointer-events: none !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                }
+                .weather-app > .fluent-sidebar .fluent-sidebar-item {
+                    flex: 0 0 44px !important;
+                    height: 44px !important;
+                    min-height: 44px !important;
+                    max-height: 44px !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    gap: 0 !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                    font-size: 0 !important;
+                }
+                .weather-app > .fluent-sidebar .fluent-sidebar-item-label {
+                    opacity: 0 !important;
+                    max-width: 0 !important;
+                    margin: 0 !important;
+                    overflow: hidden !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                    pointer-events: none !important;
+                }
+                .weather-app > .fluent-sidebar .fluent-sidebar-item-icon {
+                    margin: 0 !important;
+                    flex: 0 0 auto !important;
+                }
+            }
         `;
         document.head.appendChild(style);
     },

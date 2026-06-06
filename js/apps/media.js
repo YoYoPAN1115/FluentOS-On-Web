@@ -5640,6 +5640,11 @@ const MediaApp = {
                 backdrop-filter: none !important;
                 -webkit-backdrop-filter: none !important;
             }
+            body.fluent-v2 .media-sidebar,
+            body.fluent-v2.window-blur-disabled .media-sidebar {
+                border: none !important;
+                box-shadow: none !important;
+            }
             body.fluent-v2.window-blur-disabled .media-library-panel,
             body.fluent-v2.window-blur-disabled .media-import-empty-card,
             body.fluent-v2.window-blur-disabled .media-rate-button,
