@@ -1,0 +1,828 @@
+﻿/**
+ * Fingo AI Assistant - Complete UI Stylesheet
+ * ============================================
+ * Structure:
+ *   1. Rainbow blur layer (colorful background glow)
+ *   2. Panel positioning & open/close animations
+ *   3. Glass card (independent acrylic implementation)
+ *   4. Header toolbar
+ *   5. History sidebar
+ *   6. Scrollbar styling
+ *   7. Messages area
+ *   8. Input area with rainbow glow border
+ *   9. Empty state (floating search bar mode)
+ *  10. Taskbar button toggle
+ *  11. Keyframe animations
+ */
+
+/* ==========================================================
+   1. Rainbow Blur Layer - Floating color band above taskbar
+   ========================================================== */
+/* Fingo 彩虹模糊层，在窗口上方但在任务栏下方 - Rainbow blur layer, above windows but below taskbar */
+#fingo-blur-layer {
+    position: fixed;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 60px;
+    z-index: 9500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    overflow: visible;
+}
+
+#fingo-blur-layer.fingo-visible {
+    opacity: 1;
+}
+
+.blur-disabled #fingo-blur-layer {
+    display: none;
+}
+
+#fingo-blur-layer::before {
+    content: '';
+    position: absolute;
+    inset: -30px -40px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 50, 80, 0.45) 10%,
+        rgba(255, 160, 30, 0.5) 25%,
+        rgba(255, 240, 50, 0.4) 35%,
+        rgba(50, 220, 100, 0.45) 48%,
+        rgba(30, 140, 255, 0.5) 62%,
+        rgba(130, 60, 255, 0.5) 78%,
+        rgba(240, 50, 180, 0.4) 90%,
+        transparent 100%
+    );
+    filter: blur(35px);
+    animation: fingoFlow1 12s ease-in-out infinite alternate;
+}
+
+#fingo-blur-layer::after {
+    content: '';
+    position: absolute;
+    inset: -20px -30px;
+    background: linear-gradient(90deg,
+        transparent 5%,
+        rgba(130, 60, 255, 0.3) 20%,
+        rgba(30, 170, 255, 0.35) 40%,
+        rgba(50, 220, 80, 0.3) 55%,
+        rgba(255, 200, 50, 0.3) 70%,
+        rgba(255, 80, 60, 0.35) 85%,
+        transparent 95%
+    );
+    filter: blur(28px);
+    animation: fingoFlow2 15s ease-in-out infinite alternate-reverse;
+}
+
+/* ==========================================================
+   2. Panel Positioning & Open/Close Animations
+   --------------------------------------------------
+   CRITICAL: #fingo-panel must NOT use `transform` for centering.
+   Any non-none `transform` on a parent element breaks
+   `backdrop-filter` on children — the blur can only see the
+   parent's own (transparent) background instead of the real
+   content behind it.  Use left:0;right:0;margin:auto instead.
+   ========================================================== */
+/* Fingo 面板，在任务栏上方 - Fingo panel, above taskbar */
+#fingo-panel {
+    position: fixed;
+    bottom: 73px;
+    left: 0;
+    right: 0;
+    width: 400px;
+    max-height: 520px;
+    margin: 0 auto;
+    z-index: 10200;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    border: none;
+    background: transparent;
+    overflow: visible;
+}
+
+/*
+ * IMPORTANT: animation is on #fingo-panel (the transparent wrapper),
+ * NOT on .fingo-content. Applying `transform` via animation on the
+ * element that has `backdrop-filter` breaks the blur — even
+ * `transform: translateY(0) scale(1)` creates a new compositing
+ * context that prevents backdrop-filter from seeing through.
+ *
+ * We use fill-mode `none` (not `both`/`forwards`) so that after
+ * the animation finishes, the computed `transform` reverts to `none`.
+ * If it stayed as `translateY(0) scale(1)` via forwards-fill, the
+ * child's backdrop-filter would remain broken permanently.
+ */
+body.animations-enabled #fingo-panel:not(.hidden) {
+    animation: fingoOpen 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+    animation-fill-mode: none;
+}
+
+body.animations-enabled #fingo-panel.fingo-closing {
+    animation: fingoClose 0.22s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+/* ==========================================================
+   3. Glass Card - Acrylic / Gaussian Blur
+   --------------------------------------------------
+   Mirrors the notification-center approach exactly:
+     background: var(--bg-secondary)   => rgba(255,255,255,0.7)
+     backdrop-filter: blur(--blur-lg)  => blur(16px) saturate(150%)
+   The parent #fingo-panel has NO transform, so
+   backdrop-filter can see through to the real wallpaper.
+   ========================================================== */
+.fingo-content {
+    --fingo-glass-radius: 16px;
+
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    max-height: 520px;
+    padding: 0;
+
+    /* Identical to notification-center: */
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+
+    border-radius: var(--fingo-glass-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+    opacity: 1;
+    transform-origin: bottom center;
+    transition:
+        background 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        backdrop-filter 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    overflow: hidden;
+}
+
+.fingo-content.fingo-expanding {
+    animation: fingoCardExpand 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fingo-content.fingo-collapsing {
+    animation: fingoCardCollapse 0.36s cubic-bezier(0.55, 0, 0.8, 0.2);
+}
+
+.blur-disabled .fingo-content {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .fingo-content {
+    background: rgba(32, 32, 32, 0.92);
+}
+
+/* Subtle inner highlight along the top edge */
+.fingo-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 8px;
+    right: 8px;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.5) 30%,
+        rgba(255, 255, 255, 0.7) 50%,
+        rgba(255, 255, 255, 0.5) 70%,
+        transparent
+    );
+    z-index: 2;
+    pointer-events: none;
+    border-radius: var(--fingo-glass-radius) var(--fingo-glass-radius) 0 0;
+}
+
+.dark-mode .fingo-content::before {
+    background: linear-gradient(90deg,
+        transparent,
+        rgba(255, 255, 255, 0.08) 30%,
+        rgba(255, 255, 255, 0.12) 50%,
+        rgba(255, 255, 255, 0.08) 70%,
+        transparent
+    );
+}
+
+/* ==========================================================
+   4. Empty State - Collapse card, show only floating input
+   ========================================================== */
+.fingo-content.fingo-empty {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: visible;
+}
+
+.fingo-content.fingo-empty::before {
+    display: none;
+}
+
+.fingo-content.fingo-empty .fingo-header,
+.fingo-content.fingo-empty .fingo-history,
+.fingo-content.fingo-empty #fingo-messages,
+.fingo-content.fingo-empty #oobe-fingo-messages {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+    pointer-events: none;
+    transform: translateY(-10px);
+    transition:
+        opacity 0.26s cubic-bezier(0.4, 0, 1, 1),
+        max-height 0.42s cubic-bezier(0.55, 0, 0.8, 0.2),
+        padding 0.34s cubic-bezier(0.55, 0, 0.8, 0.2),
+        margin 0.34s cubic-bezier(0.55, 0, 0.8, 0.2),
+        transform 0.34s cubic-bezier(0.55, 0, 0.8, 0.2);
+}
+
+.fingo-content:not(.fingo-empty) .fingo-header,
+.fingo-content:not(.fingo-empty) #fingo-messages,
+.fingo-content:not(.fingo-empty) #oobe-fingo-messages {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        opacity 0.44s cubic-bezier(0.22, 1, 0.36, 1) 0.04s,
+        max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+        margin 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.08);
+}
+
+/* Floating bob animation when empty */
+.fingo-content.fingo-empty .fingo-input-wrap {
+    animation: fingoBob 3.5s ease-in-out infinite;
+}
+
+/* ==========================================================
+   5. Header Toolbar
+   ========================================================== */
+.fingo-header {
+    padding: 12px 18px 6px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    max-height: 64px;
+    overflow: hidden;
+}
+
+.fingo-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.fingo-header-left img {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.fingo-header-left span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.dark-mode .fingo-header-left span {
+    color: #e8e8e8;
+}
+
+.fingo-toolbar {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.fingo-toolbar button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: opacity 0.2s ease, background 0.2s ease;
+    padding: 0;
+}
+
+.fingo-toolbar button:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.dark-mode .fingo-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.fingo-toolbar button:active {
+    opacity: 0.8;
+    transform: scale(0.92);
+}
+
+.fingo-toolbar button img {
+    width: 15px;
+    height: 15px;
+}
+
+/* ==========================================================
+   6. History Sidebar
+   ========================================================== */
+.fingo-history {
+    display: block;
+    max-height: 0;
+    opacity: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 0 18px;
+    border-bottom: 1px solid transparent;
+    pointer-events: none;
+    transform: translateY(-8px);
+    transform-origin: top center;
+    transition:
+        max-height 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.3s cubic-bezier(0.33, 1, 0.68, 1),
+        padding 0.44s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.48s cubic-bezier(0.2, 0.9, 0.25, 1.08),
+        border-color 0.24s ease;
+}
+
+.fingo-history::-webkit-scrollbar {
+    display: none;
+}
+
+.fingo-history.show {
+    max-height: 200px;
+    opacity: 1;
+    padding: 4px 18px 8px;
+    pointer-events: auto;
+    transform: translateY(0);
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+.dark-mode .fingo-history.show {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.fingo-history-item {
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #555;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s ease;
+}
+
+.fingo-history-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .fingo-history-item {
+    color: #bbb;
+}
+
+.dark-mode .fingo-history-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.fingo-history-empty {
+    font-size: 12px;
+    color: #999;
+    padding: 10px;
+    text-align: center;
+}
+
+/* ==========================================================
+   7. Scrollbar Styling (messages & history)
+   ========================================================== */
+#fingo-messages,
+#oobe-fingo-messages,
+.fingo-history {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+#fingo-messages:hover,
+#oobe-fingo-messages:hover,
+.fingo-history:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.dark-mode #fingo-messages:hover,
+.dark-mode #oobe-fingo-messages:hover,
+.dark-mode .fingo-history:hover {
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+#fingo-messages::-webkit-scrollbar,
+#oobe-fingo-messages::-webkit-scrollbar,
+.fingo-history::-webkit-scrollbar {
+    width: 4px;
+}
+
+#fingo-messages::-webkit-scrollbar-track,
+#oobe-fingo-messages::-webkit-scrollbar-track,
+.fingo-history::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#fingo-messages::-webkit-scrollbar-thumb,
+#oobe-fingo-messages::-webkit-scrollbar-thumb,
+.fingo-history::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+#fingo-messages:hover::-webkit-scrollbar-thumb,
+#oobe-fingo-messages:hover::-webkit-scrollbar-thumb,
+.fingo-history:hover::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.dark-mode #fingo-messages:hover::-webkit-scrollbar-thumb,
+.dark-mode #oobe-fingo-messages:hover::-webkit-scrollbar-thumb,
+.dark-mode .fingo-history:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* ==========================================================
+   8. Messages Area
+   ========================================================== */
+#fingo-messages,
+#oobe-fingo-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 18px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    min-height: 40px;
+}
+
+.fingo-msg {
+    padding: 9px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 85%;
+    word-wrap: break-word;
+    animation: fingoMsgIn 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.fingo-msg-user {
+    align-self: flex-end;
+    background: var(--accent-color, #0078d4);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
+
+.fingo-msg-bot {
+    align-self: flex-start;
+    background: rgba(0, 0, 0, 0.055);
+    color: #1a1a1a;
+    border-bottom-left-radius: 4px;
+}
+
+.dark-mode .fingo-msg-bot {
+    background: rgba(255, 255, 255, 0.09);
+    color: #e4e4e4;
+}
+
+.fingo-msg-text {
+    word-break: break-word;
+}
+
+.fingo-msg-copyable {
+    position: relative;
+    padding-right: 40px;
+}
+
+.fingo-copy-btn {
+    position: absolute;
+    right: 8px;
+    bottom: 6px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+
+.fingo-copy-btn img {
+    width: 14px;
+    height: 14px;
+    display: block;
+    pointer-events: none;
+}
+
+.fingo-msg-copyable:hover .fingo-copy-btn,
+.fingo-copy-btn:focus-visible,
+.fingo-copy-btn.copied,
+.fingo-copy-btn.copy-failed {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.fingo-copy-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.dark-mode .fingo-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.fingo-copy-btn:focus-visible {
+    outline: 1px solid rgba(0, 120, 212, 0.55);
+    outline-offset: 1px;
+}
+
+.fingo-copy-btn.copied {
+    animation: fingoCopyTap 0.22s ease;
+}
+
+.fingo-copy-btn.copy-failed {
+    animation: fingoCopyShake 0.22s ease;
+}
+
+/* ==========================================================
+   9. Input Area with Rainbow Glow Border
+   ========================================================== */
+.fingo-input-wrap {
+    padding: 10px 14px 14px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.fingo-input-glow {
+    position: relative;
+    border-radius: 14px;
+    padding: 2px;
+    /* Animated rainbow gradient border */
+    background: linear-gradient(90deg,
+        rgba(255, 50, 80, 0.35),
+        rgba(255, 160, 30, 0.35),
+        rgba(255, 240, 50, 0.25),
+        rgba(50, 220, 100, 0.25),
+        rgba(30, 140, 255, 0.35),
+        rgba(130, 60, 255, 0.3),
+        rgba(240, 50, 180, 0.25),
+        rgba(255, 50, 80, 0.35)
+    );
+    background-size: 200% 100%;
+    animation: fingoGlowSlide 8s linear infinite;
+    transition: box-shadow 0.3s ease;
+}
+
+.fingo-input-glow:focus-within {
+    box-shadow:
+        0 0 16px rgba(130, 60, 255, 0.25),
+        0 0 36px rgba(30, 170, 255, 0.12);
+}
+
+#fingo-input,
+#oobe-fingo-input {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.04);
+    font-size: 14px;
+    color: #1a1a1a;
+    outline: none;
+    box-sizing: border-box;
+    transition: background 0.2s ease;
+}
+
+#fingo-input::placeholder,
+#oobe-fingo-input::placeholder {
+    color: #999;
+}
+
+.dark-mode #fingo-input,
+.dark-mode #oobe-fingo-input {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e4e4e4;
+}
+
+.dark-mode #fingo-input::placeholder,
+.dark-mode #oobe-fingo-input::placeholder {
+    color: #777;
+}
+
+/* ==========================================================
+   10. Empty State - Floating Acrylic Search Bar
+   --------------------------------------------------
+   Same approach: use system CSS vars for glass effect.
+   ========================================================== */
+.fingo-content.fingo-empty .fingo-input-glow {
+    /* Override: standalone acrylic glass card — same as notification-center */
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-color);
+    border-radius: var(--fingo-glass-radius, 16px);
+    padding: 0;
+    animation: none; /* disable gradient slide */
+}
+
+/* Rainbow glow ring behind the floating input */
+.fingo-content.fingo-empty .fingo-input-glow::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: calc(var(--fingo-glass-radius, 16px) + 3px);
+    background: linear-gradient(90deg,
+        rgba(255, 50, 80, 0.35),
+        rgba(255, 160, 30, 0.35),
+        rgba(255, 240, 50, 0.25),
+        rgba(50, 220, 100, 0.25),
+        rgba(30, 140, 255, 0.35),
+        rgba(130, 60, 255, 0.3),
+        rgba(240, 50, 180, 0.25),
+        rgba(255, 50, 80, 0.35)
+    );
+    background-size: 200% 100%;
+    animation: fingoGlowSlide 8s linear infinite;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.fingo-content.fingo-empty #fingo-input,
+.fingo-content.fingo-empty #oobe-fingo-input {
+    background: transparent !important;
+    border-radius: calc(var(--fingo-glass-radius, 16px) - 1px);
+}
+
+.blur-disabled .fingo-content.fingo-empty .fingo-input-glow {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255, 255, 255, 0.95);
+}
+
+.dark-mode.blur-disabled .fingo-content.fingo-empty .fingo-input-glow {
+    background: rgba(32, 32, 32, 0.92);
+}
+
+/* ==========================================================
+   11. Taskbar Button Icon Toggle
+   ========================================================== */
+#fingo-btn .icon-stroke,
+#fingo-btn.active .icon-fill {
+    display: inline;
+}
+
+#fingo-btn .icon-fill,
+#fingo-btn.active .icon-stroke {
+    display: none;
+}
+
+/* ==========================================================
+   12. Keyframe Animations
+   ========================================================== */
+
+/* Rainbow blur layer flow */
+@keyframes fingoFlow1 {
+    0%   { transform: translateX(-25px); filter: blur(35px) hue-rotate(0deg); }
+    33%  { transform: translateX(15px);  filter: blur(38px) hue-rotate(40deg); }
+    66%  { transform: translateX(-10px); filter: blur(32px) hue-rotate(-30deg); }
+    100% { transform: translateX(25px);  filter: blur(36px) hue-rotate(60deg); }
+}
+
+@keyframes fingoFlow2 {
+    0%   { transform: translateX(20px);  filter: blur(28px) hue-rotate(0deg); }
+    50%  { transform: translateX(-20px); filter: blur(30px) hue-rotate(-50deg); }
+    100% { transform: translateX(15px);  filter: blur(26px) hue-rotate(45deg); }
+}
+
+/* Panel open/close — no translateX(-50%) needed since we use margin:auto */
+@keyframes fingoOpen {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes fingoClose {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(18px) scale(0.96);
+    }
+}
+
+/* Rainbow border slide */
+@keyframes fingoGlowSlide {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* Card unfold/fold for first-message and reset transitions */
+@keyframes fingoCardExpand {
+    0% {
+        opacity: 0.82;
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+    }
+    65% {
+        opacity: 1;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.2);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: var(--shadow-xl);
+    }
+}
+
+@keyframes fingoCardCollapse {
+    0% {
+        opacity: 1;
+        box-shadow: var(--shadow-xl);
+    }
+    100% {
+        opacity: 0.88;
+        box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+    }
+}
+
+/* Message entrance */
+@keyframes fingoMsgIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fingoCopyTap {
+    0% {
+        transform: scale(0.86);
+    }
+    70% {
+        transform: scale(1.08);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes fingoCopyShake {
+    0% {
+        transform: translateX(0);
+    }
+    30% {
+        transform: translateX(-2px);
+    }
+    70% {
+        transform: translateX(2px);
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+/* Floating bob for empty state */
+@keyframes fingoBob {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}

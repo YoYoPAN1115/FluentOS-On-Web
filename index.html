@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluent OS</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/fluent-ui.css">
+    <link rel="stylesheet" href="css/startmenu-new.css">
+    <link rel="stylesheet" href="css/notification-compact.css">
+    <link rel="stylesheet" href="css/apps-unified.css">
+    <link rel="stylesheet" href="css/lingyi.css">
+    <link rel="stylesheet" href="css/fingo.css">
+    <link rel="stylesheet" href="css/oobe.css">
+</head>
+<body>
+    <!-- 主容器 -->
+    <div id="app">
+        <!-- 开机屏幕 -->
+        <div id="boot-screen" class="screen">
+            <div class="boot-content">
+                <div class="boot-logo-wrapper">
+                    <img src="Theme/Icon/Fluent_logo.png" alt="Fluent OS" class="boot-logo">
+                </div>
+                <div class="boot-loading-ring">
+                    <svg viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3"/>
+                        <circle class="boot-ring-arc" cx="18" cy="18" r="14" fill="none" stroke="#0078d4" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- OOBE 首次引导 -->
+        <div id="oobe-screen" class="screen hidden">
+            <div class="oobe-background" id="oobe-background"></div>
+            <div class="oobe-background-mask"></div>
+            <div class="oobe-shell">
+                <div class="oobe-card" id="oobe-card">
+                    <div class="oobe-progress" id="oobe-progress">
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                        <span class="oobe-progress-dot"></span>
+                    </div>
+
+                    <!-- Step 0: Welcome animation -->
+                    <section class="oobe-step active" data-step="0">
+                        <div class="oobe-welcome-container">
+                            <img class="oobe-welcome-logo" id="oobe-welcome-logo" src="Theme/Icon/Fluent_logo.png" alt="Fluent OS">
+                            <div class="oobe-welcome-text" id="oobe-welcome-text"></div>
+                        </div>
+                        <div class="oobe-actions oobe-welcome-actions">
+                            <button class="oobe-btn oobe-btn-primary oobe-welcome-next hidden" id="oobe-next-0" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <!-- Step 1: Language selection -->
+                    <section class="oobe-step" data-step="1">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-desktop" data-preview-desktop="language">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <!-- Simple window showing language text -->
+                                <div class="oobe-lang-preview-window" id="oobe-lang-preview-window">
+                                    <div class="oobe-lang-preview-titlebar">
+                                        <div class="oobe-lang-preview-dots">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-lang-preview-body">
+                                        <span class="oobe-lang-preview-text" id="oobe-lang-preview-text">简体</span>
+                                    </div>
+                                </div>
+                                <div class="taskbar oobe-live-taskbar">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-language">欢迎使用 FluentOS</h1>
+                        <p id="oobe-subtitle-language">选择系统语言后再继续。</p>
+                        <div class="oobe-language-options" id="oobe-language-options">
+                            <button class="oobe-option-btn" data-lang="zh" type="button">
+                                <span class="oobe-option-title">简体中文</span>
+                                <span class="oobe-option-desc">推荐中文用户</span>
+                            </button>
+                            <button class="oobe-option-btn" data-lang="en" type="button">
+                                <span class="oobe-option-title">English</span>
+                                <span class="oobe-option-desc">For English users</span>
+                            </button>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-1" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary is-disabled" id="oobe-next-1" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <!-- Step 2: Theme selection with geometric start menu -->
+                    <section class="oobe-step" data-step="2">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-desktop oobe-theme-preview" data-preview-desktop="theme">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <!-- Geometric simplified start menu -->
+                                <div class="oobe-geo-start-menu">
+                                    <div class="oobe-geo-search"><span class="oobe-geo-bar"></span></div>
+                                    <div class="oobe-geo-section">
+                                        <div class="oobe-geo-label"><span class="oobe-geo-bar-sm"></span></div>
+                                        <div class="oobe-geo-grid">
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                            <div class="oobe-geo-app"><span class="oobe-geo-icon"></span><span class="oobe-geo-bar-xs"></span></div>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-geo-section">
+                                        <div class="oobe-geo-label"><span class="oobe-geo-bar-sm"></span></div>
+                                        <div class="oobe-geo-recent">
+                                            <div class="oobe-geo-recent-item">
+                                                <span class="oobe-geo-recent-icon"></span>
+                                                <div class="oobe-geo-recent-info"><span class="oobe-geo-recent-name"></span><span class="oobe-geo-recent-time"></span></div>
+                                            </div>
+                                            <div class="oobe-geo-recent-item">
+                                                <span class="oobe-geo-recent-icon"></span>
+                                                <div class="oobe-geo-recent-info"><span class="oobe-geo-recent-name"></span><span class="oobe-geo-recent-time"></span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-geo-footer">
+                                        <div class="oobe-geo-footer-btns">
+                                            <span class="oobe-geo-footer-btn"></span>
+                                            <span class="oobe-geo-footer-btn"></span>
+                                        </div>
+                                        <span class="oobe-geo-power"></span>
+                                    </div>
+                                </div>
+                                <div class="taskbar oobe-live-taskbar">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-theme">主题设置</h1>
+                        <p id="oobe-subtitle-theme">实时预览浅色和深色模式的任务栏与开始菜单。</p>
+                        <div class="oobe-setting-block">
+                            <div class="oobe-setting-title" id="oobe-theme-title">主题</div>
+                            <div class="oobe-chip-group" id="oobe-theme-group">
+                                <button class="oobe-chip active" data-theme="light" type="button">浅色</button>
+                                <button class="oobe-chip" data-theme="dark" type="button">深色</button>
+                            </div>
+                        </div>
+                        <div class="oobe-setting-block">
+                            <div class="oobe-setting-title" id="oobe-auto-fullscreen-title">开机自动网页全屏</div>
+                            <div class="oobe-option-desc oobe-setting-desc" id="oobe-auto-fullscreen-desc">开机第2秒自动进入网页全屏，带来更沉浸的体验。</div>
+                            <div class="oobe-chip-group" id="oobe-auto-fullscreen-group">
+                                <button class="oobe-chip active" data-auto-fullscreen="true" type="button">开启</button>
+                                <button class="oobe-chip" data-auto-fullscreen="false" type="button">关闭</button>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-2" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-2" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="3">
+                        <div class="oobe-preview-frame oobe-preview-interactive">
+                            <div class="oobe-live-fingo">
+                                <div class="desktop-wallpaper oobe-live-wallpaper"></div>
+                                <div class="taskbar oobe-live-taskbar oobe-live-taskbar-fingo">
+                                    <div class="taskbar-left">
+                                        <button class="taskbar-btn taskbar-start" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-taskview" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-center">
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/files.png" alt="">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-app running" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/App_icon/browser.png" alt="">
+                                        </button>
+                                    </div>
+                                    <div class="taskbar-right">
+                                        <button class="taskbar-btn active" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-control" type="button" tabindex="-1">
+                                            <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="" class="icon-stroke">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="" class="icon-fill">
+                                        </button>
+                                        <button class="taskbar-btn taskbar-notification" type="button" tabindex="-1">
+                                            <div class="notification-time-container">
+                                                <div class="notification-time oobe-preview-time">23:24</div>
+                                                <div class="notification-date oobe-preview-date">02/18</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="oobe-live-fingo-blur"></div>
+                                <div class="fingo-content oobe-live-fingo-content fingo-empty" id="oobe-live-fingo-content">
+                                    <div class="fingo-header">
+                                        <div class="fingo-header-left">
+                                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo">
+                                            <span>Fingo</span>
+                                        </div>
+                                        <div class="fingo-toolbar">
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="+"></button>
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Timer.svg" alt="H"></button>
+                                            <button type="button" tabindex="-1"><img src="Theme/Icon/Symbol_icon/stroke/Playlist Add.svg" alt="C"></button>
+                                        </div>
+                                    </div>
+                                    <div class="fingo-history" id="oobe-fingo-history"></div>
+                                    <div id="oobe-fingo-messages"></div>
+                                    <div class="fingo-input-wrap">
+                                        <div class="fingo-input-glow">
+                                            <input id="oobe-fingo-input" type="text" autocomplete="off" placeholder="Ask me anything...">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-fingo">Fingo AI 模式</h1>
+                        <p id="oobe-subtitle-fingo">你可以在上方临时对话，退出 OOBE 后不会保存记录。</p>
+                        <div class="oobe-setting-block oobe-fingo-settings-block">
+                            <div class="oobe-fingo-settings-shell">
+                                <div id="oobe-fingo-settings-scroll-host"></div>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-3" type="button">返回</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-3" type="button">下一步</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="4">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-lock-preview">
+                                <div class="oobe-live-lock-wallpaper"></div>
+                                <div class="oobe-live-lock-overlay"></div>
+                                <div class="oobe-live-lock-time-container">
+                                    <div class="oobe-live-lock-time oobe-lock-preview-time">23:24</div>
+                                    <div class="oobe-live-lock-date oobe-lock-preview-date">02/18</div>
+                                </div>
+                                <div class="login-card oobe-live-login-card">
+                                    <div class="login-avatar">
+                                        <img class="oobe-lock-preview-avatar" src="Theme/Profile_img/UserAva.png" alt="User">
+                                    </div>
+                                    <div class="login-username oobe-lock-preview-username">Owner</div>
+                                    <div class="login-email oobe-lock-preview-email">owner@sample.com</div>
+                                    <div class="login-pin-container">
+                                        <input class="login-pin-input" type="password" disabled value="1234">
+                                        <button class="pin-toggle" type="button" tabindex="-1">
+                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="show">
+                                        </button>
+                                    </div>
+                                    <div class="login-error" style="visibility:hidden">PIN Error</div>
+                                    <button class="login-submit" type="button" tabindex="-1">Sign in</button>
+                                </div>
+                                <div class="oobe-live-lock-hint">Tap screen to sign in</div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-user">User</h1>
+                        <p id="oobe-subtitle-user">Set user name, email and avatar before continuing.</p>
+                        <div class="oobe-user-settings-shell">
+                            <div id="oobe-user-settings-scroll-host">
+                                <div class="oobe-user-settings-body" id="oobe-user-settings-body">
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-avatar-title">Avatar</div>
+                                        <div class="oobe-avatar-grid" id="oobe-user-avatar-grid"></div>
+                                        <div class="oobe-avatar-actions">
+                                            <button class="oobe-chip" id="oobe-user-upload-avatar" type="button">Upload Custom Avatar</button>
+                                            <button class="oobe-chip" id="oobe-user-default-avatar" type="button">Restore Default Avatar</button>
+                                            <input id="oobe-user-avatar-file" type="file" accept="image/*" hidden>
+                                        </div>
+                                    </div>
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-name-title">User Name</div>
+                                        <input id="oobe-user-name-input" class="oobe-input" type="text" maxlength="40" placeholder="Enter user name">
+                                    </div>
+                                    <div class="oobe-setting-block">
+                                        <div class="oobe-setting-title" id="oobe-user-email-title">Email</div>
+                                        <input id="oobe-user-email-input" class="oobe-input" type="email" maxlength="80" placeholder="Enter email">
+                                    </div>
+                                    <div class="oobe-inline-status" id="oobe-user-inline-status"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-4" type="button">Back</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-next-4" type="button">Next</button>
+                        </div>
+                    </section>
+
+                    <section class="oobe-step" data-step="5">
+                        <div class="oobe-preview-frame oobe-preview-static">
+                            <div class="oobe-live-lock-preview">
+                                <div class="oobe-live-lock-wallpaper"></div>
+                                <div class="oobe-live-lock-overlay"></div>
+                                <div class="oobe-live-lock-time-container">
+                                    <div class="oobe-live-lock-time oobe-lock-preview-time">23:24</div>
+                                    <div class="oobe-live-lock-date oobe-lock-preview-date">02/18</div>
+                                </div>
+                                <div class="login-card oobe-live-login-card">
+                                    <div class="login-avatar">
+                                        <img class="oobe-lock-preview-avatar" src="Theme/Profile_img/UserAva.png" alt="User">
+                                    </div>
+                                    <div class="login-username oobe-lock-preview-username">Owner</div>
+                                    <div class="login-email oobe-lock-preview-email">owner@sample.com</div>
+                                    <div class="login-pin-container">
+                                        <input class="login-pin-input" type="password" disabled value="1234">
+                                        <button class="pin-toggle" type="button" tabindex="-1">
+                                            <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="show">
+                                        </button>
+                                    </div>
+                                    <div class="login-error" style="visibility:hidden">PIN Error</div>
+                                    <button class="login-submit" type="button" tabindex="-1">Sign in</button>
+                                </div>
+                                <div class="oobe-live-lock-hint">Tap screen to sign in</div>
+                            </div>
+                        </div>
+                        <h1 id="oobe-title-password">Set Password</h1>
+                        <p id="oobe-subtitle-password">Enter a 4-10 digit PIN for lock screen login.</p>
+                        <div class="oobe-setting-block">
+                            <div class="oobe-setting-title" id="oobe-pin-title">PIN</div>
+                            <input id="oobe-pin-input" class="oobe-input" type="password" maxlength="10" placeholder="Leave empty to keep current PIN">
+                        </div>
+                        <div class="oobe-inline-status" id="oobe-preload-status"></div>
+                        <div class="oobe-actions">
+                            <button class="oobe-btn oobe-btn-secondary" id="oobe-back-5" type="button">Back</button>
+                            <button class="oobe-btn oobe-btn-primary" id="oobe-finish" type="button">Finish and enter lock screen</button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关机/重启/注销 覆盖层 -->
+        <div id="power-overlay" class="screen hidden">
+            <div class="power-overlay-card">
+                <div class="power-overlay-title" id="power-overlay-title">关机</div>
+                <div class="power-overlay-status">
+                    <div class="boot-loading-ring power-loading-ring">
+                        <svg viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(0,120,212,0.15)" stroke-width="3"/>
+                            <circle class="boot-ring-arc" cx="18" cy="18" r="14" fill="none" stroke="#0078d4" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <span class="power-overlay-text" id="power-overlay-text">正在关机...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 锁屏 -->
+        <div id="lock-screen" class="screen hidden">
+            <div class="lock-wallpaper"></div>
+            <div class="lock-time-container">
+                <div class="lock-time" id="lock-time">23:24</div>
+                <div class="lock-date" id="lock-date">2025/10/21</div>
+            </div>
+            <div class="lock-hint">轻点屏幕以登录</div>
+        </div>
+
+        <!-- 登录屏幕 -->
+        <div id="login-screen" class="screen hidden">
+            <div class="login-wallpaper"></div>
+            <div class="login-card">
+                <div class="login-avatar">
+                    <img src="Theme/Profile_img/UserAva.png" alt="User">
+                </div>
+                <div class="login-username">Owner</div>
+                <div class="login-email">owner@sample.com</div>
+                <div class="login-pin-container">
+                    <input type="password" id="login-pin" class="login-pin-input" placeholder="输入 PIN" maxlength="10">
+                    <button class="pin-toggle" id="pin-toggle">
+                        <img class="icon-stroke" src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="显示">
+                        <img class="icon-fill hidden" src="Theme/Icon/Symbol_icon/fill/Eye.svg" alt="隐藏">
+                    </button>
+                </div>
+                <div class="login-error hidden" id="login-error">PIN 不正确，请重试</div>
+                <div class="login-security-link hidden" id="security-link">通过安全问题登录</div>
+                <button class="login-submit" id="login-submit">登录</button>
+            </div>
+        </div>
+
+        <!-- 桌面 -->
+        <div id="desktop-screen" class="screen hidden">
+            <div class="desktop-wallpaper"></div>
+            
+            <!-- 桌面图标 -->
+            <div class="desktop-icons" id="desktop-icons">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 桌面右键菜单 -->
+            <div class="context-menu hidden" id="desktop-context-menu">
+                <div class="context-menu-item" data-action="refresh">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
+                    <span>刷新</span>
+                </div>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item" data-action="personalize">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Color Picker.svg" alt="">
+                    <span>个性化</span>
+                </div>
+            </div>
+
+            <!-- 窗口容器 -->
+            <div id="windows-container"></div>
+
+            <!-- 任务栏 -->
+            <div class="taskbar" id="taskbar">
+                <div class="taskbar-left">
+                    <button class="taskbar-btn taskbar-start" id="start-btn">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Home.svg" alt="开始" class="icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Home.svg" alt="开始" class="icon-fill">
+                    </button>
+                    <button class="taskbar-btn taskbar-taskview" id="taskview-btn" title="多任务视图 (Ctrl+W)">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Layout Grid.svg" alt="任务视图">
+                    </button>
+                </div>
+                <div class="taskbar-center" id="taskbar-apps">
+                    <!-- 动态生成应用图标 -->
+                </div>
+                <div class="taskbar-right">
+                    <button class="taskbar-btn" id="fingo-btn" title="Fingo">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Message Round.svg" alt="Fingo" class="icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo" class="icon-fill">
+                    </button>
+                    <button class="taskbar-btn taskbar-control" id="control-center-btn">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="控制中心" class="icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Settings.svg" alt="控制中心" class="icon-fill">
+                    </button>
+                    <button class="taskbar-btn taskbar-notification" id="notification-btn">
+                        <div class="notification-time-container">
+                            <div class="notification-time" id="taskbar-time">23:24</div>
+                            <div class="notification-date" id="taskbar-date">10/21</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fingo 模糊层 - 位于任务栏下方 -->
+            <div id="fingo-blur-layer"></div>
+
+            <!-- Fingo AI 助手面板 -->
+            <div id="fingo-panel" class="hidden">
+                <div class="fingo-content">
+                    <div class="fingo-header">
+                        <div class="fingo-header-left">
+                            <img src="Theme/Icon/Symbol_icon/fill/Message Round.svg" alt="Fingo">
+                            <span>Fingo</span>
+                        </div>
+                        <div class="fingo-toolbar">
+                            <button id="fingo-new-chat" title="New Chat">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="+">
+                            </button>
+                            <button id="fingo-history-btn" title="History">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Timer.svg" alt="H">
+                            </button>
+                            <button id="fingo-clear-btn" title="Clear">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Playlist Add.svg" alt="C">
+                            </button>
+                        </div>
+                    </div>
+                    <div class="fingo-history" id="fingo-history"></div>
+                    <div id="fingo-messages"></div>
+                    <div class="fingo-input-wrap">
+                        <div class="fingo-input-glow">
+                            <input type="text" id="fingo-input" placeholder="Ask me anything..." autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 开始菜单 -->
+            <div class="start-menu hidden" id="start-menu">
+                <!-- 搜索栏 -->
+                <div class="start-search">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="搜索">
+                    <input type="text" id="start-search-input">
+                </div>
+                
+                <!-- 已固定应用 -->
+                <div class="start-section">
+                    <div class="start-section-header">
+                        <span id="start-pinned-title">已固定</span>
+                        <button class="start-section-link" id="all-apps-btn">
+                            <span id="start-all-apps-text">所有应用</span>
+                            <img src="Theme/Icon/Symbol_icon/stroke/Chevron Right.svg" alt="">
+                        </button>
+                    </div>
+                    <div class="start-apps-grid" id="start-apps-grid">
+                        <!-- 动态生成 -->
+                    </div>
+                </div>
+                
+                <!-- 推荐的项目 -->
+                <div class="start-section">
+                    <div class="start-section-header">
+                        <span id="start-recommended-title">推荐的项目</span>
+                        <button class="start-section-link" id="more-recent-btn">
+                            <span id="start-more-text">更多</span>
+                            <img src="Theme/Icon/Symbol_icon/stroke/Chevron Right.svg" alt="">
+                        </button>
+                    </div>
+                    <div class="start-recent-items" id="start-recent-items">
+                        <!-- 动态生成最近文件 -->
+                    </div>
+                </div>
+                
+                <!-- 底部栏 -->
+                <div class="start-footer">
+                    <div class="start-footer-shortcuts">
+                        <button class="start-footer-btn" id="pictures-folder-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Image.svg" alt="">
+                            <span id="start-pictures-text">图片</span>
+                        </button>
+                        <button class="start-footer-btn" id="downloads-folder-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Download.svg" alt="">
+                            <span id="start-downloads-text">下载</span>
+                        </button>
+                    </div>
+                    <div class="start-power">
+                        <button class="start-power-btn" id="power-btn">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Shut Down.svg" alt="电源" class="icon-stroke">
+                            <img src="Theme/Icon/Symbol_icon/fill/Shut Down.svg" alt="电源" class="icon-fill hidden">
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 电源菜单（左键） -->
+            <div class="power-menu hidden" id="power-menu">
+                <div class="power-menu-item" data-action="lock">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Lock.svg" alt="">
+                    <span id="power-lock-text">锁屏</span>
+                </div>
+                <div class="power-menu-item" data-action="shutdown">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Shut Down.svg" alt="">
+                    <span id="power-shutdown-text">关机</span>
+                </div>
+                <div class="power-menu-item" data-action="restart">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Refresh.svg" alt="">
+                    <span id="power-restart-text">重启</span>
+                </div>
+            </div>
+
+            <!-- 注销菜单（右键电源按钮） -->
+            <div class="power-menu hidden" id="power-logout-menu">
+                <div class="power-menu-item" data-action="logout">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Logout.svg" alt="">
+                    <span id="power-logout-text">注销</span>
+                </div>
+            </div>
+
+            <!-- 控制中心 -->
+            <div class="control-center hidden" id="control-center">
+                <div class="control-center-grid">
+                    <!-- Wi-Fi -->
+                    <div class="control-tile control-tile-large" id="wifi-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Broadcast.svg" alt="Wi-Fi" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Broadcast.svg" alt="Wi-Fi" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="wifi-tile-title">Wi-Fi</div>
+                            <div class="tile-subtitle" id="wifi-tile-subtitle">已连接</div>
+                        </div>
+                    </div>
+                    <!-- 蓝牙 -->
+                    <div class="control-tile control-tile-large" id="bluetooth-tile" data-active="false">
+                        <div class="tile-icon-container">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Bluetooth_close.svg" alt="蓝牙" class="bluetooth-icon-off">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Bluetooth_open.svg" alt="蓝牙" class="bluetooth-icon-on">
+                        </div>
+                        <div class="tile-label">
+                            <div class="tile-title" id="bluetooth-tile-title">蓝牙</div>
+                            <div class="tile-subtitle" id="bluetooth-tile-subtitle">关闭</div>
+                        </div>
+                    </div>
+                    <!-- 深色模式 -->
+                    <div class="control-tile control-tile-large" id="theme-tile" data-active="false">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Moon.svg" alt="深色模式" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Moon.svg" alt="深色模式" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="theme-tile-title">深色</div>
+                        </div>
+                    </div>
+                    <!-- 模糊效果 -->
+                    <div class="control-tile control-tile-large" id="blur-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Eye.svg" alt="模糊" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Eye.svg" alt="模糊" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="blur-tile-title">模糊</div>
+                        </div>
+                    </div>
+                    <!-- 动画 -->
+                    <div class="control-tile control-tile-large" id="animation-tile" data-active="true">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Stars A.svg" alt="动画" class="tile-icon icon-stroke">
+                        <img src="Theme/Icon/Symbol_icon/fill/Stars A.svg" alt="动画" class="tile-icon icon-fill">
+                        <div class="tile-label">
+                            <div class="tile-title" id="animation-tile-title">动画</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 音量滑块 -->
+                <div class="control-slider">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Volume Up.svg" alt="音量">
+                    <input type="range" id="volume-slider" min="0" max="100" value="50">
+                    <span id="volume-value">50</span>
+                </div>
+                
+                <!-- 亮度滑块 -->
+                <div class="control-slider">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Sun.svg" alt="亮度">
+                    <input type="range" id="brightness-slider" min="20" max="100" value="100">
+                    <span id="brightness-value">100</span>
+                </div>
+            </div>
+
+            <!-- 通知中心 -->
+            <div class="notification-center hidden" id="notification-center">
+                <!-- 通知瓷贴 -->
+                <div class="notification-tile" id="notification-tile">
+                    <div class="notification-header">
+                        <h3 id="notification-title">通知</h3>
+                        <button class="notification-clear" id="notification-clear">全部清除</button>
+                    </div>
+                    <div class="notification-list" id="notification-list">
+                        <!-- 动态生成 -->
+                    </div>
+                    <div class="notification-empty">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Notification Bell.svg" alt="">
+                        <p id="notification-empty-text">没有新通知</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 模块 -->
+    <script src="js/core/csp.js"></script>
+    <script src="js/core/storage.js"></script>
+    <script src="js/core/state.js"></script>
+    <script src="js/core/i18n.js"></script>
+    <script src="js/core/recentfiles.js"></script>
+    <script src="js/core/fluent-ui.js"></script>
+    <script src="js/core/file-import.js"></script>
+    <script src="js/core/lingyi.js"></script>
+    <script src="js/ui/boot.js"></script>
+    <script src="js/ui/oobe.js"></script>
+    <script src="js/ui/lockscreen.js"></script>
+    <script src="js/ui/login.js"></script>
+    <script src="js/ui/desktop.js"></script>
+    <script src="js/ui/taskbar.js"></script>
+    <script src="js/ui/startmenu.js"></script>
+    <script src="js/ui/startmenu-update.js"></script>
+    <script src="js/ui/controlcenter.js"></script>
+    <script src="js/ui/notification-compact.js"></script>
+    <script src="js/ui/taskview.js"></script>
+    <script src="js/ui/window.js"></script>
+    <script src="js/apps/files.js"></script>
+    <script src="js/apps/settings.js"></script>
+    <script src="js/apps/calculator.js"></script>
+    <script src="js/apps/notes.js"></script>
+    <script src="js/apps/browser.js"></script>
+    <script src="js/apps/clock.js"></script>
+    <script src="js/apps/weather.js"></script>
+    <script src="js/apps/photos.js"></script>
+    <script src="js/apps/media.js"></script>
+    <script src="js/third_parts_apps/pwa-loader.js"></script>
+    <script src="js/apps/appshop.js"></script>
+    <script src="js/core/fingo-data.js"></script>
+    <script src="js/core/fingo.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

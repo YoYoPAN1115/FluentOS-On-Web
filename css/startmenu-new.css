@@ -1,0 +1,95 @@
+/* ============ 开始菜单新样式（Windows 11风格） ============ */
+
+/* 最近项目 */
+.start-recent-items {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.recent-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.recent-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .recent-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.recent-item-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
+.recent-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.recent-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recent-item-time {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+/* 开始菜单底部（更新） */
+.start-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 8px;
+}
+
+.start-footer-shortcuts {
+    display: flex;
+    gap: 4px;
+}
+
+.start-footer-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.start-footer-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .start-footer-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-footer-btn img {
+    width: 16px;
+    height: 16px;
+}
+
