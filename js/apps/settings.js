@@ -422,7 +422,7 @@ const SettingsApp = {
             
             /* 最近设置 */
             .settings-recent-list { display: flex; flex-direction: column; gap: 4px; }
-            .settings-recent-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.3s ease; }
+            .settings-recent-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); cursor: pointer; transition: all 0.3s ease; }
             .settings-recent-item:hover { background: var(--bg-hover); }
             .settings-recent-info { display: flex; gap: 12px; align-items: center; }
             .settings-recent-label { font-size: 13px; font-weight: 500; }
@@ -551,10 +551,12 @@ const SettingsApp = {
             body.fluent-v2 .settings-recent-item,
             body.fluent-v2 .network-hero-card,
             body.fluent-v2 .network-option-item,
+            body.fluent-v2 .network-expand-panel,
+            body.fluent-v2 .app-list-item,
             body.fluent-v2 .fluent-setting-item {
                 background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 border-radius: 16px !important;
             }
@@ -562,6 +564,7 @@ const SettingsApp = {
             body.fluent-v2 .settings-recommend-item:hover,
             body.fluent-v2 .settings-recent-item:hover,
             body.fluent-v2 .network-option-item:hover,
+            body.fluent-v2 .app-list-item:hover,
             body.fluent-v2 .fluent-setting-item:hover {
                 background: rgba(255, 255, 255, 0.7) !important;
             }
@@ -571,16 +574,19 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .settings-recent-item,
             body.fluent-v2.dark-mode .network-hero-card,
             body.fluent-v2.dark-mode .network-option-item,
+            body.fluent-v2.dark-mode .network-expand-panel,
+            body.fluent-v2.dark-mode .app-list-item,
             body.fluent-v2.dark-mode .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: rgba(24, 28, 36, 0.72) !important;
+                border-color: rgba(255, 255, 255, 0.12) !important;
             }
             
             body.fluent-v2.dark-mode .settings-recommend-item:hover,
             body.fluent-v2.dark-mode .settings-recent-item:hover,
             body.fluent-v2.dark-mode .network-option-item:hover,
+            body.fluent-v2.dark-mode .app-list-item:hover,
             body.fluent-v2.dark-mode .fluent-setting-item:hover {
-                background: rgba(255, 255, 255, 0.18) !important;
+                background: rgba(34, 40, 52, 0.82) !important;
             }
 
             body.fluent-v2.window-blur-disabled .settings-app,
@@ -600,6 +606,7 @@ const SettingsApp = {
             body.fluent-v2.window-blur-disabled .settings-recent-item,
             body.fluent-v2.window-blur-disabled .network-hero-card,
             body.fluent-v2.window-blur-disabled .network-option-item,
+            body.fluent-v2.window-blur-disabled .network-expand-panel,
             body.fluent-v2.window-blur-disabled .fluent-setting-item {
                 backdrop-filter: none !important;
                 -webkit-backdrop-filter: none !important;
@@ -610,6 +617,7 @@ const SettingsApp = {
             body.fluent-v2.window-blur-disabled .settings-recommend-item:hover,
             body.fluent-v2.window-blur-disabled .settings-recent-item:hover,
             body.fluent-v2.window-blur-disabled .network-option-item:hover,
+            body.fluent-v2.window-blur-disabled .network-expand-panel:hover,
             body.fluent-v2.window-blur-disabled .fluent-setting-item:hover {
                 background: var(--bg-hover) !important;
             }
@@ -659,8 +667,15 @@ const SettingsApp = {
             .network-device-empty span { font-size: 12px; color: var(--text-tertiary); }
             
             /* V2网络展开面板 */
-            body.fluent-v2 .network-expand-panel { background: rgba(255,255,255,0.45) !important; border-radius: 0 0 16px 16px !important; }
-            body.fluent-v2.dark-mode .network-expand-panel { background: rgba(255,255,255,0.08) !important; }
+            body.fluent-v2 .network-expand-panel {
+                background: rgba(255, 255, 255, 0.55) !important;
+                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border-radius: 0 0 16px 16px !important;
+            }
+            body.fluent-v2.dark-mode .network-expand-panel {
+                background: rgba(24, 28, 36, 0.72) !important;
+                border-color: rgba(255, 255, 255, 0.12) !important;
+            }
             
             /* 应用程序页面样式 */
             .storage-card-content {
@@ -935,8 +950,8 @@ const SettingsApp = {
             /* V2 应用列表样式 */
             body.fluent-v2 .app-list-item {
                 background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 border-radius: 16px !important;
             }
@@ -946,12 +961,12 @@ const SettingsApp = {
             }
             
             body.fluent-v2.dark-mode .app-list-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: rgba(24, 28, 36, 0.72) !important;
+                border-color: rgba(255, 255, 255, 0.12) !important;
             }
             
             body.fluent-v2.dark-mode .app-list-item:hover {
-                background: rgba(255, 255, 255, 0.18) !important;
+                background: rgba(34, 40, 52, 0.82) !important;
             }
             
             body.fluent-v2 .apps-list {
@@ -987,8 +1002,8 @@ const SettingsApp = {
             /* V2 模式下应用详情页卡片样式 */
             body.fluent-v2 .app-detail-page .fluent-setting-item {
                 background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 border-radius: 16px !important;
             }
@@ -1424,7 +1439,25 @@ const SettingsApp = {
             }
 
             .settings-advanced-entry .fluent-setting-item-control {
-                min-width: 112px;
+                min-width: auto;
+                display: flex;
+                align-items: center;
+            }
+
+            .settings-entry-arrow {
+                width: 18px;
+                height: 18px;
+                opacity: 0.62;
+                transition: opacity var(--transition-fast), transform var(--transition-fast);
+            }
+
+            .dark-mode .settings-entry-arrow {
+                filter: brightness(0) invert(1);
+            }
+
+            .settings-advanced-entry:hover .settings-entry-arrow {
+                opacity: 1;
+                transform: translateX(2px);
             }
 
             .settings-beta-badge {
@@ -1452,6 +1485,37 @@ const SettingsApp = {
                 flex: 1;
             }
 
+            .settings-blur-strength-item {
+                max-height: 96px;
+                transition:
+                    max-height 220ms ease,
+                    margin-bottom 220ms ease,
+                    padding 220ms ease,
+                    opacity 160ms ease,
+                    transform 220ms ease,
+                    background 180ms ease;
+            }
+
+            .settings-mica-hidden {
+                max-height: 0;
+                margin-bottom: 0 !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+                opacity: 0;
+                overflow: hidden;
+                pointer-events: none;
+                background: transparent !important;
+                border-color: transparent !important;
+                transform: translateY(-6px);
+                transition:
+                    max-height 220ms ease,
+                    margin-bottom 220ms ease,
+                    padding 220ms ease,
+                    opacity 160ms ease,
+                    transform 220ms ease,
+                    background 180ms ease;
+            }
+
             .settings-inline-value {
                 min-width: 56px;
                 color: var(--text-secondary);
@@ -1459,97 +1523,110 @@ const SettingsApp = {
                 text-align: right;
             }
 
-            .liquid-glass-preview {
+            .material-preview {
                 position: relative;
                 height: 168px;
                 margin-bottom: 16px;
                 overflow: hidden;
                 border-radius: 18px;
                 border: 1px solid var(--border-color);
-                background: linear-gradient(135deg, #eef7ff, #f8fbff 44%, #dbeafe);
+                background: linear-gradient(135deg, #d7ebff, #f8fbff 44%, #dbeafe);
                 box-shadow: var(--shadow-md);
             }
 
-            .dark-mode .liquid-glass-preview {
+            .dark-mode .material-preview {
                 background: linear-gradient(135deg, #151923, #252b36 46%, #111827);
             }
 
-            .liquid-glass-preview-bg,
-            .liquid-glass-preview-bg span {
+            .material-preview-wallpaper {
                 position: absolute;
                 inset: 0;
+                background:
+                    radial-gradient(circle at 20% 25%, rgba(0, 120, 212, 0.44), transparent 28%),
+                    radial-gradient(circle at 78% 22%, rgba(255, 145, 77, 0.38), transparent 30%),
+                    radial-gradient(circle at 52% 86%, rgba(105, 92, 255, 0.34), transparent 34%),
+                    var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
+                background-size: cover;
+                background-position: center;
             }
 
-            .liquid-glass-preview-bg span:nth-child(1) {
-                background: radial-gradient(circle at 20% 25%, rgba(0, 120, 212, 0.45), transparent 28%);
-            }
-
-            .liquid-glass-preview-bg span:nth-child(2) {
-                background: radial-gradient(circle at 78% 22%, rgba(255, 145, 77, 0.42), transparent 30%);
-            }
-
-            .liquid-glass-preview-bg span:nth-child(3) {
-                background: radial-gradient(circle at 52% 86%, rgba(105, 92, 255, 0.34), transparent 34%);
-            }
-
-            .liquid-glass-preview-panel {
+            .material-preview-panel {
                 position: absolute;
                 left: 50%;
                 top: 50%;
                 width: min(320px, calc(100% - 56px));
                 padding: 24px 28px;
                 transform: translate(-50%, -50%);
-                border-radius: 28px;
+                overflow: hidden;
+                border-radius: 22px;
                 border: 1px solid rgba(255, 255, 255, 0.58);
-                background:
-                    linear-gradient(135deg, rgba(255,255,255,0.68), rgba(255,255,255,0.24) 56%, rgba(220,238,255,0.18));
-                backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(190%) contrast(1.05);
-                -webkit-backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(190%) contrast(1.05);
+                background: rgba(255, 255, 255, 0.42);
+                backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(170%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(170%);
                 box-shadow:
-                    0 18px 42px rgba(24, 68, 120, 0.22),
-                    inset 0 1px 0 rgba(255,255,255,0.78),
-                    inset 0 -1px 0 rgba(125, 170, 220, 0.16);
+                    0 18px 42px rgba(24, 68, 120, 0.18),
+                    inset 0 1px 0 rgba(255,255,255,0.74);
             }
 
-            .dark-mode .liquid-glass-preview-panel {
-                border-color: rgba(255, 255, 255, 0.16);
-                background:
-                    linear-gradient(135deg, rgba(54,58,68,0.74), rgba(18,20,26,0.48) 58%, rgba(76,94,120,0.24));
-                box-shadow:
-                    0 22px 48px rgba(0, 0, 0, 0.48),
-                    inset 0 1px 0 rgba(255,255,255,0.16),
-                    inset 0 -1px 0 rgba(0,0,0,0.36);
+            .material-preview-mica .material-preview-panel {
+                background: rgba(238, 244, 255, 0.42);
+                backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) brightness(1.04);
+                -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) brightness(1.04);
             }
 
-            .liquid-glass-preview-panel::before {
+            .material-preview-mica .material-preview-panel::before {
+                content: '';
+                position: absolute;
+                inset: -42px;
+                z-index: 0;
+                background:
+                    radial-gradient(circle at 18% 24%, rgba(0, 120, 212, 0.36), transparent 30%),
+                    radial-gradient(circle at 76% 26%, rgba(255, 145, 77, 0.28), transparent 32%),
+                    radial-gradient(circle at 54% 84%, rgba(105, 92, 255, 0.28), transparent 36%),
+                    var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
+                background-size: cover;
+                background-position: center;
+                filter: blur(28px) saturate(145%);
+                transform: scale(1.08);
+            }
+
+            .material-preview-mica .material-preview-panel::after {
                 content: '';
                 position: absolute;
                 inset: 0;
-                border-radius: inherit;
-                background: linear-gradient(135deg, rgba(255,255,255,0.48), rgba(255,255,255,0.08) 38%, transparent 62%);
+                z-index: 0;
+                background: linear-gradient(135deg, rgba(255,255,255,0.64), rgba(255,255,255,0.34));
                 pointer-events: none;
             }
 
-            .liquid-glass-preview-0 .liquid-glass-preview-panel {
-                border-radius: 20px;
-                backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(165%);
-                -webkit-backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(165%);
+            .dark-mode .material-preview-panel {
+                border-color: rgba(255, 255, 255, 0.16);
+                background: rgba(28, 31, 38, 0.58);
+                box-shadow:
+                    0 22px 48px rgba(0, 0, 0, 0.48),
+                    inset 0 1px 0 rgba(255,255,255,0.16);
             }
 
-            .liquid-glass-preview-2 .liquid-glass-preview-panel {
-                border-radius: 36px;
-                backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(230%) contrast(1.12);
-                -webkit-backdrop-filter: blur(var(--liquid-glass-blur, 34px)) saturate(230%) contrast(1.12);
+            .dark-mode .material-preview-mica .material-preview-panel {
+                background: rgba(18, 22, 30, 0.54);
             }
 
-            .liquid-glass-preview-title {
+            .dark-mode .material-preview-mica .material-preview-panel::before {
+                filter: blur(28px) saturate(125%) brightness(0.72);
+            }
+
+            .dark-mode .material-preview-mica .material-preview-panel::after {
+                background: linear-gradient(135deg, rgba(30,34,42,0.72), rgba(10,12,18,0.48));
+            }
+
+            .material-preview-title {
                 position: relative;
                 z-index: 1;
                 font-size: 24px;
                 font-weight: 700;
             }
 
-            .liquid-glass-preview-subtitle {
+            .material-preview-subtitle {
                 position: relative;
                 z-index: 1;
                 margin-top: 4px;
@@ -3219,20 +3296,17 @@ const SettingsApp = {
         const advancedItem = FluentUI.SettingItem({
             label: t('settings.advanced-options'),
             description: t('settings.advanced-options.desc'),
-            control: FluentUI.Button({
-                text: t('settings.open'),
-                icon: 'Arrow Right',
-                iconPosition: 'right',
-                onClick: () => {
-                    this.currentPage = 'personalization-advanced';
-                    this.render();
-                }
-            }),
+            control: (() => {
+                const arrow = document.createElement('img');
+                arrow.className = 'settings-entry-arrow';
+                arrow.src = 'Theme/Icon/Symbol_icon/stroke/Arrow Right.svg';
+                arrow.alt = '';
+                return arrow;
+            })(),
             className: 'settings-advanced-entry'
         });
         advancedItem.style.cursor = 'pointer';
-        advancedItem.addEventListener('click', (e) => {
-            if (e.target.closest('button')) return;
+        advancedItem.addEventListener('click', () => {
             this.currentPage = 'personalization-advanced';
             this.render();
         });
@@ -3241,7 +3315,7 @@ const SettingsApp = {
     },
 
     renderPersonalizationAdvanced(container) {
-        container.className = 'settings-content settings-liquid-glass-page';
+        container.className = 'settings-content settings-material-page';
 
         const backBtn = document.createElement('button');
         backBtn.type = 'button';
@@ -3257,84 +3331,72 @@ const SettingsApp = {
         container.appendChild(backBtn);
 
         const section = this.createSection(t('settings.advanced-options'));
-        const currentEffect = Math.max(0, Math.min(2, Number(State.settings.liquidGlassEffect ?? 1)));
-        const effectNames = [
-            t('settings.liquid-glass.effect-clear'),
-            t('settings.liquid-glass.effect-frost'),
-            t('settings.liquid-glass.effect-prism')
-        ];
+        const currentMaterial = State.settings.materialType === 'mica' ? 'mica' : 'gaussian';
+        const materialLabels = {
+            gaussian: t('settings.material.gaussian'),
+            mica: t('settings.material.mica')
+        };
 
         const preview = document.createElement('div');
-        preview.className = `liquid-glass-preview liquid-glass-preview-${currentEffect}`;
+        preview.className = `material-preview material-preview-${currentMaterial}`;
         preview.innerHTML = `
-            <div class="liquid-glass-preview-bg">
-                <span></span><span></span><span></span>
-            </div>
-            <div class="liquid-glass-preview-panel">
-                <div class="liquid-glass-preview-title">${t('settings.liquid-glass')}</div>
-                <div class="liquid-glass-preview-subtitle">${effectNames[currentEffect]}</div>
+            <div class="material-preview-wallpaper"></div>
+            <div class="material-preview-panel">
+                <div class="material-preview-title">${t('settings.material')}</div>
+                <div class="material-preview-subtitle">${materialLabels[currentMaterial]}</div>
             </div>
         `;
         section.appendChild(preview);
 
+        let blurItem = null;
+
         section.appendChild(FluentUI.SettingItem({
-            label: `<span>${t('settings.liquid-glass')}</span><span class="settings-beta-badge">Beta</span>`,
-            description: t('settings.liquid-glass.desc'),
-            control: FluentUI.Toggle({
-                checked: State.settings.enableLiquidGlass === true,
-                onChange: (v) => {
-                    State.updateSettings({ enableLiquidGlass: v });
-                    this.addRecentSetting(t('settings.liquid-glass'), v ? t('settings.on') : t('settings.off'), 'personalization');
+            label: t('settings.material'),
+            description: t('settings.material.desc'),
+            control: FluentUI.Select({
+                value: currentMaterial,
+                options: [
+                    { value: 'gaussian', label: t('settings.material.gaussian') },
+                    { value: 'mica', label: t('settings.material.mica') }
+                ],
+                onChange: (value) => {
+                    State.updateSettings({ materialType: value });
+                    preview.className = `material-preview material-preview-${value}`;
+                    preview.querySelector('.material-preview-subtitle').textContent = materialLabels[value] || value;
+                    if (blurItem) {
+                        const isMica = value === 'mica';
+                        blurItem.classList.toggle('settings-mica-hidden', isMica);
+                        const blurSlider = blurItem.querySelector('.fluent-slider');
+                        const blurSliderWrapper = blurItem.querySelector('.fluent-slider-wrapper');
+                        if (blurSlider) blurSlider.disabled = isMica;
+                        if (blurSliderWrapper) blurSliderWrapper.classList.toggle('fluent-slider-disabled', isMica);
+                    }
+                    this.addRecentSetting(t('settings.material'), materialLabels[value] || value, 'personalization');
                     State.addNotification({
-                        title: t('settings.liquid-glass'),
-                        message: t('settings.liquid-glass.changed', { status: v ? t('settings.on') : t('settings.off') }),
+                        title: t('settings.material'),
+                        message: t('settings.material.changed', { material: materialLabels[value] || value }),
                         type: 'success'
                     });
                 }
-            }),
-            className: 'liquid-glass-toggle-item'
+            })
         }));
 
-        const effectValue = document.createElement('span');
-        effectValue.className = 'settings-inline-value';
-        effectValue.textContent = effectNames[currentEffect];
-        section.appendChild(FluentUI.SettingItem({
-            label: t('settings.liquid-glass.effect'),
-            description: t('settings.liquid-glass.effect.desc'),
-            control: (() => {
-                const wrap = document.createElement('div');
-                wrap.className = 'settings-slider-control';
-                wrap.appendChild(FluentUI.Slider({
-                    min: 0,
-                    max: 2,
-                    value: currentEffect,
-                    step: 1,
-                    onChange: (v) => {
-                        const next = Math.max(0, Math.min(2, Number(v)));
-                        State.updateSettings({ liquidGlassEffect: next });
-                        effectValue.textContent = effectNames[next];
-                        preview.className = `liquid-glass-preview liquid-glass-preview-${next}`;
-                        preview.querySelector('.liquid-glass-preview-subtitle').textContent = effectNames[next];
-                    }
-                }));
-                wrap.appendChild(effectValue);
-                return wrap;
-            })()
-        }));
-
-        const blur = Math.max(12, Math.min(70, Number(State.settings.liquidGlassBlur ?? 34)));
-        section.appendChild(FluentUI.SettingItem({
-            label: t('settings.liquid-glass.blur'),
-            description: t('settings.liquid-glass.blur.desc'),
+        const blur = Math.max(12, Math.min(70, Number(State.settings.blurIntensity ?? 40)));
+        blurItem = FluentUI.SettingItem({
+            label: t('settings.blur-intensity'),
+            description: t('settings.blur-intensity.desc'),
             control: FluentUI.Slider({
                 min: 12,
                 max: 70,
                 value: blur,
                 step: 1,
+                disabled: currentMaterial === 'mica',
                 showValue: true,
-                onChange: (v) => State.updateSettings({ liquidGlassBlur: v })
-            })
-        }));
+                onChange: (v) => State.updateSettings({ blurIntensity: v })
+            }),
+            className: `settings-blur-strength-item ${currentMaterial === 'mica' ? 'settings-mica-hidden' : ''}`
+        });
+        section.appendChild(blurItem);
 
         container.appendChild(section);
     },

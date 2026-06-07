@@ -219,6 +219,9 @@ const Desktop = {
     updateWallpaper() {
         const wallpaper = State.settings.wallpaperDesktop;
         this.wallpaperElement.style.backgroundImage = `url('${wallpaper}')`;
+        if (document.body && State.applyMaterialSetting) {
+            State.applyMaterialSetting();
+        }
         // 检测壁纸亮度并更新图标样式
         this.detectWallpaperBrightness(wallpaper);
     },

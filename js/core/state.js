@@ -67,7 +67,7 @@ const State = {
         
         // 应用新版 UI 设置
         this.applyFluentV2Setting();
-        this.applyLiquidGlassSetting();
+        this.applyMaterialSetting();
         this.applyStrictCspSetting();
         
         // 应用亮度设置
@@ -184,9 +184,8 @@ const State = {
             enableExternalFileImport: false,
             enableWindowBlur: false,
             enableFluentV2: true,
-            enableLiquidGlass: false,
-            liquidGlassEffect: 1,
-            liquidGlassBlur: 34,
+            materialType: 'gaussian',
+            blurIntensity: 40,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
@@ -367,11 +366,12 @@ const State = {
             this.applyFluentV2Setting();
         }
         if (
-            safeUpdates.enableLiquidGlass !== undefined ||
-            safeUpdates.liquidGlassEffect !== undefined ||
-            safeUpdates.liquidGlassBlur !== undefined
+            safeUpdates.materialType !== undefined ||
+            safeUpdates.blurIntensity !== undefined ||
+            safeUpdates.wallpaperDesktop !== undefined ||
+            safeUpdates.theme !== undefined
         ) {
-            this.applyLiquidGlassSetting();
+            this.applyMaterialSetting();
         }
         if (safeUpdates.strictCspEnabled !== undefined) {
             this.applyStrictCspSetting();
@@ -476,16 +476,25 @@ const State = {
         document.body.classList.add('fluent-v2');
     },
 
-    applyLiquidGlassSetting() {
-        const enabled = this.settings.enableLiquidGlass === true;
-        const effect = Math.max(0, Math.min(2, Number(this.settings.liquidGlassEffect ?? 1)));
-        const blur = Math.max(12, Math.min(70, Number(this.settings.liquidGlassBlur ?? 34)));
+    applyMaterialSetting() {
+        const material = this.settings.materialType === 'mica' ? 'mica' : 'gaussian';
+        const blur = Math.max(12, Math.min(70, Number(this.settings.blurIntensity ?? 40)));
+        const micaBlur = 75;
+        const materialBlur = material === 'mica' ? micaBlur : blur;
+        const wallpaper = this.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
+        const safeWallpaper = String(wallpaper).replace(/\\/g, '/').replace(/"/g, '\\"');
 
-        document.body.classList.toggle('liquid-glass-enabled', enabled);
-        document.body.classList.remove('liquid-glass-style-0', 'liquid-glass-style-1', 'liquid-glass-style-2');
-        document.body.classList.add(`liquid-glass-style-${effect}`);
-        document.body.style.setProperty('--liquid-glass-blur', `${blur}px`);
-        document.body.style.setProperty('--liquid-glass-effect', String(effect));
+        document.body.classList.remove(
+            'material-gaussian',
+            'material-mica'
+        );
+        document.body.classList.add(`material-${material}`);
+        document.body.style.setProperty('--v2-blur', `${materialBlur}px`);
+        document.body.style.setProperty('--v2-blur-light', `${Math.max(8, Math.round(materialBlur * 0.5))}px`);
+        document.body.style.setProperty('--fluent-material-blur', `${materialBlur}px`);
+        document.body.style.setProperty('--fluent-material-blur-light', `${Math.max(8, Math.round(materialBlur * 0.5))}px`);
+        document.body.style.setProperty('--fluent-mica-blur', `${micaBlur}px`);
+        document.body.style.setProperty('--fluent-wallpaper-url', `url("${safeWallpaper}")`);
     },
 
     applyStrictCspSetting() {

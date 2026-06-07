@@ -462,6 +462,9 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 body.fluent-v2 {
     --v2-blur: 40px;
     --v2-blur-light: 20px;
+    --fluent-material-blur: var(--v2-blur);
+    --fluent-material-blur-light: var(--v2-blur-light);
+    --fluent-wallpaper-url: url("../Theme/Picture/Fluent-2.png");
     --v2-glass-bg: rgba(255, 255, 255, 0.2);
     --v2-glass-bg-dark: rgba(40, 40, 40, 0.5);
     --v2-glass-border: rgba(255, 255, 255, 0.25);
@@ -2082,4 +2085,234 @@ body.fluent-v2 .fluent-toast-title {
 
 body.fluent-v2 .fluent-toast-message {
     font-size: 14px;
+}
+/* ============================================================
+   Fluent material modes
+   Gaussian remains the default; Mica is rendered by browser backdrop sampling.
+============================================================ */
+body.fluent-v2.material-mica:not(.blur-disabled) .window.window-blur,
+body.fluent-v2.material-mica:not(.blur-disabled).window-blur-enabled .window,
+body.fluent-v2.material-mica:not(.blur-disabled) .taskbar,
+body.fluent-v2.material-mica:not(.blur-disabled) .start-menu,
+body.fluent-v2.material-mica:not(.blur-disabled) .control-center,
+body.fluent-v2.material-mica:not(.blur-disabled) .notification-center,
+body.fluent-v2.material-mica:not(.blur-disabled) #fingo-panel,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-sidebar,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-card,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-setting-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-select-trigger,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-select-dropdown,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-dialog,
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-toast,
+body.fluent-v2.material-mica:not(.blur-disabled) .files-sidebar,
+body.fluent-v2.material-mica:not(.blur-disabled) .files-toolbar,
+body.fluent-v2.material-mica:not(.blur-disabled) .notes-toolbar,
+body.fluent-v2.material-mica:not(.blur-disabled) .browser-header,
+body.fluent-v2.material-mica:not(.blur-disabled) .photos-toolbar-v2,
+body.fluent-v2.material-mica:not(.blur-disabled) .photos-adjust-panel,
+body.fluent-v2.material-mica:not(.blur-disabled) .photos-info-panel,
+body.fluent-v2.material-mica:not(.blur-disabled) .appshop-app-card,
+body.fluent-v2.material-mica:not(.blur-disabled) .media-sidebar,
+body.fluent-v2.material-mica:not(.blur-disabled) .media-player-bar {
+    background-color: rgba(248, 251, 255, 0.72) !important;
+    background-image:
+        linear-gradient(135deg, rgba(255,255,255,0.70), rgba(242,247,255,0.48)) !important;
+    background-size: auto !important;
+    background-position: initial !important;
+    background-attachment: initial !important;
+    background-blend-mode: normal !important;
+    backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(140%) brightness(1.05) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(140%) brightness(1.05) !important;
+}
+
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .window.window-blur,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled).window-blur-enabled .window,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .taskbar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .start-menu,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .control-center,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .notification-center,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) #fingo-panel,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-sidebar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-card,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-setting-item,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-select-trigger,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-select-dropdown,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-dialog,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-toast,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .files-sidebar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .files-toolbar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .notes-toolbar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .browser-header,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-toolbar-v2,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-adjust-panel,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-info-panel,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .appshop-app-card,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .media-sidebar,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .media-player-bar {
+    background-color: rgba(24, 28, 36, 0.72) !important;
+    background-image:
+        linear-gradient(135deg, rgba(38,42,52,0.70), rgba(16,18,24,0.58)) !important;
+    background-size: auto !important;
+    background-position: initial !important;
+    background-attachment: initial !important;
+    background-blend-mode: normal !important;
+    border-color: rgba(255, 255, 255, 0.10) !important;
+    backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(120%) brightness(0.86) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(120%) brightness(0.86) !important;
+}
+
+body.fluent-v2.material-mica.window-blur-disabled .window,
+body.fluent-v2.material-mica.blur-disabled .window,
+body.fluent-v2.material-mica.blur-disabled .taskbar,
+body.fluent-v2.material-mica.blur-disabled .start-menu,
+body.fluent-v2.material-mica.blur-disabled .control-center,
+body.fluent-v2.material-mica.blur-disabled .notification-center {
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .clock-sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .files-sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .weather-sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .browser-sidebar-item,
+body.fluent-v2.material-mica:not(.blur-disabled) .notes-sidebar-item {
+    background: transparent !important;
+}
+
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .clock-sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .files-sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .weather-sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .browser-sidebar-item:hover,
+body.fluent-v2.material-mica:not(.blur-disabled) .notes-sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(130%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(130%) !important;
+}
+
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .clock-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .files-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .weather-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .browser-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .notes-sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+body.fluent-v2.material-mica:not(.blur-disabled) .fluent-sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .clock-sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .files-sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .weather-sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .browser-sidebar-item.active,
+body.fluent-v2.material-mica:not(.blur-disabled) .notes-sidebar-item.active {
+    background: rgba(0, 120, 212, 0.16) !important;
+    backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled).window-blur-enabled .window,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .window.window-blur,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .taskbar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .start-menu,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .control-center,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notification-center,
+body.fluent-v2.material-gaussian:not(.blur-disabled) #fingo-panel {
+    backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(180%) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .settings-app > .fluent-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .clock-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-card,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-setting-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-select-trigger,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-select-dropdown,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-context-menu,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-dialog,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-toast,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-toolbar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-header,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .photos-toolbar-v2,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .appshop-app-card,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .media-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .media-player-bar {
+    backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .settings-app > .fluent-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .clock-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar {
+    background: rgba(255, 255, 255, 0.46) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .fluent-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .settings-app > .fluent-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .clock-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .files-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .weather-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .browser-sidebar,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .notes-sidebar {
+    background: rgba(26, 30, 38, 0.48) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .clock-sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar-item,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar-item {
+    background: transparent !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .clock-sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar-item:hover,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.26) !important;
+    backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+}
+
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .fluent-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .clock-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .files-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .weather-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .browser-sidebar-item:hover,
+body.fluent-v2.dark-mode.material-gaussian:not(.blur-disabled) .notes-sidebar-item:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .fluent-sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .clock-sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar-item.active,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar-item.active {
+    background: rgba(0, 120, 212, 0.18) !important;
+    backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
 }
