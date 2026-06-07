@@ -452,6 +452,123 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 @keyframes fluent-scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 @keyframes fluent-scale-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
 
+/* ============ 全局按钮高光反馈 ============ */
+body.button-glow-enabled .button-glow-target {
+    position: relative;
+    overflow: hidden;
+    --button-glow-x: 50%;
+    --button-glow-y: 50%;
+}
+
+body.button-glow-enabled .fluent-toggle.button-glow-target {
+    overflow: visible;
+}
+
+body.button-glow-enabled .fluent-toggle-track.button-glow-target {
+    overflow: visible;
+}
+
+body.button-glow-enabled .button-toggle-glow-surface {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+body.button-glow-enabled .button-edge-glow,
+body.button-glow-enabled .button-glow-ripple {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 999px;
+}
+
+body.button-glow-enabled .button-edge-glow {
+    left: var(--button-glow-x);
+    top: var(--button-glow-y);
+    width: 128px;
+    height: 128px;
+    z-index: 4;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    background:
+        radial-gradient(circle,
+            rgba(255, 255, 255, 0.42) 0%,
+            rgba(255, 255, 255, 0.20) 30%,
+            rgba(111, 203, 255, 0.12) 48%,
+            transparent 72%);
+    filter: blur(7px);
+    mix-blend-mode: screen;
+    transition: opacity 140ms ease;
+}
+
+body.button-glow-enabled .button-glow-target.button-glow-hover > .button-edge-glow {
+    opacity: 0.72;
+}
+
+body.button-glow-enabled .fluent-toggle-track.button-glow-hover .button-toggle-glow-surface > .button-edge-glow {
+    opacity: 0.8;
+}
+
+body.button-glow-enabled .button-glow-ripple {
+    z-index: 3;
+    transform: translate(-50%, -50%) scale(0);
+    background:
+        radial-gradient(circle,
+            rgba(255, 255, 255, 0.34) 0%,
+            rgba(255, 255, 255, 0.18) 36%,
+            rgba(111, 203, 255, 0.10) 54%,
+            transparent 72%);
+    mix-blend-mode: screen;
+    animation: button-glow-ripple-out 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+body.button-glow-enabled .button-toggle-glow-surface .button-edge-glow {
+    width: 58px;
+    height: 58px;
+    filter: blur(5px);
+}
+
+body.button-glow-enabled .button-toggle-glow-surface .button-glow-ripple {
+    mix-blend-mode: screen;
+}
+
+body.button-glow-enabled.dark-mode .button-edge-glow {
+    background:
+        radial-gradient(circle,
+            rgba(255, 255, 255, 0.34) 0%,
+            rgba(160, 190, 255, 0.18) 34%,
+            rgba(111, 203, 255, 0.10) 52%,
+            transparent 74%);
+}
+
+body.button-glow-enabled.dark-mode .button-glow-ripple {
+    background:
+        radial-gradient(circle,
+            rgba(255, 255, 255, 0.28) 0%,
+            rgba(160, 190, 255, 0.16) 38%,
+            rgba(111, 203, 255, 0.08) 56%,
+            transparent 74%);
+}
+
+@keyframes button-glow-ripple-out {
+    0% {
+        opacity: 0.78;
+        transform: translate(-50%, -50%) scale(0.12);
+        filter: blur(1px);
+    }
+    55% {
+        opacity: 0.34;
+        filter: blur(5px);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+        filter: blur(9px);
+    }
+}
+
 /* ============================================================
    Fluent V2 - 新版实验性 UI
    启用方式: body.fluent-v2

@@ -3398,6 +3398,23 @@ const SettingsApp = {
         });
         section.appendChild(blurItem);
 
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.button-glow-effect'),
+            description: t('settings.button-glow-effect.desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.enableButtonGlowEffect !== false,
+                onChange: (v) => {
+                    State.updateSettings({ enableButtonGlowEffect: v });
+                    this.addRecentSetting(t('settings.button-glow-effect'), v ? t('settings.on') : t('settings.off'), 'personalization');
+                    State.addNotification({
+                        title: t('settings.button-glow-effect'),
+                        message: v ? t('settings.on') : t('settings.off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
         container.appendChild(section);
     },
 

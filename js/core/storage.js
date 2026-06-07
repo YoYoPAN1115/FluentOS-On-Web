@@ -71,6 +71,7 @@ const Storage = {
                 enableExternalFileImport: false,
                 enableWindowBlur: false,
                 enableFluentV2: true,
+                enableButtonGlowEffect: true,
                 pin: '1234',
                 userName: 'Owner',
                 userEmail: 'owner@sample.com',

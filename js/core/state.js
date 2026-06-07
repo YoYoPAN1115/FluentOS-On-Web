@@ -68,6 +68,7 @@ const State = {
         // 应用新版 UI 设置
         this.applyFluentV2Setting();
         this.applyMaterialSetting();
+        this.applyButtonGlowSetting();
         this.applyStrictCspSetting();
         
         // 应用亮度设置
@@ -186,6 +187,7 @@ const State = {
             enableFluentV2: true,
             materialType: 'gaussian',
             blurIntensity: 40,
+            enableButtonGlowEffect: true,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
@@ -373,6 +375,9 @@ const State = {
         ) {
             this.applyMaterialSetting();
         }
+        if (safeUpdates.enableButtonGlowEffect !== undefined) {
+            this.applyButtonGlowSetting();
+        }
         if (safeUpdates.strictCspEnabled !== undefined) {
             this.applyStrictCspSetting();
         }
@@ -495,6 +500,149 @@ const State = {
         document.body.style.setProperty('--fluent-material-blur-light', `${Math.max(8, Math.round(materialBlur * 0.5))}px`);
         document.body.style.setProperty('--fluent-mica-blur', `${micaBlur}px`);
         document.body.style.setProperty('--fluent-wallpaper-url', `url("${safeWallpaper}")`);
+    },
+
+    applyButtonGlowSetting() {
+        const enabled = this.settings.enableButtonGlowEffect !== false;
+        if (typeof document === 'undefined' || !document.body) return;
+        document.body.classList.toggle('button-glow-enabled', enabled);
+        this.ensureButtonGlowListeners();
+        if (!enabled) {
+            this.clearButtonGlowTarget();
+        }
+    },
+
+    ensureButtonGlowListeners() {
+        if (this._buttonGlowListenersReady === true || typeof document === 'undefined') return;
+        this._buttonGlowListenersReady = true;
+        this._buttonGlowTarget = null;
+        this._buttonGlowSelector = [
+            'button',
+            'a[href]',
+            '[role="button"]',
+            '.fluent-btn',
+            '.fluent-icon-btn',
+            '.fluent-toggle-wrapper',
+            '.fluent-select-trigger',
+            '.fluent-tab-close',
+            '.window-control-btn',
+            '.taskbar-btn',
+            '.desktop-icon',
+            '.start-app',
+            '.start-app-item',
+            '.start-all-app-row',
+            '.recent-item',
+            '.start-section-link',
+            '.start-footer-btn',
+            '.start-power-btn',
+            '.fluent-sidebar-item',
+            '.settings-advanced-entry',
+            '.settings-recommend-item',
+            '.settings-recent-item',
+            '.network-option-item',
+            '.app-list-item',
+            '.wallpaper-item'
+        ].join(',');
+
+        document.addEventListener('pointermove', (event) => this.handleButtonGlowPointerMove(event), { passive: true });
+        document.addEventListener('pointerout', (event) => this.handleButtonGlowPointerOut(event), { passive: true });
+        document.addEventListener('pointerdown', (event) => this.handleButtonGlowPointerDown(event), { passive: true });
+    },
+
+    getButtonGlowTarget(source) {
+        if (!source || !document.body.classList.contains('button-glow-enabled')) return null;
+        const toggleWrapper = source.closest ? source.closest('.fluent-toggle-wrapper') : null;
+        if (toggleWrapper) {
+            if (toggleWrapper.classList.contains('fluent-toggle-disabled')) return null;
+            return toggleWrapper.querySelector('.fluent-toggle-track');
+        }
+        const target = source.closest ? source.closest(this._buttonGlowSelector) : null;
+        if (!target || target.closest('.button-glow-disabled')) return null;
+        if (target.disabled || target.getAttribute('aria-disabled') === 'true') return null;
+        return target;
+    },
+
+    prepareButtonGlowTarget(target) {
+        if (!target || target.dataset.buttonGlowReady === 'true') return;
+        target.dataset.buttonGlowReady = 'true';
+        target.classList.add('button-glow-target');
+        if (target.classList.contains('fluent-toggle-track')) {
+            const surface = document.createElement('span');
+            surface.className = 'button-toggle-glow-surface';
+            surface.setAttribute('aria-hidden', 'true');
+            const edge = document.createElement('span');
+            edge.className = 'button-edge-glow';
+            edge.setAttribute('aria-hidden', 'true');
+            surface.appendChild(edge);
+            target.insertBefore(surface, target.firstChild);
+            return;
+        }
+        const edge = document.createElement('span');
+        edge.className = 'button-edge-glow';
+        edge.setAttribute('aria-hidden', 'true');
+        target.appendChild(edge);
+    },
+
+    clearButtonGlowTarget(target = this._buttonGlowTarget) {
+        if (!target) return;
+        target.classList.remove('button-glow-hover');
+        if (this._buttonGlowTarget === target) {
+            this._buttonGlowTarget = null;
+        }
+    },
+
+    updateButtonGlowPosition(target, event) {
+        const rect = target.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+        target.style.setProperty('--button-glow-x', `${x}px`);
+        target.style.setProperty('--button-glow-y', `${y}px`);
+    },
+
+    handleButtonGlowPointerMove(event) {
+        const target = this.getButtonGlowTarget(event.target);
+        if (!target) {
+            this.clearButtonGlowTarget();
+            return;
+        }
+        this.prepareButtonGlowTarget(target);
+        if (this._buttonGlowTarget && this._buttonGlowTarget !== target) {
+            this.clearButtonGlowTarget(this._buttonGlowTarget);
+        }
+        this._buttonGlowTarget = target;
+        this.updateButtonGlowPosition(target, event);
+        target.classList.add('button-glow-hover');
+    },
+
+    handleButtonGlowPointerOut(event) {
+        const target = this._buttonGlowTarget;
+        if (!target) return;
+        const related = event.relatedTarget;
+        if (related && target.contains(related)) return;
+        this.clearButtonGlowTarget(target);
+    },
+
+    handleButtonGlowPointerDown(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        const target = this.getButtonGlowTarget(event.target);
+        if (!target) return;
+        this.prepareButtonGlowTarget(target);
+        this.updateButtonGlowPosition(target, event);
+        const rect = target.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height) * 2.25;
+        const ripple = document.createElement('span');
+        ripple.className = 'button-glow-ripple';
+        ripple.setAttribute('aria-hidden', 'true');
+        ripple.style.width = `${size}px`;
+        ripple.style.height = `${size}px`;
+        ripple.style.left = `${event.clientX - rect.left}px`;
+        ripple.style.top = `${event.clientY - rect.top}px`;
+        const toggleSurface = target.classList.contains('fluent-toggle-track')
+            ? target.querySelector('.button-toggle-glow-surface')
+            : null;
+        (toggleSurface || target).appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     },
 
     applyStrictCspSetting() {
