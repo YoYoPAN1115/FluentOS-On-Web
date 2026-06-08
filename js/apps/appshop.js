@@ -5,6 +5,7 @@
 
 // 已安装应用的存储 key
 const INSTALLED_APPS_KEY = 'fluentos.installedApps';
+const UNINSTALLED_DEFAULT_APPS_KEY = 'fluentos.uninstalledDefaultApps';
 
 const AppShop = {
     windowId: null,
@@ -20,7 +21,7 @@ const AppShop = {
             id: 'netease-music', 
             name: '网易云音乐', 
             category: 'music', 
-            icon: 'kugou_music.png',
+            icon: 'wangyiyun_music.png',
             developer: 'NetEase', 
             rating: 4.7, 
             downloads: '5亿+', 
@@ -59,19 +60,6 @@ const AppShop = {
             url: 'https://www.bilibili.com/',
             themeColor: '#fb7299',
             desc: '哔哩哔哩是中国年轻人高度聚集的文化社区和视频平台，提供动画、番剧、游戏、科技等丰富内容。'
-        },
-        { 
-            id: 'tencent-video', 
-            name: '腾讯视频', 
-            category: 'video', 
-            icon: 'youku.png',
-            developer: 'Tencent', 
-            rating: 4.5, 
-            downloads: '5亿+',
-            isPWA: true,
-            url: 'https://v.qq.com/',
-            themeColor: '#ff6a00',
-            desc: '腾讯视频是中国领先的在线视频媒体平台，拥有丰富的优质流行内容和专业的媒体运营能力。'
         },
         { 
             id: 'douyu', 
@@ -141,19 +129,6 @@ const AppShop = {
             themeColor: '#e2231a',
             desc: '京东是中国自营式电商企业，提供正品行货、当日达等优质服务。'
         },
-        { 
-            id: 'pdd', 
-            name: '拼多多', 
-            category: 'shopping', 
-            icon: 'taobaoshangou.png',
-            developer: 'Pinduoduo', 
-            rating: 4.3, 
-            downloads: '8亿+',
-            isPWA: true,
-            url: 'https://www.pinduoduo.com/',
-            themeColor: '#e02e24',
-            desc: '拼多多是一家专注于C2M拼团购物的第三方社交电商平台，汇聚海量优质商品。'
-        },
         // 工具类
         { 
             id: 'baidu-netdisk', 
@@ -222,33 +197,6 @@ const AppShop = {
             themeColor: '#0091ff',
             desc: '高德地图是中国领先的数字地图内容、导航和位置服务提供商。'
         },
-        // 办公
-        { 
-            id: 'dingding', 
-            name: '钉钉', 
-            category: 'office', 
-            icon: 'office.png',
-            developer: 'Alibaba', 
-            rating: 4.3, 
-            downloads: '5亿+',
-            isPWA: true,
-            url: 'https://www.dingtalk.com/',
-            themeColor: '#3296fa',
-            desc: '钉钉是阿里巴巴集团专为企业打造的免费沟通和协同的多端平台。'
-        },
-        { 
-            id: 'wecom', 
-            name: '企业微信', 
-            category: 'office', 
-            icon: 'wechat.png',
-            developer: 'Tencent', 
-            rating: 4.4, 
-            downloads: '3亿+',
-            isPWA: true,
-            url: 'https://work.weixin.qq.com/',
-            themeColor: '#2b7cff',
-            desc: '企业微信是腾讯微信团队打造的企业通讯与办公工具，与微信消息互通。'
-        },
         // 阅读
         { 
             id: 'coolapk', 
@@ -269,19 +217,28 @@ const AppShop = {
         system_clock: 'clock.png',
         gallery: 'photos.png',
         system_music: 'media.png',
-        net_ease_music: 'kugou_music.png',
-        tencent_video: 'youku.png',
+        net_ease_music: 'wangyiyun_music.png',
         douyu: 'douyuzhibo.png',
         weibo: 'WB.png',
         jd: 'jingdong.png',
-        pdd: 'taobaoshangou.png',
         baidu_netdisk: 'baidudisk.png',
         alipay: 'zhifubao.png',
         ele_me: 'meituan.png',
         amap: 'gaode.png',
-        dingding: 'office.png',
         we_com: 'wechat.png',
         coolapk: 'app_gallery.png'
+    },
+
+    getUninstalledDefaultApps() {
+        try {
+            return JSON.parse(localStorage.getItem(UNINSTALLED_DEFAULT_APPS_KEY)) || [];
+        } catch {
+            return [];
+        }
+    },
+
+    saveUninstalledDefaultApps(appIds) {
+        localStorage.setItem(UNINSTALLED_DEFAULT_APPS_KEY, JSON.stringify([...new Set(appIds || [])]));
     },
 
     normalizeIconPath(icon) {
@@ -291,6 +248,154 @@ const AppShop = {
         const renamed = this.iconRenames[baseName];
         return renamed ? `Theme/Icon/App_icon/${renamed}` : icon;
     },
+
+    getIconPath(icon) {
+        const normalized = this.normalizeIconPath(icon || 'app_gallery.png');
+        return normalized.includes('/') ? normalized : `Theme/Icon/App_icon/${normalized}`;
+    },
+
+    getCatalogApps() {
+        const catalog = window.FluentPWACatalog;
+        if (!Array.isArray(catalog) || catalog.length === 0) return this.apps;
+        return catalog.map(app => ({
+            rating: 4.5,
+            downloads: '10万+',
+            featured: false,
+            banner: false,
+            isPWA: true,
+            width: 1100,
+            height: 760,
+            ...app
+        }));
+    },
+
+    refreshCatalog() {
+        this.apps = this.getCatalogApps();
+    },
+
+    ensurePWARegistered(app) {
+        if (typeof PWALoader === 'undefined') return false;
+        if (PWALoader.isRegistered?.(app.id)) return true;
+        if (PWALoader.registerFromCatalog) {
+            return PWALoader.registerFromCatalog({
+                ...app,
+                icon: this.getIconPath(app.icon)
+            });
+        }
+        if (PWALoader.register) {
+            PWALoader.register({
+                ...app,
+                icon: this.getIconPath(app.icon),
+                width: app.width || 1100,
+                height: app.height || 760
+            });
+            return true;
+        }
+        return false;
+    },
+
+    isExternalApp(app) {
+        return app?.openMode === 'external';
+    },
+
+    isNativeApp(app) {
+        return app?.isNative === true || app?.appType === 'native';
+    },
+
+    getDesktopAppEntry(app) {
+        const icon = this.getIconPath(app.icon);
+        const entry = {
+            id: app.id,
+            name: app.name,
+            icon,
+            isPWA: !this.isNativeApp(app),
+            isNative: this.isNativeApp(app) || undefined,
+            url: app.url,
+            openMode: app.openMode
+        };
+        if (app.titleKey) entry.nameKey = app.titleKey;
+        return entry;
+    },
+
+    registerNativeApp(app) {
+        if (!this.isNativeApp(app) || typeof WindowManager === 'undefined' || !WindowManager.appConfigs) return false;
+        const existing = WindowManager.appConfigs[app.id] || {};
+        WindowManager.appConfigs[app.id] = {
+            ...existing,
+            titleKey: app.titleKey,
+            title: app.titleKey ? undefined : app.name,
+            icon: this.getIconPath(app.icon),
+            width: app.width || existing.width || 900,
+            height: app.height || existing.height || 640,
+            minWidth: app.minWidth || existing.minWidth,
+            minHeight: app.minHeight || existing.minHeight,
+            component: app.component || existing.component
+        };
+        return true;
+    },
+
+    ensureAppRegistered(app) {
+        return this.isNativeApp(app) ? this.registerNativeApp(app) : this.ensurePWARegistered(app);
+    },
+
+    addDesktopApp(app) {
+        if (typeof Desktop === 'undefined' || !Array.isArray(Desktop.apps)) return;
+        const entry = this.getDesktopAppEntry(app);
+        const existing = Desktop.apps.find(a => a.id === app.id);
+        if (existing) {
+            Object.assign(existing, entry);
+            return;
+        }
+        Desktop.apps.push(entry);
+    },
+
+    removeDesktopApp(appId) {
+        if (typeof Desktop === 'undefined' || !Array.isArray(Desktop.apps)) return;
+        const idx = Desktop.apps.findIndex(a => a.id === appId);
+        if (idx !== -1) Desktop.apps.splice(idx, 1);
+    },
+
+    createInstalledRecord(app) {
+        return {
+            id: app.id,
+            name: app.name,
+            icon: this.getIconPath(app.icon),
+            url: app.url,
+            openMode: app.openMode,
+            appType: this.isNativeApp(app) ? 'native' : 'pwa',
+            isNative: this.isNativeApp(app) || undefined,
+            scriptLoaded: !this.isNativeApp(app),
+            installedAt: new Date().toISOString()
+        };
+    },
+
+    syncDefaultInstalledApps() {
+        let installedApps = this.getInstalledApps();
+        const installedIds = new Set(installedApps.map(app => app.id));
+        const uninstalledDefaults = new Set(this.getUninstalledDefaultApps());
+        let changed = false;
+
+        this.apps
+            .filter(app => this.isNativeApp(app) && app.defaultInstalled === true)
+            .forEach(app => {
+                this.registerNativeApp(app);
+                if (!installedIds.has(app.id) && !uninstalledDefaults.has(app.id)) {
+                    installedApps.push(this.createInstalledRecord(app));
+                    installedIds.add(app.id);
+                    changed = true;
+                }
+                if (installedIds.has(app.id) && !uninstalledDefaults.has(app.id)) {
+                    this.addDesktopApp(app);
+                } else if (uninstalledDefaults.has(app.id)) {
+                    this.removeDesktopApp(app.id);
+                }
+            });
+
+        if (changed) {
+            this.saveInstalledApps(installedApps);
+        }
+        return installedApps;
+    },
     
     getCategories() {
         return [
@@ -299,7 +404,12 @@ const AppShop = {
             { id: 'video', name: t('appshop.cat-video'), icon: 'Video' },
             { id: 'social', name: t('appshop.cat-social'), icon: 'Message Dots' },
             { id: 'shopping', name: t('appshop.cat-shopping'), icon: 'Shopping Cart' },
+            { id: 'games', name: t('appshop.cat-games'), icon: 'Gameboy' },
+            { id: 'office', name: t('appshop.cat-office'), icon: 'Briefcase' },
+            { id: 'ai', name: t('appshop.cat-ai'), icon: 'Robot' },
             { id: 'tools', name: t('appshop.cat-tools'), icon: 'Wrench' },
+            { id: 'news', name: t('appshop.cat-news'), icon: 'Book Text' },
+            { id: 'travel', name: t('appshop.cat-travel'), icon: 'Map Marker' },
             { id: 'lifestyle', name: t('appshop.cat-lifestyle'), icon: 'Home' }
         ];
     },
@@ -336,6 +446,7 @@ const AppShop = {
     init(windowId) {
         this.windowId = windowId;
         this.container = document.getElementById(`${windowId}-content`);
+        this.refreshCatalog();
         this.render();
         
         // 监听语言和主题变化
@@ -607,7 +718,7 @@ const AppShop = {
 
         // 如果已安装，则打开应用
         if (this.isInstalled(appId)) {
-            this.openPWA(app);
+            this.openApp(app);
             return;
         }
         
@@ -617,74 +728,49 @@ const AppShop = {
             type: 'info',
             duration: 5000
         });
-        
-        // 动态加载 PWA 应用脚本
-        const script = document.createElement('script');
-        script.src = `js/third_parts_apps/${appId}.js`;
-        
-        // 5秒安装时间
-        const installDelay = 5000;
-        const startTime = Date.now();
-        
-        script.onload = () => {
-            const elapsed = Date.now() - startTime;
-            const remaining = Math.max(0, installDelay - elapsed);
-            
-            // 等待剩余时间完成安装
-            setTimeout(() => {
-                // 添加到已安装列表
-                const installedApps = this.getInstalledApps();
-                installedApps.push({
-                    id: app.id,
-                    name: app.name,
-                    icon: `Theme/Icon/App_icon/${app.icon}`,
-                    url: app.url,
-                    scriptLoaded: true,
-                    installedAt: new Date().toISOString()
-                });
-                this.saveInstalledApps(installedApps);
-                
-                // 同步到 State.settings.installedApps（用于设置页面显示）
-                State.updateSettings({ 
-                    installedApps: installedApps.map(a => a.id) 
-                });
-                
-                // 动态添加到 Desktop.apps（用于开始菜单显示）
-                if (!Desktop.apps.find(a => a.id === app.id)) {
-                    Desktop.apps.push({
-                        id: app.id,
-                        name: app.name,
-                        icon: `Theme/Icon/App_icon/${app.icon}`,
-                        isPWA: true,
-                        url: app.url
-                    });
-                }
-                
-                // 刷新开始菜单
-                if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
-                    StartMenu.renderApps();
-                }
-                
-                FluentUI.Toast({
-                    title: t('appshop.install-success'),
-                    message: t('appshop.added-to-start', { name: app.name }),
-                    type: 'success',
-                    duration: 4000
-                });
-                
-                // 刷新当前视图
-                this.updateAppsList();
-            }, remaining);
-        };
-        script.onerror = () => {
+
+        if (!this.ensureAppRegistered(app)) {
             FluentUI.Toast({
                 title: t('appshop.install-fail'),
                 message: t('appshop.load-fail', { name: app.name }),
                 type: 'error',
                 duration: 4000
             });
-        };
-        document.head.appendChild(script);
+            return;
+        }
+
+        // 5秒安装时间
+        const installDelay = 5000;
+        const startTime = Date.now();
+
+        setTimeout(() => {
+            const installedApps = this.getInstalledApps();
+            installedApps.push(this.createInstalledRecord(app));
+            this.saveInstalledApps(installedApps);
+
+            if (app.defaultInstalled === true) {
+                this.saveUninstalledDefaultApps(this.getUninstalledDefaultApps().filter(id => id !== app.id));
+            }
+
+            State.updateSettings({
+                installedApps: installedApps.map(a => a.id)
+            });
+
+            this.addDesktopApp(app);
+
+            if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
+                StartMenu.renderApps();
+            }
+
+            FluentUI.Toast({
+                title: t('appshop.install-success'),
+                message: t('appshop.added-to-start', { name: app.name }),
+                type: 'success',
+                duration: 4000
+            });
+
+            this.updateAppsList();
+        }, Math.max(0, installDelay - (Date.now() - startTime)));
     },
     
     // 卸载应用（内部执行，不含弹窗）
@@ -693,19 +779,20 @@ const AppShop = {
         const installedApps = this.getInstalledApps().filter(a => a.id !== appId);
         this.saveInstalledApps(installedApps);
 
+        if (app?.defaultInstalled === true) {
+            this.saveUninstalledDefaultApps([...this.getUninstalledDefaultApps(), appId]);
+        }
+
         // 同步到 State.settings.installedApps
         State.updateSettings({
             installedApps: installedApps.map(a => a.id)
         });
 
         // 从 Desktop.apps 移除
-        const idx = Desktop.apps.findIndex(a => a.id === appId);
-        if (idx !== -1) {
-            Desktop.apps.splice(idx, 1);
-        }
+        this.removeDesktopApp(appId);
 
         // 从 PWALoader 注销
-        if (typeof PWALoader !== 'undefined') {
+        if (!this.isNativeApp(app) && typeof PWALoader !== 'undefined') {
             PWALoader.unregister(appId);
         }
 
@@ -794,7 +881,16 @@ const AppShop = {
     },
     
     // 打开 PWA 应用
-    openPWA(app) {
+    openApp(app) {
+        this.ensureAppRegistered(app);
+        if (this.isNativeApp(app)) {
+            WindowManager.openApp(app.id);
+            return;
+        }
+        if (this.isExternalApp(app)) {
+            window.open(app.url, '_blank', 'noopener,noreferrer');
+            return;
+        }
         // 直接打开独立的 PWA 窗口
         WindowManager.openApp(app.id);
     },
@@ -809,6 +905,7 @@ const AppShop = {
         const btnAction = (isSystem || installed) ? 'open' : 'install';
         const btnText = (isSystem || installed) ? t('appshop.open') : t('appshop.get');
         const btnClass = (isSystem || installed) ? 'installed' : '';
+        const isExternal = this.isExternalApp(app);
 
         const overlay = document.createElement('div');
         overlay.className = 'appshop-detail-overlay';
@@ -837,6 +934,7 @@ const AppShop = {
                     </div>
                     <div class="appshop-detail-desc">
                         <p>${app.desc || t('appshop.no-desc')}</p>
+                        ${isExternal ? `<div class="appshop-detail-link-note">${t('appshop.external-desc')}</div>` : ''}
                     </div>
                     <div class="appshop-detail-meta">
                         <div class="appshop-detail-meta-item">
@@ -851,6 +949,12 @@ const AppShop = {
                             <span class="meta-value">${categories.find(c => c.id === app.category)?.name || app.category}</span>
                             <span class="meta-label">${t('appshop.category')}</span>
                         </div>
+                        ${isExternal ? `
+                        <div class="appshop-detail-meta-item">
+                            <span class="meta-value">${t('appshop.external-link')}</span>
+                            <span class="meta-label">${t('appshop.open-mode')}</span>
+                        </div>
+                        ` : ''}
                     </div>
                     ${(!isSystem && installed) ? `
                         <button class="appshop-detail-uninstall" data-action="uninstall">${t('appshop.uninstall-app')}</button>
@@ -885,7 +989,7 @@ const AppShop = {
                 this.installApp(appId);
             } else if (action === 'open') {
                 closeModal();
-                this.openPWA(app);
+                this.openApp(app);
             }
         });
         
@@ -899,39 +1003,51 @@ const AppShop = {
     }
 };
 
+AppShop.refreshCatalog();
+AppShop.syncDefaultInstalledApps();
+
 // 初始化时恢复已安装的应用
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
-        const installedApps = AppShop.getInstalledApps();
-        
-        // 同步到 State.settings.installedApps
-        if (installedApps.length > 0) {
-            State.updateSettings({ 
-                installedApps: installedApps.map(a => a.id) 
-            });
+        AppShop.syncDefaultInstalledApps();
+        let installedApps = AppShop.getInstalledApps();
+        const catalogIds = new Set(AppShop.apps.map(app => app.id));
+        const listedInstalledApps = installedApps.filter(app => catalogIds.has(app.id));
+        if (listedInstalledApps.length !== installedApps.length) {
+            installedApps = listedInstalledApps;
+            AppShop.saveInstalledApps(installedApps);
         }
         
-        // 动态加载已安装应用的脚本
+        // 同步到 State.settings.installedApps
+        State.updateSettings({
+            installedApps: installedApps.map(a => a.id)
+        });
+        
+        let installedChanged = false;
+
+        // 从目录恢复已安装应用
         installedApps.forEach(app => {
-            // 加载 PWA 应用脚本
-            const script = document.createElement('script');
-            script.src = `js/third_parts_apps/${app.id}.js`;
-            script.onload = () => {
-                console.log(`[AppShop] 已加载: ${app.name}`);
-            };
-            document.head.appendChild(script);
-            
+            const catalogApp = AppShop.apps.find(a => a.id === app.id) || app;
+            AppShop.ensureAppRegistered(catalogApp);
+
+            const iconPath = AppShop.getIconPath(catalogApp.icon || app.icon);
+            if (app.name !== catalogApp.name || app.url !== catalogApp.url || app.icon !== iconPath || app.openMode !== catalogApp.openMode) {
+                app.name = catalogApp.name || app.name;
+                app.url = catalogApp.url || app.url;
+                app.icon = iconPath;
+                app.openMode = catalogApp.openMode;
+                installedChanged = true;
+            }
+
             // 添加到 Desktop.apps
             if (!Desktop.apps.find(a => a.id === app.id)) {
-                Desktop.apps.push({
-                    id: app.id,
-                    name: app.name,
-                    icon: app.icon,
-                    isPWA: true,
-                    url: app.url
-                });
+                AppShop.addDesktopApp(catalogApp);
             }
         });
+
+        if (installedChanged) {
+            AppShop.saveInstalledApps(installedApps);
+        }
         
         // 刷新开始菜单
         if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {

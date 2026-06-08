@@ -1254,15 +1254,28 @@ const Fingo = {
 
     _doInstallAndOpen(shopApp) {
         const lang = this.lang();
-        Desktop.apps.push({ id: shopApp.id, name: shopApp.name, icon: `Theme/Icon/App_icon/${shopApp.icon}`, isPWA: true, url: shopApp.url });
+        Desktop.apps.push({ id: shopApp.id, name: shopApp.name, icon: `Theme/Icon/App_icon/${shopApp.icon}`, isPWA: true, url: shopApp.url, openMode: shopApp.openMode });
         const installed = State.settings.installedApps || [];
         installed.push(shopApp.id);
         State.updateSettings({ installedApps: installed });
         Desktop.renderIcons();
         if (typeof StartMenu !== 'undefined') StartMenu.renderApps();
-        const script = document.createElement('script');
-        script.src = `js/third_parts_apps/${shopApp.id}.js`;
-        document.head.appendChild(script);
+        if (typeof AppShop !== 'undefined' && AppShop.ensurePWARegistered) {
+            AppShop.ensurePWARegistered(shopApp);
+            const savedApps = AppShop.getInstalledApps();
+            if (!savedApps.some(app => app.id === shopApp.id)) {
+                savedApps.push({
+                    id: shopApp.id,
+                    name: shopApp.name,
+                    icon: AppShop.getIconPath(shopApp.icon),
+                    url: shopApp.url,
+                    openMode: shopApp.openMode,
+                    scriptLoaded: true,
+                    installedAt: new Date().toISOString()
+                });
+                AppShop.saveInstalledApps(savedApps);
+            }
+        }
         setTimeout(() => {
             WindowManager.openApp(shopApp.id);
             this._ensurePanelForeground();
@@ -1352,16 +1365,28 @@ const Fingo = {
             return;
         }
         // 执行安装
-        Desktop.apps.push({ id: found.id, name: found.name, icon: `Theme/Icon/App_icon/${found.icon}`, isPWA: true, url: found.url });
+        Desktop.apps.push({ id: found.id, name: found.name, icon: `Theme/Icon/App_icon/${found.icon}`, isPWA: true, url: found.url, openMode: found.openMode });
         const installed = State.settings.installedApps || [];
         installed.push(found.id);
         State.updateSettings({ installedApps: installed });
         Desktop.renderIcons();
         if (typeof StartMenu !== 'undefined') StartMenu.renderApps();
-        // 加载脚本
-        const script = document.createElement('script');
-        script.src = `js/third_parts_apps/${found.id}.js`;
-        document.head.appendChild(script);
+        if (typeof AppShop !== 'undefined' && AppShop.ensurePWARegistered) {
+            AppShop.ensurePWARegistered(found);
+            const savedApps = AppShop.getInstalledApps();
+            if (!savedApps.some(app => app.id === found.id)) {
+                savedApps.push({
+                    id: found.id,
+                    name: found.name,
+                    icon: AppShop.getIconPath(found.icon),
+                    url: found.url,
+                    openMode: found.openMode,
+                    scriptLoaded: true,
+                    installedAt: new Date().toISOString()
+                });
+                AppShop.saveInstalledApps(savedApps);
+            }
+        }
         setTimeout(() => this.addMessage(lang === 'zh' ? `${found.name} 安装成功 ✅` : `${found.name}installed successfully ✅`, 'bot'), 400);
     },
 

@@ -25,8 +25,9 @@ const Desktop = {
         { id: 'clock', nameKey: 'clock.title', icon: 'Theme/Icon/App_icon/clock.png' },
         { id: 'weather', nameKey: 'weather.title', icon: 'Theme/Icon/App_icon/weather.png' },
         { id: 'appshop', nameKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png' },
-        { id: 'photos', nameKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png' },
-        { id: 'media', nameKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png' }
+        { id: 'camera', nameKey: 'camera.title', icon: 'Theme/Icon/App_icon/camera.png', isNative: true, isPWA: false },
+        { id: 'photos', nameKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png', isNative: true, isPWA: false },
+        { id: 'media', nameKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', isNative: true, isPWA: false }
     ],
 
     getAppName(app) {

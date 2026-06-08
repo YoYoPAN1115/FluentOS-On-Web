@@ -185,31 +185,37 @@ const StartMenu = {
             alipay: 'Z',
             amap: 'G',
             appshop: 'A',
+            audiobook: 'T',
             'baidu-netdisk': 'B',
             bilibili: 'B',
             browser: 'L',
             calculator: 'J',
+            camera: 'X',
             clock: 'S',
             coolapk: 'K',
-            dingding: 'D',
             douyu: 'D',
             'ele-me': 'E',
             files: 'W',
+            geekfa: 'J',
             jd: 'J',
+            jiazhaoba: 'J',
+            kimi: 'K',
             media: 'D',
             meituan: 'M',
             'netease-music': 'W',
             notes: 'J',
-            pdd: 'P',
+            photopea: 'P',
             photos: 'Z',
             'qq-mail': 'Q',
             'qq-music': 'Q',
             settings: 'S',
+            'snake-classic': 'J',
+            solitaire: 'J',
             taobao: 'T',
-            'tencent-video': 'T',
             weather: 'T',
             wecom: 'Q',
-            weibo: 'W'
+            weibo: 'W',
+            whiteboard: 'B'
         };
         if (idInitials[app.id]) return idInitials[app.id];
         const name = Desktop.getAppName(app).trim();
@@ -868,7 +874,7 @@ const StartMenu = {
     },
 
     // 系统内置应用列表（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
     
     showAppContextMenu(event, appId) {
         const app = Desktop.apps.find(a => a.id === appId);

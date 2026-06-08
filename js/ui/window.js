@@ -47,6 +47,7 @@ const WindowManager = {
         clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/clock.png', width: 900, height: 650, component: 'ClockApp' },
         weather: { titleKey: 'weather.title', icon: 'Theme/Icon/App_icon/weather.png', width: 920, height: 640, component: 'WeatherApp' },
         appshop: { titleKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png', width: 1000, height: 700, component: 'AppShop' },
+        camera: { titleKey: 'camera.title', icon: 'Theme/Icon/App_icon/camera.png', width: 1100, height: 720, minWidth: 760, minHeight: 520, component: 'CameraApp' },
         photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png', width: 1000, height: 700, component: 'PhotosApp' },
         media: { titleKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' }
     },
@@ -909,6 +910,11 @@ const WindowManager = {
 
         if (typeof State !== 'undefined' && typeof State.recordAppUsage === 'function') {
             State.recordAppUsage(appId);
+        }
+
+        if (config.openMode === 'external' && config.url) {
+            window.open(config.url, '_blank', 'noopener,noreferrer');
+            return;
         }
 
         // 检查是否已经打开该应用窗口 - Check if app window already exists

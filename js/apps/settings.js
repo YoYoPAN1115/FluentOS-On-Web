@@ -3728,7 +3728,7 @@ const SettingsApp = {
     appSortOrder: 'desc', // 'desc' 或 'asc'
     
     // 系统应用列表（不可卸载）
-    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
 
     // 应用描述
     getAppDescription(appId) {
@@ -3741,6 +3741,7 @@ const SettingsApp = {
             'clock': 'settings.app-desc-clock',
             'weather': 'settings.app-desc-weather',
             'appshop': 'settings.app-desc-appshop',
+            'camera': 'settings.app-desc-camera',
             'photos': 'settings.app-desc-photos',
             'media': 'settings.app-desc-media'
         };
@@ -3764,17 +3765,26 @@ const SettingsApp = {
             { id: 'browser', name: t('settings.app-browser'), icon: 'Theme/Icon/App_icon/browser.png' },
             { id: 'clock', name: t('settings.app-clock'), icon: 'Theme/Icon/App_icon/clock.png' },
             { id: 'weather', name: t('settings.app-weather'), icon: 'Theme/Icon/App_icon/weather.png' },
-            { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' },
-            { id: 'photos', name: t('settings.app-photos'), icon: 'Theme/Icon/App_icon/photos.png' },
-            { id: 'media', name: t('settings.app-media'), icon: 'Theme/Icon/App_icon/media.png' }
+            { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' }
         ];
         
-        // 获取已安装的 PWA 应用（实时检测）
+        // 获取已安装的 App Shop 应用（实时检测）
         const installedPWAs = State.settings.installedApps || [];
         const pwaApps = installedPWAs.map(appId => {
             const appConfig = typeof PWALoader !== 'undefined' ? PWALoader.apps[appId] : null;
             if (appConfig) {
                 return { id: appId, name: appConfig.name, icon: appConfig.icon, isPWA: true, desc: appConfig.description || t('settings.app-desc-default') };
+            }
+            const shopApp = typeof AppShop !== 'undefined' ? AppShop.apps.find(app => app.id === appId) : null;
+            if (shopApp) {
+                return {
+                    id: appId,
+                    name: shopApp.titleKey ? t(shopApp.titleKey) : shopApp.name,
+                    icon: AppShop.getIconPath(shopApp.icon),
+                    isPWA: !AppShop.isNativeApp(shopApp),
+                    isNative: AppShop.isNativeApp(shopApp),
+                    desc: shopApp.desc || t('settings.app-desc-default')
+                };
             }
             return null;
         }).filter(Boolean);
@@ -3785,7 +3795,7 @@ const SettingsApp = {
             appsSize += this.getAppSize(app.id, false);
         });
         pwaApps.forEach(app => {
-            appsSize += this.getAppSize(app.id, true);
+            appsSize += this.getAppSize(app.id, app.isPWA !== false);
         });
         
         const usedStorage = systemSize + appsSize;
@@ -3851,8 +3861,8 @@ const SettingsApp = {
             })),
             ...pwaApps.map(app => ({ 
                 ...app, 
-                size: this.getAppSize(app.id, true), 
-                isPWA: true 
+                size: this.getAppSize(app.id, app.isPWA !== false),
+                isPWA: app.isPWA !== false
             }))
         ];
         
@@ -4048,39 +4058,12 @@ const SettingsApp = {
                         ],
                         onClose: (result) => {
                             if (result === 'uninstall') {
-                                const installed = State.settings.installedApps || [];
-                                const newInstalled = installed.filter(id => id !== app.id);
-                                State.updateSettings({ installedApps: newInstalled });
-
-                                // 从 Desktop.apps 移除
-                                const dIdx = Desktop.apps.findIndex(a => a.id === app.id);
-                                if (dIdx !== -1) Desktop.apps.splice(dIdx, 1);
-
-                                // 从 PWALoader 注销
-                                if (typeof PWALoader !== 'undefined' && PWALoader.unregister) {
-                                    PWALoader.unregister(app.id);
+                                if (typeof AppShop !== 'undefined' && AppShop.uninstallApp) {
+                                    AppShop.uninstallApp(app.id, {
+                                        skipConfirm: true,
+                                        skipRunningCheck: true
+                                    });
                                 }
-
-                                // 如果固定在任务栏，自动取消固定
-                                if (typeof Taskbar !== 'undefined' && Taskbar.unpinApp) {
-                                    const pinned = State.settings.pinnedApps || [];
-                                    if (pinned.includes(app.id)) {
-                                        Taskbar.unpinApp(app.id);
-                                    }
-                                }
-
-                                // 刷新开始菜单
-                                const startPinned = State.settings.startPinnedApps || [];
-                                if (startPinned.includes(app.id)) {
-                                    State.updateSettings({ startPinnedApps: startPinned.filter(id => id !== app.id) });
-                                }
-
-                                if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
-                                    StartMenu.renderApps();
-                                }
-
-                                FluentUI.Toast({ title: app.name, message: t('settings.app-uninstalled'), type: 'info' });
-
                                 this.currentPage = 'applications';
                                 this.currentAppDetail = null;
                                 this.render();

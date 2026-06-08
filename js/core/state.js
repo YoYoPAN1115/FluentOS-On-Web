@@ -195,7 +195,7 @@ const State = {
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
-            startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+            startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
             windowBoundsMemory: {}

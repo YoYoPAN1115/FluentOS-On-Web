@@ -4,7 +4,7 @@
 PWALoader.register({
     id: 'netease-music',
     name: '网易云音乐',
-    icon: 'Theme/Icon/App_icon/kugou_music.png',
+    icon: 'Theme/Icon/App_icon/wangyiyun_music.png',
     url: 'https://music.163.com/',
     width: 1100,
     height: 750,
