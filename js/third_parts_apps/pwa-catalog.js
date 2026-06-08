@@ -223,7 +223,7 @@ window.FluentPWACatalog = [
         id: 'coolapk',
         name: '酷安',
         category: 'tools',
-        icon: 'app_gallery.png',
+        icon: 'kuan.png',
         developer: 'Coolapk',
         rating: 4.5,
         downloads: '5000万+',

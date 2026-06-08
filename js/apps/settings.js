@@ -4267,6 +4267,35 @@ const SettingsApp = {
             })
         }));
 
+        const appShopFeatureOptions = [
+            { value: 'auto', label: '自动按日期切换' },
+            ...Array.from({ length: 16 }, (_, index) => ({
+                value: String(index + 1),
+                label: `第 ${index + 1} 期精选`
+            }))
+        ];
+        const currentAppShopPreview = Number(State.settings.appShopFeaturePreviewIndex);
+        section.appendChild(FluentUI.SettingItem({
+            label: 'App Shop 精选预览',
+            description: '用于开发调试：手动选择 App Shop 首页展示第几期精选内容。',
+            control: FluentUI.Select({
+                options: appShopFeatureOptions,
+                value: Number.isInteger(currentAppShopPreview) && currentAppShopPreview >= 1 && currentAppShopPreview <= 16
+                    ? String(currentAppShopPreview)
+                    : 'auto',
+                onChange: (value) => {
+                    const nextValue = value === 'auto' ? 'auto' : String(value);
+                    State.updateSettings({ appShopFeaturePreviewIndex: nextValue });
+                    this.addRecentSetting('App Shop 精选预览', value === 'auto' ? '自动' : `第 ${value} 期`, 'developer');
+                    State.addNotification({
+                        title: t('settings.developer-title'),
+                        message: value === 'auto' ? 'App Shop 精选已恢复自动切换。' : `App Shop 精选已切换到第 ${value} 期。`,
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
         container.appendChild(section);
     },
     

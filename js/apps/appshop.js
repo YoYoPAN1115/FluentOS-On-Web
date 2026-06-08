@@ -12,6 +12,8 @@ const AppShop = {
     container: null,
     searchQuery: '',
     currentCategory: 'all',
+    activePage: 'featured',
+    _resizeObserver: null,
     _contentScrollRestoreRaf: null,
     
     // 应用数据（可从应用商店安装）
@@ -202,7 +204,7 @@ const AppShop = {
             id: 'coolapk', 
             name: '酷安', 
             category: 'tools', 
-            icon: 'app_gallery.png',
+            icon: 'kuan.png',
             developer: 'Coolapk', 
             rating: 4.5, 
             downloads: '5000万+',
@@ -226,7 +228,7 @@ const AppShop = {
         ele_me: 'meituan.png',
         amap: 'gaode.png',
         we_com: 'wechat.png',
-        coolapk: 'app_gallery.png'
+        coolapk: 'kuan.png'
     },
 
     getUninstalledDefaultApps() {
@@ -443,10 +445,1018 @@ const AppShop = {
         return this.getInstalledApps().some(a => a.id === appId);
     },
 
+    addStyles() {
+        if (document.getElementById('appshop-v2-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'appshop-v2-styles';
+        style.textContent = `
+            .window[data-app-id="appshop"] .window-content { padding: 0; overflow: hidden; }
+            .appshop.appshop-v2 {
+                display: grid;
+                grid-template-columns: var(--system-sidebar-width, 200px) minmax(0, 1fr);
+                width: 100%;
+                height: 100%;
+                min-height: 0;
+                container-type: inline-size;
+                --system-sidebar-width: clamp(68px, 24cqw, 232px);
+                --system-sidebar-ease: cubic-bezier(0.16, 1, 0.3, 1);
+                background: transparent !important;
+                color: var(--text-primary);
+                overflow: hidden;
+            }
+            .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
+                width: var(--system-sidebar-width, 200px) !important;
+                min-width: var(--system-sidebar-width, 200px) !important;
+                flex: none !important;
+                min-height: 0;
+                overflow-x: hidden !important;
+                transition:
+                    width 430ms var(--system-sidebar-ease),
+                    min-width 430ms var(--system-sidebar-ease),
+                    flex-basis 430ms var(--system-sidebar-ease),
+                    padding 430ms var(--system-sidebar-ease),
+                    margin 430ms var(--system-sidebar-ease),
+                    border-radius 430ms var(--system-sidebar-ease),
+                    background 260ms var(--system-sidebar-ease) !important;
+            }
+            .appshop.appshop-v2.appshop-compact {
+                --system-sidebar-width: 68px;
+            }
+            .appshop.appshop-v2:not(.appshop-compact) .appshop-nav-btn {
+                justify-content: flex-start !important;
+                text-align: left !important;
+            }
+            .appshop.appshop-v2.appshop-compact > .fluent-sidebar.appshop-sidebar {
+                width: 68px !important;
+                min-width: 68px !important;
+                flex-basis: auto !important;
+                padding: 10px 6px !important;
+                margin: 8px 0 8px 8px !important;
+                border-radius: 12px !important;
+            }
+            .appshop.appshop-v2.appshop-compact .fluent-sidebar-header {
+                opacity: 0 !important;
+                max-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+                pointer-events: none !important;
+                transform: translateX(-8px) scale(0.96) !important;
+            }
+            .appshop.appshop-v2.appshop-compact .fluent-sidebar-item-label {
+                opacity: 0 !important;
+                max-width: 0 !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+                transform: translateX(-8px) scale(0.96) !important;
+                pointer-events: none !important;
+            }
+            .appshop.appshop-v2.appshop-compact .appshop-nav-btn {
+                height: 44px !important;
+                min-height: 44px !important;
+                justify-content: center !important;
+                align-items: center !important;
+                gap: 0 !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+                font-size: 0 !important;
+            }
+            .appshop.appshop-v2.appshop-compact .appshop-nav-btn img {
+                margin: 0 !important;
+                flex: 0 0 auto !important;
+            }
+            .appshop.appshop-v2 .fluent-sidebar-header {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 16px;
+            }
+            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-header,
+            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-header span,
+            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item,
+            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item-label {
+                color: #fff !important;
+            }
+            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item img {
+                filter: brightness(0) invert(1) !important;
+            }
+            .appshop.appshop-v2 .fluent-sidebar-header img {
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
+            }
+            .appshop.appshop-v2 .appshop-nav-btn {
+                border: 0;
+                appearance: none;
+                font-weight: 650;
+                width: 100%;
+                text-align: left;
+                justify-content: flex-start;
+                color: var(--text-primary);
+            }
+            .appshop.appshop-v2 .appshop-nav-btn img {
+                width: 16px;
+                height: 16px;
+            }
+            .appshop.appshop-v2 .appshop-nav-btn .fluent-sidebar-item-label {
+                flex: 0 1 auto;
+                text-align: left;
+            }
+            .appshop-main {
+                min-width: 0;
+                min-height: 0;
+                overflow: auto;
+                padding: 24px 28px 36px;
+                background: transparent !important;
+                color: #fff;
+                position: relative;
+                z-index: 1;
+            }
+            body:not(.dark-mode) .appshop-main {
+                background: transparent !important;
+                color: #1d1d1f;
+            }
+            body:not(.dark-mode) .appshop-main h1,
+            body:not(.dark-mode) .appshop-main h2,
+            body:not(.dark-mode) .appshop-main h3,
+            body:not(.dark-mode) .appshop-main h4,
+            body:not(.dark-mode) .appshop-list-name,
+            body:not(.dark-mode) .appshop-app-name,
+            body:not(.dark-mode) .appshop-story-title,
+            body:not(.dark-mode) .appshop-editorial-title {
+                color: #1d1d1f !important;
+            }
+            body:not(.dark-mode) .appshop-page-subtitle,
+            body:not(.dark-mode) .appshop-list-desc,
+            body:not(.dark-mode) .appshop-list-meta,
+            body:not(.dark-mode) .appshop-story-subtitle,
+            body:not(.dark-mode) .appshop-story-kicker,
+            body:not(.dark-mode) .appshop-editorial-kicker {
+                color: rgba(29,29,31,0.62) !important;
+            }
+            body:not(.dark-mode) .appshop-editorial-panel {
+                border-top-color: rgba(0,0,0,0.12);
+            }
+            body:not(.dark-mode) .appshop-list-row:hover {
+                background: rgba(0,0,0,0.05);
+            }
+            body:not(.dark-mode) .appshop-app-card,
+            body:not(.dark-mode) .appshop-category-card {
+                background: rgba(255,255,255,0.78) !important;
+                border-color: rgba(0,0,0,0.08) !important;
+                color: #1d1d1f !important;
+            }
+            body:not(.dark-mode) .appshop-app-card:hover,
+            body:not(.dark-mode) .appshop-category-card:hover {
+                background: #fff !important;
+            }
+            body:not(.dark-mode) .appshop-app-developer,
+            body:not(.dark-mode) .appshop-app-meta,
+            body:not(.dark-mode) .appshop-empty,
+            body:not(.dark-mode) .appshop-empty p {
+                color: rgba(29,29,31,0.56) !important;
+            }
+            body:not(.dark-mode) .appshop-category-tab {
+                color: #1d1d1f !important;
+            }
+            body:not(.dark-mode) .appshop-category-tab.active {
+                color: #0078d4 !important;
+                background: rgba(0,120,212,0.12) !important;
+            }
+            body:not(.dark-mode) .appshop-discover-chip {
+                border-bottom-color: rgba(0,0,0,0.1) !important;
+            }
+            body.dark-mode .appshop-main,
+            body.dark-mode .appshop-main h1,
+            body.dark-mode .appshop-main h2,
+            body.dark-mode .appshop-main h3,
+            body.dark-mode .appshop-main h4,
+            body.dark-mode .appshop-main p,
+            body.dark-mode .appshop-main span,
+            body.dark-mode .appshop-app-name,
+            body.dark-mode .appshop-list-name {
+                color: #fff !important;
+            }
+            .appshop-page-title {
+                margin: 0 0 22px;
+                font-size: 34px;
+                line-height: 1.12;
+                letter-spacing: 0;
+                font-weight: 800;
+            }
+            .appshop-page-subtitle {
+                margin: -12px 0 24px;
+                color: rgba(255,255,255,0.58);
+                font-size: 15px;
+            }
+            .appshop-today-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.95fr);
+                gap: 22px;
+                margin-bottom: 34px;
+            }
+            .appshop-story-card {
+                min-height: 360px;
+                border-radius: 16px;
+                overflow: hidden;
+                background: linear-gradient(140deg, var(--story-a), var(--story-b));
+                position: relative;
+                cursor: pointer;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.32);
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            body:not(.dark-mode) .appshop-story-card {
+                background: linear-gradient(
+                    140deg,
+                    color-mix(in srgb, var(--story-a) 36%, #ffffff 64%),
+                    color-mix(in srgb, var(--story-b) 32%, #f4f8ff 68%)
+                ) !important;
+                border-color: rgba(0,0,0,0.08) !important;
+                box-shadow: 0 18px 38px rgba(20,40,70,0.16);
+            }
+            body.dark-mode .appshop-story-card {
+                background: linear-gradient(
+                    140deg,
+                    color-mix(in srgb, var(--story-a) 72%, #050507 28%),
+                    color-mix(in srgb, var(--story-b) 70%, #050507 30%)
+                ) !important;
+                border-color: rgba(255,255,255,0.1) !important;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.42);
+            }
+            .appshop-story-card.compact { min-height: 360px; }
+            .appshop-story-art {
+                position: absolute;
+                inset: 0;
+                display: grid;
+                place-items: center;
+                overflow: hidden;
+            }
+            .appshop-story-art::before,
+            .appshop-story-art::after {
+                content: "";
+                position: absolute;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.18);
+                filter: blur(2px);
+            }
+            .appshop-story-art::before {
+                width: 360px;
+                height: 360px;
+                transform: translate(24%, -12%);
+            }
+            .appshop-story-art::after {
+                width: 220px;
+                height: 220px;
+                transform: translate(-48%, 26%);
+                background: rgba(0,0,0,0.16);
+            }
+            .appshop-story-art img {
+                width: min(220px, 42%);
+                height: min(220px, 42%);
+                object-fit: contain;
+                position: relative;
+                z-index: 1;
+                filter: drop-shadow(0 24px 50px rgba(0,0,0,0.45));
+            }
+            .appshop-story-copy {
+                position: absolute;
+                left: 28px;
+                right: 28px;
+                bottom: 28px;
+                z-index: 2;
+            }
+            .appshop-story-kicker {
+                display: block;
+                margin-bottom: 8px;
+                color: rgba(255,255,255,0.68);
+                font-size: 13px;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+            .appshop-story-title {
+                margin: 0;
+                font-size: clamp(24px, 2.8vw, 34px);
+                line-height: 1.1;
+                font-weight: 850;
+                letter-spacing: 0;
+            }
+            .appshop-story-subtitle {
+                margin: 10px 0 0;
+                color: rgba(255,255,255,0.7);
+                font-size: 15px;
+                line-height: 1.35;
+            }
+            .appshop-story-card.compact .appshop-story-title {
+                font-size: clamp(23px, 2.2vw, 31px);
+            }
+            .appshop-story-card.compact .appshop-story-subtitle {
+                font-size: 14px;
+            }
+            .appshop-list-icon {
+                width: 58px;
+                height: 58px;
+                border-radius: 14px;
+                object-fit: cover;
+            }
+            .appshop-list-name {
+                margin: 0;
+                font-size: 16px;
+                font-weight: 750;
+                color: #fff;
+            }
+            .appshop-list-desc {
+                margin: 4px 0 0;
+                color: rgba(255,255,255,0.62);
+                font-size: 13px;
+                line-height: 1.25;
+            }
+            .appshop-action-btn {
+                min-width: 78px;
+            }
+            body.dark-mode .appshop-app-install.fluent-btn,
+            body.dark-mode .appshop-app-install.fluent-btn.installed,
+            body.dark-mode .appshop-detail-btn.fluent-btn,
+            body.dark-mode .appshop-detail-btn.fluent-btn.installed {
+                color: #fff !important;
+            }
+            .appshop-detail-close,
+            .appshop-detail-close:hover,
+            .appshop-story-detail-close,
+            .appshop-story-detail-close:hover {
+                position: absolute !important;
+                top: 14px !important;
+                right: 14px !important;
+                left: auto !important;
+                bottom: auto !important;
+                inset-inline-start: auto !important;
+                inset-inline-end: 14px !important;
+                transform: none !important;
+                translate: none !important;
+                width: 40px !important;
+                height: 40px !important;
+                z-index: 20 !important;
+            }
+            .appshop-detail-close img {
+                width: 20px !important;
+                height: 20px !important;
+            }
+            .appshop-section-title {
+                margin: 0 0 18px;
+                font-size: 25px;
+                line-height: 1.15;
+                font-weight: 850;
+            }
+            .appshop-editorial-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(220px, 1fr));
+                gap: 24px;
+            }
+            .appshop-editorial-panel {
+                min-width: 0;
+                border-top: 1px solid rgba(255,255,255,0.12);
+                padding-top: 18px;
+            }
+            .appshop-editorial-kicker {
+                color: rgba(255,255,255,0.48);
+                font-weight: 800;
+                font-size: 13px;
+                text-transform: uppercase;
+            }
+            .appshop-editorial-title {
+                margin: 6px 0 14px;
+                font-size: 25px;
+                line-height: 1.13;
+                font-weight: 850;
+            }
+            .appshop-list-row {
+                display: grid;
+                grid-template-columns: 54px minmax(0, 1fr) auto;
+                gap: 12px;
+                align-items: center;
+                min-height: 74px;
+                border-radius: 10px;
+                cursor: pointer;
+            }
+            .appshop-list-row:hover { background: rgba(255,255,255,0.06); }
+            .appshop-list-row .appshop-list-icon { width: 54px; height: 54px; border-radius: 13px; }
+            .appshop-list-meta { color: rgba(255,255,255,0.46); font-size: 11px; margin-top: 3px; }
+            .appshop-category-strip,
+            .appshop-discover-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 16px 28px;
+                margin-bottom: 30px;
+            }
+            .appshop-discover-chip,
+            .appshop-category-card {
+                border: 0;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                min-height: 48px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                color: #2da8ff;
+                background: transparent;
+                cursor: pointer;
+                font-size: 16px;
+                text-align: left;
+            }
+            .appshop-category-card {
+                min-height: 78px;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 12px;
+                padding: 0 16px;
+                color: #fff;
+                background: rgba(255,255,255,0.05);
+            }
+            .appshop-category-card img,
+            .appshop-discover-chip img { width: 20px; height: 20px; filter: invert(58%) sepia(73%) saturate(2812%) hue-rotate(181deg) brightness(103%) contrast(101%); }
+            .appshop-search-panel {
+                position: sticky;
+                top: -24px;
+                z-index: 4;
+                padding: 0 0 22px;
+                background: linear-gradient(#151515 82%, rgba(21,21,21,0));
+            }
+            body:not(.dark-mode) .appshop-search-panel {
+                background: linear-gradient(#f7f7f8 82%, rgba(247,247,248,0));
+            }
+            .appshop-search-large {
+                height: 56px;
+                border-radius: 14px;
+                padding: 0 16px;
+                display: grid;
+                grid-template-columns: 22px minmax(0, 1fr) 22px;
+                align-items: center;
+                gap: 12px;
+                background: rgba(255,255,255,0.92);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            }
+            .appshop-search-large img { width: 22px; height: 22px; opacity: 0.7; }
+            .appshop-search-large input {
+                border: 0;
+                outline: 0;
+                background: transparent;
+                color: #222;
+                font-size: 17px;
+            }
+            body.dark-mode .appshop-search-large {
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.12);
+            }
+            body.dark-mode .appshop-search-large input {
+                color: #fff !important;
+            }
+            body.dark-mode .appshop-search-large input::placeholder {
+                color: rgba(255,255,255,0.55);
+            }
+            body.dark-mode .appshop-search-large img {
+                filter: brightness(0) invert(1);
+            }
+            .appshop-apps-grid.clean {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 12px;
+            }
+            .appshop-story-overlay {
+                position: absolute;
+                inset: 0;
+                z-index: 40;
+                display: grid;
+                place-items: start center;
+                padding: 34px;
+                background-color: rgba(0,0,0,0.66) !important;
+                opacity: 0;
+                transition: opacity 180ms ease;
+                overflow: auto;
+            }
+            .appshop-story-overlay.show { opacity: 1; }
+            .appshop-story-modal {
+                position: relative;
+                width: min(820px, 100%);
+                max-height: calc(100vh - 92px);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 18px;
+                background-color: #1d1d1f !important;
+                color: #f7f7f7 !important;
+                overflow: auto;
+                box-shadow: 0 30px 90px rgba(0,0,0,0.58);
+                isolation: isolate;
+                transform: translateZ(0);
+            }
+            .appshop-story-detail-hero {
+                height: 330px;
+                position: relative;
+                display: grid;
+                place-items: center;
+                background: linear-gradient(140deg, var(--story-a), var(--story-b)) !important;
+                overflow: hidden;
+            }
+            .appshop-story-detail-hero img {
+                width: 170px;
+                height: 170px;
+                object-fit: contain;
+                filter: drop-shadow(0 24px 56px rgba(0,0,0,0.45));
+            }
+            .appshop-story-detail-copy {
+                position: absolute;
+                left: 24px;
+                right: 24px;
+                bottom: 22px;
+                background: transparent !important;
+            }
+            .appshop-story-detail-copy h2 {
+                margin: 6px 0 0;
+                font-size: 34px;
+                line-height: 1.05;
+                color: #fff !important;
+            }
+            .appshop-story-detail-modal h4,
+            .appshop-story-detail-appbar h4,
+            .appshop-story-detail-body p,
+            .appshop-story-detail-body strong {
+                background: transparent !important;
+            }
+            .appshop-story-detail-appbar {
+                min-height: 92px;
+                padding: 14px 24px;
+                display: grid;
+                grid-template-columns: 58px minmax(0, 1fr) auto;
+                gap: 14px;
+                align-items: center;
+                background-color: rgba(11,31,58,0.82) !important;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+            }
+            .appshop-story-detail-body {
+                padding: 26px 42px 56px;
+                background-color: #1d1d1f !important;
+                color: rgba(255,255,255,0.72) !important;
+                font-size: 20px;
+                line-height: 1.45;
+            }
+            .appshop-story-detail-body strong { color: #fff; }
+            .appshop-story-close,
+            .appshop-story-detail-close {
+                position: absolute !important;
+                top: 16px !important;
+                right: 16px !important;
+                left: auto !important;
+                bottom: auto !important;
+                inset-inline-start: auto !important;
+                inset-inline-end: 16px !important;
+                transform: none !important;
+                translate: none !important;
+                z-index: 50;
+                width: 48px !important;
+                height: 48px !important;
+                border: 1px solid rgba(255,255,255,0.15);
+                border-radius: 50%;
+                background: rgba(30,30,32,0.54);
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+                backdrop-filter: blur(16px);
+            }
+            .appshop-story-close img,
+            .appshop-story-detail-close img { width: 24px; height: 24px; filter: invert(1); }
+            .appshop-story-close:hover,
+            .appshop-story-detail-close:hover {
+                top: 16px !important;
+                right: 16px !important;
+                left: auto !important;
+                bottom: auto !important;
+                inset-inline-start: auto !important;
+                inset-inline-end: 16px !important;
+                transform: none !important;
+                translate: none !important;
+            }
+            @container (max-width: 760px) {
+                .appshop.appshop-v2 {
+                    --system-sidebar-width: 68px;
+                }
+                .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
+                    width: 68px !important;
+                    min-width: 68px !important;
+                    flex-basis: auto !important;
+                    padding: 10px 6px !important;
+                    margin: 8px 0 8px 8px !important;
+                    border-radius: 12px !important;
+                }
+                .appshop.appshop-v2 .fluent-sidebar-header span,
+                .appshop.appshop-v2 .fluent-sidebar-item-label {
+                    opacity: 0 !important;
+                    max-width: 0 !important;
+                    margin: 0 !important;
+                    overflow: hidden !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                    pointer-events: none !important;
+                }
+                .appshop.appshop-v2 .fluent-sidebar-header {
+                    opacity: 0 !important;
+                    max-height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                    pointer-events: none !important;
+                    transform: translateX(-8px) scale(0.96) !important;
+                }
+                .appshop.appshop-v2 .appshop-nav-btn {
+                    height: 44px !important;
+                    min-height: 44px !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    gap: 0 !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                    font-size: 0 !important;
+                }
+                .appshop.appshop-v2 .appshop-nav-btn img {
+                    margin: 0 !important;
+                    flex: 0 0 auto !important;
+                }
+                .appshop-today-grid,
+                .appshop-editorial-grid,
+                .appshop-category-strip,
+                .appshop-discover-grid { grid-template-columns: 1fr; }
+                .appshop-main { padding: 20px; min-width: 0; }
+            }
+            @media (max-width: 760px) {
+                .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
+                    width: 68px !important;
+                    min-width: 68px !important;
+                    flex-basis: auto !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    },
+
+    getNavItems() {
+        return [
+            { id: 'featured', label: '精选', icon: 'Star' },
+            { id: 'search', label: '搜索', icon: 'Search' },
+            { id: 'all', label: '全部应用', icon: 'Layout Grid' },
+            { id: 'purchased', label: '已购买', icon: 'Check Circle' }
+        ];
+    },
+
+    getTodayFeatureIndex() {
+        const previewIndex = Number(State?.settings?.appShopFeaturePreviewIndex);
+        if (Number.isInteger(previewIndex) && previewIndex >= 1 && previewIndex <= 16) {
+            return previewIndex - 1;
+        }
+        const start = new Date(2026, 5, 8);
+        const today = new Date();
+        const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        return Math.abs(Math.floor((localToday - start) / 86400000)) % 16;
+    },
+
+    getFeatureTemplates() {
+        return [
+            { title: '今天值得打开的 App', subtitle: '从学习、创作到娱乐，这些应用让桌面更有生命力。', section: 'The Biggest Apps and Tools', hero: ['office', 'bilibili'], groups: [['essentials', '创意与效率'], ['focus', '学习进行时'], ['fresh', '放松一下']], colors: ['#08213f', '#061129', '#18816f', '#10281d'] },
+            { title: '效率爆发日', subtitle: '把文档、计划、翻译和工具箱放在同一个节奏里。', section: 'Work Smarter', hero: ['shimo-office', 'todo'], groups: [['office', '文档协作'], ['tools', '效率工具'], ['ai', 'AI 助手']], colors: ['#1d2b64', '#0f1022', '#3f5efb', '#1a1f71'] },
+            { title: '考试和备课专场', subtitle: '题库、组卷、驾考和知识检索，一次配齐。', section: 'Learning Picks', hero: ['zujuan', 'jiazhaoba'], groups: [['learn', '学习工具'], ['office', '备课办公'], ['news', '知识资讯']], colors: ['#093028', '#237a57', '#0f2027', '#2c5364'] },
+            { title: '视频娱乐周末', subtitle: '长视频、短视频、直播和剪辑工具都在这里。', section: 'Video Weekend', hero: ['bilibili', 'video-editor'], groups: [['watch', '热门视频'], ['live', '直播现场'], ['create', '视频创作']], colors: ['#200122', '#6f0000', '#0f0c29', '#302b63'] },
+            { title: '音乐和声音', subtitle: '播放、发现、收藏，让你的系统有自己的背景音乐。', section: 'Sound On', hero: ['netease-music', 'qq-music'], groups: [['music', '音乐平台'], ['media', '本地播放'], ['life', '有声内容']], colors: ['#240b36', '#c31432', '#141e30', '#243b55'] },
+            { title: '本地生活灵感', subtitle: '出行、外卖、支付和地图，照顾一天的动线。', section: 'Life Nearby', hero: ['meituan', 'amap'], groups: [['city', '城市服务'], ['travel', '出行导航'], ['shopping', '购物支付']], colors: ['#42275a', '#734b6d', '#f7971e', '#ffd200'] },
+            { title: 'AI 助手轮换', subtitle: '让聊天、推理、写作和资料整理更轻。', section: 'AI Companion', hero: ['chatgpt', 'deepseek'], groups: [['ai', '对话助手'], ['write', '写作办公'], ['tools', '资料处理']], colors: ['#0f2027', '#203a43', '#10a37f', '#07594d'] },
+            { title: '图像和设计', subtitle: '图片编辑、设计创作和素材管理的精选组合。', section: 'Create Visuals', hero: ['photopea', 'canva'], groups: [['design', '视觉设计'], ['photos', '照片工具'], ['office', '发布与协作']], colors: ['#1f1c2c', '#928dab', '#00c4cc', '#064e55'] },
+            { title: '新闻与阅读', subtitle: '了解世界，也给自己留一点安静阅读时间。', section: 'Read More', hero: ['chinadaily', 'weread'], groups: [['news', '新闻资讯'], ['books', '阅读书架'], ['culture', '人文内容']], colors: ['#141e30', '#243b55', '#8f4f24', '#2b170b'] },
+            { title: '工具箱上新', subtitle: '格式转换、PDF、编译器和在线小工具集合。', section: 'Utility Kit', hero: ['metool', 'pdf-tools'], groups: [['tools', '在线工具'], ['dev', '开发学习'], ['convert', '转换处理']], colors: ['#232526', '#414345', '#0f172a', '#334155'] },
+            { title: '编程学习日', subtitle: '在线编译器、科技社区和 AI 编程助手。', section: 'Code and Learn', hero: ['techie-delight', 'qwen'], groups: [['code', '代码运行'], ['ai', 'AI 辅助'], ['news', '科技资讯']], colors: ['#000428', '#004e92', '#0f172a', '#1e293b'] },
+            { title: '出行和政务', subtitle: '地图、交通、支付和交管服务，适合需要办事的今天。', section: 'Move Around', hero: ['traffic-12123', 'didi'], groups: [['travel', '路线规划'], ['service', '政务生活'], ['pay', '支付购物']], colors: ['#1e3c72', '#2a5298', '#1e63b6', '#0b2d5c'] },
+            { title: '购物和灵感', subtitle: '从比价到二手交易，从灵感发现到下单。', section: 'Shop Better', hero: ['taobao', 'jd'], groups: [['shopping', '综合购物'], ['life', '本地服务'], ['discover', '兴趣社区']], colors: ['#3a1c71', '#d76d77', '#ff5000', '#7f1d1d'] },
+            { title: '轻松游戏时间', subtitle: '不用安装大型客户端，打开就能玩的网页游戏。', section: 'Play Now', hero: ['solitaire', 'snake-classic'], groups: [['games', '休闲游戏'], ['video', '游戏内容'], ['tools', '玩家工具']], colors: ['#134e5e', '#71b280', '#236b4f', '#064e3b'] },
+            { title: '系统原生精选', subtitle: '相机、照片、多媒体，默认预装也能自由卸载。', section: 'Native Essentials', hero: ['camera', 'photos'], groups: [['native', '系统原生'], ['media', '媒体体验'], ['tools', '常用工具']], colors: ['#0f0c29', '#302b63', '#0078d4', '#0f172a'] },
+            { title: '每天一点新鲜感', subtitle: '混合推荐今天最适合探索的应用。', section: 'Fresh Rotation', hero: ['kimi', 'whiteboard'], groups: [['fresh', '值得尝试'], ['focus', '工作学习'], ['relax', '娱乐放松']], colors: ['#16222a', '#3a6073', '#111827', '#374151'] }
+        ];
+    },
+
+    getFeatureGroupPicks() {
+        return {
+            essentials: ['office', 'todo', 'translator', 'pdf-tools', 'whiteboard', 'didaqingdan'],
+            focus: ['zujuan', 'jiazhaoba', 'weread', 'youdaofanyi', 'techie-delight', 'poem'],
+            fresh: ['metool', 'kimi', 'coolapk', 'geekfa', 'health', 'audiobook'],
+            office: ['office', 'shimo-office', 'qq-mail', 'whiteboard', 'didaqingdan', 'pdf-tools'],
+            tools: ['metool', 'pdf-tools', 'translator', 'youdaofanyi', 'baidu-netdisk', 'todo'],
+            ai: ['chatgpt', 'deepseek', 'qwen', 'kimi', 'youdaofanyi', 'translator'],
+            learn: ['zujuan', 'jiazhaoba', 'techie-delight', 'weread', 'douban-book', 'poem'],
+            news: ['chinadaily', 'pengpai', 'itzhijia', 'weibo', 'coolapk', 'geekfa'],
+            watch: ['bilibili', 'youku', 'yangshipin', 'douyin', 'douyu', 'audiobook'],
+            live: ['douyu', 'bilibili', 'douyin', 'yangshipin', 'youku', 'weibo'],
+            create: ['video-editor', 'canva', 'photopea', 'photos', 'media', 'whiteboard'],
+            music: ['netease-music', 'qq-music', 'kugou-music', 'audiobook', 'media', 'bilibili'],
+            media: ['media', 'photos', 'bilibili', 'youku', 'yangshipin', 'video-editor'],
+            life: ['meituan', 'ele-me', 'alipay', 'health', 'audiobook', 'douban-book'],
+            city: ['meituan', 'ele-me', 'amap', 'didi', 'alipay', 'baidu-map'],
+            travel: ['amap', 'baidu-map', 'didi', 'traffic-12123', 'meituan', 'alipay'],
+            shopping: ['taobao', 'jd', 'xianyu', 'taobao-shangou', 'alipay', 'meituan'],
+            write: ['office', 'shimo-office', 'whiteboard', 'qq-mail', 'chatgpt', 'kimi'],
+            design: ['canva', 'photopea', 'photos', 'whiteboard', 'video-editor', 'media'],
+            photos: ['photos', 'camera', 'photopea', 'canva', 'video-editor', 'media'],
+            books: ['weread', 'douban-book', 'poem', 'audiobook', 'chinadaily', 'pengpai'],
+            culture: ['poem', 'douban-book', 'weread', 'chinadaily', 'pengpai', 'weibo'],
+            dev: ['techie-delight', 'geekfa', 'itzhijia', 'qwen', 'deepseek', 'metool'],
+            convert: ['pdf-tools', 'metool', 'translator', 'youdaofanyi', 'video-editor', 'photopea'],
+            code: ['techie-delight', 'geekfa', 'itzhijia', 'qwen', 'deepseek', 'chatgpt'],
+            service: ['traffic-12123', 'jiazhaoba', 'alipay', 'meituan', 'health', 'amap'],
+            pay: ['alipay', 'taobao', 'jd', 'meituan', 'ele-me', 'taobao-shangou'],
+            discover: ['weibo', 'coolapk', 'douban-book', 'geekfa', 'bilibili', 'douyin'],
+            games: ['solitaire', 'snake-classic', 'bilibili', 'douyin', 'coolapk', 'geekfa'],
+            video: ['bilibili', 'douyin', 'youku', 'douyu', 'yangshipin', 'video-editor'],
+            native: ['camera', 'photos', 'media', 'whiteboard', 'todo', 'translator'],
+            relax: ['bilibili', 'douyin', 'qq-music', 'netease-music', 'solitaire', 'snake-classic']
+        };
+    },
+
+    getAppById(id) {
+        return this.apps.find(app => app.id === id) || null;
+    },
+
+    getRotatedApps(seed = 0, excludeIds = []) {
+        const excludes = new Set(excludeIds);
+        const source = this.apps.filter(app => !excludes.has(app.id));
+        if (source.length === 0) return [];
+        return source.map((_, index) => source[(index + seed) % source.length]);
+    },
+
+    pickApps(ids, fallbackSeed = 0, count = 1, excludeIds = []) {
+        const picked = [];
+        const seen = new Set(excludeIds);
+        ids.forEach(id => {
+            const app = this.getAppById(id);
+            if (app && !seen.has(app.id) && picked.length < count) {
+                picked.push(app);
+                seen.add(app.id);
+            }
+        });
+        this.getRotatedApps(fallbackSeed, [...seen]).forEach(app => {
+            if (picked.length < count && !seen.has(app.id)) {
+                picked.push(app);
+                seen.add(app.id);
+            }
+        });
+        return picked;
+    },
+
+    getTodayFeature() {
+        const index = this.getTodayFeatureIndex();
+        const template = this.getFeatureTemplates()[index];
+        const groupPicks = this.getFeatureGroupPicks();
+        const heroApps = this.pickApps(template.hero, index * 5, 2);
+        const used = heroApps.map(app => app.id);
+        const groups = template.groups.map((group, groupIndex) => {
+            const apps = this.pickApps(groupPicks[group[0]] || [], index * 7 + groupIndex * 9, 4, used);
+            used.push(...apps.map(app => app.id));
+            return { id: group[0], title: group[1], apps };
+        });
+        return { ...template, index, heroApps, groups };
+    },
+
+    getAppsForCurrentCategory() {
+        const apps = this.currentCategory === 'all'
+            ? this.apps
+            : this.apps.filter(app => app.category === this.currentCategory);
+        if (!this.searchQuery) return apps;
+        const q = this.searchQuery.toLowerCase();
+        return apps.filter(app =>
+            app.name.toLowerCase().includes(q) ||
+            app.developer.toLowerCase().includes(q) ||
+            String(app.category || '').toLowerCase().includes(q)
+        );
+    },
+
+    getSearchResults() {
+        const q = this.searchQuery.trim().toLowerCase();
+        const scopedApps = this.currentCategory === 'all'
+            ? this.apps
+            : this.apps.filter(app => app.category === this.currentCategory);
+        if (!q) return scopedApps;
+        return scopedApps.filter(app =>
+            app.name.toLowerCase().includes(q) ||
+            app.developer.toLowerCase().includes(q) ||
+            String(app.category || '').toLowerCase().includes(q) ||
+            String(app.desc || '').toLowerCase().includes(q)
+        );
+    },
+
+    renderShell(content) {
+        const nav = this.getNavItems();
+        return `
+            <div class="appshop appshop-v2">
+                <aside class="fluent-sidebar appshop-sidebar">
+                    ${nav.map(item => `
+                        <button class="fluent-sidebar-item appshop-nav-btn ${this.activePage === item.id ? 'active' : ''}" data-page="${item.id}" type="button">
+                            <img src="Theme/Icon/Symbol_icon/stroke/${item.icon}.svg" class="fluent-sidebar-item-icon" alt="">
+                            <span class="fluent-sidebar-item-label">${item.label}</span>
+                        </button>
+                    `).join('')}
+                </aside>
+                <main class="appshop-main">${content}</main>
+            </div>
+        `;
+    },
+
+    updateResponsiveState() {
+        const shell = this.container?.querySelector('.appshop.appshop-v2');
+        if (!shell) return;
+        shell.classList.toggle('appshop-compact', shell.clientWidth <= 760);
+    },
+
+    bindResizeObserver() {
+        if (!this.container || typeof ResizeObserver === 'undefined') {
+            this.updateResponsiveState();
+            return;
+        }
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+        }
+        this._resizeObserver = new ResizeObserver(() => this.updateResponsiveState());
+        this._resizeObserver.observe(this.container);
+        this.updateResponsiveState();
+    },
+
+    getActionLabel(app) {
+        return (this.isInstalled(app.id) || app.isSystem === true) ? '打开' : '获取';
+    },
+
+    renderActionButton(app) {
+        const installed = this.isInstalled(app.id) || app.isSystem === true;
+        return `<button class="fluent-btn fluent-btn-medium appshop-app-install appshop-action-btn ${installed ? 'installed' : ''}" data-install-app-id="${app.id}" type="button">${this.getActionLabel(app)}</button>`;
+    },
+
+    renderAppListRow(app) {
+        return `
+            <div class="appshop-list-row" data-app-id="${app.id}">
+                <img class="appshop-list-icon" src="${this.getIconPath(app.icon)}" alt="">
+                <div class="appshop-list-text">
+                    <div class="appshop-list-name">${app.name}</div>
+                    <div class="appshop-list-desc">${app.developer}</div>
+                    <div class="appshop-list-meta">${app.rating} · ${app.downloads}</div>
+                </div>
+                ${this.renderActionButton(app)}
+            </div>
+        `;
+    },
+
+    renderAppCard(app) {
+        const installed = this.isInstalled(app.id) || app.isSystem === true;
+        return `
+            <div class="appshop-app-card ${installed ? 'installed' : ''}" data-app-id="${app.id}">
+                <div class="appshop-app-icon">
+                    <img src="${this.getIconPath(app.icon)}" alt="">
+                </div>
+                <div class="appshop-app-info">
+                    <h4 class="appshop-app-name">${app.name}</h4>
+                    <p class="appshop-app-developer">${app.developer}</p>
+                    <div class="appshop-app-meta">
+                        <span class="appshop-app-rating">
+                            <img src="Theme/Icon/Symbol_icon/stroke/Star.svg" alt="">
+                            ${app.rating}
+                        </span>
+                        <span class="appshop-app-downloads">${app.downloads}</span>
+                    </div>
+                </div>
+                <button class="fluent-btn fluent-btn-medium appshop-app-install ${installed ? 'installed' : ''}" data-install-app-id="${app.id}" type="button">${this.getActionLabel(app)}</button>
+            </div>
+        `;
+    },
+
+    renderStoryCard(feature, app, storyIndex, compact = false) {
+        const colors = feature.colors || ['#1d2b64', '#0f1022'];
+        const a = colors[storyIndex * 2] || colors[0];
+        const b = colors[storyIndex * 2 + 1] || colors[1] || colors[0];
+        return `
+            <article class="appshop-story-card ${compact ? 'compact' : ''}" data-story-index="${storyIndex}" style="--story-a:${a};--story-b:${b};">
+                <div class="appshop-story-art">
+                    <img src="${this.getIconPath(app.icon)}" alt="">
+                </div>
+                <div class="appshop-story-copy">
+                    <span class="appshop-story-kicker">${storyIndex === 0 ? 'TODAY BEST' : 'SPECIAL FEATURE'}</span>
+                    <h2 class="appshop-story-title">${storyIndex === 0 ? feature.title : app.name}</h2>
+                    <p class="appshop-story-subtitle">${storyIndex === 0 ? feature.subtitle : (app.desc || app.developer)}</p>
+                </div>
+            </article>
+        `;
+    },
+
+    renderFeaturedPage() {
+        const feature = this.getTodayFeature();
+        return `
+            <h1 class="appshop-page-title">精选</h1>
+            <p class="appshop-page-subtitle">${feature.subtitle}</p>
+            <section class="appshop-today-grid">
+                ${this.renderStoryCard(feature, feature.heroApps[0], 0)}
+                ${this.renderStoryCard(feature, feature.heroApps[1], 1, true)}
+            </section>
+            <h2 class="appshop-section-title">${feature.section}</h2>
+            <section class="appshop-editorial-grid">
+                ${feature.groups.map(group => `
+                    <div class="appshop-editorial-panel">
+                        <span class="appshop-editorial-kicker">${group.id}</span>
+                        <h3 class="appshop-editorial-title">${group.title}</h3>
+                        ${group.apps.map(app => this.renderAppListRow(app)).join('')}
+                    </div>
+                `).join('')}
+            </section>
+        `;
+    },
+
+    renderSearchPage() {
+        const displayApps = this.getSearchResults();
+        const categories = this.getCategories().filter(cat => cat.id !== 'all');
+        const discover = [
+            { label: 'AI 助手', query: 'AI' },
+            { label: 'PDF 转换', query: 'PDF' },
+            { label: '视频编辑', query: '视频' },
+            { label: '在线题库', query: '组卷' },
+            { label: '地图出行', query: '地图' },
+            { label: '音乐播放', query: '音乐' }
+        ];
+        const selectedCategory = this.getCategories().find(cat => cat.id === this.currentCategory);
+        const shouldShowResults = this.searchQuery.trim() || this.currentCategory !== 'all';
+        const resultTitle = this.searchQuery.trim()
+            ? '搜索结果'
+            : `${selectedCategory?.name || '应用'}分类`;
+        return `
+            <div class="appshop-search-panel">
+                <div class="appshop-search-large">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
+                    <input class="appshop-search-input" type="text" placeholder="${t('appshop.search')}" value="${this.searchQuery}">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Microphone.svg" alt="">
+                </div>
+            </div>
+            ${shouldShowResults ? `
+                <h2 class="appshop-section-title">${resultTitle}</h2>
+                <div class="appshop-apps-grid clean">
+                    ${displayApps.map(app => this.renderAppListRow(app)).join('')}
+                </div>
+                ${displayApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt=""><p>${t('appshop.no-result')}</p></div>` : ''}
+            ` : ''}
+            <h1 class="appshop-page-title">Discover</h1>
+            <div class="appshop-discover-grid">
+                ${discover.map(item => `
+                    <button class="appshop-discover-chip" type="button" data-search-term="${item.query}">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
+                        <span>${item.label}</span>
+                    </button>
+                `).join('')}
+            </div>
+            <h2 class="appshop-section-title">应用分类</h2>
+            <div class="appshop-category-strip">
+                ${categories.map(cat => `
+                    <button class="appshop-category-card" type="button" data-category="${cat.id}">
+                        <img src="Theme/Icon/Symbol_icon/stroke/${cat.icon}.svg" alt="">
+                        <span>${cat.name}</span>
+                    </button>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    renderAllAppsPage() {
+        const categories = this.getCategories();
+        const displayApps = this.getAppsForCurrentCategory();
+        return `
+            <h1 class="appshop-page-title">全部应用</h1>
+            <section class="appshop-categories">
+                <div class="appshop-category-tabs">
+                    ${categories.map(cat => `
+                        <button class="appshop-category-tab ${this.currentCategory === cat.id ? 'active' : ''}" data-category="${cat.id}" type="button">
+                            <img src="Theme/Icon/Symbol_icon/stroke/${cat.icon}.svg" alt="">
+                            <span>${cat.name}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </section>
+            <section class="appshop-apps">
+                <div class="appshop-apps-grid clean">
+                    ${displayApps.map(app => this.renderAppCard(app)).join('')}
+                </div>
+                ${displayApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt=""><p>${t('appshop.no-result')}</p></div>` : ''}
+            </section>
+        `;
+    },
+
+    renderPurchasedPage() {
+        const installedIds = new Set(this.getInstalledApps().map(app => app.id));
+        const installedApps = this.apps.filter(app => installedIds.has(app.id));
+        return `
+            <h1 class="appshop-page-title">已购买</h1>
+            <p class="appshop-page-subtitle">这些应用已经安装到本地，可以直接打开或在详情页卸载。</p>
+            <div class="appshop-apps-grid clean">
+                ${installedApps.map(app => this.renderAppListRow(app)).join('')}
+            </div>
+            ${installedApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Check Circle.svg" alt=""><p>还没有已安装的 App</p></div>` : ''}
+        `;
+    },
+
     init(windowId) {
         this.windowId = windowId;
         this.container = document.getElementById(`${windowId}-content`);
         this.refreshCatalog();
+        this.addStyles();
         this.render();
         
         // 监听语言和主题变化
@@ -456,252 +1466,121 @@ const AppShop = {
 
     render(options = {}) {
         const preserveScroll = options.preserveScroll === true;
+        const shouldFocusSearch = options.focusSearch === true;
         const previousScrollTop = preserveScroll
-            ? (this.container?.querySelector('.appshop-content')?.scrollTop || 0)
+            ? (this.container?.querySelector('.appshop-main')?.scrollTop || 0)
             : 0;
-        const featuredApps = this.apps.filter(app => app.featured);
-        const bannerApp = this.apps.find(app => app.banner);
-        const categories = this.getCategories();
-        const filteredApps = this.currentCategory === 'all'
-            ? this.apps
-            : this.apps.filter(app => app.category === this.currentCategory);
 
-        // 搜索过滤
-        const displayApps = this.searchQuery
-            ? filteredApps.filter(app =>
-                app.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                app.developer.toLowerCase().includes(this.searchQuery.toLowerCase())
-              )
-            : filteredApps;
-
-        this.container.innerHTML = `
-            <div class="appshop">
-                <div class="appshop-header">
-                    <div class="appshop-search">
-                        <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="" class="appshop-search-icon">
-                        <input type="text" class="appshop-search-input" placeholder="${t('appshop.search')}" value="${this.searchQuery}">
-                    </div>
-                </div>
-
-                <div class="appshop-content">
-                    <section class="appshop-featured">
-                        <div class="appshop-featured-grid">
-                            <div class="appshop-banner" data-app-id="${bannerApp?.id || ''}">
-                                <div class="appshop-banner-content">
-                                    <span class="appshop-banner-tag">${t('appshop.featured')}</span>
-                                    <h2 class="appshop-banner-title">${bannerApp?.name || t('appshop.hot-apps')}</h2>
-                                    <p class="appshop-banner-desc">${bannerApp?.developer || ''}</p>
-                                </div>
-                                <div class="appshop-banner-icon">
-                                    <img src="Theme/Icon/App_icon/${bannerApp?.icon || 'app_gallery.png'}" alt="">
-                                </div>
-                            </div>
-
-                            <div class="appshop-featured-cards">
-                                ${featuredApps.slice(0, 3).map((app, index) => `
-                                    <div class="appshop-featured-card ${index === 0 ? 'large' : ''}" data-app-id="${app.id}">
-                                        <div class="appshop-featured-card-icon">
-                                            <img src="Theme/Icon/App_icon/${app.icon}" alt="">
-                                        </div>
-                                        <div class="appshop-featured-card-info">
-                                            <h4>${app.name}</h4>
-                                            <span>${app.developer}</span>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-
-                        <div class="appshop-carousel-dots">
-                            <span class="dot active"></span>
-                            <span class="dot"></span>
-                            <span class="dot"></span>
-                            <span class="dot"></span>
-                        </div>
-                    </section>
-
-                    <section class="appshop-categories">
-                        <div class="appshop-category-tabs">
-                            ${categories.map(cat => `
-                                <button class="appshop-category-tab ${this.currentCategory === cat.id ? 'active' : ''}" data-category="${cat.id}">
-                                    <img src="Theme/Icon/Symbol_icon/stroke/${cat.icon}.svg" alt="">
-                                    <span>${cat.name}</span>
-                                </button>
-                            `).join('')}
-                        </div>
-                    </section>
-
-                    <section class="appshop-apps">
-                        <div class="appshop-apps-grid">
-                            ${displayApps.map(app => {
-                                const installed = this.isInstalled(app.id);
-                                const isSystem = app.isSystem === true;
-                                const btnText = (isSystem || installed) ? t('appshop.open') : t('appshop.get');
-                                const btnClass = (isSystem || installed) ? 'installed' : '';
-                                return `
-                                <div class="appshop-app-card ${btnClass}" data-app-id="${app.id}">
-                                    <div class="appshop-app-icon">
-                                        <img src="Theme/Icon/App_icon/${app.icon}" alt="">
-                                    </div>
-                                    <div class="appshop-app-info">
-                                        <h4 class="appshop-app-name">${app.name}</h4>
-                                        <p class="appshop-app-developer">${app.developer}</p>
-                                        <div class="appshop-app-meta">
-                                            <span class="appshop-app-rating">
-                                                <img src="Theme/Icon/Symbol_icon/stroke/Star.svg" alt="">
-                                                ${app.rating}
-                                            </span>
-                                            <span class="appshop-app-downloads">${app.downloads}</span>
-                                        </div>
-                                    </div>
-                                    <button class="fluent-btn fluent-btn-medium appshop-app-install ${btnClass}">${btnText}</button>
-                                </div>
-                            `}).join('')}
-                        </div>
-
-                        ${displayApps.length === 0 ? `
-                            <div class="appshop-empty">
-                                <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
-                                <p>${t('appshop.no-result')}</p>
-                            </div>
-                        ` : ''}
-                    </section>
-                </div>
-            </div>
-        `;
+        const pages = {
+            featured: () => this.renderFeaturedPage(),
+            search: () => this.renderSearchPage(),
+            all: () => this.renderAllAppsPage(),
+            purchased: () => this.renderPurchasedPage()
+        };
+        const pageContent = (pages[this.activePage] || pages.featured)();
+        this.container.innerHTML = this.renderShell(pageContent);
 
         this.bindEvents();
+        this.bindResizeObserver();
 
         if (preserveScroll && previousScrollTop > 0) {
             if (this._contentScrollRestoreRaf) {
                 cancelAnimationFrame(this._contentScrollRestoreRaf);
             }
             this._contentScrollRestoreRaf = requestAnimationFrame(() => {
-                const content = this.container?.querySelector('.appshop-content');
+                const content = this.container?.querySelector('.appshop-main');
                 if (!content) return;
                 const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
                 content.scrollTop = Math.min(previousScrollTop, maxScroll);
                 this._contentScrollRestoreRaf = null;
             });
         }
+        if (shouldFocusSearch) {
+            requestAnimationFrame(() => {
+                const input = this.container?.querySelector('.appshop-search-input');
+                if (!input) return;
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            });
+        }
     },
 
     // 只更新应用列表（不重新渲染搜索框）
     updateAppsList() {
-        const appsGrid = this.container.querySelector('.appshop-apps-grid');
-        const emptyState = this.container.querySelector('.appshop-empty');
-        if (!appsGrid) return;
-        
-        const filteredApps = this.currentCategory === 'all' 
-            ? this.apps 
-            : this.apps.filter(app => app.category === this.currentCategory);
-        
-        const displayApps = this.searchQuery 
-            ? filteredApps.filter(app => 
-                app.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                app.developer.toLowerCase().includes(this.searchQuery.toLowerCase())
-              )
-            : filteredApps;
-        
-        appsGrid.innerHTML = displayApps.map(app => {
-            const installed = this.isInstalled(app.id);
-            const isSystem = app.isSystem === true;
-            const btnText = (isSystem || installed) ? t('appshop.open') : t('appshop.get');
-            const btnClass = (isSystem || installed) ? 'installed' : '';
-            return `
-                <div class="appshop-app-card ${btnClass}" data-app-id="${app.id}">
-                    <div class="appshop-app-icon">
-                        <img src="Theme/Icon/App_icon/${app.icon}" alt="">
-                    </div>
-                    <div class="appshop-app-info">
-                        <h4 class="appshop-app-name">${app.name}</h4>
-                        <p class="appshop-app-developer">${app.developer}</p>
-                        <div class="appshop-app-meta">
-                            <span class="appshop-app-rating">
-                                <img src="Theme/Icon/Symbol_icon/stroke/Star.svg" alt="">
-                                ${app.rating}
-                            </span>
-                            <span class="appshop-app-downloads">${app.downloads}</span>
-                        </div>
-                    </div>
-                    <button class="fluent-btn fluent-btn-medium appshop-app-install ${btnClass}">${btnText}</button>
-                </div>
-            `;
-        }).join('');
-
-        // 处理空状态
-        const appsSection = this.container.querySelector('.appshop-apps');
-        let existingEmpty = appsSection.querySelector('.appshop-empty');
-        if (displayApps.length === 0) {
-            if (!existingEmpty) {
-                appsSection.insertAdjacentHTML('beforeend', `
-                    <div class="appshop-empty">
-                        <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
-                        <p>${t('appshop.no-result')}</p>
-                    </div>
-                `);
-            }
-        } else if (existingEmpty) {
-            existingEmpty.remove();
-        }
-        
-        // 重新绑定应用卡片事件
-        this.bindAppCardEvents();
+        this.render({ preserveScroll: true });
     },
     
     // 绑定应用卡片事件
     bindAppCardEvents() {
-        this.container.querySelectorAll('.appshop-apps-grid [data-app-id]').forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (e.target.classList.contains('appshop-app-install')) {
-                    this.installApp(card.dataset.appId);
-                } else {
-                    this.showAppDetail(card.dataset.appId);
-                }
-            });
-        });
+        this.bindEvents();
     },
 
     bindEvents() {
-        // 搜索（只更新应用列表，不重新渲染搜索框）
+        this.container.querySelectorAll('.appshop-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.activePage = btn.dataset.page || 'featured';
+                if (this.activePage === 'search') {
+                    this.currentCategory = 'all';
+                }
+                this.render();
+            });
+        });
+
         const searchInput = this.container.querySelector('.appshop-search-input');
         if (searchInput) {
             let debounceTimer;
             searchInput.addEventListener('input', (e) => {
                 this.searchQuery = e.target.value;
-                
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
-                    this.updateAppsList();
-                }, 300);
+                    this.render({ preserveScroll: true, focusSearch: true });
+                }, 120);
             });
         }
-        
-        // 分类切换
-        this.container.querySelectorAll('.appshop-category-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                this.currentCategory = tab.dataset.category;
+
+        this.container.querySelectorAll('[data-search-term]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.searchQuery = btn.dataset.searchTerm || '';
+                this.currentCategory = 'all';
+                this.activePage = 'search';
                 this.render();
             });
         });
-        
-        // 应用卡片点击
-        this.container.querySelectorAll('[data-app-id]').forEach(card => {
-            card.addEventListener('click', (e) => {
-                if (e.target.classList.contains('appshop-app-install')) {
-                    this.installApp(card.dataset.appId);
-                } else {
-                    this.showAppDetail(card.dataset.appId);
-                }
+
+        this.container.querySelectorAll('.appshop-category-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                this.currentCategory = tab.dataset.category;
+                this.activePage = 'all';
+                this.render({ preserveScroll: true });
             });
         });
-        
-        // 安装按钮
-        this.container.querySelectorAll('.appshop-app-install').forEach(btn => {
+
+        this.container.querySelectorAll('.appshop-category-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this.currentCategory = card.dataset.category || 'all';
+                this.searchQuery = '';
+                this.activePage = 'search';
+                this.render();
+            });
+        });
+
+        this.container.querySelectorAll('[data-install-app-id]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const appId = btn.closest('[data-app-id]').dataset.appId;
-                this.installApp(appId);
+                this.installApp(btn.dataset.installAppId);
+            });
+        });
+
+        this.container.querySelectorAll('[data-story-index]').forEach(card => {
+            card.addEventListener('click', () => {
+                this.showFeaturedStory(Number(card.dataset.storyIndex || 0));
+            });
+        });
+
+        this.container.querySelectorAll('[data-app-id]').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.closest('[data-install-app-id]')) return;
+                this.showAppDetail(row.dataset.appId);
             });
         });
     },
@@ -895,6 +1774,64 @@ const AppShop = {
         WindowManager.openApp(app.id);
     },
 
+    showFeaturedStory(storyIndex = 0) {
+        const feature = this.getTodayFeature();
+        const app = feature.heroApps[storyIndex] || feature.heroApps[0];
+        if (!app) return;
+        const colors = feature.colors || ['#1d2b64', '#0f1022'];
+        const a = colors[storyIndex * 2] || colors[0];
+        const b = colors[storyIndex * 2 + 1] || colors[1] || colors[0];
+        const title = storyIndex === 0 ? feature.title : `${app.name} 特别精选`;
+        const intro = storyIndex === 0
+            ? feature.subtitle
+            : `${app.name} 是今天精选中最值得打开的应用之一。`;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'appshop-story-overlay';
+        overlay.innerHTML = `
+            <article class="appshop-story-modal" style="--story-a:${a};--story-b:${b};">
+                <button class="appshop-story-detail-close" type="button">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="${t('close')}">
+                </button>
+                <header class="appshop-story-detail-hero">
+                    <img src="${this.getIconPath(app.icon)}" alt="">
+                    <div class="appshop-story-detail-copy">
+                        <span class="appshop-story-kicker">${storyIndex === 0 ? 'TODAY BEST' : 'SPECIAL FEATURE'}</span>
+                        <h2>${title}</h2>
+                    </div>
+                </header>
+                <div class="appshop-story-detail-appbar">
+                    <img class="appshop-list-icon" src="${this.getIconPath(app.icon)}" alt="">
+                    <div>
+                        <h4>${app.name}</h4>
+                        <p>${app.developer}</p>
+                    </div>
+                    ${this.renderActionButton(app)}
+                </div>
+                <div class="appshop-story-detail-body">
+                    <p><strong>${intro}</strong></p>
+                    <p>${app.desc || t('appshop.no-desc')}</p>
+                    <p>这期精选把它放在主推位置，是因为它能和同页推荐的工具形成一条完整的使用路线：先发现内容，再处理任务，最后把结果带回 Fluent OS 的桌面工作流。</p>
+                    <p>继续向下浏览本期精选，你会看到 3 组不同方向的应用组合，每组都能和 ${app.name} 形成互补。</p>
+                </div>
+            </article>
+        `;
+        this.container.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('show'));
+        const close = () => {
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 180);
+        };
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+        });
+        overlay.querySelector('.appshop-story-detail-close')?.addEventListener('click', close);
+        overlay.querySelector('[data-install-app-id]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.installApp(app.id);
+        });
+    },
+
     showAppDetail(appId) {
         const app = this.apps.find(a => a.id === appId);
         if (!app) return;
@@ -903,7 +1840,7 @@ const AppShop = {
         const isSystem = app.isSystem === true;
         const themeColor = app.themeColor || '#0078d4';
         const btnAction = (isSystem || installed) ? 'open' : 'install';
-        const btnText = (isSystem || installed) ? t('appshop.open') : t('appshop.get');
+        const btnText = this.getActionLabel(app);
         const btnClass = (isSystem || installed) ? 'installed' : '';
         const isExternal = this.isExternalApp(app);
 
