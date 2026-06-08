@@ -61,6 +61,7 @@ const WindowManager = {
 
     init() {
         this.container = document.getElementById('windows-container');
+        this._bindDesktopInactivityListener();
         State.on('languageChange', () => {
             this.windows.forEach(w => {
                 const cfg = this.getAppConfig(w.appId);
@@ -292,6 +293,90 @@ const WindowManager = {
         }, this.TASKBAR_ICON_FEEDBACK_MS);
     },
 
+    _clearTaskbarIndicatorMotion(appId) {
+        if (!appId) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
+        if (!taskbarBtn) return;
+        if (taskbarBtn._indicatorMotionTimer) {
+            clearTimeout(taskbarBtn._indicatorMotionTimer);
+            taskbarBtn._indicatorMotionTimer = null;
+        }
+        taskbarBtn.classList.remove('taskbar-indicator-sync', 'taskbar-indicator-minimizing', 'taskbar-indicator-restoring');
+        taskbarBtn.style.removeProperty('--taskbar-indicator-duration');
+        taskbarBtn.style.removeProperty('--taskbar-indicator-ease');
+    },
+
+    _startTaskbarIndicatorMotion(windowData, mode, duration, easing) {
+        if (!windowData || !windowData.appId || duration <= 0) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${windowData.appId}"]`);
+        if (!taskbarBtn) return;
+
+        this._clearTaskbarIndicatorMotion(windowData.appId);
+        taskbarBtn.style.setProperty('--taskbar-indicator-duration', `${duration}ms`);
+        taskbarBtn.style.setProperty('--taskbar-indicator-ease', easing);
+        taskbarBtn.classList.add('taskbar-indicator-sync', `taskbar-indicator-${mode}`);
+
+        taskbarBtn._indicatorMotionTimer = setTimeout(() => {
+            this._clearTaskbarIndicatorMotion(windowData.appId);
+        }, duration + 40);
+    },
+
+    _setTaskbarIndicatorForWindow(windowData, forceActive = false) {
+        if (!windowData || !windowData.appId) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${windowData.appId}"]`);
+        if (!taskbarBtn) return;
+
+        const isVisible = windowData.element && windowData.element.style.display !== 'none' && !windowData.element.classList.contains('closing');
+        const isInactive = windowData.element?.classList.contains('window-inactive') === true;
+        const isMinimized = windowData.isMinimized === true || windowData.element?.style.display === 'none';
+        const isActive = forceActive && isVisible && !isMinimized && !windowData.isMinimizing && !isInactive;
+        taskbarBtn.classList.toggle('taskbar-app-active', isActive);
+        taskbarBtn.classList.toggle('taskbar-app-minimized', isMinimized);
+        taskbarBtn.classList.toggle('running', isVisible);
+    },
+
+    _syncTaskbarAppState(appId) {
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
+        if (!taskbarBtn) return;
+        const windowData = this.windows.find((w) => w.appId === appId && w.element && !w.element.classList.contains('closing'));
+        const isRunning = !!windowData;
+        const isMinimized = !!windowData && (windowData.isMinimized === true || windowData.element?.style.display === 'none');
+        const isActive = !!windowData && !isMinimized && !windowData.isMinimizing && !windowData.element.classList.contains('window-inactive');
+
+        taskbarBtn.classList.toggle('running', isRunning || isMinimized);
+        taskbarBtn.classList.toggle('taskbar-app-minimized', isMinimized);
+        taskbarBtn.classList.toggle('taskbar-app-active', isActive);
+    },
+
+    _syncAllTaskbarAppStates() {
+        const ids = new Set([
+            ...Array.from(State.runningApps || []),
+            ...this.windows.map((w) => w && w.appId).filter(Boolean)
+        ]);
+        ids.forEach((appId) => this._syncTaskbarAppState(appId));
+    },
+
+    _setActiveWindow(windowId = null) {
+        this.activeWindowId = windowId;
+        this.windows.forEach((w) => {
+            if (!w || !w.element) return;
+            const isActive = !!windowId && w.id === windowId && !w.isMinimized && !w.isMinimizing;
+            w.element.classList.toggle('window-inactive', !isActive && !w.isMinimized && !w.isMinimizing && !w.element.classList.contains('closing'));
+        });
+    },
+
+    _bindDesktopInactivityListener() {
+        if (this._desktopInactivityBound || typeof document === 'undefined') return;
+        this._desktopInactivityBound = true;
+        document.addEventListener('pointerdown', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target && target.closest('.window')) return;
+            if (target && target.closest('.taskbar')) return;
+            this._setActiveWindow(null);
+            this._syncAllTaskbarAppStates();
+        }, true);
+    },
+
     _effectiveDuration(duration) {
         if (!this._isAnimationEnabled()) return 0;
         return Math.max(0, Math.round(duration || 0));
@@ -311,6 +396,7 @@ const WindowManager = {
             clearTimeout(windowData._dockFeedbackTimer);
             windowData._dockFeedbackTimer = null;
         }
+        this._clearTaskbarIndicatorMotion(windowData.appId);
     },
 
     _captureWindowVisualState(windowData) {
@@ -372,6 +458,8 @@ const WindowManager = {
         windowData.isMinimizing = false;
         windowData.isRestoring = false;
         this.updateMaximizedWallpaperEffect();
+        this._syncAllTaskbarAppStates();
+        this._setTaskbarIndicatorForWindow(windowData, false);
     },
 
     _finalizeRestore(windowData) {
@@ -388,6 +476,8 @@ const WindowManager = {
         windowData.isMinimized = false;
         windowData.isRestoring = false;
         windowData.isMinimizing = false;
+        this._setTaskbarIndicatorForWindow(windowData, true);
+        this._syncAllTaskbarAppStates();
     },
 
     _startMinimizeAnimation(windowData, fromInterruptedRestore = false) {
@@ -436,8 +526,11 @@ const WindowManager = {
             return;
         }
 
+        const minimizeEase = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
         const opacityDuration = Math.round(duration * 0.56);
-        el.style.transition = `transform ${duration}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+        el.style.transition = `transform ${duration}ms ${minimizeEase}, opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+        this._startTaskbarIndicatorMotion(windowData, 'minimizing', duration, minimizeEase);
+        this._setTaskbarIndicatorForWindow(windowData, false);
 
         requestAnimationFrame(() => {
             if (!windowData.isMinimizing) return;
@@ -501,8 +594,10 @@ const WindowManager = {
             return;
         }
 
+        const restoreEase = 'cubic-bezier(0.16, 1, 0.3, 1)';
         const opacityDuration = Math.round(duration * 0.68);
-        el.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        el.style.transition = `transform ${duration}ms ${restoreEase}, opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        this._startTaskbarIndicatorMotion(windowData, 'restoring', duration, restoreEase);
         requestAnimationFrame(() => {
             if (!windowData.isRestoring) return;
             el.style.transform = '';
@@ -921,6 +1016,7 @@ const WindowManager = {
         const existingWindow = this.windows.find(w => w.appId === appId);
         if (existingWindow) {
             this.focusWindow(existingWindow.id);
+            this._syncTaskbarAppState(appId);
             
             if (data && config.component && globalThis[config.component]) {
                 if (data.fileId && globalThis[config.component].loadFile) {
@@ -956,6 +1052,7 @@ const WindowManager = {
         this.container.appendChild(windowElement);
         
         State.addRunningApp(appId);
+        this._syncTaskbarAppState(appId);
 
         
         if (config.component && globalThis[config.component]) {
@@ -1249,7 +1346,13 @@ const WindowManager = {
         });
 
         // 最小化按钮 - Minimize button
-        minimizeBtn.addEventListener('click', () => {
+        minimizeBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        minimizeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             this._hideSnapMenu(windowElement, true);
             this.minimizeWindow(windowElement.id);
         });
@@ -1283,6 +1386,12 @@ const WindowManager = {
             if (!e.target.closest('.window-snap-layout-menu')) {
                 this._hideAllSnapMenus(windowElement.id);
             }
+            this.focusWindow(windowElement.id);
+        });
+        windowElement.addEventListener('click', () => {
+            this.focusWindow(windowElement.id);
+        });
+        windowElement.addEventListener('mousedown', () => {
             this.focusWindow(windowElement.id);
         });
         windowElement.addEventListener('mouseleave', () => {
@@ -1433,6 +1542,9 @@ const WindowManager = {
 
         this._syncZIndexCounter();
         windowData.element.style.zIndex = ++this.zIndexCounter;
+        this._setActiveWindow(windowId);
+        this._syncAllTaskbarAppStates();
+        this._setTaskbarIndicatorForWindow(windowData, true);
 
         if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
             Fingo._ensurePanelForeground();
@@ -1464,6 +1576,8 @@ const WindowManager = {
         } else {
             this._startMinimizeAnimation(windowData, false);
         }
+        this._syncAllTaskbarAppStates();
+        this._setTaskbarIndicatorForWindow(windowData, !windowData.isMinimized);
     },
     toggleMaximize(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
@@ -1529,6 +1643,8 @@ const WindowManager = {
             
             // 更新壁纸效果 - Update wallpaper effect
             this.updateMaximizedWallpaperEffect();
+            this._setActiveWindow(windowId);
+            this._syncAllTaskbarAppStates();
         }
     },
     
@@ -1543,6 +1659,7 @@ const WindowManager = {
             w.element.style.display !== 'none'
         );
         const taskbar = this._getTaskbarElement();
+        this._syncAllTaskbarAppStates();
         
         if (hasMaximized) {
             this._setFullscreenUnmaximizeSync(false);
@@ -1566,6 +1683,7 @@ const WindowManager = {
                 taskbar.classList.remove('hidden');
             }
         }
+        this._syncAllTaskbarAppStates();
     },
 
     closeWindow(windowId) {
@@ -1598,8 +1716,18 @@ const WindowManager = {
                 if (!hasOtherWindows) {
                     State.removeRunningApp(windowData.appId);
                 }
+                if (this.activeWindowId === windowId) {
+                    this.activeWindowId = null;
+                    const nextWindow = this.windows.slice().reverse().find((w) => w.element && !w.isMinimized && !w.element.classList.contains('closing'));
+                    if (nextWindow) {
+                        this.focusWindow(nextWindow.id);
+                    } else {
+                        this._setActiveWindow(null);
+                    }
+                }
                 // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
+                this._syncAllTaskbarAppStates();
             }, closeDuration);
         };
 
@@ -1648,4 +1776,3 @@ const WindowManager = {
         return this._getMinimizeDockPoint();
     }
 };
-

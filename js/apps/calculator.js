@@ -165,7 +165,7 @@ const CalculatorApp = {
                 margin-bottom: 12px;
                 padding: var(--calc-mode-pad-y) var(--calc-mode-pad-x);
                 border-radius: 999px;
-                background: rgba(0, 120, 212, 0.12);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.12);
                 color: var(--accent);
                 font-size: var(--calc-mode-font-size);
                 font-weight: 600;
@@ -245,13 +245,13 @@ const CalculatorApp = {
             }
 
             .calc-btn-operator {
-                background: rgba(0, 120, 212, 0.15);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.15);
                 color: var(--accent);
                 font-weight: 500;
             }
 
             .calc-btn-operator:hover {
-                background: rgba(0, 120, 212, 0.25);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.25);
             }
 
             .calc-btn-clear {

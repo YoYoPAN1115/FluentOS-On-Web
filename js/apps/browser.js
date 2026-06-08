@@ -868,8 +868,8 @@ const BrowserApp = {
                 border-radius: 18px;
                 text-decoration: none;
                 color: inherit;
-                background: rgba(255, 255, 255, 0.68);
-                border: 1px solid rgba(255, 255, 255, 0.55);
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55));
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3));
                 box-shadow: 0 18px 40px rgba(16, 24, 40, 0.08);
                 transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
             }
@@ -877,17 +877,17 @@ const BrowserApp = {
             .browser-search-card:hover {
                 transform: translateY(-2px);
                 box-shadow: 0 24px 48px rgba(16, 24, 40, 0.14);
-                background: rgba(255, 255, 255, 0.82);
+                background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62));
             }
 
             .dark-mode .browser-search-card {
-                background: rgba(255, 255, 255, 0.06);
-                border-color: rgba(255, 255, 255, 0.08);
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48));
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1));
                 box-shadow: none;
             }
 
             .dark-mode .browser-search-card:hover {
-                background: rgba(255, 255, 255, 0.1);
+                background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58));
             }
 
             .browser-search-card strong {

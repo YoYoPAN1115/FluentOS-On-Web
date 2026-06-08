@@ -782,8 +782,12 @@ function handlePowerAction({ action }) {
     const textEl = document.getElementById('power-overlay-text');
 
     // 关闭所有打开的窗口
-    if (typeof WindowManager !== 'undefined') {
-        WindowManager.windows.forEach(w => WindowManager.closeWindow(w.id));
+    if (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows)) {
+        WindowManager.windows.slice().forEach((w) => {
+            if (w && typeof WindowManager.closeWindow === 'function') {
+                WindowManager.closeWindow(w.id);
+            }
+        });
     }
 
     // 根据操作类型设置文字
@@ -793,7 +797,8 @@ function handlePowerAction({ action }) {
         logout: { title: t('power.logout.title'), status: t('power.logout.status') }
     };
 
-    const info = texts[action];
+    const info = texts[action] || texts.logout;
+    if (!overlay || !titleEl || !textEl) return;
     titleEl.textContent = info.title;
     textEl.textContent = info.status;
 
@@ -887,6 +892,7 @@ function handleLockToLogin() {
     }
     
     // 3. 显示登录界面（只为了显示密码卡片）
+    if (!loginScreen) return;
     loginScreen.classList.remove('hidden');
     loginScreen.classList.add('show');
     
@@ -1008,6 +1014,7 @@ function handleLoginToDesktop() {
     document.body.classList.add('login-to-desktop-blur');
     
     // 2. 立即准备桌面（模糊状态，透明）
+    if (!desktopScreen || !loginScreen) return;
     desktopScreen.classList.remove('hidden');
     desktopScreen.style.opacity = '0';
     document.body.classList.add('desktop-blur-in');

@@ -606,13 +606,13 @@ const AppShop = {
             }
             body:not(.dark-mode) .appshop-app-card,
             body:not(.dark-mode) .appshop-category-card {
-                background: rgba(255,255,255,0.78) !important;
-                border-color: rgba(0,0,0,0.08) !important;
+                background: var(--fluent-card-bg-light, rgba(255,255,255,0.55)) !important;
+                border-color: var(--fluent-card-border-light, rgba(255,255,255,0.3)) !important;
                 color: #1d1d1f !important;
             }
             body:not(.dark-mode) .appshop-app-card:hover,
             body:not(.dark-mode) .appshop-category-card:hover {
-                background: #fff !important;
+                background: var(--fluent-card-bg-light-hover, rgba(255,255,255,0.62)) !important;
             }
             body:not(.dark-mode) .appshop-app-developer,
             body:not(.dark-mode) .appshop-app-meta,

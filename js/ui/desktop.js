@@ -199,8 +199,8 @@ const Desktop = {
         this.selectionBox.className = 'selection-box';
         this.selectionBox.style.cssText = `
             position: absolute;
-            border: 2px solid rgba(0, 120, 212, 0.8);
-            background: rgba(0, 120, 212, 0.1);
+            border: 2px solid rgba(var(--accent-rgb, 0, 120, 212), 0.8);
+            background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
             pointer-events: none;
             display: none;
             z-index: 1000;

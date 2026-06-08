@@ -201,8 +201,8 @@ const FilesApp = {
         this.selectionBox.className = 'files-selection-box';
         this.selectionBox.style.cssText = `
             position: absolute;
-            border: 2px solid rgba(0, 120, 212, 0.8);
-            background: rgba(0, 120, 212, 0.1);
+            border: 2px solid rgba(var(--accent-rgb, 0, 120, 212), 0.8);
+            background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
             pointer-events: none;
             display: none;
             z-index: 1000;
@@ -264,31 +264,31 @@ const FilesApp = {
             
             /* V2 新版外观选中样式 - 圆角浅蓝高亮 */
             body.fluent-v2 .file-item.selected { 
-                background: rgba(0, 120, 212, 0.25) !important; 
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.25) !important;
                 color: inherit !important;
                 border-radius: 12px !important;
             }
             body.fluent-v2 .file-item.selected:hover { 
-                background: rgba(0, 120, 212, 0.35) !important; 
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.35) !important;
             }
             body.fluent-v2.dark-mode .file-item.selected { 
-                background: rgba(100, 180, 255, 0.3) !important; 
+                background: rgba(var(--accent-rgb, 100, 180, 255), 0.3) !important;
                 color: inherit !important;
             }
             body.fluent-v2.dark-mode .file-item.selected:hover { 
-                background: rgba(100, 180, 255, 0.4) !important; 
+                background: rgba(var(--accent-rgb, 100, 180, 255), 0.4) !important;
             }
             
             /* 拖拽放置区域样式 */
             .files-content.drag-over {
-                background: rgba(0, 120, 212, 0.1);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
                 border: 2px dashed var(--accent);
                 border-radius: 8px;
             }
 
             /* 文件夹条目作为放置目标 */
             .file-item.drag-over {
-                background: rgba(0, 120, 212, 0.12);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.12);
                 outline: 2px dashed var(--accent);
                 outline-offset: 2px;
             }

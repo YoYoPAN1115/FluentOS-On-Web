@@ -215,20 +215,20 @@ body.dark-mode.window-blur-enabled .window .settings-sidebar {
 }
 
 .calculator-button.operator {
-    background: rgba(0, 120, 212, 0.2) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.2) !important;
 }
 
 .calculator-button.operator:hover {
-    background: rgba(0, 120, 212, 0.3) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.3) !important;
 }
 
 .calculator-button.equals {
-    background: rgba(0, 120, 212, 0.9) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.9) !important;
     color: white !important;
 }
 
 .calculator-button.equals:hover {
-    background: rgba(0, 120, 212, 1) !important;
+    background: var(--accent-hover) !important;
 }
 
 /* 模糊禁用时的纯色底 */

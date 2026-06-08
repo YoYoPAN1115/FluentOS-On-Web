@@ -79,6 +79,34 @@ const Taskbar = {
         allApps.forEach(appId => {
             this.renderAppButton(appId);
         });
+        this.syncAllAppIndicators();
+    },
+
+    getWindowState(appId) {
+        if (typeof WindowManager === 'undefined' || !Array.isArray(WindowManager.windows)) return null;
+        return WindowManager.windows.find((w) => w && w.appId === appId && w.element && !w.element.classList.contains('closing')) || null;
+    },
+
+    syncAppIndicator(appId, windowState = null) {
+        const btn = this.appsContainer.querySelector(`[data-app-id="${appId}"]`);
+        if (!btn) return;
+
+        const state = windowState || this.getWindowState(appId);
+        const isOpen = !!state;
+        const isMinimized = !!state && (state.isMinimized === true || state.element?.style.display === 'none');
+        const isActive = !!state && !isMinimized && !state.isMinimizing && !state.isRestoring && !state.element.classList.contains('window-inactive');
+
+        btn.classList.toggle('running', isOpen || isMinimized);
+        btn.classList.toggle('taskbar-app-active', isActive);
+        btn.classList.toggle('taskbar-app-minimized', isMinimized);
+    },
+
+    syncAllAppIndicators() {
+        const ids = new Set([
+            ...Array.from(State.runningApps || []),
+            ...(WindowManager && Array.isArray(WindowManager.windows) ? WindowManager.windows.map((w) => w && w.appId).filter(Boolean) : [])
+        ]);
+        ids.forEach((appId) => this.syncAppIndicator(appId));
     },
 
     renderAppButton(appId) {
@@ -128,9 +156,11 @@ const Taskbar = {
                 if (State.runningApps.has(appId)) {
                     // 如果应用已运行，切换窗口显示
                     WindowManager.toggleWindow(appId);
+                    WindowManager._syncTaskbarAppState?.(appId);
                 } else {
                     // 打开应用
                     WindowManager.openApp(appId);
+                    WindowManager._syncTaskbarAppState?.(appId);
                 }
             }
         });
@@ -310,6 +340,7 @@ const Taskbar = {
             // 如果任务栏没有这个图标，添加它
             this.renderAppButton(appId);
         }
+        this.syncAppIndicator(appId);
     },
 
     onAppStop(appId) {
@@ -317,6 +348,8 @@ const Taskbar = {
         const btn = this.appsContainer.querySelector(`[data-app-id="${appId}"]`);
         if (btn) {
             btn.classList.remove('running');
+            btn.classList.remove('taskbar-app-active');
+            btn.classList.remove('taskbar-app-minimized');
             
             // 如果应用未固定，从任务栏移除（带动画）
             const isPinned = (State.settings.pinnedApps || []).includes(appId);
@@ -331,6 +364,7 @@ const Taskbar = {
                 }
             }
         }
+        this.syncAppIndicator(appId);
     },
 
     updateTime() {

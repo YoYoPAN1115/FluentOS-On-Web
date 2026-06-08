@@ -27,7 +27,7 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 .fluent-btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
 .fluent-btn-outline:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); }
 .fluent-btn-text { background: transparent; color: var(--accent); }
-.fluent-btn-text:hover:not(:disabled) { background: rgba(0, 120, 212, 0.1); }
+.fluent-btn-text:hover:not(:disabled) { background: rgba(var(--accent-rgb, 0, 120, 212), 0.1); }
 .fluent-btn-danger { background: #d13438; color: white; }
 .fluent-btn-danger:hover:not(:disabled) { background: #a4262c; }
 .fluent-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -132,7 +132,7 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 
 /* ============ 输入框/搜索框 ============ */
 .fluent-input-wrapper { display: flex; align-items: center; gap: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0 12px; transition: all var(--transition-fast); }
-.fluent-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2); }
+.fluent-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 0, 120, 212), 0.2); }
 .fluent-input-disabled { opacity: 0.5; pointer-events: none; }
 .fluent-input-icon { width: 16px; height: 16px; opacity: 0.5; flex-shrink: 0; }
 .fluent-input { flex: 1; border: none; background: transparent; padding: 10px 0; font-size: 14px; font-family: inherit; color: var(--text-primary); outline: none; min-width: 0; }
@@ -327,7 +327,7 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 }
 
 .fluent-scroll-area.dragging .fluent-scroll-thumb {
-    background: rgba(0, 120, 212, 0.62);
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.62);
 }
 
 .fluent-scroll-area.no-scroll .fluent-scroll-rail {
@@ -496,7 +496,7 @@ body.button-glow-enabled .button-edge-glow {
         radial-gradient(circle,
             rgba(255, 255, 255, 0.42) 0%,
             rgba(255, 255, 255, 0.20) 30%,
-            rgba(111, 203, 255, 0.12) 48%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.14) 48%,
             transparent 72%);
     filter: blur(7px);
     mix-blend-mode: screen;
@@ -518,7 +518,7 @@ body.button-glow-enabled .button-glow-ripple {
         radial-gradient(circle,
             rgba(255, 255, 255, 0.34) 0%,
             rgba(255, 255, 255, 0.18) 36%,
-            rgba(111, 203, 255, 0.10) 54%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.12) 54%,
             transparent 72%);
     mix-blend-mode: screen;
     animation: button-glow-ripple-out 620ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -538,8 +538,8 @@ body.button-glow-enabled.dark-mode .button-edge-glow {
     background:
         radial-gradient(circle,
             rgba(255, 255, 255, 0.34) 0%,
-            rgba(160, 190, 255, 0.18) 34%,
-            rgba(111, 203, 255, 0.10) 52%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.18) 34%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.10) 52%,
             transparent 74%);
 }
 
@@ -547,8 +547,8 @@ body.button-glow-enabled.dark-mode .button-glow-ripple {
     background:
         radial-gradient(circle,
             rgba(255, 255, 255, 0.28) 0%,
-            rgba(160, 190, 255, 0.16) 38%,
-            rgba(111, 203, 255, 0.08) 56%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.16) 38%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.08) 56%,
             transparent 74%);
 }
 
@@ -618,8 +618,8 @@ body.fluent-v2 .fluent-btn {
     /* 渐变透明文字 */
     color: transparent;
     background-image: linear-gradient(180deg, 
-        rgba(0, 80, 160, 0.8) 0%, 
-        rgba(0, 120, 212, 0.6) 100%);
+        var(--accent-hover) 0%,
+        var(--accent) 100%);
     -webkit-background-clip: text;
     background-clip: text;
 }
@@ -725,17 +725,17 @@ body.fluent-v2.dark-mode .fluent-btn:hover::before {
 
 /* V2 毛玻璃卡片 */
 body.fluent-v2 .fluent-card {
-    background: var(--v2-glass-bg);
+    background: var(--fluent-card-bg-light);
     backdrop-filter: blur(var(--v2-blur)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%);
-    border: 1px solid var(--v2-glass-border);
+    border: 1px solid var(--fluent-card-border-light);
     border-radius: 24px;
     box-shadow: var(--v2-shadow);
 }
 
 body.fluent-v2.dark-mode .fluent-card {
-    background: var(--v2-glass-bg-dark);
-    border-color: var(--v2-glass-border-dark);
+    background: var(--fluent-card-bg-dark);
+    border-color: var(--fluent-card-border-dark);
     box-shadow: var(--v2-shadow-dark);
 }
 
@@ -802,9 +802,9 @@ body.fluent-v2 .files-sidebar-item.active,
 body.fluent-v2 .weather-sidebar-item.active,
 body.fluent-v2 .browser-sidebar-item.active,
 body.fluent-v2 .notes-sidebar-item.active {
-    background: rgba(0, 120, 212, 0.15);
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.15);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(0, 120, 212, 0.25);
+    border: 1px solid rgba(var(--accent-rgb, 0, 120, 212), 0.25);
     color: var(--accent);
 }
 
@@ -825,9 +825,9 @@ body.fluent-v2.dark-mode .files-sidebar-item.active,
 body.fluent-v2.dark-mode .weather-sidebar-item.active,
 body.fluent-v2.dark-mode .browser-sidebar-item.active,
 body.fluent-v2.dark-mode .notes-sidebar-item.active {
-    background: rgba(96, 165, 250, 0.2);
-    border-color: rgba(96, 165, 250, 0.3);
-    color: #60a5fa;
+    background: rgba(var(--accent-rgb, 96, 165, 250), 0.2);
+    border-color: rgba(var(--accent-rgb, 96, 165, 250), 0.3);
+    color: var(--accent);
 }
 
 body.fluent-v2.dark-mode .fluent-sidebar-item.active img,
@@ -1021,25 +1021,25 @@ body.fluent-v2.dark-mode .notes-sidebar-item.active img {
 }
 
 body.fluent-v2 .fluent-setting-item {
-    background: rgba(255, 255, 255, 0.55);
+    background: var(--fluent-card-bg-light);
     backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid var(--fluent-card-border-light);
     border-radius: 16px;
     margin-bottom: 8px;
 }
 
 body.fluent-v2 .fluent-setting-item:hover {
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--fluent-card-bg-light-hover);
 }
 
 body.fluent-v2.dark-mode .fluent-setting-item {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--fluent-card-bg-dark);
+    border-color: var(--fluent-card-border-dark);
 }
 
 body.fluent-v2.dark-mode .fluent-setting-item:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--fluent-card-bg-dark-hover);
 }
 
 /* V2 毛玻璃输入框 - 带两层高亮 */
@@ -1170,7 +1170,7 @@ body.fluent-v2 .fluent-select-option {
 }
 
 body.fluent-v2 .fluent-select-option.selected {
-    background: rgba(0, 120, 212, 0.8);
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.8);
     backdrop-filter: blur(10px);
 }
 
@@ -1218,12 +1218,12 @@ body.fluent-v2 .fluent-toggle-thumb::before {
 
 body.fluent-v2 .fluent-toggle.active .fluent-toggle-track {
     background: linear-gradient(180deg, 
-        rgba(0, 140, 255, 0.6) 0%, 
-        rgba(0, 100, 200, 0.5) 100%);
-    border-color: rgba(0, 120, 212, 0.5);
+        rgba(var(--accent-rgb, 0, 120, 212), 0.62) 0%,
+        rgba(var(--accent-rgb, 0, 120, 212), 0.46) 100%);
+    border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.5);
     box-shadow: 
         inset 0 2px 4px rgba(0, 0, 0, 0.1),
-        0 0 16px rgba(0, 120, 212, 0.3);
+        0 0 16px rgba(var(--accent-rgb, 0, 120, 212), 0.3);
 }
 
 body.fluent-v2 .fluent-toggle.active .fluent-toggle-thumb {
@@ -1237,46 +1237,39 @@ body.fluent-v2 .fluent-toggle.active .fluent-toggle-thumb {
 /* V2 深色模式开关 */
 body.fluent-v2.dark-mode .fluent-toggle-track {
     background: linear-gradient(180deg, 
-        rgba(60, 60, 60, 0.5) 0%, 
-        rgba(40, 40, 40, 0.4) 100%);
-    border-color: rgba(255, 255, 255, 0.1);
+        rgba(180, 180, 180, 0.4) 0%,
+        rgba(160, 160, 160, 0.3) 100%);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 body.fluent-v2.dark-mode .fluent-toggle-thumb {
     left: -1px;
     top: -3px;
     transform: none !important;
-    background: linear-gradient(145deg, 
-        rgba(120, 120, 120, 0.9) 0%, 
-        rgba(90, 90, 90, 0.7) 50%, 
-        rgba(70, 70, 70, 0.8) 100%);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 
-        0 3px 12px rgba(0, 0, 0, 0.4),
-        0 1px 4px rgba(0, 0, 0, 0.3),
-        inset 0 2px 3px rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.75);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-track {
     background: linear-gradient(180deg, 
-        rgba(0, 100, 180, 0.5) 0%, 
-        rgba(0, 80, 150, 0.4) 100%);
+        rgba(var(--accent-rgb, 0, 120, 212), 0.62) 0%,
+        rgba(var(--accent-rgb, 0, 120, 212), 0.46) 100%);
+    border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.5);
     box-shadow: 
-        inset 0 2px 4px rgba(0, 0, 0, 0.2),
-        0 0 20px rgba(0, 120, 212, 0.2);
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 0 16px rgba(var(--accent-rgb, 0, 120, 212), 0.3);
 }
 
 body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-thumb {
     left: 17px;
     transform: none !important;
-    background: linear-gradient(145deg, 
-        rgba(150, 200, 255, 0.9) 0%, 
-        rgba(100, 170, 240, 0.7) 50%, 
-        rgba(80, 150, 220, 0.8) 100%);
-    box-shadow: 
-        0 3px 16px rgba(0, 120, 212, 0.5),
-        0 1px 4px rgba(0, 0, 0, 0.3),
-        inset 0 2px 3px rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* V2 毛玻璃标签栏 */
@@ -1713,7 +1706,7 @@ body.fluent-v2 .settings-section {
     background: transparent !important;
 }
 
-body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
+body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
     background-color: transparent;
 }
 
@@ -1723,7 +1716,7 @@ body.fluent-v2 .settings-content > div:not(.settings-section):not(.settings-over
 }
 
 /* 修复V2模式下窗口重叠时的白条问题 */
-body.fluent-v2 .window *:not(.fluent-setting-item):not(.fluent-sidebar-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
+body.fluent-v2 .window *:not(.fluent-setting-item):not(.fluent-sidebar-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
     background-color: transparent;
 }
 
@@ -1805,11 +1798,11 @@ body.fluent-v2.dark-mode .calc-btn {
 }
 
 body.fluent-v2 .calc-btn-operator {
-    background: rgba(0, 120, 212, 0.2) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.2) !important;
 }
 
 body.fluent-v2 .calc-btn-equals {
-    background: linear-gradient(135deg, rgba(0, 120, 212, 0.6), rgba(0, 90, 180, 0.7)) !important;
+    background: linear-gradient(135deg, rgba(var(--accent-rgb, 0, 120, 212), 0.6), var(--accent-hover)) !important;
     color: white !important;
 }
 
@@ -2018,7 +2011,7 @@ body.fluent-v2 .fluent-dialog-error .fluent-dialog-icon { filter: invert(25%) se
 
 /* 旧版UI - 单圈高亮 */
 .fluent-input-dialog-input:focus {
-    border-color: #0078d4;
+    border-color: var(--accent);
 }
 
 .fluent-input-dialog-input.error {
@@ -2036,7 +2029,7 @@ body.fluent-v2 .fluent-dialog-error .fluent-dialog-icon { filter: invert(25%) se
 }
 
 .dark-mode .fluent-input-dialog-input:focus {
-    border-color: #4aa3e8;
+    border-color: var(--accent);
 }
 
 .fluent-input-error {
@@ -2054,8 +2047,8 @@ body.fluent-v2 .fluent-input-dialog-input {
 }
 
 body.fluent-v2 .fluent-input-dialog-input:focus {
-    border-color: #0078d4;
-    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.25);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 0, 120, 212), 0.25);
 }
 
 body.fluent-v2.dark-mode .fluent-input-dialog-input {
@@ -2063,8 +2056,8 @@ body.fluent-v2.dark-mode .fluent-input-dialog-input {
 }
 
 body.fluent-v2.dark-mode .fluent-input-dialog-input:focus {
-    border-color: #4aa3e8;
-    box-shadow: 0 0 0 2px rgba(74, 163, 232, 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 74, 163, 232), 0.3);
 }
 
 /* ============ 通知组件 (Toast) ============ */
@@ -2203,6 +2196,16 @@ body.fluent-v2 .fluent-toast-title {
 body.fluent-v2 .fluent-toast-message {
     font-size: 14px;
 }
+
+/* Global translucent card tone: match the lighter #FFFFFF8C setting-card state. */
+body.fluent-v2 {
+    --fluent-card-bg-light: rgba(255, 255, 255, 0.55);
+    --fluent-card-bg-light-hover: rgba(255, 255, 255, 0.62);
+    --fluent-card-bg-dark: rgba(24, 28, 36, 0.48);
+    --fluent-card-bg-dark-hover: rgba(34, 40, 52, 0.58);
+    --fluent-card-border-light: rgba(255, 255, 255, 0.30);
+    --fluent-card-border-dark: rgba(255, 255, 255, 0.10);
+}
 /* ============================================================
    Fluent material modes
    Gaussian remains the default; Mica is rendered by browser backdrop sampling.
@@ -2213,7 +2216,6 @@ body.fluent-v2.material-mica:not(.blur-disabled) .taskbar,
 body.fluent-v2.material-mica:not(.blur-disabled) .start-menu,
 body.fluent-v2.material-mica:not(.blur-disabled) .control-center,
 body.fluent-v2.material-mica:not(.blur-disabled) .notification-center,
-body.fluent-v2.material-mica:not(.blur-disabled) #fingo-panel,
 body.fluent-v2.material-mica:not(.blur-disabled) .fluent-sidebar,
 body.fluent-v2.material-mica:not(.blur-disabled) .fluent-card,
 body.fluent-v2.material-mica:not(.blur-disabled) .fluent-setting-item,
@@ -2248,7 +2250,6 @@ body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .taskbar,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .start-menu,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .control-center,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .notification-center,
-body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) #fingo-panel,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-sidebar,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-card,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-setting-item,
@@ -2328,7 +2329,7 @@ body.fluent-v2.material-mica:not(.blur-disabled) .files-sidebar-item.active,
 body.fluent-v2.material-mica:not(.blur-disabled) .weather-sidebar-item.active,
 body.fluent-v2.material-mica:not(.blur-disabled) .browser-sidebar-item.active,
 body.fluent-v2.material-mica:not(.blur-disabled) .notes-sidebar-item.active {
-    background: rgba(0, 120, 212, 0.16) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.16) !important;
     backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) !important;
     -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) !important;
 }
@@ -2338,8 +2339,7 @@ body.fluent-v2.material-gaussian:not(.blur-disabled) .window.window-blur,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .taskbar,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .start-menu,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .control-center,
-body.fluent-v2.material-gaussian:not(.blur-disabled) .notification-center,
-body.fluent-v2.material-gaussian:not(.blur-disabled) #fingo-panel {
+body.fluent-v2.material-gaussian:not(.blur-disabled) .notification-center {
     backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(180%) !important;
 }
@@ -2429,7 +2429,85 @@ body.fluent-v2.material-gaussian:not(.blur-disabled) .files-sidebar-item.active,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .weather-sidebar-item.active,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-sidebar-item.active,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .notes-sidebar-item.active {
-    background: rgba(0, 120, 212, 0.18) !important;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.18) !important;
     backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
     -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+}
+
+body.fluent-v2 .fluent-card,
+body.fluent-v2 .fluent-setting-item,
+body.fluent-v2 .settings-recommend-item,
+body.fluent-v2 .settings-recent-item,
+body.fluent-v2 .network-hero-card,
+body.fluent-v2 .network-option-item,
+body.fluent-v2 .network-expand-panel,
+body.fluent-v2 .app-list-item,
+body.fluent-v2 .appshop-app-card,
+body.fluent-v2 .appshop-category-card,
+body.fluent-v2 .appshop-featured-card:not(.large),
+body.fluent-v2 .worldclock-card,
+body.fluent-v2 .browser-search-card {
+    background-color: var(--fluent-card-bg-light) !important;
+    background-image: none !important;
+    border-color: var(--fluent-card-border-light) !important;
+}
+
+body.fluent-v2 .fluent-card:hover,
+body.fluent-v2 .fluent-setting-item:hover,
+body.fluent-v2 .settings-recommend-item:hover,
+body.fluent-v2 .settings-recent-item:hover,
+body.fluent-v2 .network-option-item:hover,
+body.fluent-v2 .app-list-item:hover,
+body.fluent-v2 .appshop-app-card:hover,
+body.fluent-v2 .appshop-category-card:hover,
+body.fluent-v2 .appshop-featured-card:not(.large):hover,
+body.fluent-v2 .worldclock-card:hover,
+body.fluent-v2 .browser-search-card:hover {
+    background-color: var(--fluent-card-bg-light-hover) !important;
+}
+
+body.fluent-v2.dark-mode .fluent-card,
+body.fluent-v2.dark-mode .fluent-setting-item,
+body.fluent-v2.dark-mode .settings-recommend-item,
+body.fluent-v2.dark-mode .settings-recent-item,
+body.fluent-v2.dark-mode .network-hero-card,
+body.fluent-v2.dark-mode .network-option-item,
+body.fluent-v2.dark-mode .network-expand-panel,
+body.fluent-v2.dark-mode .app-list-item,
+body.fluent-v2.dark-mode .appshop-app-card,
+body.fluent-v2.dark-mode .appshop-category-card,
+body.fluent-v2.dark-mode .appshop-featured-card:not(.large),
+body.fluent-v2.dark-mode .worldclock-card,
+body.fluent-v2.dark-mode .browser-search-card {
+    background-color: var(--fluent-card-bg-dark) !important;
+    background-image: none !important;
+    border-color: var(--fluent-card-border-dark) !important;
+}
+
+body.fluent-v2.dark-mode .fluent-card:hover,
+body.fluent-v2.dark-mode .fluent-setting-item:hover,
+body.fluent-v2.dark-mode .settings-recommend-item:hover,
+body.fluent-v2.dark-mode .settings-recent-item:hover,
+body.fluent-v2.dark-mode .network-option-item:hover,
+body.fluent-v2.dark-mode .app-list-item:hover,
+body.fluent-v2.dark-mode .appshop-app-card:hover,
+body.fluent-v2.dark-mode .appshop-category-card:hover,
+body.fluent-v2.dark-mode .appshop-featured-card:not(.large):hover,
+body.fluent-v2.dark-mode .worldclock-card:hover,
+body.fluent-v2.dark-mode .browser-search-card:hover {
+    background-color: var(--fluent-card-bg-dark-hover) !important;
+}
+
+/* Keep inactive window navigation and chrome icons neutral across light/dark themes. */
+body.fluent-v2 {
+    --fluent-neutral-icon-filter: brightness(0) saturate(100%) invert(47%) sepia(8%) saturate(442%) hue-rotate(176deg) brightness(91%) contrast(86%);
+    --fluent-neutral-icon-opacity: 0.92;
+}
+
+body.fluent-v2 .window.window-inactive .window-control-btn img,
+body.fluent-v2.dark-mode .window.window-inactive .window-control-btn img,
+body.fluent-v2 .window.window-inactive :is(.fluent-sidebar-item, .sidebar-item, .clock-sidebar-item, .clock-nav-item, .files-sidebar-item, .weather-sidebar-item, .browser-sidebar-item, .notes-sidebar-item, .media-nav-item) :is(img, svg, .media-symbol),
+body.fluent-v2.dark-mode .window.window-inactive :is(.fluent-sidebar-item, .sidebar-item, .clock-sidebar-item, .clock-nav-item, .files-sidebar-item, .weather-sidebar-item, .browser-sidebar-item, .notes-sidebar-item, .media-nav-item) :is(img, svg, .media-symbol) {
+    filter: var(--fluent-neutral-icon-filter) !important;
+    opacity: var(--fluent-neutral-icon-opacity) !important;
 }

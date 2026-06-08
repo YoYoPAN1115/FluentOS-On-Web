@@ -389,12 +389,176 @@ const SettingsApp = {
             .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+            .settings-appearance-section > .fluent-setting-item,
+            .settings-appearance-section > .settings-accent-panel {
+                margin: 0 0 10px 0;
+            }
+            .settings-appearance-section > .fluent-setting-item:last-child,
+            .settings-appearance-section > .settings-accent-panel:last-child {
+                margin-bottom: 0;
+            }
+            .settings-appearance-section > .fluent-setting-item,
+            .settings-appearance-section .settings-accent-entry {
+                min-height: 80px;
+                padding: 16px 20px;
+                box-sizing: border-box;
+            }
             .wallpaper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 200px)); gap: 12px; justify-content: start; transition: all 0.3s ease; }
             .wallpaper-item { width: 200px; height: 112px; border-radius: var(--radius-md); overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: all 0.3s ease; position: relative; }
             .wallpaper-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
             .wallpaper-item:hover img { transform: scale(1.05); }
             .wallpaper-item.selected { border-color: var(--accent); }
             .wallpaper-item.selected::after { content: '✓'; position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+            .settings-accent-panel {
+                display: flex;
+                flex-direction: column;
+                margin: 12px 0 18px;
+            }
+            .settings-accent-entry {
+                margin-bottom: 0;
+            }
+            .settings-accent-entry.is-expanded {
+                border-bottom-left-radius: 0 !important;
+                border-bottom-right-radius: 0 !important;
+            }
+            .settings-accent-entry-swatch {
+                width: 30px;
+                height: 30px;
+                border-radius: 9px;
+                border: 2px solid rgba(255, 255, 255, 0.72);
+                background: var(--accent);
+                background-color: var(--accent);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.1),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+            }
+            .dark-mode .settings-accent-entry-swatch {
+                border-color: rgba(255, 255, 255, 0.32);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.32),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+            }
+            .settings-accent-entry .expand-arrow {
+                transition: transform 360ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease;
+            }
+            .settings-accent-entry.is-expanded .expand-arrow {
+                transform: rotate(90deg);
+            }
+            .settings-accent-expand-panel {
+                overflow: hidden;
+                padding: 18px 20px 22px 20px;
+                transform-origin: top center;
+                animation: settingsAccentExpand 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+            .settings-accent-panel.is-collapsing .settings-accent-expand-panel {
+                animation: settingsAccentCollapse 260ms cubic-bezier(0.4, 0, 0.2, 1) both;
+                pointer-events: none;
+            }
+            @keyframes settingsAccentExpand {
+                0% { opacity: 0; max-height: 0; transform: translateY(-12px) scaleY(0.96); filter: blur(2px); }
+                55% { opacity: 1; filter: blur(0); }
+                100% { opacity: 1; max-height: 720px; transform: translateY(0) scaleY(1); filter: blur(0); }
+            }
+            @keyframes settingsAccentCollapse {
+                0% { opacity: 1; max-height: 720px; transform: translateY(0) scaleY(1); filter: blur(0); }
+                100% { opacity: 0; max-height: 0; transform: translateY(-10px) scaleY(0.96); filter: blur(2px); }
+            }
+            .settings-accent-auto-row {
+                gap: 16px;
+            }
+            .settings-accent-group {
+                margin-top: 20px;
+            }
+            .settings-accent-group-title {
+                margin-bottom: 10px;
+                font-size: 14px;
+                color: var(--text-primary);
+            }
+            .settings-accent-row,
+            .settings-accent-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                max-width: 500px;
+            }
+            .settings-accent-swatch {
+                width: 54px;
+                height: 54px;
+                position: relative;
+                padding: 0;
+                appearance: none;
+                -webkit-appearance: none;
+                box-sizing: border-box;
+                border: 3px solid transparent;
+                border-radius: 8px;
+                background: var(--swatch-color) !important;
+                background-color: var(--swatch-color) !important;
+                background-image: none !important;
+                cursor: pointer;
+                transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, border-color 180ms ease;
+            }
+            .settings-accent-swatch:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            }
+            .settings-accent-swatch.selected {
+                border-color: var(--accent);
+                box-shadow:
+                    0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.2),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+            }
+            .settings-accent-swatch.selected::after {
+                content: '✓';
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                width: 22px;
+                height: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                background: var(--accent);
+                color: #fff;
+                font-size: 14px;
+                font-weight: 600;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+                text-shadow: none;
+            }
+            .settings-accent-custom {
+                width: 72px;
+                height: 48px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-top: 10px;
+                border: 2px solid var(--border-color);
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                font-size: 28px;
+                cursor: pointer;
+                transition: border-color 0.16s ease, background 0.16s ease;
+            }
+            .settings-accent-custom:hover {
+                border-color: var(--accent);
+                background: var(--accent-soft);
+            }
+            .settings-accent-custom-wrap {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .settings-accent-expand-panel,
+                .settings-accent-panel.is-collapsing .settings-accent-expand-panel {
+                    animation: none;
+                }
+                .settings-accent-entry .expand-arrow,
+                .settings-accent-swatch {
+                    transition: none;
+                }
+            }
             
             /* 概览页面样式 */
             .settings-overview { padding: 24px 32px; }
@@ -430,20 +594,20 @@ const SettingsApp = {
             .settings-recent-time { font-size: 12px; color: var(--text-tertiary); }
             
             /* 设置项高亮动画 */
-            .fluent-setting-item.highlight { background: rgba(0, 120, 212, 0.15) !important; transition: background 0.3s ease; }
+            .fluent-setting-item.highlight { background: rgba(var(--accent-rgb, 0, 120, 212), 0.15) !important; transition: background 0.3s ease; }
             .fluent-setting-item.highlight-fade { background: transparent !important; transition: background 0.5s ease; }
-            .fluent-setting-item.highlight-soft-blue { background: rgba(111, 203, 255, 0.28) !important; transition: background 0.2s ease; }
+            .fluent-setting-item.highlight-soft-blue { background: rgba(var(--accent-rgb, 0, 120, 212), 0.24) !important; transition: background 0.2s ease; }
             .fluent-setting-item.highlight-soft-blue-fade { background: transparent !important; transition: background 0.3s ease; }
             body.fluent-v2 .fluent-setting-item.highlight-soft-blue {
-                background: rgba(98, 196, 255, 0.42) !important;
-                border-color: rgba(54, 142, 255, 0.62) !important;
-                box-shadow: 0 0 0 1px rgba(54, 142, 255, 0.32), 0 8px 22px rgba(54, 142, 255, 0.2) !important;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.32) !important;
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.62) !important;
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.32), 0 8px 22px rgba(var(--accent-rgb, 0, 120, 212), 0.2) !important;
                 transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
             }
             body.fluent-v2.dark-mode .fluent-setting-item.highlight-soft-blue {
-                background: rgba(84, 170, 255, 0.34) !important;
-                border-color: rgba(122, 196, 255, 0.7) !important;
-                box-shadow: 0 0 0 1px rgba(122, 196, 255, 0.42), 0 10px 24px rgba(39, 129, 255, 0.28) !important;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.28) !important;
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.68) !important;
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.42), 0 10px 24px rgba(var(--accent-rgb, 0, 120, 212), 0.28) !important;
             }
             body.fluent-v2 .fluent-setting-item.highlight-soft-blue-fade {
                 transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
@@ -554,10 +718,10 @@ const SettingsApp = {
             body.fluent-v2 .network-expand-panel,
             body.fluent-v2 .app-list-item,
             body.fluent-v2 .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.55) !important;
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
                 backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
                 border-radius: 16px !important;
             }
             
@@ -566,7 +730,7 @@ const SettingsApp = {
             body.fluent-v2 .network-option-item:hover,
             body.fluent-v2 .app-list-item:hover,
             body.fluent-v2 .fluent-setting-item:hover {
-                background: rgba(255, 255, 255, 0.7) !important;
+                background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62)) !important;
             }
             
             /* 深色模式 - 所有卡片统一透明度 */
@@ -577,8 +741,8 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .network-expand-panel,
             body.fluent-v2.dark-mode .app-list-item,
             body.fluent-v2.dark-mode .fluent-setting-item {
-                background: rgba(24, 28, 36, 0.72) !important;
-                border-color: rgba(255, 255, 255, 0.12) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             body.fluent-v2.dark-mode .settings-recommend-item:hover,
@@ -586,7 +750,7 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .network-option-item:hover,
             body.fluent-v2.dark-mode .app-list-item:hover,
             body.fluent-v2.dark-mode .fluent-setting-item:hover {
-                background: rgba(34, 40, 52, 0.82) !important;
+                background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58)) !important;
             }
 
             body.fluent-v2.window-blur-disabled .settings-app,
@@ -668,13 +832,13 @@ const SettingsApp = {
             
             /* V2网络展开面板 */
             body.fluent-v2 .network-expand-panel {
-                background: rgba(255, 255, 255, 0.55) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
                 border-radius: 0 0 16px 16px !important;
             }
             body.fluent-v2.dark-mode .network-expand-panel {
-                background: rgba(24, 28, 36, 0.72) !important;
-                border-color: rgba(255, 255, 255, 0.12) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             /* 应用程序页面样式 */
@@ -767,7 +931,7 @@ const SettingsApp = {
             }
             
             .apps-sort-btn:hover {
-                background: rgba(0, 120, 212, 0.1);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
             }
             
             .apps-list {
@@ -957,16 +1121,16 @@ const SettingsApp = {
             }
             
             body.fluent-v2 .app-list-item:hover {
-                background: rgba(255, 255, 255, 0.7) !important;
+                background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62)) !important;
             }
             
             body.fluent-v2.dark-mode .app-list-item {
-                background: rgba(24, 28, 36, 0.72) !important;
-                border-color: rgba(255, 255, 255, 0.12) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             body.fluent-v2.dark-mode .app-list-item:hover {
-                background: rgba(34, 40, 52, 0.82) !important;
+                background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58)) !important;
             }
             
             body.fluent-v2 .apps-list {
@@ -1001,16 +1165,16 @@ const SettingsApp = {
             
             /* V2 模式下应用详情页卡片样式 */
             body.fluent-v2 .app-detail-page .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.55) !important;
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
                 backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
                 border-radius: 16px !important;
             }
             
             body.fluent-v2.dark-mode .app-detail-page .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             .app-detail-back {
@@ -1467,7 +1631,7 @@ const SettingsApp = {
                 margin-left: 8px;
                 padding: 0 7px;
                 border-radius: 999px;
-                background: rgba(0, 120, 212, 0.14);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.14);
                 color: var(--accent);
                 font-size: 11px;
                 font-weight: 600;
@@ -1542,7 +1706,7 @@ const SettingsApp = {
                 position: absolute;
                 inset: 0;
                 background:
-                    radial-gradient(circle at 20% 25%, rgba(0, 120, 212, 0.44), transparent 28%),
+                    radial-gradient(circle at 20% 25%, rgba(var(--accent-rgb, 0, 120, 212), 0.44), transparent 28%),
                     radial-gradient(circle at 78% 22%, rgba(255, 145, 77, 0.38), transparent 30%),
                     radial-gradient(circle at 52% 86%, rgba(105, 92, 255, 0.34), transparent 34%),
                     var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
@@ -1580,7 +1744,7 @@ const SettingsApp = {
                 inset: -42px;
                 z-index: 0;
                 background:
-                    radial-gradient(circle at 18% 24%, rgba(0, 120, 212, 0.36), transparent 30%),
+                    radial-gradient(circle at 18% 24%, rgba(var(--accent-rgb, 0, 120, 212), 0.36), transparent 30%),
                     radial-gradient(circle at 76% 26%, rgba(255, 145, 77, 0.28), transparent 32%),
                     radial-gradient(circle at 54% 84%, rgba(105, 92, 255, 0.28), transparent 36%),
                     var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
@@ -3205,6 +3369,7 @@ const SettingsApp = {
         
         // 外观设置
         const appearanceSection = this.createSection(t('settings.appearance'));
+        appearanceSection.classList.add('settings-appearance-section');
         
         // 主题选择 - 使用 FluentUI.SettingItem + FluentUI.Select
         appearanceSection.appendChild(FluentUI.SettingItem({
@@ -3226,6 +3391,8 @@ const SettingsApp = {
                 }
             })
         }));
+
+        appearanceSection.appendChild(this.createAccentColorPanel());
         
         // 模糊效果
         appearanceSection.appendChild(FluentUI.SettingItem({
@@ -4206,7 +4373,8 @@ const SettingsApp = {
 
         const list = FluentUI.List({
             items: [
-                { id: 'version', title: t('settings.version'), description: '1.5.0 MVP', icon: 'Information Circle' },
+                { id: 'version', title: t('settings.version'), description: '2.0.0.1 BETA', icon: 'Information Circle' },
+                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260608', icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
             ]
@@ -4299,6 +4467,183 @@ const SettingsApp = {
         container.appendChild(section);
     },
     
+    getAccentPalette() {
+        return [
+            '#ffb900', '#ff8c00', '#f7630c', '#ca5010', '#da3b01', '#ef6950', '#d13438', '#ff4343',
+            '#e74856', '#e81123', '#e3008c', '#bf0077', '#c30052', '#9a0089', '#b146c2', '#881798',
+            '#0078d4', '#0063b1', '#8e8cd8', '#6b69d6', '#8764b8', '#744da9', '#b24bc2', '#881798',
+            '#0099bc', '#2d7d9a', '#00b7c3', '#038387', '#00a98f', '#018574', '#00cc6a', '#10893e',
+            '#7a7574', '#5d5a58', '#68768a', '#515c6b', '#567c73', '#486860', '#498205', '#107c10',
+            '#767676', '#4c4a48', '#69797e', '#4a5459', '#647c64', '#525e54', '#847545', '#7e735f'
+        ];
+    },
+
+    createAccentColorPanel() {
+        const currentColor = State.normalizeAccentColor
+            ? State.normalizeAccentColor(State.settings.accentColor)
+            : (State.settings.accentColor || '#0078d4');
+        const autoEnabled = State.settings.accentColorAuto === true;
+        const readabilityEnabled = State.settings.accentColorReadability === true;
+        const expanded = State.settings.accentColorExpanded === true;
+        const recentColors = State.normalizeRecentAccentColors
+            ? State.normalizeRecentAccentColors(State.settings.recentAccentColors)
+            : (State.settings.recentAccentColors || []);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `settings-accent-panel ${expanded ? 'is-expanded' : ''}`;
+
+        const entry = document.createElement('div');
+        entry.className = `network-option-item network-option-expandable settings-accent-entry ${expanded ? 'is-expanded' : ''}`;
+        entry.innerHTML = `
+            <div class="network-option-icon">
+                <span class="settings-accent-entry-swatch" style="--accent: ${currentColor}; background: ${currentColor}; background-color: ${currentColor};"></span>
+            </div>
+            <div class="network-option-info">
+                <h4>${t('settings.accent-color')}</h4>
+                <p>${autoEnabled ? t('settings.accent-auto') : currentColor.toUpperCase()}</p>
+            </div>
+            <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" class="network-option-arrow expand-arrow" alt="">
+        `;
+        entry.addEventListener('click', () => {
+            if (expanded) {
+                wrapper.classList.add('is-collapsing');
+                const reducedMotion = typeof window !== 'undefined'
+                    && window.matchMedia
+                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                setTimeout(() => {
+                    State.updateSettings({ accentColorExpanded: false });
+                    this.render();
+                }, reducedMotion ? 0 : 260);
+                return;
+            }
+            State.updateSettings({ accentColorExpanded: true });
+            this.render();
+        });
+        wrapper.appendChild(entry);
+
+        const selectColor = (color) => {
+            const normalized = State.normalizeAccentColor ? State.normalizeAccentColor(color) : color;
+            State.updateSettings({
+                accentColor: normalized,
+                accentColorAuto: false,
+                recentAccentColors: State.addRecentAccentColor ? State.addRecentAccentColor(normalized) : [normalized, ...recentColors].slice(0, 8)
+            });
+            this.addRecentSetting(t('settings.accent-color'), normalized, 'personalization');
+            State.addNotification({ title: t('settings.accent-color'), message: t('settings.accent-color-changed'), type: 'success' });
+            this.render();
+        };
+
+        const createSwatch = (color) => {
+            const normalized = State.normalizeAccentColor ? State.normalizeAccentColor(color) : color;
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.className = `settings-accent-swatch ${normalized === currentColor ? 'selected' : ''}`;
+            swatch.style.setProperty('--swatch-color', normalized);
+            swatch.style.background = normalized;
+            swatch.style.backgroundColor = normalized;
+            swatch.title = normalized;
+            swatch.setAttribute('aria-label', normalized);
+            swatch.addEventListener('click', () => selectColor(normalized));
+            return swatch;
+        };
+
+        if (!expanded) {
+            return wrapper;
+        }
+
+        const panel = document.createElement('div');
+        panel.className = 'network-expand-panel settings-accent-expand-panel';
+
+        const autoRow = document.createElement('div');
+        autoRow.className = 'network-expand-row settings-accent-auto-row';
+        autoRow.innerHTML = `<span>${t('settings.accent-auto')}</span>`;
+        const autoToggle = FluentUI.Toggle({
+            checked: autoEnabled,
+            onChange: async (next) => {
+                State.updateSettings({ accentColorAuto: next });
+                this.addRecentSetting(t('settings.accent-color'), next ? t('settings.on') : t('settings.off'), 'personalization');
+                State.addNotification({
+                    title: t('settings.accent-color'),
+                    message: next ? t('settings.accent-auto-on') : t('settings.accent-auto-off'),
+                    type: next ? 'info' : 'success'
+                });
+                if (next && State.updateAccentFromWallpaper) {
+                    const color = await State.updateAccentFromWallpaper(State.settings.wallpaperDesktop);
+                    if (color) {
+                        this.render();
+                        return;
+                    }
+                }
+                this.render();
+            }
+        });
+        autoRow.appendChild(autoToggle);
+        panel.appendChild(autoRow);
+
+        const readabilityRow = document.createElement('div');
+        readabilityRow.className = 'network-expand-row settings-accent-auto-row';
+        readabilityRow.innerHTML = `<span>${t('settings.accent-readability')}</span>`;
+        const readabilityToggle = FluentUI.Toggle({
+            checked: readabilityEnabled,
+            onChange: (next) => {
+                State.updateSettings({ accentColorReadability: next });
+                this.addRecentSetting(t('settings.accent-color'), next ? t('settings.on') : t('settings.off'), 'personalization');
+                State.addNotification({
+                    title: t('settings.accent-color'),
+                    message: next ? t('settings.accent-readability-on') : t('settings.accent-readability-off'),
+                    type: next ? 'info' : 'success'
+                });
+                this.render();
+            }
+        });
+        readabilityRow.appendChild(readabilityToggle);
+        panel.appendChild(readabilityRow);
+
+        if (recentColors.length) {
+            const recentGroup = document.createElement('div');
+            recentGroup.className = 'settings-accent-group';
+            recentGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-recent')}</div>`;
+            const row = document.createElement('div');
+            row.className = 'settings-accent-row';
+            recentColors.forEach((color) => row.appendChild(createSwatch(color)));
+            recentGroup.appendChild(row);
+            panel.appendChild(recentGroup);
+        }
+
+        const paletteGroup = document.createElement('div');
+        paletteGroup.className = 'settings-accent-group';
+        paletteGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-windows')}</div>`;
+        const grid = document.createElement('div');
+        grid.className = 'settings-accent-grid';
+        this.getAccentPalette().forEach((color) => grid.appendChild(createSwatch(color)));
+        paletteGroup.appendChild(grid);
+        panel.appendChild(paletteGroup);
+
+        const customGroup = document.createElement('div');
+        customGroup.className = 'settings-accent-group';
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = currentColor;
+        input.style.display = 'none';
+        input.addEventListener('input', (event) => selectColor(event.target.value));
+        const customBtn = document.createElement('button');
+        customBtn.type = 'button';
+        customBtn.className = 'settings-accent-custom';
+        customBtn.textContent = '+';
+        customBtn.setAttribute('aria-label', t('settings.accent-custom'));
+        customBtn.addEventListener('click', () => input.click());
+        customGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-custom')}</div>`;
+        const customWrap = document.createElement('div');
+        customWrap.className = 'settings-accent-custom-wrap';
+        customWrap.appendChild(customBtn);
+        customWrap.appendChild(input);
+        customGroup.appendChild(customWrap);
+        panel.appendChild(customGroup);
+        wrapper.appendChild(panel);
+
+        return wrapper;
+    },
+
     // 辅助方法：创建分区
     createSection(title) {
         const section = document.createElement('div');

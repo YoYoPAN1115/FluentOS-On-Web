@@ -55,6 +55,7 @@ const State = {
         
         // 应用主题
         this.applyTheme();
+        this.applyAccentColorSetting();
         
         // 应用动画设置
         this.applyAnimationSetting();
@@ -68,6 +69,9 @@ const State = {
         // 应用新版 UI 设置
         this.applyFluentV2Setting();
         this.applyMaterialSetting();
+        if (this.settings.accentColorAuto === true) {
+            this.updateAccentFromWallpaper(this.settings.wallpaperDesktop);
+        }
         this.applyButtonGlowSetting();
         this.applyStrictCspSetting();
         
@@ -187,6 +191,12 @@ const State = {
             enableFluentV2: true,
             materialType: 'gaussian',
             blurIntensity: 40,
+            accentColor: '#0078d4',
+            accentColorAuto: false,
+            accentColorExpanded: false,
+            accentColorReadability: false,
+            wallpaperAccentColor: '#0078d4',
+            recentAccentColors: ['#d83b01', '#0078d4', '#00b7c3', '#4c4a48', '#e81123'],
             enableButtonGlowEffect: true,
             userName: 'Owner',
             userEmail: 'owner@sample.com',
@@ -210,6 +220,24 @@ const State = {
 
         if (this.settings.enableFluentV2 !== true) {
             this.settings.enableFluentV2 = true;
+            changed = true;
+        }
+
+        const normalizedAccent = this.normalizeAccentColor(this.settings.accentColor);
+        if (normalizedAccent !== this.settings.accentColor) {
+            this.settings.accentColor = normalizedAccent;
+            changed = true;
+        }
+
+        const normalizedWallpaperAccent = this.normalizeAccentColor(this.settings.wallpaperAccentColor, normalizedAccent);
+        if (normalizedWallpaperAccent !== this.settings.wallpaperAccentColor) {
+            this.settings.wallpaperAccentColor = normalizedWallpaperAccent;
+            changed = true;
+        }
+
+        const normalizedRecentAccentColors = this.normalizeRecentAccentColors(this.settings.recentAccentColors);
+        if (JSON.stringify(normalizedRecentAccentColors) !== JSON.stringify(this.settings.recentAccentColors)) {
+            this.settings.recentAccentColors = normalizedRecentAccentColors;
             changed = true;
         }
 
@@ -312,6 +340,15 @@ const State = {
         if (Object.prototype.hasOwnProperty.call(safeUpdates, 'userAvatar')) {
             safeUpdates.userAvatar = this.normalizeUserAvatar(safeUpdates.userAvatar);
         }
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'accentColor')) {
+            safeUpdates.accentColor = this.normalizeAccentColor(safeUpdates.accentColor);
+        }
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'wallpaperAccentColor')) {
+            safeUpdates.wallpaperAccentColor = this.normalizeAccentColor(safeUpdates.wallpaperAccentColor);
+        }
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'recentAccentColors')) {
+            safeUpdates.recentAccentColors = this.normalizeRecentAccentColors(safeUpdates.recentAccentColors);
+        }
         if (safeUpdates.strictCspEnabled === true) {
             safeUpdates.strictCspLastEnabled = true;
         } else if (safeUpdates.strictCspEnabled === false) {
@@ -375,6 +412,20 @@ const State = {
         ) {
             this.applyMaterialSetting();
         }
+        if (
+            safeUpdates.accentColor !== undefined ||
+            safeUpdates.wallpaperAccentColor !== undefined ||
+            safeUpdates.accentColorReadability !== undefined ||
+            safeUpdates.theme !== undefined
+        ) {
+            this.applyAccentColorSetting();
+        }
+        if (
+            safeUpdates.accentColorAuto === true ||
+            (safeUpdates.wallpaperDesktop !== undefined && this.settings.accentColorAuto === true)
+        ) {
+            this.updateAccentFromWallpaper(this.settings.wallpaperDesktop);
+        }
         if (safeUpdates.enableButtonGlowEffect !== undefined) {
             this.applyButtonGlowSetting();
         }
@@ -419,6 +470,261 @@ const State = {
         } catch (e) {
             // ignore
         }
+    },
+
+    normalizeAccentColor(value, fallback = '#0078d4') {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (!match) return fallback;
+        const hex = match[1].length === 3
+            ? match[1].split('').map((char) => char + char).join('')
+            : match[1];
+        return `#${hex.toLowerCase()}`;
+    },
+
+    normalizeRecentAccentColors(colors) {
+        const defaults = ['#d83b01', '#0078d4', '#00b7c3', '#4c4a48', '#e81123'];
+        const source = Array.isArray(colors) && colors.length ? colors : defaults;
+        const seen = new Set();
+        return source
+            .map((color) => this.normalizeAccentColor(color, ''))
+            .filter((color) => color && !seen.has(color) && seen.add(color))
+            .slice(0, 8);
+    },
+
+    addRecentAccentColor(color, colors = null) {
+        const normalized = this.normalizeAccentColor(color);
+        const source = Array.isArray(colors) ? colors : this.settings.recentAccentColors;
+        return this.normalizeRecentAccentColors([normalized, ...(source || [])]);
+    },
+
+    hexToRgb(hex) {
+        const normalized = this.normalizeAccentColor(hex);
+        const value = parseInt(normalized.slice(1), 16);
+        return {
+            r: (value >> 16) & 255,
+            g: (value >> 8) & 255,
+            b: value & 255
+        };
+    },
+
+    rgbToHex(r, g, b) {
+        const toHex = (value) => Math.max(0, Math.min(255, Math.round(value)))
+            .toString(16)
+            .padStart(2, '0');
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    },
+
+    rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0;
+        let s = 0;
+        const l = (max + min) / 2;
+
+        if (max !== min) {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r:
+                    h = (g - b) / d + (g < b ? 6 : 0);
+                    break;
+                case g:
+                    h = (b - r) / d + 2;
+                    break;
+                default:
+                    h = (r - g) / d + 4;
+                    break;
+            }
+            h /= 6;
+        }
+
+        return { h, s, l };
+    },
+
+    hslToRgb(h, s, l) {
+        if (s === 0) {
+            const gray = l * 255;
+            return { r: gray, g: gray, b: gray };
+        }
+
+        const hueToRgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        return {
+            r: hueToRgb(p, q, h + 1 / 3) * 255,
+            g: hueToRgb(p, q, h) * 255,
+            b: hueToRgb(p, q, h - 1 / 3) * 255
+        };
+    },
+
+    createAccentHoverColor(hex) {
+        const { r, g, b } = this.hexToRgb(hex);
+        const hsl = this.rgbToHsl(r, g, b);
+        hsl.s = Math.min(0.92, hsl.s + 0.05);
+        hsl.l = document.body && document.body.classList.contains('dark-mode')
+            ? Math.min(0.78, hsl.l + 0.08)
+            : Math.max(0.26, hsl.l - 0.08);
+        const next = this.hslToRgb(hsl.h, hsl.s, hsl.l);
+        return this.rgbToHex(next.r, next.g, next.b);
+    },
+
+    optimizeAccentColorForReadability(hex) {
+        if (this.settings.accentColorReadability !== true || typeof document === 'undefined') {
+            return this.normalizeAccentColor(hex);
+        }
+
+        const { r, g, b } = this.hexToRgb(hex);
+        const hsl = this.rgbToHsl(r, g, b);
+        const isDarkMode = document.body && document.body.classList.contains('dark-mode');
+
+        hsl.s = Math.min(0.9, Math.max(0.34, hsl.s + 0.02));
+        hsl.l = isDarkMode
+            ? Math.min(0.74, hsl.l + (hsl.l < 0.5 ? 0.1 : 0.06))
+            : Math.max(0.24, hsl.l - (hsl.l > 0.55 ? 0.1 : 0.06));
+
+        const next = this.hslToRgb(hsl.h, hsl.s, hsl.l);
+        return this.rgbToHex(next.r, next.g, next.b);
+    },
+
+    applyAccentColorSetting() {
+        if (typeof document === 'undefined') return;
+        const rawAccent = this.normalizeAccentColor(this.settings.accentColor);
+        const accent = this.optimizeAccentColorForReadability(rawAccent);
+        const hover = this.createAccentHoverColor(accent);
+        const { r, g, b } = this.hexToRgb(accent);
+        const targets = [document.documentElement, document.body].filter(Boolean);
+
+        targets.forEach((target) => {
+            target.style.setProperty('--accent', accent);
+            target.style.setProperty('--accent-raw', rawAccent);
+            target.style.setProperty('--accent-hover', hover);
+            target.style.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
+            target.style.setProperty('--accent-soft', `rgba(${r}, ${g}, ${b}, 0.16)`);
+        });
+    },
+
+    async updateAccentFromWallpaper(wallpaper) {
+        if (typeof document === 'undefined') return null;
+        const source = wallpaper || this.settings.wallpaperDesktop;
+        if (!source) return null;
+        const token = (this._accentExtractionToken || 0) + 1;
+        this._accentExtractionToken = token;
+
+        try {
+            const color = await this.extractAccentColorFromImage(source);
+            if (!color || this._accentExtractionToken !== token || this.settings.accentColorAuto !== true) {
+                return color || null;
+            }
+            this.updateSettings({
+                accentColor: color,
+                wallpaperAccentColor: color,
+                recentAccentColors: this.addRecentAccentColor(color)
+            });
+            return color;
+        } catch (error) {
+            console.warn('Accent color extraction failed', error);
+            return null;
+        }
+    },
+
+    async extractAccentColorFromImage(src) {
+        const tryImage = async (imageSrc, shouldRevoke = false) => {
+            try {
+                const img = await this.loadImageForAccentExtraction(imageSrc);
+                return this.sampleAccentColorFromImage(img);
+            } finally {
+                if (shouldRevoke && typeof URL !== 'undefined') URL.revokeObjectURL(imageSrc);
+            }
+        };
+
+        try {
+            return await tryImage(src);
+        } catch (firstError) {
+            if (!/^https?:\/\//i.test(String(src || '')) || typeof fetch !== 'function' || typeof URL === 'undefined') {
+                throw firstError;
+            }
+            const response = await fetch(src, { mode: 'cors' });
+            const blob = await response.blob();
+            return tryImage(URL.createObjectURL(blob), true);
+        }
+    },
+
+    loadImageForAccentExtraction(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            if (!/^data:image\//i.test(String(src || '')) && !/^blob:/i.test(String(src || ''))) {
+                img.crossOrigin = 'anonymous';
+            }
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
+    },
+
+    sampleAccentColorFromImage(img) {
+        const canvas = document.createElement('canvas');
+        const width = Math.max(1, Math.min(112, img.naturalWidth || img.width || 112));
+        const height = Math.max(1, Math.min(72, img.naturalHeight || img.height || 72));
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const data = ctx.getImageData(0, 0, width, height).data;
+        const buckets = new Map();
+
+        for (let i = 0; i < data.length; i += 16) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const a = data[i + 3];
+            if (a < 170) continue;
+
+            const hsl = this.rgbToHsl(r, g, b);
+            if (hsl.l < 0.16 || hsl.l > 0.86 || hsl.s < 0.16) continue;
+
+            const key = [
+                Math.round(r / 24) * 24,
+                Math.round(g / 24) * 24,
+                Math.round(b / 24) * 24
+            ].join(',');
+            const bucket = buckets.get(key) || { r: 0, g: 0, b: 0, weight: 0, score: 0 };
+            const vividness = hsl.s * 2.2 + (1 - Math.abs(hsl.l - 0.52)) * 1.3;
+            const weight = 1 + vividness;
+            bucket.r += r * weight;
+            bucket.g += g * weight;
+            bucket.b += b * weight;
+            bucket.weight += weight;
+            bucket.score += weight;
+            buckets.set(key, bucket);
+        }
+
+        let best = null;
+        buckets.forEach((bucket) => {
+            if (!best || bucket.score > best.score) best = bucket;
+        });
+        if (!best || best.weight <= 0) return null;
+
+        const avg = {
+            r: best.r / best.weight,
+            g: best.g / best.weight,
+            b: best.b / best.weight
+        };
+        const hsl = this.rgbToHsl(avg.r, avg.g, avg.b);
+        hsl.s = Math.max(0.38, Math.min(0.86, hsl.s));
+        hsl.l = Math.max(0.32, Math.min(0.62, hsl.l));
+        const rgb = this.hslToRgb(hsl.h, hsl.s, hsl.l);
+        return this.rgbToHex(rgb.r, rgb.g, rgb.b);
     },
 
     // 应用动画设置
