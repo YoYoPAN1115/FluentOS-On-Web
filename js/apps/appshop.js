@@ -13,8 +13,11 @@ const AppShop = {
     searchQuery: '',
     currentCategory: 'all',
     activePage: 'featured',
+    isSearchActive: false,
     _resizeObserver: null,
     _contentScrollRestoreRaf: null,
+    _iconColorCache: new Map(),
+    _iconColorPending: new Map(),
     
     // 应用数据（可从应用商店安装）
     apps: [
@@ -548,7 +551,7 @@ const AppShop = {
             .appshop.appshop-v2 .appshop-nav-btn {
                 border: 0;
                 appearance: none;
-                font-weight: 650;
+                font-weight: 400 !important;
                 width: 100%;
                 text-align: left;
                 justify-content: flex-start;
@@ -561,6 +564,7 @@ const AppShop = {
             .appshop.appshop-v2 .appshop-nav-btn .fluent-sidebar-item-label {
                 flex: 0 1 auto;
                 text-align: left;
+                font-weight: 400 !important;
             }
             .appshop-main {
                 min-width: 0;
@@ -623,6 +627,58 @@ const AppShop = {
                 color: #0078d4 !important;
                 background: rgba(0,120,212,0.12) !important;
             }
+            .appshop-category-tabs {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                overflow-x: auto;
+                padding-bottom: 10px;
+            }
+            .appshop-category-tab {
+                width: 44px !important;
+                min-width: 44px !important;
+                height: 40px !important;
+                padding: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                gap: 0 !important;
+                overflow: hidden !important;
+                border-radius: 999px !important;
+                transition:
+                    width 180ms ease,
+                    min-width 180ms ease,
+                    padding 180ms ease,
+                    background 160ms ease,
+                    border-color 160ms ease,
+                    color 160ms ease !important;
+            }
+            .appshop-category-tab img {
+                width: 16px !important;
+                height: 16px !important;
+                flex: 0 0 16px;
+            }
+            .appshop-category-tab span {
+                max-width: 0;
+                opacity: 0;
+                overflow: hidden;
+                white-space: nowrap;
+                transform: translateX(-4px);
+                transition: max-width 180ms ease, opacity 160ms ease, transform 180ms ease;
+            }
+            .appshop-category-tab:hover,
+            .appshop-category-tab:focus-visible {
+                width: 106px !important;
+                min-width: 106px !important;
+                padding: 0 14px !important;
+                gap: 8px !important;
+            }
+            .appshop-category-tab:hover span,
+            .appshop-category-tab:focus-visible span {
+                max-width: 58px;
+                opacity: 1;
+                transform: translateX(0);
+            }
             body:not(.dark-mode) .appshop-discover-chip {
                 border-bottom-color: rgba(0,0,0,0.1) !important;
             }
@@ -684,12 +740,49 @@ const AppShop = {
                 box-shadow: 0 20px 50px rgba(0,0,0,0.42);
             }
             .appshop-story-card.compact { min-height: 360px; }
+            .appshop-story-shapes,
             .appshop-story-art {
                 position: absolute;
                 inset: 0;
+                overflow: hidden;
+            }
+            .appshop-story-shapes {
+                z-index: 1;
+                pointer-events: none;
+            }
+            .appshop-story-shape {
+                position: absolute;
+                width: var(--shape-size, 72px);
+                height: var(--shape-size, 72px);
+                left: var(--shape-left, 50%);
+                top: var(--shape-top, 50%);
+                opacity: var(--shape-opacity, 0.24);
+                background: color-mix(in srgb, var(--story-b) 42%, #ffffff 58%);
+                animation: appshop-story-float var(--shape-duration, 18s) ease-in-out infinite alternate;
+                animation-delay: var(--shape-delay, 0s);
+                transform: translate3d(0,0,0) rotate(var(--shape-rotate, 0deg));
+            }
+            .appshop-story-shape.circle { border-radius: 50%; }
+            .appshop-story-shape.square { border-radius: 12px; }
+            .appshop-story-shape.triangle {
+                width: 0;
+                height: 0;
+                border-left: calc(var(--shape-size, 72px) * 0.55) solid transparent;
+                border-right: calc(var(--shape-size, 72px) * 0.55) solid transparent;
+                border-bottom: var(--shape-size, 72px) solid color-mix(in srgb, var(--story-a) 36%, #ffffff 64%);
+                background: transparent;
+            }
+            @keyframes appshop-story-float {
+                from { translate: -8px 6px; rotate: -2deg; }
+                to { translate: 10px -8px; rotate: 4deg; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .appshop-story-shape { animation: none; }
+            }
+            .appshop-story-art {
                 display: grid;
                 place-items: center;
-                overflow: hidden;
+                z-index: 2;
             }
             .appshop-story-art::before,
             .appshop-story-art::after {
@@ -723,7 +816,7 @@ const AppShop = {
                 left: 28px;
                 right: 28px;
                 bottom: 28px;
-                z-index: 2;
+                z-index: 3;
             }
             .appshop-story-kicker {
                 display: block;
@@ -745,6 +838,10 @@ const AppShop = {
                 color: rgba(255,255,255,0.7);
                 font-size: 15px;
                 line-height: 1.35;
+                display: -webkit-box;
+                -webkit-line-clamp: 1;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
             .appshop-story-card.compact .appshop-story-title {
                 font-size: clamp(23px, 2.2vw, 31px);
@@ -780,9 +877,7 @@ const AppShop = {
                 color: #fff !important;
             }
             .appshop-detail-close,
-            .appshop-detail-close:hover,
-            .appshop-story-detail-close,
-            .appshop-story-detail-close:hover {
+            .appshop-detail-close:hover {
                 position: absolute !important;
                 top: 14px !important;
                 right: 14px !important;
@@ -831,11 +926,12 @@ const AppShop = {
             .appshop-list-row {
                 display: grid;
                 grid-template-columns: 54px minmax(0, 1fr) auto;
-                gap: 12px;
+                gap: 18px;
                 align-items: center;
-                min-height: 74px;
+                min-height: 82px;
                 border-radius: 10px;
                 cursor: pointer;
+                padding: 6px 8px;
             }
             .appshop-list-row:hover { background: rgba(255,255,255,0.06); }
             .appshop-list-row .appshop-list-icon { width: 54px; height: 54px; border-radius: 13px; }
@@ -876,11 +972,11 @@ const AppShop = {
                 position: sticky;
                 top: -24px;
                 z-index: 4;
-                padding: 0 0 22px;
-                background: linear-gradient(#151515 82%, rgba(21,21,21,0));
+                padding: 0 0 10px;
+                background: transparent;
             }
             body:not(.dark-mode) .appshop-search-panel {
-                background: linear-gradient(#f7f7f8 82%, rgba(247,247,248,0));
+                background: transparent;
             }
             .appshop-search-large {
                 height: 56px;
@@ -890,7 +986,9 @@ const AppShop = {
                 grid-template-columns: 22px minmax(0, 1fr) 22px;
                 align-items: center;
                 gap: 12px;
-                background: rgba(255,255,255,0.92);
+                background: rgba(255,255,255,0.74);
+                border: 1px solid rgba(255,255,255,0.72);
+                backdrop-filter: blur(22px) saturate(1.25);
                 box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             }
             .appshop-search-large img { width: 22px; height: 22px; opacity: 0.7; }
@@ -902,8 +1000,8 @@ const AppShop = {
                 font-size: 17px;
             }
             body.dark-mode .appshop-search-large {
-                background: rgba(255,255,255,0.1);
-                border: 1px solid rgba(255,255,255,0.12);
+                background: rgba(0,0,0,0.42);
+                border: 1px solid rgba(255,255,255,0.14);
             }
             body.dark-mode .appshop-search-large input {
                 color: #fff !important;
@@ -917,7 +1015,27 @@ const AppShop = {
             .appshop-apps-grid.clean {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 12px;
+                gap: 20px 30px;
+            }
+            .appshop-search-page {
+                min-height: 100%;
+            }
+            .appshop-search-results {
+                margin: 6px 0 28px;
+            }
+            .appshop-search-browse {
+                transition: opacity 220ms ease, transform 220ms ease, max-height 260ms ease;
+                opacity: 1;
+                transform: translateY(0);
+                max-height: 720px;
+                overflow: hidden;
+                padding-top: 24px;
+            }
+            .appshop-search-browse.hidden {
+                opacity: 0;
+                transform: translateY(-8px);
+                max-height: 0;
+                pointer-events: none;
             }
             .appshop-story-overlay {
                 position: absolute;
@@ -945,6 +1063,15 @@ const AppShop = {
                 isolation: isolate;
                 transform: translateZ(0);
             }
+            body:not(.dark-mode) .appshop-story-overlay {
+                background-color: rgba(30,30,32,0.48) !important;
+            }
+            body:not(.dark-mode) .appshop-story-modal {
+                background-color: #f8f8f9 !important;
+                color: #1d1d1f !important;
+                border-color: rgba(0,0,0,0.08) !important;
+                box-shadow: 0 30px 90px rgba(20,30,45,0.28);
+            }
             .appshop-story-detail-hero {
                 height: 330px;
                 position: relative;
@@ -958,6 +1085,8 @@ const AppShop = {
                 height: 170px;
                 object-fit: contain;
                 filter: drop-shadow(0 24px 56px rgba(0,0,0,0.45));
+                position: relative;
+                z-index: 2;
             }
             .appshop-story-detail-copy {
                 position: absolute;
@@ -965,12 +1094,16 @@ const AppShop = {
                 right: 24px;
                 bottom: 22px;
                 background: transparent !important;
+                z-index: 3;
             }
             .appshop-story-detail-copy h2 {
                 margin: 6px 0 0;
                 font-size: 34px;
                 line-height: 1.05;
                 color: #fff !important;
+            }
+            .appshop-story-detail-hero .appshop-story-kicker {
+                color: rgba(255,255,255,0.72) !important;
             }
             .appshop-story-detail-modal h4,
             .appshop-story-detail-appbar h4,
@@ -988,14 +1121,41 @@ const AppShop = {
                 background-color: rgba(11,31,58,0.82) !important;
                 border-bottom: 1px solid rgba(255,255,255,0.08);
             }
+            body:not(.dark-mode) .appshop-story-detail-appbar {
+                background-color: rgba(255,255,255,0.88) !important;
+                border-bottom-color: rgba(0,0,0,0.08);
+            }
+            body:not(.dark-mode) .appshop-story-detail-appbar h4 {
+                color: #1d1d1f !important;
+            }
+            body:not(.dark-mode) .appshop-story-detail-appbar p {
+                color: rgba(29,29,31,0.62) !important;
+            }
             .appshop-story-detail-body {
                 padding: 26px 42px 56px;
                 background-color: #1d1d1f !important;
-                color: rgba(255,255,255,0.72) !important;
+                color: #fff !important;
                 font-size: 20px;
                 line-height: 1.45;
             }
-            .appshop-story-detail-body strong { color: #fff; }
+            body:not(.dark-mode) .appshop-story-detail-body {
+                background-color: #f8f8f9 !important;
+                color: #1d1d1f !important;
+            }
+            .appshop-story-detail-body p {
+                margin: 0;
+                color: #fff !important;
+            }
+            body:not(.dark-mode) .appshop-story-detail-body p {
+                color: #1d1d1f !important;
+            }
+            .appshop-story-detail-body strong {
+                color: #fff;
+                font-weight: 760;
+            }
+            body:not(.dark-mode) .appshop-story-detail-body strong {
+                color: #1d1d1f !important;
+            }
             .appshop-story-close,
             .appshop-story-detail-close {
                 position: absolute !important;
@@ -1010,6 +1170,9 @@ const AppShop = {
                 z-index: 50;
                 width: 48px !important;
                 height: 48px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-sizing: border-box !important;
                 border: 1px solid rgba(255,255,255,0.15);
                 border-radius: 50%;
                 background: rgba(30,30,32,0.54);
@@ -1017,9 +1180,17 @@ const AppShop = {
                 place-items: center;
                 cursor: pointer;
                 backdrop-filter: blur(16px);
+                transition: background 160ms ease, border-color 160ms ease !important;
             }
             .appshop-story-close img,
             .appshop-story-detail-close img { width: 24px; height: 24px; filter: invert(1); }
+            body:not(.dark-mode) .appshop-story-detail-close {
+                background: rgba(255,255,255,0.62);
+                border-color: rgba(0,0,0,0.12);
+            }
+            body:not(.dark-mode) .appshop-story-detail-close img {
+                filter: none;
+            }
             .appshop-story-close:hover,
             .appshop-story-detail-close:hover {
                 top: 16px !important;
@@ -1030,6 +1201,12 @@ const AppShop = {
                 inset-inline-end: 16px !important;
                 transform: none !important;
                 translate: none !important;
+                background: rgba(30,30,32,0.72);
+                border-color: rgba(255,255,255,0.28);
+            }
+            body:not(.dark-mode) .appshop-story-detail-close:hover {
+                background: rgba(255,255,255,0.88);
+                border-color: rgba(0,0,0,0.2);
             }
             @container (max-width: 760px) {
                 .appshop.appshop-v2 {
@@ -1094,11 +1271,406 @@ const AppShop = {
 
     getNavItems() {
         return [
-            { id: 'featured', label: '精选', icon: 'Star' },
-            { id: 'search', label: '搜索', icon: 'Search' },
-            { id: 'all', label: '全部应用', icon: 'Layout Grid' },
-            { id: 'purchased', label: '已购买', icon: 'Check Circle' }
+            { id: 'featured', label: t('appshop.nav-featured'), icon: 'Star' },
+            { id: 'search', label: t('appshop.nav-search'), icon: 'Search' },
+            { id: 'all', label: t('appshop.nav-all'), icon: 'Layout Grid' },
+            { id: 'purchased', label: t('appshop.nav-purchased'), icon: 'Check Circle' }
         ];
+    },
+
+    getCurrentLanguage() {
+        return typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'en' : 'zh';
+    },
+
+    getFeatureStoryIntros() {
+        return [
+            [
+                {
+                    zh: 'Office 是今天这组推荐的起点：它适合把灵感、资料和待办快速整理成可交付的文档。无论你是在写课程报告、整理会议纪要，还是准备一份给朋友看的计划，它都能和后面的学习、视频、工具类 App 串起来，让桌面从打开应用开始就进入工作状态。',
+                    en: 'Office leads today\'s set because it turns notes, sources, and plans into documents quickly. It pairs naturally with the learning, video, and utility apps below, so the desktop can move from an idea to something ready to share.'
+                },
+                {
+                    zh: '哔哩哔哩负责给这期精选加入灵感和休息时间。它不只是娱乐平台，也能找到教程、科技内容、创作经验和许多轻松的兴趣频道。把它放在 Office 旁边，是希望你在完成任务之后，也能顺手打开一个窗口，用内容给下一段学习或创作补一点能量。',
+                    en: 'Bilibili adds inspiration and breathing room to this collection. Beyond entertainment, it carries tutorials, technology stories, creator tips, and light channels that help you recharge before the next task.'
+                }
+            ],
+            [
+                {
+                    zh: '石墨文档适合多人协作的效率日。它把文档、表格和轻量资料整理放在浏览器里完成，适合课堂小组、工作汇报和临时项目。放在主推位，是因为它能减少来回传文件的时间，让编辑、评论、同步更新这些动作都集中在同一个工作空间。',
+                    en: 'Shimo Office is built for collaborative workdays. Documents, sheets, comments, and updates stay in one browser workspace, reducing file handoffs and keeping group work moving.'
+                },
+                {
+                    zh: '待办清单是效率爆发日里的节拍器。它不抢走注意力，只帮你把今天要完成的事拆成清楚的下一步。和文档、翻译、AI 工具放在一起时，它能让资料收集、写作和交付形成闭环，避免打开很多 App 后忘记真正要做的事。',
+                    en: 'Todo keeps the rhythm of a productive day. It breaks work into clear next steps and ties documents, translation, and AI tools into a simple loop of collect, write, and finish.'
+                }
+            ],
+            [
+                {
+                    zh: '组卷网面向备课和复习场景，适合需要快速组织题目、查找知识点和搭建练习材料的用户。它在这期里承担“把知识变成训练”的角色：先确定范围，再组合题目，最后配合文档或阅读工具沉淀成一份可重复使用的学习资料。',
+                    en: 'Zujuan is for lesson prep and focused review. It helps turn knowledge areas into practice material, then pairs with document and reading tools to make reusable study resources.'
+                },
+                {
+                    zh: '驾照宝典是更具体、更生活化的学习工具。它把考试准备拆成题库、练习和模拟，让碎片时间也能推进进度。放在考试和备课专场中，是因为它代表了 Fluent OS 里的另一种学习方式：目标明确、反馈直接、打开就能继续。',
+                    en: 'Jiazhaoba brings a practical kind of studying: question banks, drills, and mock exams that fit into short sessions. It is goal-oriented and easy to resume.'
+                }
+            ],
+            [
+                {
+                    zh: '哔哩哔哩在视频娱乐周末里负责“看见更多”。长视频、短内容、直播切片和创作教程都能在这里交汇，既能放松，也能找到下一次剪辑或表达的灵感。它适合放在周末第一屏，因为打开后很容易按兴趣继续探索。',
+                    en: 'Bilibili anchors video weekend with long-form shows, short clips, live highlights, and creator lessons. It is relaxed, but it can also spark the next edit or idea.'
+                },
+                {
+                    zh: '视频编辑器让这期不只停留在观看。它适合把素材剪成片段、整理节奏、做出可以分享的小作品。和视频平台、直播内容放在一起，形成从观看到创作的路径：看到灵感，收集素材，再用工具把它变成自己的表达。',
+                    en: 'Video Editor turns watching into making. It helps trim clips, shape rhythm, and prepare small pieces worth sharing after inspiration comes from the video apps around it.'
+                }
+            ],
+            [
+                {
+                    zh: '网易云音乐适合给系统铺一层情绪背景。它的歌单、评论和发现机制很适合陪伴写作、整理文件或夜间放松。放在这期第一张卡，是因为音乐能快速改变桌面的节奏，让 Fluent OS 不只是工具集合，也像一个可以进入状态的空间。',
+                    en: 'NetEase Cloud Music gives the desktop a mood. Playlists, comments, and discovery make it useful for writing, sorting files, or winding down.'
+                },
+                {
+                    zh: 'QQ 音乐更像一座稳定的大曲库，适合想快速找到熟悉歌曲、热门专辑或常听歌单的用户。它与网易云音乐形成互补：一个偏发现和氛围，一个偏完整和顺手。两者一起，让声音成为今天桌面体验的一部分。',
+                    en: 'QQ Music is the dependable large library in this set. It complements NetEase Cloud Music with familiar tracks, albums, and quick access to everyday playlists.'
+                }
+            ],
+            [
+                {
+                    zh: '美团把附近的餐饮、电影、酒店和生活服务压缩进一个入口，适合安排一天里的现实行动。它在这期里承担“离开桌面也能继续”的角色：先在系统里查找和计划，再把选择落到城市里的具体地点和服务。',
+                    en: 'Meituan connects the desktop to nearby food, movies, hotels, and city services. It helps turn a plan made on screen into something to do nearby.'
+                },
+                {
+                    zh: '高德地图负责这期的方向感。无论是通勤、约会、办事还是临时找店，它都能把路线、时间和位置整理清楚。和美团、支付、购物工具放在一起时，它让本地生活不只是“找服务”，也包括怎样更顺地到达那里。',
+                    en: 'Amap adds direction to local life. Routes, timing, and places become clearer, especially when paired with food, payment, and shopping apps.'
+                }
+            ],
+            [
+                {
+                    zh: 'ChatGPT 是 AI 助手轮换中的通用入口，适合头脑风暴、总结资料、写作润色和代码问题。它的价值不在于替你完成所有事，而在于把模糊想法变成可继续推进的步骤。放在首位，是因为它能连接本期几乎所有工作流。',
+                    en: 'ChatGPT is the general entry point for brainstorming, summarizing, writing, and coding questions. It turns vague ideas into next steps and connects many workflows in this set.'
+                },
+                {
+                    zh: 'DeepSeek 更偏向推理、分析和中文语境下的长问题处理。它适合拆解复杂需求、对比方案、整理资料脉络，也适合在写作前先把结构想清楚。与 ChatGPT 并列推荐，是为了给 AI 使用保留不同风格的选择。',
+                    en: 'DeepSeek is strong for reasoning, analysis, and long Chinese-context tasks. It is useful for breaking down requirements and comparing options before writing or building.'
+                }
+            ],
+            [
+                {
+                    zh: 'Photopea 是视觉创作里最像专业工具的一环。它适合处理 PSD、修图、做封面和快速改素材，不需要离开浏览器就能完成很多设计动作。把它放在这期，是为了让图片编辑从“临时找工具”变成桌面里的稳定能力。',
+                    en: 'Photopea brings a professional editing feel to the browser. PSD files, image fixes, covers, and quick asset changes can happen without leaving the desktop.'
+                },
+                {
+                    zh: 'Canva 更适合从模板和排版开始，把想法快速做成海报、简报、社交图或视觉资料。它和 Photopea 的关系很自然：一个偏精细编辑，一个偏快速成稿。两者并排时，创作可以从修图一路走到发布。',
+                    en: 'Canva starts from templates and layout, helping ideas become posters, slides, social graphics, or visual notes quickly. It pairs well with Photopea for a full create-to-publish flow.'
+                }
+            ],
+            [
+                {
+                    zh: '中国日报适合用来获得更正式、更国际化的新闻视角。它在阅读专场里承担信息入口的角色，适合早晨浏览重点新闻、练习英文阅读，或者为写作收集背景材料。和书籍、社区内容搭配后，信息会更有层次。',
+                    en: 'China Daily offers a formal, international news angle. It is useful for morning headlines, English reading practice, and background material for writing.'
+                },
+                {
+                    zh: '微信读书给这期增加安静的长阅读空间。它适合在碎片时间继续一本书，也适合把想法、划线和笔记慢慢积累起来。和新闻 App 放在一起，是希望你既能快速了解外部变化，也能留出沉下来的阅读节奏。',
+                    en: 'Weread adds a quieter long-reading space. It helps continue books in short sessions and collect highlights or notes over time.'
+                }
+            ],
+            [
+                {
+                    zh: 'MeTool 像一个随手打开的小工具抽屉，适合处理编码、格式、转换和各种临时需求。它在工具箱专场中负责快速解决小问题：不用安装复杂软件，也不用到处搜索网页，打开后直接找到对应能力就能继续工作。',
+                    en: 'MeTool is a small drawer of quick utilities for encoding, formatting, conversion, and temporary chores. It keeps small problems from interrupting work.'
+                },
+                {
+                    zh: 'PDF 工具适合处理办公里最常见也最容易卡住的文件格式。合并、拆分、转换、压缩这些动作一旦顺手，很多交付流程都会轻松不少。放在这期主推位，是因为它能补上文档工作最后一公里。',
+                    en: 'PDF Tools handles the common file tasks that often slow office work: merge, split, convert, and compress. It helps finish the last mile of document delivery.'
+                }
+            ],
+            [
+                {
+                    zh: 'Techie Delight 适合把编程学习变成可查询、可运行、可复盘的过程。它提供算法、数据结构和示例内容，适合在遇到概念卡点时快速补一段知识。和 AI 编程助手搭配时，它能提供更可靠的基础材料。',
+                    en: 'Techie Delight supports programming study with algorithms, data structures, and examples. It is a helpful reference when concepts need a clear refresh.'
+                },
+                {
+                    zh: '通义千问在编程学习日里适合做解释、改写和辅助推理。你可以把问题、代码片段或学习目标交给它，让它帮你拆成更容易理解的步骤。它不是替代练习，而是让练习过程少一点卡顿。',
+                    en: 'Qwen helps explain, rewrite, and reason through programming study. It can break a code question or learning goal into steps without replacing practice.'
+                }
+            ],
+            [
+                {
+                    zh: '交管 12123 面向办事场景，适合处理车辆、驾驶证和交通相关服务。它在出行和政务专场里代表“必须准确完成”的任务：少一些花哨，多一些清楚入口。放在主推位，是为了让日常事务也能在桌面中被快速找到。',
+                    en: 'Traffic 12123 is for practical vehicle, license, and traffic services. It represents tasks that need clear entry points and accurate completion.'
+                },
+                {
+                    zh: '滴滴适合解决城市移动里的临时决定。无论是去办事、赶时间还是从一个地点切到另一个地点，它都能补上公共交通之外的选择。和地图、政务、支付 App 组合后，这期推荐从路线规划延伸到真正出发。',
+                    en: 'Didi covers the flexible side of city movement, from urgent trips to point-to-point travel. It extends route planning into actually getting there.'
+                }
+            ],
+            [
+                {
+                    zh: '淘宝适合从明确购买到随意逛逛的多种购物场景。它在这期里提供丰富商品和灵感入口，可以查价格、找替代、收藏想法，也可以快速完成日常采购。和京东并列时，一个偏广度和发现，一个偏效率和稳定。',
+                    en: 'Taobao covers both targeted shopping and casual discovery. It is useful for price checks, alternatives, collections, and everyday purchases.'
+                },
+                {
+                    zh: '京东更强调确定性：正品、自营、物流和售后让它适合购买数码、家电和急需用品。放在购物专场的第二张精选卡，是为了和淘宝形成清晰互补，让用户可以根据“想探索”或“要稳妥”快速选择。',
+                    en: 'JD emphasizes certainty: reliable goods, logistics, and support. It complements Taobao when the goal is less browsing and more confident purchasing.'
+                }
+            ],
+            [
+                {
+                    zh: '纸牌游戏适合在轻松游戏时间里做一个低压力入口。它不需要复杂规则，也不要求长时间投入，打开后就能开始一局。放在主推位，是因为它能给桌面留一点放松空间，让短暂休息也有明确边界。',
+                    en: 'Solitaire is a low-pressure way to take a short break. It starts quickly, needs no heavy setup, and gives downtime a clear boundary.'
+                },
+                {
+                    zh: '经典贪吃蛇带来更直接的反应和节奏感。它简单、熟悉、容易重开，适合在工作或学习间隙换一下脑子。和纸牌一起推荐，是为了让轻量游戏既有安静思考，也有一点快速操作的乐趣。',
+                    en: 'Classic Snake adds quick reaction and rhythm. It is familiar, easy to restart, and works well as a brief reset between tasks.'
+                }
+            ],
+            [
+                {
+                    zh: '相机是系统原生精选里最直接的创作入口。它适合快速预览摄像头、拍照、保存素材，也适合测试设备状态。作为默认预装 App，它展示了 Fluent OS 原生体验的一面：功能明确、打开迅速、需要时就在那里。',
+                    en: 'Camera is the direct native capture tool: preview the webcam, take photos, save material, or test device state quickly.'
+                },
+                {
+                    zh: '照片应用负责把本地图片和每日壁纸整理成可浏览、可编辑的空间。它适合查看素材、做轻量调整，也适合把系统视觉内容重新带回桌面。和相机放在一起，形成从拍摄到浏览再到编辑的原生闭环。',
+                    en: 'Photos organizes local images and daily wallpapers into a browse-and-edit space. Together with Camera, it forms a native capture-to-review loop.'
+                }
+            ],
+            [
+                {
+                    zh: 'Kimi 适合处理长文本、资料阅读和写作前的材料整理。它在新鲜感轮换中承担“把复杂内容读薄”的角色：把一大段信息拆成摘要、提纲和下一步。适合今天想试试新工具，又希望它马上派上用场的用户。',
+                    en: 'Kimi is useful for long text, reading material, and pre-writing organization. It helps turn large information blocks into summaries, outlines, and next steps.'
+                },
+                {
+                    zh: '白板应用给这期带来更自由的空间。它适合画流程、列想法、做临时结构，也适合把 AI 或阅读产生的内容重新摆成视觉关系。放在每天一点新鲜感里，是因为它能让桌面从线性任务变成开放思考。',
+                    en: 'Whiteboard adds open space for flows, ideas, and rough structures. It helps turn AI or reading output into visible relationships.'
+                }
+            ]
+        ];
+    },
+
+    getFallbackStoryColors(feature, app, storyIndex) {
+        const colors = feature.colors || ['#1d2b64', '#0f1022'];
+        const primary = app?.themeColor || colors[storyIndex * 2] || colors[0] || '#0078d4';
+        const secondary = colors[storyIndex * 2 + 1] || colors[1] || this.shiftHexColor(primary, -22);
+        return { primary, secondary };
+    },
+
+    getStoryColors(feature, app, storyIndex) {
+        const cached = this._iconColorCache.get(app.id);
+        if (cached) return cached;
+        const fallback = this.getFallbackStoryColors(feature, app, storyIndex);
+        this.ensureIconColors(app, fallback);
+        return fallback;
+    },
+
+    ensureIconColors(app, fallback) {
+        if (!app?.id || this._iconColorCache.has(app.id) || this._iconColorPending.has(app.id)) return;
+        const iconPath = this.getIconPath(app.icon);
+        const pending = this.extractIconColors(iconPath, fallback)
+            .then(colors => {
+                this._iconColorCache.set(app.id, colors);
+                this.applyStoryColors(app.id, colors);
+            })
+            .catch(() => {
+                this._iconColorCache.set(app.id, fallback);
+                this.applyStoryColors(app.id, fallback);
+            })
+            .finally(() => this._iconColorPending.delete(app.id));
+        this._iconColorPending.set(app.id, pending);
+    },
+
+    extractIconColors(iconPath, fallback) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    const size = 64;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    if (!ctx) {
+                        resolve(fallback);
+                        return;
+                    }
+                    ctx.clearRect(0, 0, size, size);
+                    ctx.drawImage(img, 0, 0, size, size);
+                    const { data } = ctx.getImageData(0, 0, size, size);
+                    const buckets = new Map();
+                    for (let i = 0; i < data.length; i += 16) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const a = data[i + 3];
+                        if (a < 96) continue;
+                        const max = Math.max(r, g, b);
+                        const min = Math.min(r, g, b);
+                        const brightness = (r + g + b) / 3;
+                        const saturation = max === 0 ? 0 : (max - min) / max;
+                        if ((brightness > 235 && saturation < 0.22) || brightness < 22) continue;
+                        const qr = Math.round(r / 24) * 24;
+                        const qg = Math.round(g / 24) * 24;
+                        const qb = Math.round(b / 24) * 24;
+                        const key = `${qr},${qg},${qb}`;
+                        const current = buckets.get(key) || { r: 0, g: 0, b: 0, count: 0, score: 0 };
+                        current.r += r;
+                        current.g += g;
+                        current.b += b;
+                        current.count += 1;
+                        current.score += 0.55 + saturation + Math.min(0.35, Math.abs(brightness - 128) / 260);
+                        buckets.set(key, current);
+                    }
+                    const colors = [...buckets.values()]
+                        .filter(bucket => bucket.count > 1)
+                        .map(bucket => {
+                            const r = Math.round(bucket.r / bucket.count);
+                            const g = Math.round(bucket.g / bucket.count);
+                            const b = Math.round(bucket.b / bucket.count);
+                            return { r, g, b, score: bucket.score, hex: this.rgbToHex(r, g, b) };
+                        })
+                        .sort((a, b) => b.score - a.score);
+                    if (colors.length === 0) {
+                        resolve(fallback);
+                        return;
+                    }
+                    const primary = colors[0].hex;
+                    const secondaryMatch = colors.find(color => this.colorDistance(colors[0], color) > 72);
+                    const secondary = secondaryMatch?.hex || this.shiftHexColor(primary, -28);
+                    resolve({ primary, secondary });
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            img.onerror = reject;
+            img.src = iconPath;
+        });
+    },
+
+    applyStoryColors(appId, colors) {
+        const targets = this.container?.querySelectorAll(`[data-story-app-id="${appId}"]`);
+        targets?.forEach(target => {
+            target.style.setProperty('--story-a', colors.primary);
+            target.style.setProperty('--story-b', colors.secondary);
+        });
+    },
+
+    colorDistance(a, b) {
+        return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+    },
+
+    rgbToHex(r, g, b) {
+        return `#${[r, g, b].map(value => Math.max(0, Math.min(255, value)).toString(16).padStart(2, '0')).join('')}`;
+    },
+
+    shiftHexColor(hex, lightnessShift = 0) {
+        const rgb = this.hexToRgb(hex);
+        if (!rgb) return hex || '#0078d4';
+        const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+        hsl.l = Math.max(16, Math.min(78, hsl.l + lightnessShift));
+        hsl.s = Math.max(34, Math.min(92, hsl.s + 8));
+        const shifted = this.hslToRgb(hsl.h, hsl.s, hsl.l);
+        return this.rgbToHex(shifted.r, shifted.g, shifted.b);
+    },
+
+    hexToRgb(hex) {
+        const match = String(hex || '').match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+        if (!match) return null;
+        return {
+            r: parseInt(match[1], 16),
+            g: parseInt(match[2], 16),
+            b: parseInt(match[3], 16)
+        };
+    },
+
+    rgbToHsl(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        let h = 0;
+        let s = 0;
+        const l = (max + min) / 2;
+        if (max !== min) {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return { h: h * 360, s: s * 100, l: l * 100 };
+    },
+
+    hslToRgb(h, s, l) {
+        h /= 360;
+        s /= 100;
+        l /= 100;
+        if (s === 0) {
+            const value = Math.round(l * 255);
+            return { r: value, g: value, b: value };
+        }
+        const hueToRgb = (p, q, tValue) => {
+            let t = tValue;
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        return {
+            r: Math.round(hueToRgb(p, q, h + 1 / 3) * 255),
+            g: Math.round(hueToRgb(p, q, h) * 255),
+            b: Math.round(hueToRgb(p, q, h - 1 / 3) * 255)
+        };
+    },
+
+    getStoryIntro(feature, app, storyIndex) {
+        const lang = this.getCurrentLanguage();
+        return feature.storyIntros?.[storyIndex]?.[lang]
+            || feature.storyIntros?.[storyIndex]?.zh
+            || app?.desc
+            || feature.subtitle
+            || '';
+    },
+
+    getStoryDetailIntro(feature, app, storyIndex) {
+        const intro = this.getStoryIntro(feature, app, storyIndex);
+        const lang = this.getCurrentLanguage();
+        const title = storyIndex === 0 ? feature.title : app.name;
+        const section = feature.section || title;
+        if (lang === 'en') {
+            return `${intro} ${t('appshop.story-detail-extra-en', { name: app.name, title, section })}`;
+        }
+        return `${intro}${t('appshop.story-detail-extra', { name: app.name, title, section })}`;
+    },
+
+    getStoryExcerpt(text, maxLength = 82) {
+        if (!text || text.length <= maxLength) return text || '';
+        return `${text.slice(0, maxLength).trim()}...`;
+    },
+
+    renderStoryShapes(storyIndex = 0) {
+        const seeds = storyIndex === 0
+            ? [
+                ['circle', 132, '68%', '10%', 0.22, '22s', '-3s', '10deg'],
+                ['triangle', 76, '12%', '20%', 0.2, '18s', '-8s', '-8deg'],
+                ['square', 88, '78%', '70%', 0.18, '24s', '-12s', '18deg'],
+                ['circle', 54, '28%', '76%', 0.16, '20s', '-5s', '0deg']
+            ]
+            : [
+                ['square', 112, '12%', '14%', 0.2, '23s', '-7s', '-12deg'],
+                ['circle', 82, '72%', '18%', 0.18, '19s', '-4s', '0deg'],
+                ['triangle', 70, '76%', '68%', 0.19, '25s', '-11s', '22deg'],
+                ['circle', 48, '24%', '74%', 0.14, '21s', '-2s', '0deg']
+            ];
+        return `<div class="appshop-story-shapes" aria-hidden="true">${seeds.map(shape => `
+            <span class="appshop-story-shape ${shape[0]}" style="--shape-size:${shape[1]}px;--shape-left:${shape[2]};--shape-top:${shape[3]};--shape-opacity:${shape[4]};--shape-duration:${shape[5]};--shape-delay:${shape[6]};--shape-rotate:${shape[7]};"></span>
+        `).join('')}</div>`;
     },
 
     getTodayFeatureIndex() {
@@ -1113,6 +1685,26 @@ const AppShop = {
     },
 
     getFeatureTemplates() {
+        if (this.getCurrentLanguage() === 'en') {
+            return [
+                { title: 'Apps Worth Opening Today', subtitle: 'From study and creation to entertainment, these apps make the desktop feel more alive.', section: 'The Biggest Apps and Tools', hero: ['office', 'bilibili'], groups: [['essentials', 'Create and Productivity'], ['focus', 'Study Mode'], ['fresh', 'Take a Break']], colors: ['#08213f', '#061129', '#18816f', '#10281d'] },
+                { title: 'Productivity Burst', subtitle: 'Bring documents, planning, translation, and utilities into the same rhythm.', section: 'Work Smarter', hero: ['shimo-office', 'todo'], groups: [['office', 'Document Collaboration'], ['tools', 'Productivity Tools'], ['ai', 'AI Assistants']], colors: ['#1d2b64', '#0f1022', '#3f5efb', '#1a1f71'] },
+                { title: 'Exam and Lesson Prep', subtitle: 'Question banks, paper generation, driving tests, and knowledge search in one set.', section: 'Learning Picks', hero: ['zujuan', 'jiazhaoba'], groups: [['learn', 'Learning Tools'], ['office', 'Teaching and Office'], ['news', 'Knowledge Sources']], colors: ['#093028', '#237a57', '#0f2027', '#2c5364'] },
+                { title: 'Video Weekend', subtitle: 'Long videos, short clips, live streams, and editing tools for a relaxed weekend.', section: 'Video Weekend', hero: ['bilibili', 'video-editor'], groups: [['watch', 'Popular Video'], ['live', 'Live Now'], ['create', 'Video Creation']], colors: ['#200122', '#6f0000', '#0f0c29', '#302b63'] },
+                { title: 'Music and Sound', subtitle: 'Play, discover, and collect music so the system has its own soundtrack.', section: 'Sound On', hero: ['netease-music', 'qq-music'], groups: [['music', 'Music Platforms'], ['media', 'Local Playback'], ['life', 'Audio Content']], colors: ['#240b36', '#c31432', '#141e30', '#243b55'] },
+                { title: 'Local Life Ideas', subtitle: 'Travel, food delivery, payment, and maps for the movement of a full day.', section: 'Life Nearby', hero: ['meituan', 'amap'], groups: [['city', 'City Services'], ['travel', 'Navigation'], ['shopping', 'Shopping and Payment']], colors: ['#42275a', '#734b6d', '#f7971e', '#ffd200'] },
+                { title: 'AI Assistant Rotation', subtitle: 'Make chatting, reasoning, writing, and source organization lighter.', section: 'AI Companion', hero: ['chatgpt', 'deepseek'], groups: [['ai', 'Chat Assistants'], ['write', 'Writing and Office'], ['tools', 'Material Processing']], colors: ['#0f2027', '#203a43', '#10a37f', '#07594d'] },
+                { title: 'Images and Design', subtitle: 'A selected mix for image editing, design creation, and asset management.', section: 'Create Visuals', hero: ['photopea', 'canva'], groups: [['design', 'Visual Design'], ['photos', 'Photo Tools'], ['office', 'Publish and Collaborate']], colors: ['#1f1c2c', '#928dab', '#00c4cc', '#064e55'] },
+                { title: 'News and Reading', subtitle: 'Understand the world while keeping quiet time for longer reading.', section: 'Read More', hero: ['chinadaily', 'weread'], groups: [['news', 'News'], ['books', 'Bookshelf'], ['culture', 'Culture']], colors: ['#141e30', '#243b55', '#8f4f24', '#2b170b'] },
+                { title: 'Utility Kit Refresh', subtitle: 'Format conversion, PDFs, compilers, and useful online utilities.', section: 'Utility Kit', hero: ['metool', 'pdf-tools'], groups: [['tools', 'Online Utilities'], ['dev', 'Developer Learning'], ['convert', 'Conversion']], colors: ['#232526', '#414345', '#0f172a', '#334155'] },
+                { title: 'Coding Study Day', subtitle: 'Online compilers, technology communities, and AI coding assistants.', section: 'Code and Learn', hero: ['techie-delight', 'qwen'], groups: [['code', 'Run Code'], ['ai', 'AI Support'], ['news', 'Tech News']], colors: ['#000428', '#004e92', '#0f172a', '#1e293b'] },
+                { title: 'Travel and Services', subtitle: 'Maps, traffic, payment, and public services for practical errands.', section: 'Move Around', hero: ['traffic-12123', 'didi'], groups: [['travel', 'Route Planning'], ['service', 'Public Services'], ['pay', 'Payment and Shopping']], colors: ['#1e3c72', '#2a5298', '#1e63b6', '#0b2d5c'] },
+                { title: 'Shopping and Inspiration', subtitle: 'From price checks to second-hand finds, from discovery to checkout.', section: 'Shop Better', hero: ['taobao', 'jd'], groups: [['shopping', 'Shopping'], ['life', 'Local Services'], ['discover', 'Interest Communities']], colors: ['#3a1c71', '#d76d77', '#ff5000', '#7f1d1d'] },
+                { title: 'Light Game Time', subtitle: 'Web games you can open and play without installing a large client.', section: 'Play Now', hero: ['solitaire', 'snake-classic'], groups: [['games', 'Casual Games'], ['video', 'Game Content'], ['tools', 'Player Tools']], colors: ['#134e5e', '#71b280', '#236b4f', '#064e3b'] },
+                { title: 'Native Essentials', subtitle: 'Camera, Photos, and Media are preinstalled but still removable.', section: 'Native Essentials', hero: ['camera', 'photos'], groups: [['native', 'Native Apps'], ['media', 'Media Experience'], ['tools', 'Common Tools']], colors: ['#0f0c29', '#302b63', '#0078d4', '#0f172a'] },
+                { title: 'A Fresh Mix Today', subtitle: 'A mixed rotation of apps worth exploring today.', section: 'Fresh Rotation', hero: ['kimi', 'whiteboard'], groups: [['fresh', 'Worth Trying'], ['focus', 'Work and Study'], ['relax', 'Relax']], colors: ['#16222a', '#3a6073', '#111827', '#374151'] }
+            ];
+        }
         return [
             { title: '今天值得打开的 App', subtitle: '从学习、创作到娱乐，这些应用让桌面更有生命力。', section: 'The Biggest Apps and Tools', hero: ['office', 'bilibili'], groups: [['essentials', '创意与效率'], ['focus', '学习进行时'], ['fresh', '放松一下']], colors: ['#08213f', '#061129', '#18816f', '#10281d'] },
             { title: '效率爆发日', subtitle: '把文档、计划、翻译和工具箱放在同一个节奏里。', section: 'Work Smarter', hero: ['shimo-office', 'todo'], groups: [['office', '文档协作'], ['tools', '效率工具'], ['ai', 'AI 助手']], colors: ['#1d2b64', '#0f1022', '#3f5efb', '#1a1f71'] },
@@ -1203,6 +1795,7 @@ const AppShop = {
     getTodayFeature() {
         const index = this.getTodayFeatureIndex();
         const template = this.getFeatureTemplates()[index];
+        const storyIntros = this.getFeatureStoryIntros()[index] || [];
         const groupPicks = this.getFeatureGroupPicks();
         const heroApps = this.pickApps(template.hero, index * 5, 2);
         const used = heroApps.map(app => app.id);
@@ -1211,20 +1804,13 @@ const AppShop = {
             used.push(...apps.map(app => app.id));
             return { id: group[0], title: group[1], apps };
         });
-        return { ...template, index, heroApps, groups };
+        return { ...template, index, storyIntros, heroApps, groups };
     },
 
     getAppsForCurrentCategory() {
-        const apps = this.currentCategory === 'all'
+        return this.currentCategory === 'all'
             ? this.apps
             : this.apps.filter(app => app.category === this.currentCategory);
-        if (!this.searchQuery) return apps;
-        const q = this.searchQuery.toLowerCase();
-        return apps.filter(app =>
-            app.name.toLowerCase().includes(q) ||
-            app.developer.toLowerCase().includes(q) ||
-            String(app.category || '').toLowerCase().includes(q)
-        );
     },
 
     getSearchResults() {
@@ -1234,6 +1820,7 @@ const AppShop = {
             : this.apps.filter(app => app.category === this.currentCategory);
         if (!q) return scopedApps;
         return scopedApps.filter(app =>
+            app.id.toLowerCase().includes(q) ||
             app.name.toLowerCase().includes(q) ||
             app.developer.toLowerCase().includes(q) ||
             String(app.category || '').toLowerCase().includes(q) ||
@@ -1324,18 +1911,19 @@ const AppShop = {
     },
 
     renderStoryCard(feature, app, storyIndex, compact = false) {
-        const colors = feature.colors || ['#1d2b64', '#0f1022'];
-        const a = colors[storyIndex * 2] || colors[0];
-        const b = colors[storyIndex * 2 + 1] || colors[1] || colors[0];
+        const colors = this.getStoryColors(feature, app, storyIndex);
+        const title = storyIndex === 0 ? feature.title : app.name;
+        const intro = this.getStoryIntro(feature, app, storyIndex);
         return `
-            <article class="appshop-story-card ${compact ? 'compact' : ''}" data-story-index="${storyIndex}" style="--story-a:${a};--story-b:${b};">
+            <article class="appshop-story-card ${compact ? 'compact' : ''}" data-story-index="${storyIndex}" data-story-app-id="${app.id}" style="--story-a:${colors.primary};--story-b:${colors.secondary};">
+                ${this.renderStoryShapes(storyIndex)}
                 <div class="appshop-story-art">
                     <img src="${this.getIconPath(app.icon)}" alt="">
                 </div>
                 <div class="appshop-story-copy">
-                    <span class="appshop-story-kicker">${storyIndex === 0 ? 'TODAY BEST' : 'SPECIAL FEATURE'}</span>
-                    <h2 class="appshop-story-title">${storyIndex === 0 ? feature.title : app.name}</h2>
-                    <p class="appshop-story-subtitle">${storyIndex === 0 ? feature.subtitle : (app.desc || app.developer)}</p>
+                    <span class="appshop-story-kicker">${storyIndex === 0 ? t('appshop.today-best') : t('appshop.special-feature')}</span>
+                    <h2 class="appshop-story-title">${title}</h2>
+                    <p class="appshop-story-subtitle">${this.getStoryExcerpt(intro)}</p>
                 </div>
             </article>
         `;
@@ -1344,7 +1932,7 @@ const AppShop = {
     renderFeaturedPage() {
         const feature = this.getTodayFeature();
         return `
-            <h1 class="appshop-page-title">精选</h1>
+            <h1 class="appshop-page-title">${t('appshop.featured')}</h1>
             <p class="appshop-page-subtitle">${feature.subtitle}</p>
             <section class="appshop-today-grid">
                 ${this.renderStoryCard(feature, feature.heroApps[0], 0)}
@@ -1367,50 +1955,58 @@ const AppShop = {
         const displayApps = this.getSearchResults();
         const categories = this.getCategories().filter(cat => cat.id !== 'all');
         const discover = [
-            { label: 'AI 助手', query: 'AI' },
-            { label: 'PDF 转换', query: 'PDF' },
-            { label: '视频编辑', query: '视频' },
-            { label: '在线题库', query: '组卷' },
-            { label: '地图出行', query: '地图' },
-            { label: '音乐播放', query: '音乐' }
+            { label: t('appshop.discover-ai'), query: 'AI' },
+            { label: t('appshop.discover-pdf'), query: 'PDF' },
+            { label: t('appshop.discover-video'), query: this.getCurrentLanguage() === 'en' ? 'video' : '视频' },
+            { label: t('appshop.discover-study'), query: this.getCurrentLanguage() === 'en' ? 'zujuan' : '组卷' },
+            { label: t('appshop.discover-map'), query: this.getCurrentLanguage() === 'en' ? 'map' : '地图' },
+            { label: t('appshop.discover-music'), query: this.getCurrentLanguage() === 'en' ? 'music' : '音乐' }
         ];
         const selectedCategory = this.getCategories().find(cat => cat.id === this.currentCategory);
-        const shouldShowResults = this.searchQuery.trim() || this.currentCategory !== 'all';
+        const query = this.searchQuery.trim();
+        const shouldShowResults = Boolean(query || this.currentCategory !== 'all');
+        const shouldHideBrowse = this.isSearchActive || Boolean(query);
         const resultTitle = this.searchQuery.trim()
-            ? '搜索结果'
-            : `${selectedCategory?.name || '应用'}分类`;
+            ? t('appshop.search-results')
+            : t('appshop.category-results', { category: selectedCategory?.name || t('appshop.app') });
         return `
-            <div class="appshop-search-panel">
-                <div class="appshop-search-large">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
-                    <input class="appshop-search-input" type="text" placeholder="${t('appshop.search')}" value="${this.searchQuery}">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Microphone.svg" alt="">
-                </div>
-            </div>
-            ${shouldShowResults ? `
-                <h2 class="appshop-section-title">${resultTitle}</h2>
-                <div class="appshop-apps-grid clean">
-                    ${displayApps.map(app => this.renderAppListRow(app)).join('')}
-                </div>
-                ${displayApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt=""><p>${t('appshop.no-result')}</p></div>` : ''}
-            ` : ''}
-            <h1 class="appshop-page-title">Discover</h1>
-            <div class="appshop-discover-grid">
-                ${discover.map(item => `
-                    <button class="appshop-discover-chip" type="button" data-search-term="${item.query}">
+            <div class="appshop-search-page">
+                <div class="appshop-search-panel">
+                    <div class="appshop-search-large">
                         <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
-                        <span>${item.label}</span>
-                    </button>
-                `).join('')}
-            </div>
-            <h2 class="appshop-section-title">应用分类</h2>
-            <div class="appshop-category-strip">
-                ${categories.map(cat => `
-                    <button class="appshop-category-card" type="button" data-category="${cat.id}">
-                        <img src="Theme/Icon/Symbol_icon/stroke/${cat.icon}.svg" alt="">
-                        <span>${cat.name}</span>
-                    </button>
-                `).join('')}
+                        <input class="appshop-search-input" type="text" placeholder="${t('appshop.search')}" value="${this.searchQuery}">
+                        <img src="Theme/Icon/Symbol_icon/stroke/Microphone.svg" alt="">
+                    </div>
+                </div>
+                ${shouldShowResults ? `
+                    <section class="appshop-search-results">
+                        <h2 class="appshop-section-title">${resultTitle}</h2>
+                        <div class="appshop-apps-grid clean">
+                            ${displayApps.map(app => this.renderAppListRow(app)).join('')}
+                        </div>
+                        ${displayApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt=""><p>${t('appshop.no-result')}</p></div>` : ''}
+                    </section>
+                ` : ''}
+                <div class="appshop-search-browse ${shouldHideBrowse ? 'hidden' : ''}">
+                    <h1 class="appshop-page-title">${t('appshop.discover')}</h1>
+                    <div class="appshop-discover-grid">
+                        ${discover.map(item => `
+                            <button class="appshop-discover-chip" type="button" data-search-term="${item.query}">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
+                                <span>${item.label}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                    <h2 class="appshop-section-title">${t('appshop.categories')}</h2>
+                    <div class="appshop-category-strip">
+                        ${categories.map(cat => `
+                            <button class="appshop-category-card" type="button" data-category="${cat.id}">
+                                <img src="Theme/Icon/Symbol_icon/stroke/${cat.icon}.svg" alt="">
+                                <span>${cat.name}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
             </div>
         `;
     },
@@ -1419,7 +2015,7 @@ const AppShop = {
         const categories = this.getCategories();
         const displayApps = this.getAppsForCurrentCategory();
         return `
-            <h1 class="appshop-page-title">全部应用</h1>
+            <h1 class="appshop-page-title">${t('appshop.all-apps')}</h1>
             <section class="appshop-categories">
                 <div class="appshop-category-tabs">
                     ${categories.map(cat => `
@@ -1432,7 +2028,7 @@ const AppShop = {
             </section>
             <section class="appshop-apps">
                 <div class="appshop-apps-grid clean">
-                    ${displayApps.map(app => this.renderAppCard(app)).join('')}
+                    ${displayApps.map(app => this.renderAppListRow(app)).join('')}
                 </div>
                 ${displayApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt=""><p>${t('appshop.no-result')}</p></div>` : ''}
             </section>
@@ -1443,12 +2039,12 @@ const AppShop = {
         const installedIds = new Set(this.getInstalledApps().map(app => app.id));
         const installedApps = this.apps.filter(app => installedIds.has(app.id));
         return `
-            <h1 class="appshop-page-title">已购买</h1>
-            <p class="appshop-page-subtitle">这些应用已经安装到本地，可以直接打开或在详情页卸载。</p>
+            <h1 class="appshop-page-title">${t('appshop.purchased')}</h1>
+            <p class="appshop-page-subtitle">${t('appshop.purchased-subtitle')}</p>
             <div class="appshop-apps-grid clean">
                 ${installedApps.map(app => this.renderAppListRow(app)).join('')}
             </div>
-            ${installedApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Check Circle.svg" alt=""><p>还没有已安装的 App</p></div>` : ''}
+            ${installedApps.length === 0 ? `<div class="appshop-empty"><img src="Theme/Icon/Symbol_icon/stroke/Check Circle.svg" alt=""><p>${t('appshop.installed-empty')}</p></div>` : ''}
         `;
     },
 
@@ -1518,9 +2114,13 @@ const AppShop = {
     bindEvents() {
         this.container.querySelectorAll('.appshop-nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                this.activePage = btn.dataset.page || 'featured';
-                if (this.activePage === 'search') {
+                const nextPage = btn.dataset.page || 'featured';
+                this.activePage = nextPage;
+                this.isSearchActive = false;
+                if (nextPage === 'search') {
                     this.currentCategory = 'all';
+                } else {
+                    this.searchQuery = '';
                 }
                 this.render();
             });
@@ -1529,12 +2129,27 @@ const AppShop = {
         const searchInput = this.container.querySelector('.appshop-search-input');
         if (searchInput) {
             let debounceTimer;
+            searchInput.addEventListener('focus', () => {
+                if (this.isSearchActive) return;
+                this.isSearchActive = true;
+                this.render({ preserveScroll: true, focusSearch: true });
+            });
             searchInput.addEventListener('input', (e) => {
                 this.searchQuery = e.target.value;
+                this.isSearchActive = true;
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
                     this.render({ preserveScroll: true, focusSearch: true });
                 }, 120);
+            });
+        }
+
+        const searchPage = this.container.querySelector('.appshop-search-page');
+        if (searchPage) {
+            searchPage.addEventListener('pointerdown', (e) => {
+                if (!this.isSearchActive) return;
+                if (e.target.closest('.appshop-search-panel, .appshop-search-results, .appshop-search-browse, .appshop-empty')) return;
+                this.exitSearchMode();
             });
         }
 
@@ -1543,6 +2158,7 @@ const AppShop = {
                 this.searchQuery = btn.dataset.searchTerm || '';
                 this.currentCategory = 'all';
                 this.activePage = 'search';
+                this.isSearchActive = true;
                 this.render();
             });
         });
@@ -1551,6 +2167,8 @@ const AppShop = {
             tab.addEventListener('click', () => {
                 this.currentCategory = tab.dataset.category;
                 this.activePage = 'all';
+                this.searchQuery = '';
+                this.isSearchActive = false;
                 this.render({ preserveScroll: true });
             });
         });
@@ -1560,6 +2178,7 @@ const AppShop = {
                 this.currentCategory = card.dataset.category || 'all';
                 this.searchQuery = '';
                 this.activePage = 'search';
+                this.isSearchActive = true;
                 this.render();
             });
         });
@@ -1583,6 +2202,14 @@ const AppShop = {
                 this.showAppDetail(row.dataset.appId);
             });
         });
+    },
+
+    exitSearchMode() {
+        this.searchQuery = '';
+        this.currentCategory = 'all';
+        this.isSearchActive = false;
+        this.activePage = 'search';
+        this.render({ preserveScroll: true });
     },
 
     installApp(appId) {
@@ -1778,25 +2405,22 @@ const AppShop = {
         const feature = this.getTodayFeature();
         const app = feature.heroApps[storyIndex] || feature.heroApps[0];
         if (!app) return;
-        const colors = feature.colors || ['#1d2b64', '#0f1022'];
-        const a = colors[storyIndex * 2] || colors[0];
-        const b = colors[storyIndex * 2 + 1] || colors[1] || colors[0];
-        const title = storyIndex === 0 ? feature.title : `${app.name} 特别精选`;
-        const intro = storyIndex === 0
-            ? feature.subtitle
-            : `${app.name} 是今天精选中最值得打开的应用之一。`;
+        const colors = this.getStoryColors(feature, app, storyIndex);
+        const title = storyIndex === 0 ? feature.title : t('appshop.special-feature-title', { name: app.name });
+        const intro = this.getStoryDetailIntro(feature, app, storyIndex);
 
         const overlay = document.createElement('div');
         overlay.className = 'appshop-story-overlay';
         overlay.innerHTML = `
-            <article class="appshop-story-modal" style="--story-a:${a};--story-b:${b};">
+            <article class="appshop-story-modal" data-story-app-id="${app.id}" style="--story-a:${colors.primary};--story-b:${colors.secondary};">
                 <button class="appshop-story-detail-close" type="button">
                     <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="${t('close')}">
                 </button>
                 <header class="appshop-story-detail-hero">
+                    ${this.renderStoryShapes(storyIndex)}
                     <img src="${this.getIconPath(app.icon)}" alt="">
                     <div class="appshop-story-detail-copy">
-                        <span class="appshop-story-kicker">${storyIndex === 0 ? 'TODAY BEST' : 'SPECIAL FEATURE'}</span>
+                        <span class="appshop-story-kicker">${storyIndex === 0 ? t('appshop.today-best') : t('appshop.special-feature')}</span>
                         <h2>${title}</h2>
                     </div>
                 </header>
@@ -1810,13 +2434,11 @@ const AppShop = {
                 </div>
                 <div class="appshop-story-detail-body">
                     <p><strong>${intro}</strong></p>
-                    <p>${app.desc || t('appshop.no-desc')}</p>
-                    <p>这期精选把它放在主推位置，是因为它能和同页推荐的工具形成一条完整的使用路线：先发现内容，再处理任务，最后把结果带回 Fluent OS 的桌面工作流。</p>
-                    <p>继续向下浏览本期精选，你会看到 3 组不同方向的应用组合，每组都能和 ${app.name} 形成互补。</p>
                 </div>
             </article>
         `;
         this.container.appendChild(overlay);
+        this.ensureIconColors(app, colors);
         requestAnimationFrame(() => overlay.classList.add('show'));
         const close = () => {
             overlay.classList.remove('show');
