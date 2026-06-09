@@ -48,6 +48,7 @@ const FluentUI = {
     // ============ 按钮 ============
     _nativeScrollFxInitialized: false,
     _nativeScrollHideTimers: new WeakMap(),
+    _nativeScrollHoverLockTimers: new WeakMap(),
     _nativeScrollBounceStates: new WeakMap(),
     _nativeScrollUseTranslate: null,
 
@@ -103,6 +104,15 @@ const FluentUI = {
                 this._nativeScrollHideTimers.delete(scrollable);
             }, HIDE_DELAY);
             this._nativeScrollHideTimers.set(scrollable, timer);
+
+            const prevHoverLockTimer = this._nativeScrollHoverLockTimers.get(scrollable);
+            if (prevHoverLockTimer) clearTimeout(prevHoverLockTimer);
+            scrollable.classList.add('fluent-scroll-hover-locked');
+            const hoverLockTimer = setTimeout(() => {
+                scrollable.classList.remove('fluent-scroll-hover-locked');
+                this._nativeScrollHoverLockTimers.delete(scrollable);
+            }, 180);
+            this._nativeScrollHoverLockTimers.set(scrollable, hoverLockTimer);
         };
 
         const collectTopLevelTargets = (scrollable) => {
@@ -552,14 +562,15 @@ const FluentUI = {
         };
 
         const openDropdown = () => {
-            if (disabled) return;
-            // 关闭其他可能打开的下拉菜单
-            document.querySelectorAll('.fluent-select-dropdown.open').forEach(el => {
-                el.classList.remove('open');
-            });
-            document.querySelectorAll('.fluent-select-wrapper.active').forEach(el => {
-                el.classList.remove('active');
-            });
+            if (disabled || isOpen) return;
+            const closeEvent = typeof CustomEvent === 'function'
+                ? new CustomEvent('fluent-select-close-all', { detail: { source: wrapper } })
+                : (() => {
+                    const event = document.createEvent('CustomEvent');
+                    event.initCustomEvent('fluent-select-close-all', false, false, { source: wrapper });
+                    return event;
+                })();
+            document.dispatchEvent(closeEvent);
 
             isOpen = true;
             wrapper.classList.add('active');
@@ -595,7 +606,13 @@ const FluentUI = {
             }
         };
 
+        const handleCloseAll = (e) => {
+            if (e.detail && e.detail.source === wrapper) return;
+            closeDropdown();
+        };
+
         trigger.addEventListener('click', toggleDropdown);
+        document.addEventListener('fluent-select-close-all', handleCloseAll);
         
         wrapper.appendChild(trigger);
         // 不再将 dropdown 放入 wrapper，而是动态挂载到 body
@@ -614,13 +631,18 @@ const FluentUI = {
         };
         
         // 清理：当 wrapper 从 DOM 移除时，也移除 dropdown
-        const observer = new MutationObserver(() => {
-            if (!document.body.contains(wrapper) && dropdown.parentElement) {
-                dropdown.remove();
-                observer.disconnect();
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        let observer = null;
+        if (typeof MutationObserver !== 'undefined') {
+            observer = new MutationObserver(() => {
+                if (!document.body.contains(wrapper)) {
+                    closeDropdown();
+                    if (dropdown.parentElement) dropdown.remove();
+                    document.removeEventListener('fluent-select-close-all', handleCloseAll);
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
         
         return wrapper;
     },

@@ -38,7 +38,7 @@ const State = {
         this.settings = Storage.get(Storage.keys.SETTINGS);
         this.session = Storage.get(Storage.keys.SESSION);
         this.fs = Storage.get(Storage.keys.FS);
-        this.desktopLayout = Storage.get(Storage.keys.DESKTOP_LAYOUT);
+        this.desktopLayout = Storage.get(Storage.keys.DESKTOP_LAYOUT) || { icons: [] };
         this.appUsage = Storage.get(Storage.keys.APP_USAGE) || {};
         this.notifications = Storage.get(Storage.keys.NOTIFICATIONS) || [];
         this.ensureSettingsDefaults();
@@ -306,19 +306,72 @@ const State = {
         }
     },
 
+    areValuesEqual(a, b) {
+        if (Object.is(a, b)) return true;
+        if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+        try {
+            return JSON.stringify(a) === JSON.stringify(b);
+        } catch (_) {
+            return false;
+        }
+    },
+
     // 订阅状态变化
-    on(event, callback) {
+    on(event, callback, options = {}) {
+        if (typeof callback !== 'function') return () => {};
         if (!this.listeners[event]) {
             this.listeners[event] = [];
         }
+
+        const key = options && options.key;
+        if (key) {
+            callback._stateListenerKey = key;
+            this.off(event, key);
+        } else if (this.listeners[event].includes(callback)) {
+            return () => this.off(event, callback);
+        }
+
         this.listeners[event].push(callback);
+        return () => this.off(event, callback);
+    },
+
+    off(event, callbackOrKey) {
+        const list = this.listeners[event];
+        if (!Array.isArray(list) || !callbackOrKey) return false;
+
+        const next = list.filter((callback) => {
+            if (callback === callbackOrKey) return false;
+            if (typeof callbackOrKey === 'string' && callback._stateListenerKey === callbackOrKey) return false;
+            return true;
+        });
+
+        if (next.length === list.length) return false;
+        if (next.length > 0) this.listeners[event] = next;
+        else delete this.listeners[event];
+        return true;
+    },
+
+    once(event, callback, options = {}) {
+        let unsubscribe = null;
+        const wrapped = (data) => {
+            if (unsubscribe) unsubscribe();
+            callback(data);
+        };
+        unsubscribe = this.on(event, wrapped, options);
+        return unsubscribe;
     },
 
     // 触发事件
     emit(event, data) {
-        if (this.listeners[event]) {
-            this.listeners[event].forEach(callback => callback(data));
-        }
+        const list = this.listeners[event];
+        if (!Array.isArray(list) || list.length === 0) return;
+        list.slice().forEach(callback => {
+            try {
+                callback(data);
+            } catch (error) {
+                console.error(`State listener error for "${event}":`, error);
+            }
+        });
     },
 
     // 切换视图
@@ -330,7 +383,7 @@ const State = {
 
     // 更新设置
     updateSettings(updates) {
-        const safeUpdates = { ...(updates || {}) };
+        let safeUpdates = { ...(updates || {}) };
         if (Object.prototype.hasOwnProperty.call(safeUpdates, 'enableFluentV2')) {
             safeUpdates.enableFluentV2 = true;
         }
@@ -369,6 +422,18 @@ const State = {
             safeUpdates.fingoApiKey = '';
             safeUpdates.fingoApiEncrypted = null;
             safeUpdates.fingoApiStorageType = 'none';
+        }
+
+        const changedUpdates = {};
+        Object.keys(safeUpdates).forEach((key) => {
+            if (!this.areValuesEqual(this.settings && this.settings[key], safeUpdates[key])) {
+                changedUpdates[key] = safeUpdates[key];
+            }
+        });
+        safeUpdates = changedUpdates;
+
+        if (Object.keys(safeUpdates).length === 0) {
+            return false;
         }
 
         this.settings = { ...this.settings, ...safeUpdates };
@@ -432,6 +497,7 @@ const State = {
         if (safeUpdates.strictCspEnabled !== undefined) {
             this.applyStrictCspSetting();
         }
+        return true;
     },
 
     // 更新会话

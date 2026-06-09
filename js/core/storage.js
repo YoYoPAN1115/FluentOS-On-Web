@@ -6,6 +6,7 @@ const Storage = {
         SETTINGS: 'fluentos.settings',
         SESSION: 'fluentos.session',
         FS: 'fluentos.fs',
+        DESKTOP_LAYOUT: 'fluentos.desktopLayout',
         APP_USAGE: 'fluentos.appUsage',
         NOTIFICATIONS: 'fluentos.notifications'
     },
@@ -24,7 +25,9 @@ const Storage = {
     // 保存数据
     set(key, value) {
         try {
-            localStorage.setItem(key, JSON.stringify(value));
+            const serialized = JSON.stringify(value);
+            if (localStorage.getItem(key) === serialized) return true;
+            localStorage.setItem(key, serialized);
             return true;
         } catch (error) {
             console.error('Storage set error:', error);
@@ -159,6 +162,13 @@ const Storage = {
                     ]
                 }
             });
+        }
+
+        // 迁移旧版本因缺失 DESKTOP_LAYOUT key 写入到 "undefined" 的桌面布局
+        const legacyDesktopLayout = this.get('undefined');
+        if (!this.get(this.keys.DESKTOP_LAYOUT) && legacyDesktopLayout && Array.isArray(legacyDesktopLayout.icons)) {
+            this.set(this.keys.DESKTOP_LAYOUT, legacyDesktopLayout);
+            this.remove('undefined');
         }
 
         // 默认桌面布局

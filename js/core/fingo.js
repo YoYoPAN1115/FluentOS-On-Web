@@ -28,7 +28,7 @@ const Fingo = {
         this.historyEl = document.getElementById('fingo-history');
         this.contentEl = this.element?.querySelector('.fingo-content');
         this._updateInputPlaceholder();
-        State.on('languageChange', () => this._updateInputPlaceholder());
+        State.on('languageChange', () => this._updateInputPlaceholder(), { key: 'Fingo.languageChange' });
         this._ensureContextMenu();
         this._loadConversations();
         if (!this.currentId) this.newConversation(true);
@@ -516,20 +516,16 @@ const Fingo = {
 
     // --- 对话历史管理 ---
     _loadConversations() {
-        try {
-            const raw = localStorage.getItem(this.STORAGE_KEY);
-            if (raw) {
-                this.conversations = JSON.parse(raw);
-                if (this.conversations.length) {
-                    this.currentId = this.conversations[0].id;
-                    this._renderMessages(this.conversations[0].messages);
-                }
-            }
-        } catch(e) { this.conversations = []; }
+        const conversations = Storage.get(this.STORAGE_KEY, []);
+        this.conversations = Array.isArray(conversations) ? conversations : [];
+        if (this.conversations.length) {
+            this.currentId = this.conversations[0].id;
+            this._renderMessages(this.conversations[0].messages);
+        }
     },
 
     _saveConversations() {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.conversations));
+        Storage.set(this.STORAGE_KEY, this.conversations);
     },
 
     newConversation(silent) {

@@ -16,6 +16,10 @@ const SettingsApp = {
     _sidebarScrollRestoreRaf: null,
     _sidebarScrollRestoreTimer: null,
 
+    _isMounted() {
+        return !!(this.container && this.container.isConnected);
+    },
+
     getPages() {
         const pages = [
             { id: 'overview', label: 'settings.overview', icon: 'Home', desc: t('settings.overview-desc') },
@@ -95,36 +99,27 @@ const SettingsApp = {
         }
         this.render();
         
-        // 监听语言切换事件
-        State.on('languageChange', () => this.render());
-        
-        // 监听应用安装变化，实时刷新应用列表
-        if (!this._installedAppsListener) {
-            this._installedAppsListener = true;
-            State.on('settingsChange', () => {
-                if (this.currentPage === 'applications' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('languageChange', () => {
+            if (this._isMounted()) this.render();
+        }, { key: 'SettingsApp.languageChange' });
 
-        if (!this._appUsageListener) {
-            this._appUsageListener = true;
-            State.on('appUsageChange', () => {
-                if (this.currentPage === 'applications' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('settingsChange', () => {
+            if (this._isMounted() && this.currentPage === 'applications') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.settingsChange' });
 
-        if (!this._fingoApiListener) {
-            this._fingoApiListener = true;
-            State.on('fingoApiKeyReady', () => {
-                if (this.currentPage === 'fingo' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('appUsageChange', () => {
+            if (this._isMounted() && this.currentPage === 'applications') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.appUsageChange' });
+
+        State.on('fingoApiKeyReady', () => {
+            if (this._isMounted() && this.currentPage === 'fingo') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.fingoApiKeyReady' });
     },
 
     openData(data) {
@@ -171,6 +166,8 @@ const SettingsApp = {
             clearTimeout(this._scrollRestoreTimer);
             this._scrollRestoreTimer = null;
         }
+        this.container = null;
+        this.windowId = null;
         return true;
     },
 
@@ -310,9 +307,10 @@ const SettingsApp = {
     },
 
     render() {
+        if (!this.container) return;
         this._saveCurrentScrollPosition();
         this._saveSidebarScrollPosition();
-        if (this.container) this.container.style.overflow = 'hidden';
+        this.container.style.overflow = 'hidden';
         this.container.innerHTML = '';
         if (this.currentPage !== 'developer' && this._developerModeVisible) {
             this._developerModeVisible = false;
@@ -717,6 +715,8 @@ const SettingsApp = {
             body.fluent-v2 .network-option-item,
             body.fluent-v2 .network-expand-panel,
             body.fluent-v2 .app-list-item,
+            body.fluent-v2 .wallpaper-item,
+            body.fluent-v2 .settings-overview-wallpaper,
             body.fluent-v2 .fluent-setting-item {
                 background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
                 backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
@@ -732,6 +732,32 @@ const SettingsApp = {
             body.fluent-v2 .fluent-setting-item:hover {
                 background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62)) !important;
             }
+
+            body.fluent-v2 .settings-content .settings-recommend-item,
+            body.fluent-v2 .settings-content .settings-recent-item,
+            body.fluent-v2 .settings-content .network-hero-card,
+            body.fluent-v2 .settings-content .network-option-item,
+            body.fluent-v2 .settings-content .network-expand-panel,
+            body.fluent-v2 .settings-content .app-list-item,
+            body.fluent-v2 .settings-content .wallpaper-item,
+            body.fluent-v2 .settings-content .settings-overview-wallpaper,
+            body.fluent-v2 .settings-content .fluent-setting-item {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                background-color: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                background-image: none !important;
+            }
+
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-recommend-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-recent-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .network-option-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .network-expand-panel:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .app-list-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .wallpaper-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-overview-wallpaper:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .fluent-setting-item:hover {
+                background-color: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+            }
             
             /* 深色模式 - 所有卡片统一透明度 */
             body.fluent-v2.dark-mode .settings-recommend-item,
@@ -740,6 +766,8 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .network-option-item,
             body.fluent-v2.dark-mode .network-expand-panel,
             body.fluent-v2.dark-mode .app-list-item,
+            body.fluent-v2.dark-mode .wallpaper-item,
+            body.fluent-v2.dark-mode .settings-overview-wallpaper,
             body.fluent-v2.dark-mode .fluent-setting-item {
                 background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
                 border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
@@ -751,6 +779,30 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .app-list-item:hover,
             body.fluent-v2.dark-mode .fluent-setting-item:hover {
                 background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58)) !important;
+            }
+
+            body.fluent-v2.dark-mode .settings-content .settings-recommend-item,
+            body.fluent-v2.dark-mode .settings-content .settings-recent-item,
+            body.fluent-v2.dark-mode .settings-content .network-hero-card,
+            body.fluent-v2.dark-mode .settings-content .network-option-item,
+            body.fluent-v2.dark-mode .settings-content .network-expand-panel,
+            body.fluent-v2.dark-mode .settings-content .app-list-item,
+            body.fluent-v2.dark-mode .settings-content .wallpaper-item,
+            body.fluent-v2.dark-mode .settings-content .settings-overview-wallpaper,
+            body.fluent-v2.dark-mode .settings-content .fluent-setting-item {
+                background-color: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                background-image: none !important;
+            }
+
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-recommend-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-recent-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .network-option-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .network-expand-panel:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .app-list-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .wallpaper-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-overview-wallpaper:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .fluent-setting-item:hover {
+                background-color: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
             }
 
             body.fluent-v2.window-blur-disabled .settings-app,
@@ -2064,22 +2116,13 @@ const SettingsApp = {
 
     getAvatarThumbCache() {
         if (this._avatarThumbCache) return this._avatarThumbCache;
-        try {
-            const raw = localStorage.getItem(this._avatarThumbStorageKey);
-            const parsed = raw ? JSON.parse(raw) : {};
-            this._avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
-        } catch (_) {
-            this._avatarThumbCache = {};
-        }
+        const parsed = Storage.get(this._avatarThumbStorageKey, {});
+        this._avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
         return this._avatarThumbCache;
     },
 
     saveAvatarThumbCache() {
-        try {
-            localStorage.setItem(this._avatarThumbStorageKey, JSON.stringify(this._avatarThumbCache || {}));
-        } catch (_) {
-            // ignore storage errors
-        }
+        Storage.set(this._avatarThumbStorageKey, this._avatarThumbCache || {});
     },
 
     getAvatarThumbSrc(src, fallback = '') {
@@ -2500,11 +2543,7 @@ const SettingsApp = {
         }
 
         setTimeout(() => {
-            try {
-                localStorage.clear();
-            } catch (error) {
-                console.error('Failed to clear localStorage:', error);
-            }
+            Storage.clear();
             window.location.reload();
         }, 900);
     },
@@ -4373,8 +4412,8 @@ const SettingsApp = {
 
         const list = FluentUI.List({
             items: [
-                { id: 'version', title: t('settings.version'), description: '2.0.0.1 BETA', icon: 'Information Circle' },
-                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260608', icon: 'Information Circle' },
+                { id: 'version', title: t('settings.version'), description: '2.0.0.2 BETA', icon: 'Information Circle' },
+                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260609', icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
             ]

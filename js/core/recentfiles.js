@@ -3,13 +3,19 @@
  */
 const RecentFiles = {
     maxItems: 12,
+
+    toMillis(value) {
+        if (typeof value === 'number') return value;
+        const time = Date.parse(value);
+        return Number.isFinite(time) ? time : 0;
+    },
     
     // 获取最近文件列表
     getRecentFiles() {
         const files = [];
         this.traverseFS(State.fs.root, files);
         // 按修改时间排序
-        files.sort((a, b) => (b.modified || 0) - (a.modified || 0));
+        files.sort((a, b) => this.toMillis(b.modified) - this.toMillis(a.modified));
         return files.slice(0, this.maxItems);
     },
     
@@ -46,7 +52,8 @@ const RecentFiles = {
     // 格式化时间
     formatTime(timestamp) {
         const now = Date.now();
-        const diff = now - timestamp;
+        const time = this.toMillis(timestamp);
+        const diff = time > 0 ? now - time : 0;
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);
