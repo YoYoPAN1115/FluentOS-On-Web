@@ -318,16 +318,19 @@ FluentUI.TabBar({
 });
 ```
 
-### 侧边栏 (Sidebar)
+### 应用窗口导航 (FluentWindow)
 
 ```javascript
-FluentUI.Sidebar({
+FluentWindow.mount({
+    container: document.getElementById(`${windowId}-content`),
     items: [
         { id: 'home', label: '首页', icon: 'Home' },
         { id: 'settings', label: '设置', icon: 'Settings' }
     ],
-    activeItem: 'home',
-    onItemClick: (itemId) => {}
+    activeId: 'home',
+    onNavigate: (pageId, pageEl) => {
+        pageEl.textContent = pageId;
+    }
 });
 ```
 

@@ -1,0 +1,599 @@
+/**
+ * FluentWindow - 全新窗口框架样式 (核心)
+ * ===================================================================
+ * 配合 js/core/fluent-window.js 使用。
+ * 所有视觉效果集中在此文件，修改即可全局生效。
+ *
+ * 设计对应需求图一 (侧边栏收起) / 图三 (侧边栏展开)。
+ */
+
+/* ============ 框架级 CSS 变量 ============ */
+.fw-frame {
+    --fw-expanded-w: 220px;
+    --fw-collapsed-w: 60px;
+    --fw-fade-ms: 170ms;
+
+    /* 丝滑非线性缓动 (近似 easeOutExpo)，用于侧边栏收起/展开 */
+    --fw-ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --fw-collapse-ms: 420ms;
+
+    /* 内容副卡片：默认按“窗口模糊开启”的有色低透明度材质处理 */
+    --fw-window-radius: 16px;
+    --fw-card-bg: rgba(255, 255, 255, 0.42);
+    --fw-card-radius: var(--fw-window-radius);
+
+    /* 导航项 */
+    --fw-nav-fg: var(--text-primary, #1f1f1f);
+    --fw-nav-hover: rgba(0, 0, 0, 0.045);
+    --fw-nav-active-bg: rgba(var(--accent-rgb, 0, 120, 212), 0.4);
+    --fw-card-border: rgba(0, 0, 0, 0.06);
+    --fw-accent: var(--accent, #0078d4);
+}
+
+.dark-mode .fw-frame {
+    --fw-card-bg: rgba(0, 0, 0, 0.42);
+    --fw-nav-hover: rgba(255, 255, 255, 0.06);
+    --fw-nav-active-bg: rgba(var(--accent-rgb, 96, 205, 255), 0.4);
+    --fw-card-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ============ 宿主窗口材质 ============ */
+/* 整窗主大卡片：无论系统“窗口模糊”开关如何，都始终保持全局高斯模糊。 */
+body.window-blur-enabled .window.fw-host,
+body.window-blur-disabled .window.fw-host,
+.window.fw-host {
+    --fw-window-radius: 16px;
+    background: rgba(252, 252, 252, 0.72) !important;
+    backdrop-filter: blur(40px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
+    border-radius: var(--fw-window-radius) !important;
+    transform: translateZ(0);
+    isolation: isolate;
+}
+
+body.dark-mode.window-blur-enabled .window.fw-host,
+body.dark-mode.window-blur-disabled .window.fw-host,
+.dark-mode .window.fw-host {
+    background: rgba(34, 34, 34, 0.72) !important;
+}
+
+/* 副卡片材质切换：开启窗口模糊时为有色半透明，关闭时为不透明实色。 */
+body.window-blur-enabled .fw-frame {
+    --fw-card-bg: rgba(255, 255, 255, 0.42);
+    --fw-card-border: rgba(0, 0, 0, 0.08);
+}
+
+body.dark-mode.window-blur-enabled .fw-frame {
+    --fw-card-bg: rgba(0, 0, 0, 0.42);
+    --fw-card-border: rgba(255, 255, 255, 0.08);
+}
+
+body.window-blur-disabled .fw-frame {
+    --fw-card-bg: #ffffff;
+    --fw-card-border: rgba(0, 0, 0, 0.09);
+}
+
+body.dark-mode.window-blur-disabled .fw-frame {
+    --fw-card-bg: #202020;
+    --fw-card-border: rgba(255, 255, 255, 0.09);
+}
+
+body.blur-disabled .fw-frame {
+    --fw-card-bg: #ffffff;
+    --fw-card-border: rgba(0, 0, 0, 0.09);
+}
+
+body.dark-mode.blur-disabled .fw-frame {
+    --fw-card-bg: #202020;
+    --fw-card-border: rgba(255, 255, 255, 0.09);
+}
+
+/* 关闭“窗口模糊”时，副卡片必须是实色不透明。这里不用变量，直接压过旧全局规则。 */
+body.window-blur-disabled .window.fw-host .fw-card,
+body.fluent-v2.window-blur-disabled .window.fw-host .fw-card {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.dark-mode.window-blur-disabled .window.fw-host .fw-card,
+body.fluent-v2.dark-mode.window-blur-disabled .window.fw-host .fw-card {
+    background: #202020 !important;
+    background-color: #202020 !important;
+}
+
+/* 标题栏透明融入模糊卡片 (去掉分隔线和底色) */
+.window.fw-host .window-titlebar {
+    background: transparent !important;
+    border-bottom: none !important;
+    padding: 10px 14px 6px;
+}
+
+body.window-blur-enabled .window.fw-host .window-titlebar,
+body.window-blur-disabled .window.fw-host .window-titlebar,
+body.fluent-v2.window-blur-disabled .window.fw-host .window-titlebar {
+    background: transparent !important;
+    border-bottom: none !important;
+}
+
+/* 内容区透明、去内边距，交由框架自行布局 */
+.window.fw-host .window-content,
+.fw-content-host {
+    background: transparent !important;
+    padding: 0;
+    overflow: hidden;
+}
+
+body.window-blur-enabled .window.fw-host .window-content,
+body.window-blur-disabled .window.fw-host .window-content,
+body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
+    background: transparent !important;
+}
+
+/* ============ 框架主体布局 ============ */
+.fw-frame {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    min-height: 0;
+}
+
+/* ---------- 侧边栏 ---------- */
+.fw-sidebar {
+    flex-shrink: 0;
+    width: var(--fw-expanded-w);
+    box-sizing: border-box;
+    padding: 18px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* 丝滑非线性宽度动画 */
+    transition: width var(--fw-collapse-ms) var(--fw-ease),
+                padding var(--fw-collapse-ms) var(--fw-ease);
+}
+
+.fw-sidebar-resizer {
+    flex: 0 0 0;
+    width: 0;
+    position: relative;
+    z-index: 4;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.fw-sidebar-resizer::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: -4px;
+    width: 8px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background 0.16s ease;
+}
+
+.fw-sidebar-resizer:hover::before,
+.fw-frame.fw-sidebar-resizing .fw-sidebar-resizer::before {
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.28);
+}
+
+.fw-frame.fw-collapsed .fw-sidebar-resizer {
+    pointer-events: none;
+}
+
+.fw-frame.fw-collapsed .fw-sidebar {
+    width: var(--fw-collapsed-w);
+    padding-top: 18px;
+    padding-left: 6px;
+    padding-right: 6px;
+}
+
+.fw-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.fw-nav-footer {
+    margin-top: auto;
+    padding-top: 6px;
+}
+
+/* ---------- 导航项 ---------- */
+.fw-nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 40px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fw-nav-fg);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.fw-nav-item:hover {
+    background: var(--fw-nav-hover);
+}
+
+/* 选中态：小背景半透明卡片 + 左侧强调条 */
+.fw-nav-item.active {
+    background: var(--fw-nav-active-bg);
+    color: var(--fw-accent);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.48);
+}
+
+.dark-mode .fw-nav-item.active {
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb, 96, 205, 255), 0.48);
+}
+
+/* 激活态左侧 Fluent 强调条 */
+.fw-nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--fw-accent);
+    transition: height 0.2s var(--fw-ease);
+}
+
+.fw-nav-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.fw-nav-icon-img,
+.fw-nav-icon-symbol {
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+}
+
+.fw-nav-icon-img {
+    display: block;
+    object-fit: contain;
+}
+
+.fw-nav-icon-symbol {
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    opacity: 0;
+    -webkit-mask: var(--fw-icon-url) center / contain no-repeat;
+    mask: var(--fw-icon-url) center / contain no-repeat;
+}
+
+.fw-nav-item.active .fw-nav-icon-symbol {
+    opacity: 1;
+}
+
+.fw-nav-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* 收起时标签淡出 + 位移 */
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity calc(var(--fw-collapse-ms) * 0.6) var(--fw-ease),
+                transform var(--fw-collapse-ms) var(--fw-ease);
+}
+
+.fw-frame.fw-collapsed .fw-nav-label {
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    flex: 0 0 0;
+    width: 0;
+    min-width: 0;
+}
+
+.fw-frame.fw-collapsed .fw-nav-item {
+    gap: 0;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fw-nav-badge {
+    flex-shrink: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--fw-accent);
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    transition: opacity calc(var(--fw-collapse-ms) * 0.5) var(--fw-ease);
+}
+
+.fw-frame.fw-collapsed .fw-nav-badge {
+    opacity: 0;
+}
+
+/* ---------- 内容区 + 纯白圆角卡片 ---------- */
+.fw-content {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 2px 0 0 4px;
+    display: flex;
+}
+
+.fw-frame.fw-no-sidebar .fw-content {
+    padding-left: 0;
+}
+
+.fw-frame.fw-no-sidebar .fw-card {
+    border-top-left-radius: var(--fw-card-radius);
+}
+
+.fw-card {
+    flex: 1;
+    min-width: 0;
+    background-color: var(--fw-card-bg);
+    background-image: none;
+    border: 1px solid var(--fw-card-border);
+    /* 异形副卡片：左上 + 右下为圆角，曲率与窗口圆角一致。 */
+    border-radius: var(--fw-card-radius) 0 var(--fw-card-radius) 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: auto;
+    position: relative;
+    isolation: isolate;
+}
+
+body.window-blur-enabled .fw-card {
+    background: rgba(255, 255, 255, 0.42) !important;
+    background-color: rgba(255, 255, 255, 0.42) !important;
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+
+body.dark-mode.window-blur-enabled .fw-card {
+    background: rgba(0, 0, 0, 0.42) !important;
+    background-color: rgba(0, 0, 0, 0.42) !important;
+}
+
+body.window-blur-disabled .fw-card,
+body.blur-disabled .fw-card {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+body.dark-mode.window-blur-disabled .fw-card,
+body.dark-mode.blur-disabled .fw-card {
+    background: #202020 !important;
+    background-color: #202020 !important;
+}
+
+.dark-mode .fw-card {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.fw-page {
+    padding: 28px 32px;
+    min-height: 100%;
+    box-sizing: border-box;
+    color: var(--text-primary, #1f1f1f);
+    background: transparent;
+}
+
+/* ============ 原生 App 接入适配 ============ */
+.files-fw-page {
+    height: 100%;
+    min-height: 0;
+    padding: 0 !important;
+}
+
+.files-fw-app {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.files-fw-main {
+    flex: 1;
+    min-height: 0;
+}
+
+.appshop-fw-page,
+.media-fw-page {
+    height: 100%;
+    min-height: 0;
+    padding: 0 !important;
+}
+
+.appshop-fw-app {
+    height: 100%;
+    min-height: 0;
+    display: block !important;
+    width: 100% !important;
+    grid-template-columns: none !important;
+    container-type: normal !important;
+}
+
+.appshop-fw-app .appshop-main {
+    height: 100%;
+    min-height: 0;
+    width: 100% !important;
+    max-width: none !important;
+    grid-column: auto !important;
+}
+
+.media-fw-app {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.media-fw-main {
+    grid-column: 1 / -1 !important;
+}
+
+.media-fw-search {
+    margin-bottom: 18px;
+}
+
+/* ---------- 页面切换动效 (淡出 / 淡入) ---------- */
+.fw-page {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity var(--fw-fade-ms) ease,
+                transform calc(var(--fw-fade-ms) + 80ms) cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+}
+
+/* 离场: 淡出 + 轻微上移 */
+.fw-page.fw-page-leave {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+/* 入场初态: 透明 + 轻微下移，随后过渡到默认态 */
+.fw-page.fw-page-enter {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+/* 收起态下卡片滚动条等可保持默认 */
+.fw-card::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.fw-card::-webkit-scrollbar-track {
+    background: transparent;
+}
+.fw-card::-webkit-scrollbar-thumb {
+    background: var(--text-tertiary, rgba(0, 0, 0, 0.25));
+    border-radius: 3px;
+}
+
+/* ============ 非前置窗口：所有框架/应用 icon 统一变灰 ============ */
+.window.window-inactive .fw-nav-item,
+.window.window-inactive .fw-nav-item.active,
+.window.window-inactive .fw-page,
+.window.window-inactive .window-content {
+    color: rgba(150, 150, 150, 0.78) !important;
+}
+
+.window.window-inactive .fw-nav-item.active {
+    background: rgba(150, 150, 150, 0.16) !important;
+    box-shadow: inset 0 0 0 1px rgba(150, 150, 150, 0.28) !important;
+}
+
+.window.window-inactive .fw-nav-item.active::before,
+.window.window-inactive .fw-nav-icon-symbol {
+    background: rgba(150, 150, 150, 0.86) !important;
+}
+
+.window.window-inactive img[src*="Theme/Icon/"],
+.window.window-inactive img[src*="Symbol_icon/"],
+.window.window-inactive .fw-nav-icon-img,
+.window.window-inactive .window-content img {
+    filter: grayscale(1) saturate(0) opacity(0.62) !important;
+}
+
+/* ============ Fluent 自渲染竖直滚轮（全局接管） ============ */
+* {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+}
+
+.fw-scroll-host {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.fw-scroll-host::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
+}
+
+.fw-scrollbar-rail {
+    position: fixed;
+    width: 8px;
+    z-index: 2147483000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+}
+
+.fw-scrollbar-rail.visible,
+.fw-scrollbar-rail.dragging {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.fw-scrollbar-thumb {
+    width: 4px;
+    margin-left: 2px;
+    border-radius: 999px;
+    background: rgba(70, 70, 70, 0.42);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+        0 2px 8px rgba(0, 0, 0, 0.16);
+    transition: width 160ms ease, margin 160ms ease, background 160ms ease;
+}
+
+.dark-mode .fw-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.36);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+        0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.fw-scrollbar-rail:hover .fw-scrollbar-thumb,
+.fw-scrollbar-rail.dragging .fw-scrollbar-thumb {
+    width: 6px;
+    margin-left: 1px;
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.62);
+}
+
+.browser-fw-page {
+    height: 100%;
+    min-height: 0;
+    padding: 0 !important;
+}
+
+/* 降低动效偏好时禁用过渡 */
+@media (prefers-reduced-motion: reduce) {
+    .fw-sidebar,
+    .fw-nav-label,
+    .fw-nav-badge,
+    .fw-page {
+        transition: none !important;
+    }
+}

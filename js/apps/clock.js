@@ -5,6 +5,7 @@
 const ClockApp = {
     windowId: null,
     container: null,
+    frame: null,
     currentTab: 'timer',
     timerNotificationId: null,
     
@@ -74,32 +75,38 @@ const ClockApp = {
 
     render() {
         this.container.innerHTML = '';
-        
-        const app = document.createElement('div');
-        app.className = 'clock-app';
-        
-        // 使用 FluentUI.Sidebar 创建侧边栏
-        const sidebar = FluentUI.Sidebar({
+
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[ClockApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
             items: this.getTabs().map(tab => ({ id: tab.id, label: tab.label, icon: tab.icon })),
-            activeItem: this.currentTab,
-            onItemClick: (tabId) => {
+            activeId: this.currentTab,
+            onNavigate: (tabId, pageEl) => {
                 this.currentTab = tabId;
-                this.render();
+                pageEl.classList.add('clock-content');
+                pageEl.id = 'clock-content';
+                pageEl.innerHTML = this.renderTab();
+                this.addStyles();
+                this.bindEvents();
             }
         });
-        
-        // 内容区域
-        const content = document.createElement('div');
-        content.className = 'clock-content';
-        content.id = 'clock-content';
-        content.innerHTML = this.renderTab();
-        
-        app.appendChild(sidebar);
-        app.appendChild(content);
-        this.container.appendChild(app);
+    },
 
-        this.addStyles();
-        this.bindEvents();
+    beforeClose() {
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+        return true;
     },
 
     addStyles() {
@@ -184,13 +191,6 @@ const ClockApp = {
             .dark-mode .calendar-day:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .calendar-nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
             
-            /* 自定义滚动条 - 与通知中心一致 */
-            .clock-app *::-webkit-scrollbar { width: 6px; height: 6px; }
-            .clock-app *::-webkit-scrollbar-track { background: transparent; }
-            .clock-app *::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 3px; }
-            .clock-app *::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
-            /* Firefox */
-            .clock-app * { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
             body.fluent-v2 .clock-app .timer-btn.fluent-btn { min-width: 148px; }
             body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn {
                 color: #111111 !important;
@@ -205,18 +205,6 @@ const ClockApp = {
                 background-clip: border-box;
                 -webkit-background-clip: border-box;
                 background-image: none !important;
-            }
-            body.fluent-v2:not(.dark-mode) .clock-app .fluent-sidebar-item {
-                color: #111111;
-            }
-            body.fluent-v2.dark-mode .clock-app .fluent-sidebar-item {
-                color: #ffffff;
-            }
-            body.fluent-v2:not(.dark-mode) .clock-app .fluent-sidebar-item img {
-                filter: brightness(0);
-            }
-            body.fluent-v2.dark-mode .clock-app .fluent-sidebar-item img {
-                filter: brightness(0) invert(1);
             }
         `;
         document.head.appendChild(style);

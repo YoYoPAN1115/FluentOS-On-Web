@@ -4,17 +4,10 @@
 const SettingsApp = {
     windowId: null,
     container: null,
+    frame: null,
     currentPage: 'overview',
     _aboutDevTapCount: 0,
     _developerModeVisible: false,
-    _pageScrollTop: {},
-    _scrollRestoreRaf: null,
-    _scrollRestoreTimer: null,
-    _lastRestoredScrollKey: '',
-    _lastScrollRestoreAt: 0,
-    _sidebarScrollTop: 0,
-    _sidebarScrollRestoreRaf: null,
-    _sidebarScrollRestoreTimer: null,
 
     _isMounted() {
         return !!(this.container && this.container.isConnected);
@@ -77,26 +70,6 @@ const SettingsApp = {
         this.currentPage = 'overview';
         this._aboutDevTapCount = 0;
         this._developerModeVisible = false;
-        this._pageScrollTop = {};
-        this._sidebarScrollTop = 0;
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-            this._scrollRestoreRaf = null;
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
-        }
-        this._lastRestoredScrollKey = '';
-        this._lastScrollRestoreAt = 0;
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
-        }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
-        }
         this.render();
         
         State.on('languageChange', () => {
@@ -127,8 +100,21 @@ const SettingsApp = {
         const app = this.getAppDetailData(data.appId);
         if (!app) return;
         this.currentAppDetail = app;
-        this.currentPage = 'app-detail';
-        this.render();
+        this.navigateToPage('app-detail');
+    },
+
+    navigateToPage(pageId, options = {}) {
+        if (!pageId) return;
+        const previousPage = this.currentPage;
+        this.currentPage = pageId;
+        if (this.frame && typeof this.frame.navigate === 'function' && previousPage !== pageId) {
+            this.frame.navigate(pageId);
+        } else {
+            this.render();
+        }
+        if (typeof options.after === 'function') {
+            setTimeout(options.after, options.delay || 180);
+        }
     },
 
     getAppDetailData(appId) {
@@ -150,211 +136,65 @@ const SettingsApp = {
     },
 
     beforeClose() {
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
-        }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
-        }
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-            this._scrollRestoreRaf = null;
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
         }
         this.container = null;
         this.windowId = null;
         return true;
     },
 
-    _getScrollRouteKey(content = null) {
-        const pageId = (content && content.dataset && content.dataset.pageId) || this.currentPage || 'overview';
-        if (pageId === 'app-detail') {
-            const appId = (content && content.dataset && content.dataset.detailAppId) ||
-                (this.currentAppDetail && this.currentAppDetail.id) ||
-                'unknown';
-            return `app-detail:${appId}`;
-        }
-        return pageId;
-    },
-
-    _saveCurrentScrollPosition() {
-        if (!this.container) return;
-        const content = this.container.querySelector('.settings-content');
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        const prevTop = this._pageScrollTop[scrollKey];
-        const nextTop = content.scrollTop;
-        const restoreGap = performance.now() - this._lastScrollRestoreAt;
-        const isTransientReset = scrollKey === this._lastRestoredScrollKey &&
-            restoreGap < 260 &&
-            Number.isFinite(prevTop) &&
-            prevTop > 2 &&
-            nextTop <= 1;
-        if (isTransientReset) return;
-        this._pageScrollTop[scrollKey] = nextTop;
-    },
-
-    _restoreScrollPosition(content) {
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        const savedTop = this._pageScrollTop[scrollKey];
-        if (!Number.isFinite(savedTop)) return;
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
-        }
-
-        let frameCount = 0;
-        const maxFrames = 8;
-        const applyRestore = () => {
-            if (!content.isConnected) {
-                this._scrollRestoreRaf = null;
-                return;
-            }
-
-            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
-            const targetTop = Math.min(savedTop, maxScroll);
-            if (Math.abs(content.scrollTop - targetTop) > 1) {
-                content.scrollTop = targetTop;
-            }
-
-            frameCount += 1;
-            const stillGrowing = savedTop > maxScroll + 1 && frameCount < maxFrames;
-            if (stillGrowing) {
-                this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
-                return;
-            }
-
-            this._lastRestoredScrollKey = scrollKey;
-            this._lastScrollRestoreAt = performance.now();
-            this._scrollRestoreRaf = null;
-        };
-        this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
-
-        this._scrollRestoreTimer = setTimeout(() => {
-            if (!content.isConnected) return;
-            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
-            const targetTop = Math.min(savedTop, maxScroll);
-            if (Math.abs(content.scrollTop - targetTop) > 1) {
-                content.scrollTop = targetTop;
-            }
-            this._lastRestoredScrollKey = scrollKey;
-            this._lastScrollRestoreAt = performance.now();
-            this._scrollRestoreTimer = null;
-        }, 140);
-    },
-
-    _bindScrollTracking(content) {
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        content.addEventListener('scroll', () => {
-            this._pageScrollTop[scrollKey] = content.scrollTop;
-        }, { passive: true });
-    },
-
-    _saveSidebarScrollPosition() {
-        if (!this.container) return;
-        const sidebar = this.container.querySelector('.settings-app > .fluent-sidebar');
-        if (!sidebar) return;
-        this._sidebarScrollTop = sidebar.scrollTop;
-    },
-
-    _restoreSidebarScrollPosition(sidebar) {
-        if (!sidebar) return;
-        const savedTop = this._sidebarScrollTop;
-        if (!Number.isFinite(savedTop) || savedTop <= 0) return;
-
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
-        }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
-        }
-
-        this._sidebarScrollRestoreRaf = requestAnimationFrame(() => {
-            if (!sidebar.isConnected) {
-                this._sidebarScrollRestoreRaf = null;
-                return;
-            }
-            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
-            sidebar.scrollTop = Math.min(savedTop, maxScroll);
-            this._sidebarScrollRestoreRaf = null;
-        });
-
-        this._sidebarScrollRestoreTimer = setTimeout(() => {
-            if (!sidebar.isConnected) return;
-            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
-            sidebar.scrollTop = Math.min(savedTop, maxScroll);
-            this._sidebarScrollRestoreTimer = null;
-        }, 120);
-    },
-
-    _bindSidebarScrollTracking(sidebar) {
-        if (!sidebar) return;
-        sidebar.addEventListener('scroll', () => {
-            this._sidebarScrollTop = sidebar.scrollTop;
-        }, { passive: true });
-    },
-
     render() {
         if (!this.container) return;
-        this._saveCurrentScrollPosition();
-        this._saveSidebarScrollPosition();
         this.container.style.overflow = 'hidden';
         this.container.innerHTML = '';
         if (this.currentPage !== 'developer' && this._developerModeVisible) {
             this._developerModeVisible = false;
             this._aboutDevTapCount = 0;
         }
-        
-        const app = document.createElement('div');
-        app.className = 'settings-app';
-        
-        // 使用 FluentUI.Sidebar 创建侧边栏
-        const sidebar = FluentUI.Sidebar({
+
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[SettingsApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
             items: this.getPages().map(p => ({ id: p.id, label: t(p.label), icon: p.icon })),
-            activeItem: this.currentPage,
-            onItemClick: (pageId) => {
+            activeId: this.currentPage,
+            preserveScrollPositions: true,
+            getScrollKey: (pageId) => {
+                if (pageId === 'app-detail') {
+                    const appId = this.currentAppDetail && this.currentAppDetail.id;
+                    return `app-detail:${appId || 'unknown'}`;
+                }
+                return pageId || 'overview';
+            },
+            onNavigate: (pageId, pageEl) => {
                 if (this.currentPage === 'developer' && pageId !== 'developer') {
                     this._developerModeVisible = false;
                     this._aboutDevTapCount = 0;
                 }
                 this.currentPage = pageId;
-                this.render();
+                pageEl.classList.add('settings-content', 'settings-fw-content');
+                pageEl.id = 'settings-content';
+                pageEl.dataset.pageId = this.currentPage;
+                if (this.currentPage === 'app-detail' && this.currentAppDetail && this.currentAppDetail.id) {
+                    pageEl.dataset.detailAppId = this.currentAppDetail.id;
+                } else {
+                    delete pageEl.dataset.detailAppId;
+                }
+
+                this.renderPage(pageEl);
+                this.addStyles();
             }
         });
-        
-        // 内容区域
-        const content = document.createElement('div');
-        content.className = 'settings-content';
-        content.id = 'settings-content';
-        content.dataset.pageId = this.currentPage;
-        if (this.currentPage === 'app-detail' && this.currentAppDetail && this.currentAppDetail.id) {
-            content.dataset.detailAppId = this.currentAppDetail.id;
-        } else {
-            delete content.dataset.detailAppId;
-        }
-        this.renderPage(content);
-        this._bindScrollTracking(content);
-        this._restoreScrollPosition(content);
-        this._bindSidebarScrollTracking(sidebar);
-        this._restoreSidebarScrollPosition(sidebar);
-        
-        app.appendChild(sidebar);
-        app.appendChild(content);
-        this.container.appendChild(app);
-        
-        this.addStyles();
     },
 
     addStyles() {
@@ -364,26 +204,6 @@ const SettingsApp = {
         style.id = 'settings-app-styles';
         style.textContent = `
             .settings-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
-            .settings-app > .fluent-sidebar {
-                min-height: 0;
-            }
-            .settings-app > .fluent-sidebar .fluent-sidebar-item {
-                box-sizing: border-box !important;
-                transition:
-                    gap 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    padding 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    margin 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    font-size 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    background 260ms cubic-bezier(0.16, 1, 0.3, 1),
-                    color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
-            }
-            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item {
-                min-height: 44px !important;
-                margin-bottom: 6px !important;
-            }
-            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item:last-child {
-                margin-bottom: 0 !important;
-            }
             .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
@@ -2067,8 +1887,7 @@ const SettingsApp = {
                 <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" class="settings-recommend-arrow" alt="">
             `;
             item.addEventListener('click', () => {
-                this.currentPage = rec.pageId;
-                this.render();
+                this.navigateToPage(rec.pageId);
             });
             recommendList.appendChild(item);
         });
@@ -2095,10 +1914,10 @@ const SettingsApp = {
                     <span class="settings-recent-time">${rec.time}</span>
                 `;
                 item.addEventListener('click', () => {
-                    this.currentPage = rec.pageId;
-                    this.render();
-                    // 高亮对应设置项
-                    this.highlightSetting(rec.label);
+                    this.navigateToPage(rec.pageId, {
+                        after: () => this.highlightSetting(rec.label),
+                        delay: 220
+                    });
                 });
                 recentList.appendChild(item);
             });
@@ -3198,9 +3017,10 @@ const SettingsApp = {
     },
 
     _goPrivacyAndHighlightStrictCsp() {
-        this.currentPage = 'privacy';
-        this.render();
-        this.highlightSettingByDataId('privacy-strict-csp', 1200);
+        this.navigateToPage('privacy', {
+            after: () => this.highlightSettingByDataId('privacy-strict-csp', 1200),
+            delay: 220
+        });
     },
 
     _getFingoApiStorageStatusText(type) {

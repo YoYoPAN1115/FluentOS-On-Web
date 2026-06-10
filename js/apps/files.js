@@ -13,6 +13,7 @@ const FilesApp = {
     ],
     windowId: null,
     container: null,
+    frame: null,
     currentPath: ['root'],
     currentNode: null,
     history: [],
@@ -77,17 +78,72 @@ const FilesApp = {
         }
     },
 
+    beforeClose() {
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+        const ctxMenu = document.getElementById(`${this.windowId}-files-context-menu`);
+        if (ctxMenu && ctxMenu.parentElement === document.body) {
+            ctxMenu.remove();
+        }
+        this.container = null;
+        this.windowId = null;
+        return true;
+    },
+
+    getQuickAccessItems() {
+        return [
+            { id: 'desktop', label: t('files.desktop'), icon: 'Folder' },
+            { id: 'documents', label: t('files.documents'), icon: 'File' },
+            { id: 'pictures', label: t('files.pictures'), icon: 'Image' },
+            { id: 'downloads', label: t('files.downloads'), icon: 'Download' },
+            { id: 'recycle', label: t('files.recycle'), icon: 'Trash' }
+        ];
+    },
+
+    getCurrentQuickAccessId() {
+        const quickAccessIds = this.getQuickAccessItems().map(item => item.id);
+        return this.currentPath.find(id => quickAccessIds.includes(id)) || null;
+    },
+
     render() {
         if (!this.container) {
             console.error('[FilesApp] render: 容器不存在');
             return;
         }
-        
+
         this.container.innerHTML = '';
-        
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[FilesApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
+            items: this.getQuickAccessItems(),
+            activeId: this.getCurrentQuickAccessId(),
+            onNavigate: (id, pageEl) => {
+                pageEl.classList.add('files-fw-page');
+                this.renderContentPage(pageEl);
+                if (id && id !== this.getCurrentQuickAccessId()) {
+                    this.navigateToId(id);
+                }
+            }
+        });
+    },
+
+    renderContentPage(pageEl) {
+        pageEl.innerHTML = '';
+
         const app = document.createElement('div');
-        app.className = 'files-app';
-        
+        app.className = 'files-app files-fw-app';
+
         // 使用 FluentUI.NavigationBar 创建工具栏
         const searchBox = FluentUI.SearchBox({
             placeholder: t('files.search'),
@@ -128,37 +184,11 @@ const FilesApp = {
         });
         toolbar.className = 'files-toolbar fluent-navbar';
         app.appendChild(toolbar);
-        
+
         // 主区域
         const main = document.createElement('div');
-        main.className = 'files-main';
-        
-        // 使用 FluentUI.Sidebar 创建侧边栏
-        const sidebar = FluentUI.Sidebar({
-            sections: [{
-                title: t('files.quick-access'),
-                items: [
-                    { id: 'desktop', label: t('files.desktop'), icon: 'Folder' },
-                    { id: 'documents', label: t('files.documents'), icon: 'File' },
-                    { id: 'pictures', label: t('files.pictures'), icon: 'Image' },
-                    { id: 'downloads', label: t('files.downloads'), icon: 'Download' },
-                    // 回收站固定在最后
-                    { id: 'recycle', label: t('files.recycle'), icon: 'Trash' }
-                ]
-            }],
-            activeItem: this.currentPath[this.currentPath.length - 1],
-            onItemClick: (id) => this.navigateToId(id)
-        });
-        sidebar.style.position = 'relative';
-        
-        // V2模式下在侧边栏底部添加项目计数
-        const sidebarCount = document.createElement('div');
-        sidebarCount.className = 'files-sidebar-count';
-        sidebarCount.id = 'files-sidebar-count';
-        sidebar.appendChild(sidebarCount);
-        
-        main.appendChild(sidebar);
-        
+        main.className = 'files-main files-fw-main';
+
         // 内容区域
         const content = document.createElement('div');
         content.className = 'files-content';
@@ -179,8 +209,8 @@ const FilesApp = {
         ctxMenu.className = 'context-menu hidden';
         ctxMenu.id = `${this.windowId}-files-context-menu`;
         app.appendChild(ctxMenu);
-        
-        this.container.appendChild(app);
+
+        pageEl.appendChild(app);
 
         this.addStyles();
         this.createSelectionBox();
@@ -237,18 +267,6 @@ const FilesApp = {
             .files-search input { flex: 1; border: none; background: none; font-size: 13px; outline: none; }
             .files-search:focus-within { box-shadow: 0 0 0 2px var(--accent); background: var(--bg-tertiary); }
             .files-main { flex: 1; display: flex; overflow: hidden; }
-            .files-sidebar { width: 200px; border-right: 1px solid var(--border-color); padding: 12px 8px; overflow-y: auto; background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(20px) saturate(180%); }
-            .dark-mode .files-sidebar { background: rgba(32, 32, 32, 0.5); }
-            .blur-disabled .files-sidebar { backdrop-filter: none; background: rgba(255, 255, 255, 0.95); }
-            .dark-mode.blur-disabled .files-sidebar { background: rgba(32, 32, 32, 0.95); }
-            .sidebar-section { margin-bottom: 16px; }
-            .sidebar-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 8px 12px; }
-            .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
-            .sidebar-item:hover { background: rgba(0, 0, 0, 0.05); }
-            .sidebar-item img { width: 16px; height: 16px; }
-            .sidebar-item span { font-size: 13px; }
-            .files-sidebar-count { display: none; }
-            body.fluent-v2 .files-sidebar-count { display: block; }
             .files-content { flex: 1; overflow-y: auto; padding: 16px; position: relative; }
             .files-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; }
             .file-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border-radius: var(--radius-md); cursor: pointer; transition: background var(--transition-fast); }
@@ -259,7 +277,6 @@ const FilesApp = {
             .files-statusbar { padding: 8px 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); background: var(--bg-tertiary); }
             .dark-mode .toolbar-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .breadcrumb-item:hover { background: rgba(255, 255, 255, 0.1); }
-            .dark-mode .sidebar-item:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .file-item:hover { background: rgba(255, 255, 255, 0.1); }
             
             /* V2 新版外观选中样式 - 圆角浅蓝高亮 */
@@ -308,14 +325,6 @@ const FilesApp = {
         // 后退/前进
         document.getElementById('files-back')?.addEventListener('click', () => this.goBack());
         document.getElementById('files-forward')?.addEventListener('click', () => this.goForward());
-
-        // 侧边栏项目
-        this.container.querySelectorAll('.sidebar-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.id;
-                this.navigateToId(id);
-            });
-        });
 
         // 将右键菜单移到 body，避免在窗口 transform/overflow 下错位或被裁剪
         const externalMenu = document.getElementById(`${this.windowId}-files-context-menu`);
@@ -1102,26 +1111,27 @@ const FilesApp = {
     },
 
     updateSidebarActive() {
-        // 更新侧边栏选中状态
-        const sidebar = this.container.querySelector('.fluent-sidebar');
-        if (!sidebar) return;
-        
         // 获取当前路径中的快速访问项目ID
-        const quickAccessIds = ['desktop', 'documents', 'pictures', 'downloads', 'recycle'];
-        const currentId = this.currentPath.find(id => quickAccessIds.includes(id));
-        
-        // 移除所有 active 状态
-        sidebar.querySelectorAll('.fluent-sidebar-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // 添加当前项目的 active 状态
-        if (currentId) {
-            const activeItem = sidebar.querySelector(`.fluent-sidebar-item[data-id="${currentId}"]`);
-            if (activeItem) {
-                activeItem.classList.add('active');
-            }
+        const currentId = this.getCurrentQuickAccessId();
+        if (this.frame) {
+            this.frame.activeId = currentId;
         }
+
+        // 移除所有 active 状态
+        this.container.querySelectorAll('.fw-nav-item').forEach(item => {
+            const isActive = !!currentId && item.dataset.id === currentId;
+            item.classList.toggle('active', isActive);
+            const icon = item.querySelector('.fw-nav-icon-symbol');
+            if (icon && icon.dataset.iconName && typeof FluentWindow !== 'undefined' && FluentWindow._iconPath) {
+                const iconPath = FluentWindow._iconPath(icon.dataset.iconName, isActive ? 'fill' : 'stroke');
+                icon.style.setProperty(
+                    '--fw-icon-url',
+                    `url("${iconPath}")`
+                );
+                const fallbackImg = item.querySelector('.fw-nav-icon-img');
+                if (fallbackImg) fallbackImg.src = iconPath;
+            }
+        });
     },
 
     renderFileList() {
@@ -1261,11 +1271,6 @@ const FilesApp = {
         const status = document.getElementById('files-status');
         if (status) {
             status.textContent = t('files.items', {count});
-        }
-        // V2模式下更新侧边栏计数
-        const sidebarCount = document.getElementById('files-sidebar-count');
-        if (sidebarCount) {
-            sidebarCount.textContent = t('files.items', {count});
         }
     },
     

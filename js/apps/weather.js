@@ -6,6 +6,7 @@
 const WeatherApp = {
     windowId: null,
     container: null,
+    frame: null,
     currentCity: null,
     coords: { lat: 39.9042, lon: 116.4074 }, // 默认北京
     data: null,
@@ -46,36 +47,37 @@ const WeatherApp = {
 
     renderSkeleton() {
         this.container.innerHTML = '';
-        
-        const app = document.createElement('div');
-        app.className = 'weather-app';
-        
-        // 使用 FluentUI.Sidebar 创建城市选择列表
-        const sidebar = FluentUI.Sidebar({
-            header: t('weather.city-list'),
+
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[WeatherApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
             items: Object.entries(this.locations).map(([key, loc]) => ({
                 id: key,
                 label: t(loc.nameKey),
                 icon: 'Earth'
             })),
-            activeItem: this.currentLocKey,
-            width: '200px',
-            onItemClick: (key) => {
+            activeId: this.currentLocKey,
+            onNavigate: (key, pageEl) => {
+                pageEl.classList.add('weather-content');
+                pageEl.id = 'weather-content';
                 this.currentLocKey = key;
                 const loc = this.locations[key];
-                this.fetchWeatherByCoords(loc.lat, loc.lon);
-                // 更新侧边栏高亮
-                this.container.querySelectorAll('.fluent-sidebar-item').forEach(el => {
-                    el.classList.toggle('active', el.dataset.id === key);
-                });
+                this.renderWeatherSkeleton(pageEl);
+                if (loc) this.fetchWeatherByCoords(loc.lat, loc.lon);
             }
         });
-        app.appendChild(sidebar);
-        
-        // 内容区域
-        const content = document.createElement('div');
-        content.className = 'weather-content';
-        content.id = 'weather-content';
+    },
+
+    renderWeatherSkeleton(content) {
         content.innerHTML = `
             <div class="weather-widget" id="weather-widget"></div>
             <div class="weather-hero" id="weather-hero">
@@ -102,8 +104,16 @@ const WeatherApp = {
                 <div class="daily-list" id="daily-list"></div>
             </div>
         `;
-        app.appendChild(content);
-        this.container.appendChild(app);
+    },
+
+    beforeClose() {
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+        this.container = null;
+        this.windowId = null;
+        return true;
     },
 
     addStyles() {
@@ -112,37 +122,9 @@ const WeatherApp = {
         style.id = 'weather-app-styles';
         style.textContent = `
             .weather-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
-            .weather-app > .fluent-sidebar {
-                display: flex !important;
-                flex-direction: column !important;
-                flex: 0 0 var(--system-sidebar-width, 200px) !important;
-                width: var(--system-sidebar-width, 200px) !important;
-                min-width: var(--system-sidebar-width, 200px) !important;
-                min-height: 0 !important;
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-            }
-            .weather-app > .fluent-sidebar .fluent-sidebar-header {
-                flex: 0 0 auto !important;
-            }
-            .weather-app > .fluent-sidebar .fluent-sidebar-item {
-                box-sizing: border-box !important;
-                flex: 0 0 36px !important;
-                height: 36px !important;
-                min-height: 36px !important;
-                max-height: 36px !important;
-                padding-top: 0 !important;
-                padding-bottom: 0 !important;
-            }
-            body.fluent-v2 .weather-app > .fluent-sidebar .fluent-sidebar-item {
-                flex-basis: 44px !important;
-                height: 44px !important;
-                min-height: 44px !important;
-                max-height: 44px !important;
-            }
             .saved-item:hover { background: rgba(0,0,0,0.05); }
 
-            .weather-content { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 24px 32px; }
+            .weather-content { min-width: 0; min-height: 100%; padding: 24px 32px; }
             .weather-widget { margin-bottom: 16px; }
             .weather-hero { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, #4b7cff 0%, #6790ff 100%); border-radius: 24px; padding: 20px 24px; color: white; box-shadow: 0 10px 30px rgba(75,124,255,0.25); }
             .dark-mode .weather-hero { background: linear-gradient(180deg, #2a2f3a 0%, #3c4252 100%); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
@@ -168,58 +150,6 @@ const WeatherApp = {
             .day-temp { text-align: center; font-weight: 600; }
             .day-desc { text-align: right; opacity: .85; }
 
-            /* 自定义滚动条 */
-            .weather-app *::-webkit-scrollbar { width: 6px; height: 6px; }
-            .weather-app *::-webkit-scrollbar-track { background: transparent; }
-            .weather-app *::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 3px; }
-            .weather-app *::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
-            .weather-app * { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
-            @container (max-width: 760px) {
-                .weather-app {
-                    --system-sidebar-width: 68px;
-                }
-                .weather-app > .fluent-sidebar {
-                    width: 68px !important;
-                    min-width: 68px !important;
-                    flex-basis: 68px !important;
-                    padding: 10px 6px !important;
-                    margin: 8px 0 8px 8px !important;
-                    border-radius: 12px !important;
-                }
-                .weather-app > .fluent-sidebar .fluent-sidebar-header {
-                    opacity: 0 !important;
-                    max-height: 0 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    overflow: hidden !important;
-                    pointer-events: none !important;
-                    transform: translateX(-8px) scale(0.96) !important;
-                }
-                .weather-app > .fluent-sidebar .fluent-sidebar-item {
-                    flex: 0 0 44px !important;
-                    height: 44px !important;
-                    min-height: 44px !important;
-                    max-height: 44px !important;
-                    justify-content: center !important;
-                    align-items: center !important;
-                    gap: 0 !important;
-                    padding-left: 0 !important;
-                    padding-right: 0 !important;
-                    font-size: 0 !important;
-                }
-                .weather-app > .fluent-sidebar .fluent-sidebar-item-label {
-                    opacity: 0 !important;
-                    max-width: 0 !important;
-                    margin: 0 !important;
-                    overflow: hidden !important;
-                    transform: translateX(-8px) scale(0.96) !important;
-                    pointer-events: none !important;
-                }
-                .weather-app > .fluent-sidebar .fluent-sidebar-item-icon {
-                    margin: 0 !important;
-                    flex: 0 0 auto !important;
-                }
-            }
         `;
         document.head.appendChild(style);
     },

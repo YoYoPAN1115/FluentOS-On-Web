@@ -5,6 +5,7 @@
 const MediaApp = {
     windowId: null,
     container: null,
+    frame: null,
     audioTypes: new Set(['mp3', 'm4a', 'aac', 'ogg', 'oga', 'wav', 'flac', 'opus', 'webm']),
     videoTypes: new Set(['mp4', 'webm', 'ogv', 'mov', 'm4v', 'mkv']),
     library: [],
@@ -85,6 +86,10 @@ const MediaApp = {
 
     beforeClose() {
         this.destroy();
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
         this.library = [];
         this.currentIndex = -1;
         this.restoreStarted = false;
@@ -248,72 +253,120 @@ const MediaApp = {
         });
     },
 
+    getFrameNavItems() {
+        return [
+            { id: 'library', label: this.localText('library'), icon: 'Music' },
+            { id: 'recent', label: this.localText('recent'), icon: 'Clock' },
+            { id: 'now', label: this.localText('now'), icon: 'Media Reel V' },
+            { id: 'playlist', label: this.localText('playlist'), icon: 'Playlist' }
+        ];
+    },
+
+    getFrameFooterItems() {
+        return [
+            { id: 'settings', label: this.localText('settings'), icon: 'Settings' }
+        ];
+    },
+
+    getFrameActiveView() {
+        return ['recent', 'now', 'playlist', 'settings'].includes(this.activeView) ? this.activeView : 'library';
+    },
+
     render() {
-        const playbackState = this.capturePlaybackState();
-        const current = this.activeItem;
-        const filteredItems = this.getFilteredItems();
-        const preservedAudio = this.detachReusableAudio(current);
-        this.container.innerHTML = `
-            <div class="media-app ${this.playerExpanded ? 'player-expanded' : ''}">
-                <aside class="media-sidebar">
-                    <label class="media-search">
-                        <input id="media-search-input" type="search" value="${this.escapeAttr(this.searchQuery)}" placeholder="${this.localText('search')}">
-                        <span>${this.symbolIcon('Search.svg')}</span>
-                    </label>
-                    <nav class="media-nav">
-                        ${this.renderNavItem('library', 'Music.svg', this.localText('library'))}
-                        ${this.renderNavItem('recent', 'Clock.svg', this.localText('recent'))}
-                        ${this.renderNavItem('now', 'Media Reel V.svg', this.localText('now'))}
-                        ${this.renderNavItem('playlist', 'Playlist.svg', this.localText('playlist'))}
-                    </nav>
-                    <div class="media-sidebar-bottom">
-                        ${this.renderNavItem('settings', 'Settings.svg', this.localText('settings'))}
-                    </div>
-                </aside>
-
-                <main class="media-main">
-                    ${this.renderMainContent(filteredItems, current)}
-                </main>
-
-                ${this.renderExpandedPlayer(current)}
-
-                <footer class="media-player-bar ${this.library.length ? '' : 'is-hidden'}">
-                    <div class="media-now-card" data-action="expand-player">
-                        ${this.renderSmallArt(current)}
-                        <div>
-                            <strong>${this.escapeHtml(current?.title || this.localText('emptyTitle'))}</strong>
-                            <span>${this.escapeHtml(this.getItemSubtitle(current, true))}</span>
-                        </div>
-                    </div>
-                    <div class="media-controls">
-                        <div class="media-button-row">
-                            <button data-action="previous" title="${this.localText('previous')}">${this.symbolIcon('Previous.svg')}</button>
-                            <button class="media-play-btn" data-action="play-toggle" title="${this.localText('play')}">${this.symbolIcon('Play.svg')}</button>
-                            <button data-action="next" title="${this.localText('next')}">${this.symbolIcon('Next.svg')}</button>
-                        </div>
-                    </div>
-                    <div class="media-options">
-                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="${this.localText('shuffle')}">${this.symbolIcon('Exchange A.svg')}</button>
-                        <button data-action="expand-player" title="${this.localText('expand')}">${this.symbolIcon('Playlist.svg')}</button>
-                    </div>
-
-                    <input class="media-hidden-input" id="media-file-input" type="file" multiple accept="audio/*,video/*">
-                    <input class="media-hidden-input" id="media-folder-input" type="file" webkitdirectory multiple accept="audio/*,video/*">
-                </footer>
-            </div>
-        `;
-        this.observeResponsiveShell();
-        this.applyFluentScrollAreas();
-        this.attachReusableAudio(preservedAudio);
-        this.bindEvents();
-        this.loadCurrentMedia(false);
-        if (!preservedAudio) {
-            this.restorePlaybackState(playbackState);
+        const initialPlaybackState = this.capturePlaybackState();
+        const initialCurrent = this.activeItem;
+        const initialPreservedAudio = this.detachReusableAudio(initialCurrent);
+        let isInitialFrameRender = true;
+        this.container.innerHTML = '';
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
         }
-        this.updateProgressUi();
-        if (this.playerExpanded) {
-            requestAnimationFrame(() => this.updateExpandedAnimationOrigin());
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[MediaApp] FluentWindow framework is not loaded');
+            return;
         }
+
+        const renderMediaPage = (view, pageEl) => {
+            const pagePlaybackState = isInitialFrameRender ? initialPlaybackState : this.capturePlaybackState();
+            const pageCurrentBeforeRender = this.activeItem;
+            const pagePreservedAudio = isInitialFrameRender
+                ? initialPreservedAudio
+                : this.detachReusableAudio(pageCurrentBeforeRender);
+
+            if (view && view !== this.getFrameActiveView()) {
+                if (view === 'now') {
+                    if (!this.activeItem && this.library.length) this.currentIndex = 0;
+                    this.activeView = 'now';
+                    this.playerExpanded = true;
+                } else {
+                    this.activeView = view;
+                }
+            }
+
+            const current = this.activeItem;
+            const filteredItems = this.getFilteredItems();
+            pageEl.classList.add('media-fw-page');
+            pageEl.innerHTML = `
+                <div class="media-app media-fw-app ${this.playerExpanded ? 'player-expanded' : ''}">
+                    <main class="media-main media-fw-main">
+                        <label class="media-search media-fw-search">
+                            <input id="media-search-input" type="search" value="${this.escapeAttr(this.searchQuery)}" placeholder="${this.localText('search')}">
+                            <span>${this.symbolIcon('Search.svg')}</span>
+                        </label>
+                        ${this.renderMainContent(filteredItems, current)}
+                    </main>
+
+                    ${this.renderExpandedPlayer(current)}
+
+                    <footer class="media-player-bar ${this.library.length ? '' : 'is-hidden'}">
+                        <div class="media-now-card" data-action="expand-player">
+                            ${this.renderSmallArt(current)}
+                            <div>
+                                <strong>${this.escapeHtml(current?.title || this.localText('emptyTitle'))}</strong>
+                                <span>${this.escapeHtml(this.getItemSubtitle(current, true))}</span>
+                            </div>
+                        </div>
+                        <div class="media-controls">
+                            <div class="media-button-row">
+                                <button data-action="previous" title="${this.localText('previous')}">${this.symbolIcon('Previous.svg')}</button>
+                                <button class="media-play-btn" data-action="play-toggle" title="${this.localText('play')}">${this.symbolIcon('Play.svg')}</button>
+                                <button data-action="next" title="${this.localText('next')}">${this.symbolIcon('Next.svg')}</button>
+                            </div>
+                        </div>
+                        <div class="media-options">
+                            <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="${this.localText('shuffle')}">${this.symbolIcon('Exchange A.svg')}</button>
+                            <button data-action="expand-player" title="${this.localText('expand')}">${this.symbolIcon('Playlist.svg')}</button>
+                        </div>
+
+                        <input class="media-hidden-input" id="media-file-input" type="file" multiple accept="audio/*,video/*">
+                        <input class="media-hidden-input" id="media-folder-input" type="file" webkitdirectory multiple accept="audio/*,video/*">
+                    </footer>
+                </div>
+            `;
+
+            this.observeResponsiveShell();
+            this.attachReusableAudio(pagePreservedAudio);
+            this.bindEvents();
+            this.loadCurrentMedia(false);
+            if (!pagePreservedAudio) {
+                this.restorePlaybackState(pagePlaybackState);
+            }
+            this.updateProgressUi();
+            if (this.playerExpanded) {
+                requestAnimationFrame(() => this.updateExpandedAnimationOrigin());
+            }
+            isInitialFrameRender = false;
+        };
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
+            items: this.getFrameNavItems(),
+            footerItems: this.getFrameFooterItems(),
+            activeId: this.getFrameActiveView(),
+            onNavigate: renderMediaPage
+        });
     },
 
     detachReusableAudio(current) {
@@ -1004,20 +1057,6 @@ const MediaApp = {
                 <p>${description !== null ? description : (this.library.length ? '' : this.localText('emptyDesc'))}</p>
             </div>
         `;
-    },
-
-    applyFluentScrollAreas() {
-        if (!this.container || typeof FluentUI === 'undefined' || !FluentUI.ScrollArea) return;
-        const main = this.container.querySelector('.media-main');
-        if (!main || main.querySelector(':scope > .fluent-scroll-area')) return;
-
-        const content = document.createDocumentFragment();
-        while (main.firstChild) content.appendChild(main.firstChild);
-        const scrollArea = FluentUI.ScrollArea({
-            content,
-            className: 'media-main-scroll'
-        });
-        main.appendChild(scrollArea);
     },
 
     observeResponsiveShell() {
@@ -3445,26 +3484,16 @@ const MediaApp = {
                 }
             }
             .media-main {
-                overflow: hidden !important;
-            }
-            .media-main-scroll {
-                height: 100%;
-                min-height: 0;
-            }
-            .media-main-scroll .fluent-scroll-viewport {
                 height: 100%;
                 max-height: none !important;
-                padding: 0;
+                overflow: auto !important;
             }
-            .media-main-scroll .fluent-scroll-viewport::after {
+            .media-main::after {
                 content: "";
                 display: block;
                 height: 120px;
                 background: transparent !important;
                 pointer-events: none;
-            }
-            .media-main-scroll .fluent-scroll-rail {
-                right: 5px;
             }
             .media-main .media-library-panel:last-child {
                 margin-bottom: 0 !important;
@@ -3518,7 +3547,7 @@ const MediaApp = {
             .media-main {
                 padding-bottom: 20px !important;
             }
-            .media-main-scroll .fluent-scroll-viewport::after {
+            .media-main::after {
                 height: 0 !important;
             }
             .media-player-bar.is-hidden {
@@ -4118,13 +4147,11 @@ const MediaApp = {
                 overflow: hidden !important;
                 background: transparent !important;
             }
-            .media-main-scroll,
-            .media-main-scroll .fluent-scroll-viewport {
+            .media-main {
                 height: 100% !important;
                 min-height: 0 !important;
-            }
-            .media-main-scroll .fluent-scroll-viewport {
                 padding: 24px 28px 88px !important;
+                overflow: auto !important;
             }
             .media-home,
             .media-page-recent,
@@ -4439,7 +4466,7 @@ const MediaApp = {
                 .media-nav-icon {
                     width: auto !important;
                 }
-                .media-main-scroll .fluent-scroll-viewport {
+                .media-main {
                     padding: 18px 18px 78px !important;
                 }
                 .media-home-head {
@@ -4623,7 +4650,7 @@ const MediaApp = {
                 background: var(--bg-secondary) !important;
                 color: var(--text-primary) !important;
             }
-            body:not(.fluent-v2) .media-main-scroll .fluent-scroll-viewport {
+            body:not(.fluent-v2) .media-main {
                 padding: 16px 16px 78px !important;
             }
             body:not(.fluent-v2) .media-player-bar {
@@ -4650,7 +4677,7 @@ const MediaApp = {
             body:not(.fluent-v2) .media-nav-item {
                 padding-left: 10px !important;
             }
-            body:not(.fluent-v2) .media-main-scroll .fluent-scroll-viewport {
+            body:not(.fluent-v2) .media-main {
                 padding-left: 34px !important;
                 padding-right: 18px !important;
             }
@@ -4754,7 +4781,7 @@ const MediaApp = {
                 background: var(--media-native-active) !important;
                 box-shadow: 0 0 0 1px rgba(0,120,212,0.32) inset !important;
             }
-            body.fluent-v2 .media-main-scroll .fluent-scroll-viewport {
+            body.fluent-v2 .media-main {
                 padding: 24px 30px 92px 34px !important;
             }
             body.fluent-v2 .media-library-panel,
@@ -5004,7 +5031,7 @@ const MediaApp = {
             .media-sidebar-bottom .media-nav-item {
                 margin-bottom: 0 !important;
             }
-            .media-main-scroll .fluent-scroll-viewport {
+            .media-main {
                 transition: padding 430ms cubic-bezier(0.16, 1, 0.3, 1) !important;
             }
             .media-settings-panel {
@@ -5252,7 +5279,7 @@ const MediaApp = {
                     margin-top: auto !important;
                     justify-items: center !important;
                 }
-                .media-main-scroll .fluent-scroll-viewport {
+                .media-main {
                     padding: 18px 16px 88px !important;
                 }
                 .media-home-head {
@@ -5608,7 +5635,7 @@ const MediaApp = {
                 width: min(760px, calc(100% - var(--media-sidebar-width) - 36px)) !important;
                 transform: translateX(-50%) !important;
             }
-            .media-app.media-compact-width .media-main-scroll .fluent-scroll-viewport {
+            .media-app.media-compact-width .media-main {
                 padding-left: 34px !important;
                 padding-right: 30px !important;
             }

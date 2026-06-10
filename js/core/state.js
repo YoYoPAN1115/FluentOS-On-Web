@@ -205,7 +205,7 @@ const State = {
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
-            startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
+            startPinnedApps: ['files', 'settings', 'settingsnew', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
             windowBoundsMemory: {}
@@ -907,7 +907,7 @@ const State = {
             '.start-section-link',
             '.start-footer-btn',
             '.start-power-btn',
-            '.fluent-sidebar-item',
+            '.fw-nav-item',
             '.settings-advanced-entry',
             '.settings-recommend-item',
             '.settings-recent-item',

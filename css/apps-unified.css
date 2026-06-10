@@ -24,28 +24,10 @@ body.window-blur-enabled .window-content {
     -webkit-backface-visibility: hidden;
 }
 
-/* 修复子元素 backdrop-filter 叠加问题 */
-body.window-blur-enabled .window .fluent-sidebar,
-body.window-blur-enabled .window .files-sidebar,
-body.window-blur-enabled .window .settings-sidebar {
-    /* 避免多层 backdrop-filter 叠加导致色块 */
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: rgba(255, 255, 255, 0.3) !important;
-}
-
-body.dark-mode.window-blur-enabled .window .fluent-sidebar,
-body.dark-mode.window-blur-enabled .window .files-sidebar,
-body.dark-mode.window-blur-enabled .window .settings-sidebar {
-    background: rgba(0, 0, 0, 0.2) !important;
-}
-
 /* 设置应用 */
 .settings-app {
     background: transparent !important;
 }
-
-/* 设置侧边栏样式已统一到 fluent-ui.css 的 .fluent-sidebar */
 
 .settings-content {
     background: transparent !important;
@@ -66,19 +48,6 @@ body.dark-mode.window-blur-enabled .window .settings-sidebar {
 /* 文件管理器 */
 .files-app {
     background: transparent !important;
-}
-
-.files-sidebar {
-    background: rgba(255, 255, 255, 0.25) !important;
-    /* 避免叠加 backdrop-filter 导致色块 */
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
-}
-
-.dark-mode .files-sidebar {
-    background: rgba(45, 45, 45, 0.4) !important;
-    border-right-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 .files-content {
@@ -237,11 +206,6 @@ body.window-blur-disabled .window {
     backdrop-filter: none !important;
 }
 
-body.window-blur-disabled .files-sidebar {
-    background: var(--bg-secondary) !important;
-    backdrop-filter: none !important;
-}
-
 body.window-blur-disabled .settings-section,
 body.window-blur-disabled .notes-editor,
 body.window-blur-disabled .browser-address-bar,
@@ -256,74 +220,4 @@ body.window-blur-disabled .browser-header,
 body.window-blur-disabled .files-toolbar {
     background: var(--bg-secondary) !important;
     backdrop-filter: none !important;
-}
-
-/* ============ 设置、文件、App Shop - 自定义滚动条 ============ */
-/* WebKit 滚动条 */
-.settings-app *::-webkit-scrollbar,
-.files-app *::-webkit-scrollbar,
-.appshop *::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-.settings-app *::-webkit-scrollbar-track,
-.files-app *::-webkit-scrollbar-track,
-.appshop *::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.settings-app *::-webkit-scrollbar-thumb,
-.files-app *::-webkit-scrollbar-thumb,
-.appshop *::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 6px;
-    border: 1px solid transparent;
-    background-clip: padding-box;
-    transition: background-color 180ms ease;
-}
-
-.settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
-.files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
-.appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.25);
-}
-
-.dark-mode .settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
-.dark-mode .files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb,
-.dark-mode .appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
-.files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
-.appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.4);
-}
-
-.dark-mode .settings-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
-.dark-mode .files-app .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover,
-.dark-mode .appshop .fluent-scrollbar-active::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.45);
-}
-
-/* Firefox 滚动条 */
-.settings-app *,
-.files-app *,
-.appshop * {
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
-    transition: scrollbar-color 180ms ease;
-}
-
-.settings-app .fluent-scrollbar-active,
-.files-app .fluent-scrollbar-active,
-.appshop .fluent-scrollbar-active {
-    scrollbar-color: rgba(0, 0, 0, 0.35) transparent;
-}
-
-.dark-mode .settings-app .fluent-scrollbar-active,
-.dark-mode .files-app .fluent-scrollbar-active,
-.dark-mode .appshop .fluent-scrollbar-active {
-    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
 }

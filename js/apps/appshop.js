@@ -10,11 +10,11 @@ const UNINSTALLED_DEFAULT_APPS_KEY = 'fluentos.uninstalledDefaultApps';
 const AppShop = {
     windowId: null,
     container: null,
+    frame: null,
     searchQuery: '',
     currentCategory: 'all',
     activePage: 'featured',
     isSearchActive: false,
-    _resizeObserver: null,
     _contentScrollRestoreRaf: null,
     _iconColorCache: new Map(),
     _iconColorPending: new Map(),
@@ -455,116 +455,13 @@ const AppShop = {
         style.textContent = `
             .window[data-app-id="appshop"] .window-content { padding: 0; overflow: hidden; }
             .appshop.appshop-v2 {
-                display: grid;
-                grid-template-columns: var(--system-sidebar-width, 200px) minmax(0, 1fr);
+                display: block;
                 width: 100%;
                 height: 100%;
                 min-height: 0;
-                container-type: inline-size;
-                --system-sidebar-width: clamp(68px, 24cqw, 232px);
-                --system-sidebar-ease: cubic-bezier(0.16, 1, 0.3, 1);
                 background: transparent !important;
                 color: var(--text-primary);
                 overflow: hidden;
-            }
-            .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
-                width: var(--system-sidebar-width, 200px) !important;
-                min-width: var(--system-sidebar-width, 200px) !important;
-                flex: none !important;
-                min-height: 0;
-                overflow-x: hidden !important;
-                transition:
-                    width 430ms var(--system-sidebar-ease),
-                    min-width 430ms var(--system-sidebar-ease),
-                    flex-basis 430ms var(--system-sidebar-ease),
-                    padding 430ms var(--system-sidebar-ease),
-                    margin 430ms var(--system-sidebar-ease),
-                    border-radius 430ms var(--system-sidebar-ease),
-                    background 260ms var(--system-sidebar-ease) !important;
-            }
-            .appshop.appshop-v2.appshop-compact {
-                --system-sidebar-width: 68px;
-            }
-            .appshop.appshop-v2:not(.appshop-compact) .appshop-nav-btn {
-                justify-content: flex-start !important;
-                text-align: left !important;
-            }
-            .appshop.appshop-v2.appshop-compact > .fluent-sidebar.appshop-sidebar {
-                width: 68px !important;
-                min-width: 68px !important;
-                flex-basis: auto !important;
-                padding: 10px 6px !important;
-                margin: 8px 0 8px 8px !important;
-                border-radius: 12px !important;
-            }
-            .appshop.appshop-v2.appshop-compact .fluent-sidebar-header {
-                opacity: 0 !important;
-                max-height: 0 !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: hidden !important;
-                pointer-events: none !important;
-                transform: translateX(-8px) scale(0.96) !important;
-            }
-            .appshop.appshop-v2.appshop-compact .fluent-sidebar-item-label {
-                opacity: 0 !important;
-                max-width: 0 !important;
-                margin: 0 !important;
-                overflow: hidden !important;
-                transform: translateX(-8px) scale(0.96) !important;
-                pointer-events: none !important;
-            }
-            .appshop.appshop-v2.appshop-compact .appshop-nav-btn {
-                height: 44px !important;
-                min-height: 44px !important;
-                justify-content: center !important;
-                align-items: center !important;
-                gap: 0 !important;
-                padding-left: 0 !important;
-                padding-right: 0 !important;
-                font-size: 0 !important;
-            }
-            .appshop.appshop-v2.appshop-compact .appshop-nav-btn img {
-                margin: 0 !important;
-                flex: 0 0 auto !important;
-            }
-            .appshop.appshop-v2 .fluent-sidebar-header {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-bottom: 16px;
-            }
-            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-header,
-            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-header span,
-            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item,
-            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item-label {
-                color: #fff !important;
-            }
-            body.dark-mode .appshop.appshop-v2 .fluent-sidebar-item img {
-                filter: brightness(0) invert(1) !important;
-            }
-            .appshop.appshop-v2 .fluent-sidebar-header img {
-                width: 30px;
-                height: 30px;
-                border-radius: 8px;
-            }
-            .appshop.appshop-v2 .appshop-nav-btn {
-                border: 0;
-                appearance: none;
-                font-weight: 400 !important;
-                width: 100%;
-                text-align: left;
-                justify-content: flex-start;
-                color: var(--text-primary);
-            }
-            .appshop.appshop-v2 .appshop-nav-btn img {
-                width: 16px;
-                height: 16px;
-            }
-            .appshop.appshop-v2 .appshop-nav-btn .fluent-sidebar-item-label {
-                flex: 0 1 auto;
-                text-align: left;
-                font-weight: 400 !important;
             }
             .appshop-main {
                 min-width: 0;
@@ -1209,61 +1106,11 @@ const AppShop = {
                 border-color: rgba(0,0,0,0.2);
             }
             @container (max-width: 760px) {
-                .appshop.appshop-v2 {
-                    --system-sidebar-width: 68px;
-                }
-                .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
-                    width: 68px !important;
-                    min-width: 68px !important;
-                    flex-basis: auto !important;
-                    padding: 10px 6px !important;
-                    margin: 8px 0 8px 8px !important;
-                    border-radius: 12px !important;
-                }
-                .appshop.appshop-v2 .fluent-sidebar-header span,
-                .appshop.appshop-v2 .fluent-sidebar-item-label {
-                    opacity: 0 !important;
-                    max-width: 0 !important;
-                    margin: 0 !important;
-                    overflow: hidden !important;
-                    transform: translateX(-8px) scale(0.96) !important;
-                    pointer-events: none !important;
-                }
-                .appshop.appshop-v2 .fluent-sidebar-header {
-                    opacity: 0 !important;
-                    max-height: 0 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    overflow: hidden !important;
-                    pointer-events: none !important;
-                    transform: translateX(-8px) scale(0.96) !important;
-                }
-                .appshop.appshop-v2 .appshop-nav-btn {
-                    height: 44px !important;
-                    min-height: 44px !important;
-                    justify-content: center !important;
-                    align-items: center !important;
-                    gap: 0 !important;
-                    padding-left: 0 !important;
-                    padding-right: 0 !important;
-                    font-size: 0 !important;
-                }
-                .appshop.appshop-v2 .appshop-nav-btn img {
-                    margin: 0 !important;
-                    flex: 0 0 auto !important;
-                }
                 .appshop-today-grid,
                 .appshop-editorial-grid,
                 .appshop-category-strip,
                 .appshop-discover-grid { grid-template-columns: 1fr; }
                 .appshop-main { padding: 20px; min-width: 0; }
-            }
-            @media (max-width: 760px) {
-                .appshop.appshop-v2 > .fluent-sidebar.appshop-sidebar {
-                    width: 68px !important;
-                    min-width: 68px !important;
-                    flex-basis: auto !important;
-                }
             }
         `;
         document.head.appendChild(style);
@@ -1829,39 +1676,11 @@ const AppShop = {
     },
 
     renderShell(content) {
-        const nav = this.getNavItems();
         return `
-            <div class="appshop appshop-v2">
-                <aside class="fluent-sidebar appshop-sidebar">
-                    ${nav.map(item => `
-                        <button class="fluent-sidebar-item appshop-nav-btn ${this.activePage === item.id ? 'active' : ''}" data-page="${item.id}" type="button">
-                            <img src="Theme/Icon/Symbol_icon/stroke/${item.icon}.svg" class="fluent-sidebar-item-icon" alt="">
-                            <span class="fluent-sidebar-item-label">${item.label}</span>
-                        </button>
-                    `).join('')}
-                </aside>
+            <div class="appshop appshop-v2 appshop-fw-app">
                 <main class="appshop-main">${content}</main>
             </div>
         `;
-    },
-
-    updateResponsiveState() {
-        const shell = this.container?.querySelector('.appshop.appshop-v2');
-        if (!shell) return;
-        shell.classList.toggle('appshop-compact', shell.clientWidth <= 760);
-    },
-
-    bindResizeObserver() {
-        if (!this.container || typeof ResizeObserver === 'undefined') {
-            this.updateResponsiveState();
-            return;
-        }
-        if (this._resizeObserver) {
-            this._resizeObserver.disconnect();
-        }
-        this._resizeObserver = new ResizeObserver(() => this.updateResponsiveState());
-        this._resizeObserver.observe(this.container);
-        this.updateResponsiveState();
     },
 
     getActionLabel(app) {
@@ -2060,6 +1879,20 @@ const AppShop = {
         State.on('settingsChange', () => this.render({ preserveScroll: true }));
     },
 
+    beforeClose() {
+        if (this._contentScrollRestoreRaf) {
+            cancelAnimationFrame(this._contentScrollRestoreRaf);
+            this._contentScrollRestoreRaf = null;
+        }
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+        this.container = null;
+        this.windowId = null;
+        return true;
+    },
+
     render(options = {}) {
         const preserveScroll = options.preserveScroll === true;
         const shouldFocusSearch = options.focusSearch === true;
@@ -2073,11 +1906,39 @@ const AppShop = {
             all: () => this.renderAllAppsPage(),
             purchased: () => this.renderPurchasedPage()
         };
-        const pageContent = (pages[this.activePage] || pages.featured)();
-        this.container.innerHTML = this.renderShell(pageContent);
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
 
-        this.bindEvents();
-        this.bindResizeObserver();
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[AppShop] FluentWindow framework is not loaded');
+            return;
+        }
+
+        const renderPage = (pageId, pageEl) => {
+            const nextPage = pageId || 'featured';
+            if (nextPage !== this.activePage) {
+                this.activePage = nextPage;
+                this.isSearchActive = false;
+                if (nextPage === 'search') {
+                    this.currentCategory = 'all';
+                } else {
+                    this.searchQuery = '';
+                }
+            }
+            pageEl.classList.add('appshop-fw-page');
+            const pageContent = (pages[this.activePage] || pages.featured)();
+            pageEl.innerHTML = this.renderShell(pageContent);
+            this.bindEvents();
+        };
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
+            items: this.getNavItems(),
+            activeId: this.activePage,
+            onNavigate: renderPage
+        });
 
         if (preserveScroll && previousScrollTop > 0) {
             if (this._contentScrollRestoreRaf) {
@@ -2112,20 +1973,6 @@ const AppShop = {
     },
 
     bindEvents() {
-        this.container.querySelectorAll('.appshop-nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const nextPage = btn.dataset.page || 'featured';
-                this.activePage = nextPage;
-                this.isSearchActive = false;
-                if (nextPage === 'search') {
-                    this.currentCategory = 'all';
-                } else {
-                    this.searchQuery = '';
-                }
-                this.render();
-            });
-        });
-
         const searchInput = this.container.querySelector('.appshop-search-input');
         if (searchInput) {
             let debounceTimer;

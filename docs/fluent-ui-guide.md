@@ -66,39 +66,20 @@ FluentUI.TabBar({
 });
 ```
 
-### 4. Sidebar 侧边栏
+### 4. FluentWindow 应用窗口导航
 
 ```javascript
-FluentUI.Sidebar({
-    header: '导航',
-    sections: [
-        {
-            title: '快速访问',
-            items: [
-                { id: 'home', label: '首页', icon: 'Home' },
-                { id: 'docs', label: '文档', icon: 'File' }
-            ]
-        },
-        {
-            title: '设置',
-            items: [
-                { id: 'settings', label: '设置', icon: 'Settings' }
-            ]
-        }
-    ],
-    activeItem: 'home',
-    width: '200px',
-    onItemClick: (itemId, item) => console.log('点击', itemId)
-});
-
-// 或使用扁平结构
-FluentUI.Sidebar({
+FluentWindow.mount({
+    container: document.getElementById(`${windowId}-content`),
     items: [
         { id: 'home', label: '首页', icon: 'Home' },
+        { id: 'docs', label: '文档', icon: 'File' },
         { id: 'settings', label: '设置', icon: 'Settings' }
     ],
-    activeItem: 'home',
-    onItemClick: (itemId) => {}
+    activeId: 'home',
+    onNavigate: (pageId, pageEl) => {
+        pageEl.textContent = `当前页面: ${pageId}`;
+    }
 });
 ```
 
@@ -361,30 +342,24 @@ FluentUI.Empty({
 
 ## 在应用中使用示例
 
-### 设置应用侧边栏
+### 设置应用窗口导航
 
 ```javascript
 render() {
-    const sidebar = FluentUI.Sidebar({
-        sections: [
-            {
-                title: '设置',
-                items: [
-                    { id: 'personalization', label: t('settings.personalization'), icon: 'Color Picker' },
-                    { id: 'system', label: t('settings.system'), icon: 'Settings' },
-                    { id: 'about', label: t('settings.about'), icon: 'Information Circle' }
-                ]
-            }
+    this.frame = FluentWindow.mount({
+        container: this.container,
+        items: [
+            { id: 'personalization', label: t('settings.personalization'), icon: 'Color Picker' },
+            { id: 'system', label: t('settings.system'), icon: 'Settings' },
+            { id: 'about', label: t('settings.about'), icon: 'Information Circle' }
         ],
-        activeItem: this.currentPage,
-        onItemClick: (pageId) => {
+        activeId: this.currentPage,
+        preserveScrollPositions: true,
+        onNavigate: (pageId, pageEl) => {
             this.currentPage = pageId;
-            this.render();
+            pageEl.textContent = pageId;
         }
     });
-    
-    this.container.innerHTML = '';
-    this.container.appendChild(sidebar);
 }
 ```
 
