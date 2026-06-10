@@ -632,12 +632,22 @@ body.animations-enabled .login-card.show {
     transform: translateY(-50%);
     width: 24px;
     height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 0;
+    line-height: 0;
+    overflow: hidden;
 }
 
 .pin-toggle img {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    display: block;
 }
 
 .login-error {
@@ -722,6 +732,8 @@ body.animations-enabled .login-card.show {
     padding: 10px;
     overflow-x: auto; /* 当列数过多时可以横向滚动 */
     overflow-y: hidden;
+    /* 容器本身不拦截鼠标事件，让下层的小组件可以交互；图标自身恢复事件 */
+    pointer-events: none;
 }
 
 .desktop-icon {
@@ -736,6 +748,7 @@ body.animations-enabled .login-card.show {
     cursor: pointer;
     transition: background var(--transition-fast);
     position: relative;
+    pointer-events: auto; /* 容器已关闭事件，图标自身恢复 */
 }
 
 .desktop-icon:hover {

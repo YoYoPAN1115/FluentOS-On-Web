@@ -370,6 +370,7 @@ const Desktop = {
                 e.target.closest('.control-center') ||
                 e.target.closest('.notification-center') ||
                 e.target.closest('#fingo-panel') ||
+                e.target.closest('.widgets-layer') ||
                 e.target.closest('.desktop-icon')) {
                 return;
             }
@@ -483,6 +484,7 @@ const Desktop = {
                 e.target.closest('.control-center') ||
                 e.target.closest('.notification-center') ||
                 e.target.closest('#fingo-panel') ||
+                e.target.closest('.widgets-layer') ||
                 e.target.closest('.desktop-icon')) {
                 return; // 不阻止默认行为，让其他元素处理
             }
@@ -697,6 +699,10 @@ const Desktop = {
                     <span>${selectLabel}</span>
                 </div>
                 <div class="context-menu-separator"></div>
+                <div class="context-menu-item" data-action="add-widget">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Dashboard Plus.svg" alt="">
+                    <span>${t('desktop.menu.add-widget')}</span>
+                </div>
                 <div class="context-menu-item" data-action="personalize">
                     <img src="Theme/Icon/Symbol_icon/stroke/Color Picker.svg" alt="">
                     <span>${t('desktop.menu.personalize')}</span>
@@ -785,6 +791,11 @@ const Desktop = {
                 break;
             case 'personalize':
                 this.openApp('settings');
+                break;
+            case 'add-widget':
+                if (typeof Widgets !== 'undefined') {
+                    Widgets.open();
+                }
                 break;
             case 'rename': {
                 const id = this.contextTargetId;

@@ -19,6 +19,8 @@ const LockScreen = {
         // 绑定事件
         this.element.addEventListener('click', () => this.unlock());
         document.addEventListener('keydown', (e) => {
+            // 在锁屏小组件（如搜索框）内输入时不触发解锁
+            if (e.target && e.target.closest && e.target.closest('.fluent-widget')) return;
             if (State.view === 'lock') {
                 this.unlock();
             }
@@ -71,6 +73,8 @@ const LockScreen = {
     },
 
     unlock() {
+        // 编辑锁屏小组件时，点击锁屏不触发解锁流程
+        if (typeof Widgets !== 'undefined' && Widgets.lockEditMode) return;
         State.setView('login');
     }
 };

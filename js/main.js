@@ -217,6 +217,7 @@ function initModules() {
     NotificationCenter.init();
     WindowManager.init();
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
+    if (typeof Widgets !== 'undefined') { Widgets.init(); }
     Fingo.init();
     initGlobalShortcuts();
     initGlobalFileDragOverlay();
