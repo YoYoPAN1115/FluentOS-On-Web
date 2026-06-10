@@ -195,9 +195,16 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
     display: flex;
     flex-direction: column;
     gap: 9px;
+    /* 导航列表可上下滚动（滚动条由全局样式隐藏，始终不可见） */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .fw-nav-footer {
+    flex: 0 0 auto;
+    overflow: visible;
     margin-top: auto;
     padding-top: 6px;
 }
@@ -209,6 +216,7 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
     align-items: center;
     gap: 12px;
     width: 100%;
+    flex-shrink: 0;
     height: 40px;
     padding: 0 10px;
     border: none;
@@ -227,10 +235,11 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
     background: var(--fw-nav-hover);
 }
 
-/* 选中态：小背景半透明卡片 + 左侧强调条 */
+/* 选中态：小背景半透明卡片 + 左侧强调条
+   文字/图标颜色随主题色明度自适应：浅色主题色→黑，深色主题色→白 */
 .fw-nav-item.active {
     background: var(--fw-nav-active-bg);
-    color: var(--fw-accent);
+    color: var(--accent-contrast, #ffffff);
     font-weight: 600;
     box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.48);
 }
@@ -284,8 +293,15 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
     mask: var(--fw-icon-url) center / contain no-repeat;
 }
 
-.fw-nav-item.active .fw-nav-icon-symbol {
-    opacity: 1;
+/* 选中态：图标颜色与文字强制统一（始终跟随 --accent-contrast 的黑/白规则）。
+   图标源 SVG 为黑色描边，通过 filter 强制压为纯黑或纯白，
+   不再使用 currentColor 蒙版叠层，避免双重渲染导致颜色不一致。 */
+.fw-nav-item.active .fw-nav-icon-img {
+    filter: brightness(0);
+}
+
+body.accent-deep .fw-nav-item.active .fw-nav-icon-img {
+    filter: brightness(0) invert(1);
 }
 
 .fw-nav-label {

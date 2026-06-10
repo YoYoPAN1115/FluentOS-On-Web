@@ -56,7 +56,8 @@
 
 /* 深色模式下所有Symbol图标变白色 */
 .dark-mode img[src*="Symbol_icon/stroke/"],
-.dark-mode img[src*="Symbol_icon/fill/"] {
+.dark-mode img[src*="Symbol_icon/fill/"],
+.dark-mode img[src*="Symbol_icon/weather/"] {
     filter: brightness(0) invert(1);
 }
 

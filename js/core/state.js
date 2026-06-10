@@ -671,13 +671,22 @@ const State = {
         const { r, g, b } = this.hexToRgb(accent);
         const targets = [document.documentElement, document.body].filter(Boolean);
 
+        // 根据主题色明度计算前景对比色：浅色主题色→黑字，深色主题色→白字
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        const contrastFg = luminance > 0.6 ? '#1b1b1b' : '#ffffff';
+
         targets.forEach((target) => {
             target.style.setProperty('--accent', accent);
             target.style.setProperty('--accent-raw', rawAccent);
             target.style.setProperty('--accent-hover', hover);
             target.style.setProperty('--accent-rgb', `${r}, ${g}, ${b}`);
             target.style.setProperty('--accent-soft', `rgba(${r}, ${g}, ${b}, 0.16)`);
+            target.style.setProperty('--accent-contrast', contrastFg);
         });
+        // accent-deep：主题色较深（前景应为白色）
+        if (document.body) {
+            document.body.classList.toggle('accent-deep', contrastFg === '#ffffff');
+        }
     },
 
     async updateAccentFromWallpaper(wallpaper) {

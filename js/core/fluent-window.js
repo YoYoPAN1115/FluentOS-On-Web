@@ -87,6 +87,8 @@ const FluentWindow = {
             'audio',
             '.fw-scrollbar-rail',
             '.fw-scrollbar-thumb',
+            '.fw-nav',
+            '.widgets-sidebar',
             '.fluent-scroll-area',
             '.fluent-scroll-area *',
             '.pwa-app',

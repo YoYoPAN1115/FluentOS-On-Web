@@ -325,10 +325,19 @@ body:not(.animations-enabled) #widgets-drawer {
     background: var(--bg-tertiary);
 }
 
+/* 选中态：文字/图标颜色随主题色明度自适应（浅色主题色→黑，深色主题色→白） */
 .widgets-sidebar-item.active {
-    background: var(--accent-soft, rgba(0, 120, 212, 0.12));
-    color: var(--accent);
+    background: rgba(var(--accent-rgb, 0, 120, 212), 0.4);
+    color: var(--accent-contrast, #ffffff);
     font-weight: 600;
+}
+
+body:not(.accent-deep) .widgets-sidebar-item.active img {
+    filter: none;
+}
+
+body.accent-deep .widgets-sidebar-item.active img {
+    filter: invert(1);
 }
 
 .widgets-page {
