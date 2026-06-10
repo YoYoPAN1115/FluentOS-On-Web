@@ -459,6 +459,7 @@ const WindowManager = {
         windowData.isMinimizing = false;
         windowData.isRestoring = false;
         this.updateMaximizedWallpaperEffect();
+        this._syncWidgetDimState();
         this._syncAllTaskbarAppStates();
         this._setTaskbarIndicatorForWindow(windowData, false);
     },
@@ -479,6 +480,7 @@ const WindowManager = {
         windowData.isMinimizing = false;
         this._setTaskbarIndicatorForWindow(windowData, true);
         this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
     },
 
     _startMinimizeAnimation(windowData, fromInterruptedRestore = false) {
@@ -529,6 +531,8 @@ const WindowManager = {
 
         const minimizeEase = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
         const opacityDuration = Math.round(duration * 0.56);
+        // 小组件恢复正常的过渡与最小化动画同时启动、同节奏
+        this._syncWidgetDimState(duration, minimizeEase);
         el.style.transition = `transform ${duration}ms ${minimizeEase}, opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
         this._startTaskbarIndicatorMotion(windowData, 'minimizing', duration, minimizeEase);
         this._setTaskbarIndicatorForWindow(windowData, false);
@@ -597,6 +601,8 @@ const WindowManager = {
 
         const restoreEase = 'cubic-bezier(0.16, 1, 0.3, 1)';
         const opacityDuration = Math.round(duration * 0.68);
+        // 小组件退避的过渡与恢复动画同时启动、同节奏
+        this._syncWidgetDimState(duration, restoreEase);
         el.style.transition = `transform ${duration}ms ${restoreEase}, opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
         this._startTaskbarIndicatorMotion(windowData, 'restoring', duration, restoreEase);
         requestAnimationFrame(() => {
@@ -1054,6 +1060,8 @@ const WindowManager = {
         
         State.addRunningApp(appId);
         this._syncTaskbarAppState(appId);
+        // 小组件退避过渡与窗口打开动画（250ms）同步
+        this._syncWidgetDimState(this._effectiveDuration(250), 'cubic-bezier(0.4, 0, 0.2, 1)');
 
         
         if (config.component && globalThis[config.component]) {
@@ -1533,11 +1541,13 @@ const WindowManager = {
 
         if (windowData.isMinimizing) {
             this._startRestoreAnimation(windowData, true);
+            this._syncWidgetDimState();
             return;
         }
 
         if (windowData.isMinimized) {
             this._startRestoreAnimation(windowData, false);
+            this._syncWidgetDimState();
             return;
         }
 
@@ -1545,6 +1555,7 @@ const WindowManager = {
         windowData.element.style.zIndex = ++this.zIndexCounter;
         this._setActiveWindow(windowId);
         this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
         this._setTaskbarIndicatorForWindow(windowData, true);
 
         if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
@@ -1556,6 +1567,7 @@ const WindowManager = {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData || windowData.isMinimized || windowData.isMinimizing) return;
         this._startMinimizeAnimation(windowData, windowData.isRestoring);
+        this._syncWidgetDimState();
     },
 
     toggleWindow(appId) {
@@ -1649,6 +1661,29 @@ const WindowManager = {
         }
     },
     
+    /**
+     * 同步「前台是否有可见窗口」的 body 状态类。
+     * 桌面小组件据此切换为半透明磨砂 + 灰字的退避样式。
+     *
+     * 可选传入 durationMs / ease：把小组件退避过渡的时长与缓动
+     * 写入 CSS 变量，使其与触发它的窗口动画（打开 / 关闭 /
+     * 最小化 / 恢复）实时同步。
+     */
+    _syncWidgetDimState(durationMs, ease) {
+        const hasForeground = this.windows.some(w =>
+            !w.isMinimized &&
+            !w.isMinimizing &&
+            w.element &&
+            !w.element.classList.contains('closing') &&
+            w.element.style.display !== 'none'
+        );
+        if (typeof durationMs === 'number') {
+            document.body.style.setProperty('--widget-dim-duration', `${Math.max(0, durationMs)}ms`);
+            document.body.style.setProperty('--widget-dim-ease', ease || 'ease');
+        }
+        document.body.classList.toggle('has-foreground-window', hasForeground);
+    },
+
     // 更新最大化窗口的壁纸效果 - Update wallpaper effect for maximized windows
     updateMaximizedWallpaperEffect() {
         const hasMaximized = this.windows.some(w =>
@@ -1661,6 +1696,7 @@ const WindowManager = {
         );
         const taskbar = this._getTaskbarElement();
         this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
         
         if (hasMaximized) {
             this._setFullscreenUnmaximizeSync(false);
@@ -1708,6 +1744,8 @@ const WindowManager = {
             windowData.element.style.opacity = '';
             windowData.element.classList.add('closing');
             this._setFullscreenCloseSync(shouldSyncFullscreenClose && closeDuration > 0, closeDuration);
+            // 小组件恢复正常的过渡与窗口关闭动画（250ms）同步
+            this._syncWidgetDimState(closeDuration, 'cubic-bezier(0.4, 0, 1, 1)');
             // Start wallpaper/taskbar transition together with the close motion.
             this.updateMaximizedWallpaperEffect();
             setTimeout(() => {

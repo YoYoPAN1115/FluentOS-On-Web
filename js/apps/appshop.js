@@ -2157,6 +2157,11 @@ const AppShop = {
             }
         }
 
+        // 清理桌面上的应用快捷方式
+        if (typeof Desktop !== 'undefined' && typeof Desktop.removeAppShortcut === 'function') {
+            Desktop.removeAppShortcut(appId);
+        }
+
         // 刷新开始菜单
         const startPinnedApps = State.settings.startPinnedApps || [];
         if (startPinnedApps.includes(appId)) {

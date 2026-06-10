@@ -274,6 +274,37 @@ body:not(.animations-enabled) #widgets-drawer {
     transform: scale(0.96);
 }
 
+/* —— 收起后悬浮在任务栏正上方的「展开抽屉 / 完成」按钮组 —— */
+#widgets-collapsed-bar {
+    position: fixed;
+    bottom: 88px;
+    left: 50%;
+    transform: translate(-50%, 18px);
+    z-index: 10500;
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    box-shadow: var(--shadow-xl);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#widgets-collapsed-bar.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}
+
+body:not(.animations-enabled) #widgets-collapsed-bar {
+    transition: none;
+}
+
 .widgets-btn-primary {
     background: var(--accent);
     border-color: transparent;
@@ -633,9 +664,9 @@ body.animations-enabled .widget-drop-indicator {
     color: #fff;
 }
 
-.fluent-widget-body.w-boxoffice {
-    background: linear-gradient(160deg, rgba(40, 30, 18, 0.94), rgba(92, 64, 28, 0.9));
-    color: #ffe9c2;
+.fluent-widget-body.w-answer-theme {
+    background: linear-gradient(160deg, rgba(30, 24, 64, 0.95), rgba(78, 46, 130, 0.9));
+    color: #f0eaff;
 }
 
 .fluent-widget-body.w-word-theme {
@@ -1105,8 +1136,7 @@ body.animations-enabled .widget-drop-indicator {
     min-height: 0;
 }
 
-.w-news-row,
-.w-movie-row {
+.w-news-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1117,8 +1147,7 @@ body.animations-enabled .widget-drop-indicator {
     min-width: 0;
 }
 
-.w-news-row:hover,
-.w-movie-row:hover {
+.w-news-row:hover {
     background: rgba(128, 128, 128, 0.15);
 }
 
@@ -1139,8 +1168,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-news-rank.r2 { background: #ff7d2f; color: #fff; }
 .w-news-rank.r3 { background: #ffac38; color: #fff; }
 
-.w-news-title,
-.w-movie-name {
+.w-news-title {
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -1148,19 +1176,108 @@ body.animations-enabled .widget-drop-indicator {
     white-space: nowrap;
 }
 
-.w-news-hot,
-.w-movie-box,
-.w-movie-rate {
+.w-news-hot {
     flex-shrink: 0;
     font-size: 11px;
     opacity: 0.75;
     font-variant-numeric: tabular-nums;
 }
 
-.w-movie-box {
-    font-weight: 600;
-    opacity: 0.95;
+/* —— 答案之书 —— */
+.w-answer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
 }
+
+.w-answer-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+}
+
+.w-answer-tag img {
+    width: 14px;
+    height: 14px;
+    filter: invert(1) !important;
+}
+
+.w-answer-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 0 8px;
+    opacity: 0.8;
+    overflow: hidden;
+}
+
+/* 答案揭晓：丝滑浮现 */
+.w-answer-display.w-answer-reveal {
+    font-size: 16px;
+    font-weight: 600;
+    opacity: 1;
+    animation: w-answer-in 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes w-answer-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); filter: blur(4px); }
+    to { opacity: 1; transform: none; filter: none; }
+}
+
+.w-answer-bar {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.w-answer-bar input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 12px;
+    outline: none;
+}
+
+.w-answer-bar input::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.w-answer-bar input:focus {
+    border-color: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.w-answer-bar button {
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.w-answer-bar button:hover { background: rgba(255, 255, 255, 0.34); }
+.w-answer-bar button:active { transform: scale(0.95); }
 
 /* —— 农历 —— */
 .w-lunar {
@@ -1498,17 +1615,18 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-list-sub,
 .w-size-l .w-list-sub { font-size: 12px; }
 .w-size-m .w-news-row,
-.w-size-l .w-news-row,
-.w-size-m .w-movie-row,
-.w-size-l .w-movie-row { font-size: 13.5px; padding: 3px 5px; }
+.w-size-l .w-news-row { font-size: 13.5px; padding: 3px 5px; }
 .w-size-m .w-news-rank,
 .w-size-l .w-news-rank { width: 20px; height: 20px; font-size: 11px; }
 .w-size-m .w-news-hot,
-.w-size-l .w-news-hot,
-.w-size-m .w-movie-box,
-.w-size-l .w-movie-box,
-.w-size-m .w-movie-rate,
-.w-size-l .w-movie-rate { font-size: 12.5px; }
+.w-size-l .w-news-hot { font-size: 12.5px; }
+
+/* 答案之书（中尺寸） */
+.w-size-m .w-answer-tag { font-size: 12px; }
+.w-size-m .w-answer-display { font-size: 15px; }
+.w-size-m .w-answer-display.w-answer-reveal { font-size: 17px; }
+.w-size-m .w-answer-bar input,
+.w-size-m .w-answer-bar button { height: 32px; font-size: 13px; }
 .w-size-m .w-list-body,
 .w-size-l .w-list-body { gap: 4px; }
 
@@ -1562,3 +1680,330 @@ body.animations-enabled .widget-drop-indicator {
 /* 加载 / 空状态 */
 .w-size-m .w-loading,
 .w-size-l .w-loading { font-size: 13.5px; }
+
+/* —— 多媒体 —— */
+.fluent-widget-body.w-media-theme {
+    padding: 0;
+    color: #fff;
+    overflow: hidden;
+}
+
+/* 中尺寸：卡片背景取自封面主题色（浅色模式更亮、深色模式更暗） */
+.fluent-widget-body.w-media-theme.w-media-medium {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--w-media-c1, #8e8cf0) 58%, #ffffff) 0%,
+        color-mix(in srgb, var(--w-media-c2, #5856d6) 74%, #ffffff) 100%);
+    color: #1c1c1e;
+}
+
+body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--w-media-c1, #8e8cf0) 60%, #000000) 0%,
+        color-mix(in srgb, var(--w-media-c2, #5856d6) 42%, #000000) 100%);
+    color: #ffffff;
+}
+
+.w-media {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* 右上角的音乐角标 */
+.w-media-note {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 16px;
+    height: 16px;
+    background: #fa2d48;
+    -webkit-mask: url('../Theme/Icon/Symbol_icon/stroke/Music.svg') center / contain no-repeat;
+    mask: url('../Theme/Icon/Symbol_icon/stroke/Music.svg') center / contain no-repeat;
+    pointer-events: none;
+}
+
+/* 封面 */
+.w-media-cover-full {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+.w-media-cover-box {
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+
+.w-media-cover-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.w-media-cover-fallback img {
+    width: 38%;
+    height: 38%;
+    opacity: 0.9;
+    filter: invert(1) !important;
+}
+
+/* 小尺寸：底部信息可读性渐变 */
+.w-media-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 38%, rgba(0, 0, 0, 0.58) 100%);
+    pointer-events: none;
+}
+
+.w-media-s .w-media-overlay {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.w-media-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.w-media-artist {
+    font-size: 11px;
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.w-media-s .w-media-title,
+.w-media-s .w-media-artist {
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* 播放按钮：胶囊 + 周围羽化虚化（径向蒙版的 backdrop-filter） */
+.w-media-play {
+    position: relative;
+    z-index: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    align-self: flex-start;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.w-media-play::before {
+    content: '';
+    position: absolute;
+    inset: -10px -16px;
+    z-index: -1;
+    border-radius: 999px;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    -webkit-mask: radial-gradient(closest-side, #000 52%, transparent 100%);
+    mask: radial-gradient(closest-side, #000 52%, transparent 100%);
+    pointer-events: none;
+}
+
+.w-media-play:hover { background: rgba(255, 255, 255, 0.32); }
+.w-media-play:active { transform: scale(0.96); }
+
+.w-media-play img {
+    width: 14px;
+    height: 14px;
+    filter: invert(1) !important;
+}
+
+/* 中尺寸布局 */
+.w-media-m {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px;
+    box-sizing: border-box;
+}
+
+.w-media-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-right: 20px;
+}
+
+.w-media-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fa2d48;
+}
+
+.w-media-m .w-media-title { font-size: 16px; }
+.w-media-m .w-media-artist { font-size: 12.5px; }
+
+/* 中尺寸按钮：浅色模式下用深色半透明底、黑字黑图标 */
+body:not(.dark-mode) .w-media-m .w-media-play {
+    background: rgba(0, 0, 0, 0.12);
+    color: #1c1c1e;
+}
+
+body:not(.dark-mode) .w-media-m .w-media-play:hover { background: rgba(0, 0, 0, 0.2); }
+
+body:not(.dark-mode) .w-media-m .w-media-play img { filter: none !important; }
+
+/* 空状态 */
+.w-media-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #5856d6 0%, #b06ee8 100%);
+}
+
+.w-media-empty-icon {
+    width: 28px;
+    height: 28px;
+    opacity: 0.92;
+    filter: invert(1) !important;
+}
+
+.w-media-empty-text {
+    font-size: 12px;
+    color: #fff;
+    opacity: 0.88;
+}
+
+/* ==========================================================
+   10. 前台有窗口时，桌面小组件退避（半透明磨砂 + 灰字）
+   body.has-foreground-window 由 WindowManager 维护：
+   存在未最小化窗口时添加，全部关闭/最小化后移除。
+   ========================================================== */
+
+/* 平滑过渡：时长与缓动由 WindowManager._syncWidgetDimState 写入
+   CSS 变量，与触发退避的窗口动画（打开 250ms / 关闭 250ms /
+   最小化 460ms / 恢复 520ms）实时同步、同节奏 */
+#desktop-widgets-layer .fluent-widget-body,
+#desktop-widgets-layer .fluent-widget-body * {
+    transition: color var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease),
+                background var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease),
+                border-color var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease),
+                filter var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease),
+                opacity var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease);
+}
+
+body.has-foreground-window #desktop-widgets-layer .fluent-widget-body {
+    background: var(--bg-tertiary) !important;
+    backdrop-filter: blur(var(--blur-lg)) saturate(120%) !important;
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(120%) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-sm) !important;
+    color: var(--text-tertiary) !important;
+}
+
+/* 文字统一变灰 */
+body.has-foreground-window #desktop-widgets-layer .fluent-widget-body * {
+    color: var(--text-tertiary) !important;
+    text-shadow: none !important;
+}
+
+/* 彩色子元素背景统一中性化 */
+body.has-foreground-window #desktop-widgets-layer .w-cal-item {
+    background: rgba(128, 128, 128, 0.1) !important;
+    border-left-color: var(--text-tertiary) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-news-rank,
+body.has-foreground-window #desktop-widgets-layer .w-search-go,
+body.has-foreground-window #desktop-widgets-layer .w-track-bar button {
+    background: rgba(128, 128, 128, 0.22) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-holiday-row,
+body.has-foreground-window #desktop-widgets-layer .w-lunar-tag,
+body.has-foreground-window #desktop-widgets-layer .w-lunar-festival {
+    background: rgba(128, 128, 128, 0.14) !important;
+    border-color: var(--border-color) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-track-item {
+    border-left-color: var(--border-color) !important;
+}
+
+/* 图标变灰 */
+body.has-foreground-window #desktop-widgets-layer .w-weather-icon,
+body.has-foreground-window #desktop-widgets-layer .w-search-pill img {
+    filter: brightness(0) invert(0.55) !important;
+}
+
+/* 照片小组件：图片整体变灰淡出，露出磨砂底 */
+body.has-foreground-window #desktop-widgets-layer .w-photo {
+    filter: grayscale(1) opacity(0.35);
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-photo-overlay {
+    background: none;
+}
+
+/* 多媒体小组件：封面变灰淡出，角标与按钮中性化 */
+body.has-foreground-window #desktop-widgets-layer .w-media-cover-full,
+body.has-foreground-window #desktop-widgets-layer .w-media-cover-box,
+body.has-foreground-window #desktop-widgets-layer .w-media-empty {
+    filter: grayscale(1) opacity(0.35);
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-shade {
+    background: none;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-note {
+    background: var(--text-tertiary) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-play {
+    background: rgba(128, 128, 128, 0.22) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-play img {
+    filter: brightness(0) invert(0.55) !important;
+}
+
+/* 时钟：表盘与指针变灰 */
+body.has-foreground-window #desktop-widgets-layer .w-clock-face {
+    background: rgba(128, 128, 128, 0.1);
+    border-color: var(--border-color);
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-clock-hand,
+body.has-foreground-window #desktop-widgets-layer .w-clock-pin {
+    background: var(--text-tertiary);
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-clock-tick::before {
+    background: rgba(128, 128, 128, 0.4);
+}

@@ -131,6 +131,7 @@ const Widgets = {
                         <span class="widgets-drawer-tag hidden"></span>
                     </div>
                     <div class="widgets-drawer-actions">
+                        <button class="widgets-btn" id="widgets-collapse-btn"></button>
                         <button class="widgets-btn" id="widgets-lock-btn"></button>
                         <button class="widgets-btn widgets-btn-primary" id="widgets-done-btn"></button>
                     </div>
@@ -152,6 +153,19 @@ const Widgets = {
             }
         });
         wrap.querySelector('#widgets-done-btn').addEventListener('click', () => this.done());
+        wrap.querySelector('#widgets-collapse-btn').addEventListener('click', () => this._collapseDrawer());
+
+        // 收起抽屉后悬浮在任务栏上方的「展开抽屉 / 完成」按钮组
+        const bar = document.createElement('div');
+        bar.id = 'widgets-collapsed-bar';
+        bar.innerHTML = `
+            <button class="widgets-btn" id="widgets-expand-btn"></button>
+            <button class="widgets-btn widgets-btn-primary" id="widgets-collapsed-done-btn"></button>`;
+        document.body.appendChild(bar);
+        this.collapsedBar = bar;
+
+        bar.querySelector('#widgets-expand-btn').addEventListener('click', () => this._expandDrawer());
+        bar.querySelector('#widgets-collapsed-done-btn').addEventListener('click', () => this.done());
 
         this._renderSidebar();
         this.updateTexts();
@@ -378,6 +392,12 @@ const Widgets = {
         this.drawer.querySelector('#widgets-done-btn').textContent = t('widgets.drawer.done');
         this.drawer.querySelector('.widgets-drawer-hint').textContent =
             this.lockEditMode ? t('widgets.drawer.hint-lock') : t('widgets.drawer.hint-desktop');
+
+        this.drawer.querySelector('#widgets-collapse-btn').textContent = t('widgets.drawer.collapse');
+        if (this.collapsedBar) {
+            this.collapsedBar.querySelector('#widgets-expand-btn').textContent = t('widgets.drawer.expand');
+            this.collapsedBar.querySelector('#widgets-collapsed-done-btn').textContent = t('widgets.drawer.done');
+        }
     },
 
     /* ==================== 布局数据（持久化） ==================== */
@@ -454,6 +474,11 @@ const Widgets = {
             if (!def) return;
             layer.appendChild(this._makeWidgetEl(inst, def, m, surface));
         });
+
+        // 桌面图标与小组件共用网格：小组件布局变化后让图标重新避让排布
+        if (surface === 'desktop' && typeof Desktop !== 'undefined' && Desktop.iconsContainer) {
+            Desktop.renderIcons();
+        }
     },
 
     /** 渲染小组件内容（统一入口，real / preview 共用） */
@@ -513,7 +538,7 @@ const Widgets = {
         // 普通模式：点击跳转对应 App（仅桌面；锁屏上点击不触发解锁）
         el.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (this.isOpen) return;
+            if (this.isOpen || this._suppressNavClick) return;
             if (surface !== 'desktop') return;
             if (e.target.closest('input, button, a')) return;
             if (def.onClick) def.onClick(ctx);
@@ -529,10 +554,13 @@ const Widgets = {
             }
         });
 
-        // 编辑模式下可拖动调整位置
+        // 拖动调整位置：编辑模式下全部可拖；桌面上的小组件平时也可随时拖动
         el.addEventListener('pointerdown', (e) => {
-            if (!this.isOpen || e.button !== 0) return;
+            if (e.button !== 0) return;
+            if (!this.isOpen && surface !== 'desktop') return;
             if (e.target.closest('.fluent-widget-remove')) return;
+            // 普通模式下不抢占小组件内部交互（输入框、按钮等）
+            if (!this.isOpen && e.target.closest('input, textarea, select, button, a')) return;
             e.preventDefault();
             e.stopPropagation();
             this._pendingDrag = {
@@ -613,6 +641,8 @@ const Widgets = {
     open() {
         if (this.isOpen) return;
         this.isOpen = true;
+        this.collapsed = false;
+        if (this.collapsedBar) this.collapsedBar.classList.remove('show');
         this._minimizeOpenWindows();
         document.body.classList.add('widgets-edit-mode');
         this.drawerPage = 'home';
@@ -632,11 +662,13 @@ const Widgets = {
     done() {
         if (!this.isOpen) return;
         this.isOpen = false;
+        this.collapsed = false;
         clearTimeout(this._reopenTimer);
         if (this.lockEditMode) {
             this._exitLockEdit();
         }
         this.drawer.classList.remove('open');
+        if (this.collapsedBar) this.collapsedBar.classList.remove('show');
         document.body.classList.remove('widgets-edit-mode');
         // 清空页面内容，停止预览中的定时器
         const page = this.drawer.querySelector('.widgets-page');
@@ -650,12 +682,29 @@ const Widgets = {
         this.drawer.classList.remove('open');
     },
 
-    /** 拖动结束后重新滑入 */
+    /** 拖动结束后重新滑入（用户手动收起抽屉时不自动弹回） */
     _showDrawerAgain(delay = 220) {
         clearTimeout(this._reopenTimer);
         this._reopenTimer = setTimeout(() => {
-            if (this.isOpen) this.drawer.classList.add('open');
+            if (this.isOpen && !this.collapsed) this.drawer.classList.add('open');
         }, delay);
+    },
+
+    /** 「收起抽屉」：暂时收起抽屉，露出被遮挡的小组件以便编辑 */
+    _collapseDrawer() {
+        if (!this.isOpen || this.collapsed) return;
+        this.collapsed = true;
+        clearTimeout(this._reopenTimer);
+        this.drawer.classList.remove('open');
+        if (this.collapsedBar) this.collapsedBar.classList.add('show');
+    },
+
+    /** 「展开抽屉」：重新滑入 */
+    _expandDrawer() {
+        if (!this.isOpen || !this.collapsed) return;
+        this.collapsed = false;
+        if (this.collapsedBar) this.collapsedBar.classList.remove('show');
+        this.drawer.classList.add('open');
     },
 
     /* ==================== 窗口最小化 / 恢复 ==================== */

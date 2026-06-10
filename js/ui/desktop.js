@@ -100,7 +100,9 @@ const Desktop = {
             }
 
             // Internal fluent drag: only treat desktop blank area as move target.
-            if (targetEl?.closest('.desktop-icon')) return;
+            // 正在被拖动的图标自身不算遮挡（允许就近落回）。
+            const hoverIcon = targetEl?.closest('.desktop-icon');
+            if (hoverIcon && !hoverIcon.classList.contains('dragging')) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
         });
@@ -136,8 +138,9 @@ const Desktop = {
                 return;
             }
 
-            // Ignore internal drops onto icon targets.
-            if (targetEl?.closest('.desktop-icon')) return;
+            // Ignore internal drops onto icon targets (the dragged icon itself doesn't count).
+            const dropIcon = targetEl?.closest('.desktop-icon');
+            if (dropIcon && !dropIcon.classList.contains('dragging')) return;
 
             e.preventDefault();
             this.element.classList.remove('drag-over');
@@ -147,14 +150,14 @@ const Desktop = {
             
             try {
                 const data = JSON.parse(fileData);
-                this.handleFileDrop(data);
+                this.handleFileDrop(data, e.clientX, e.clientY);
             } catch (err) {
                 console.error('[Desktop] 拖拽数据解析失败:', err);
             }
         });
     },
     
-    handleFileDrop(data) {
+    handleFileDrop(data, dropX, dropY) {
         const ids = Array.isArray(data?.ids) ? data.ids : [data?.id];
         const dragIds = [...new Set(ids.filter(id => typeof id === 'string' && id))];
         if (dragIds.length === 0) return;
@@ -165,14 +168,19 @@ const Desktop = {
         let movedCount = 0;
         let firstMovedName = '';
         desktop.children = desktop.children || [];
+        const droppedIds = [];
 
         dragIds.forEach((id) => {
             const node = State.findNode(id);
             if (!node) return;
 
-            // 如果已经在桌面，不需要移动
             const parent = State.findParentNode(id);
-            if (!parent || parent.id === 'desktop') return;
+            // 已经在桌面：仅按落点重新摆放
+            if (parent && parent.id === 'desktop') {
+                droppedIds.push(id);
+                return;
+            }
+            if (!parent) return;
 
             // 从原位置移除
             const idx = parent.children ? parent.children.findIndex(c => c.id === id) : -1;
@@ -181,17 +189,52 @@ const Desktop = {
 
             // 添加到桌面
             desktop.children.push(node);
+            droppedIds.push(id);
             movedCount++;
             if (!firstMovedName) firstMovedName = node.name;
         });
 
-        if (movedCount === 0) return;
-        State.updateFS(State.fs);
+        // 按拖放落点把图标吸附到共用网格的格子上
+        if (typeof dropX === 'number' && typeof dropY === 'number' && droppedIds.length > 0) {
+            this._placeIconsAt(droppedIds, dropX, dropY);
+        }
 
-        const message = movedCount === 1
-            ? `已移动 "${firstMovedName}" 到桌面`
-            : `已移动 ${movedCount} 个项目到桌面`;
-        FluentUI.Toast({ title: t('files.desktop'), message, type: 'success' });
+        if (movedCount > 0) {
+            State.updateFS(State.fs); // 触发 fsChange → renderIcons
+            const message = movedCount === 1
+                ? `已移动 "${firstMovedName}" 到桌面`
+                : `已移动 ${movedCount} 个项目到桌面`;
+            FluentUI.Toast({ title: t('files.desktop'), message, type: 'success' });
+        } else if (droppedIds.length > 0) {
+            this.renderIcons();
+        }
+    },
+
+    /** 把一组桌面图标放到落点所在的网格格子上（被占用时吸附到最近空格） */
+    _placeIconsAt(ids, x, y) {
+        const grid = this._desktopGrid();
+        const posMap = this._getIconPosMap();
+        const occupied = new Set(grid.occupied);
+        // 其他图标当前占用的格子（被拖动的除外）
+        if (this._iconCells) {
+            this._iconCells.forEach((cell, id) => {
+                if (!ids.includes(id)) occupied.add(`${cell.col},${cell.row}`);
+            });
+        }
+        const baseCol = Math.min(Math.max(Math.round((x - grid.marginX - grid.cell / 2) / grid.pitch), 0), grid.cols - 1);
+        const baseRow = Math.min(Math.max(Math.round((y - grid.marginTop - grid.cell / 2) / grid.pitch), 0), grid.rows - 1);
+
+        ids.forEach((id, i) => {
+            let cell;
+            if (i === 0 && !occupied.has(`${baseCol},${baseRow}`)) {
+                cell = { col: baseCol, row: baseRow };
+            } else {
+                cell = this._findFreeCell(grid, occupied, baseCol, baseRow);
+            }
+            posMap[id] = cell;
+            occupied.add(`${cell.col},${cell.row}`);
+        });
+        this._saveIconPosMap(posMap);
     },
     
     createSelectionBox() {
@@ -279,6 +322,12 @@ const Desktop = {
 
     // 获取桌面图标（使用彩色图标）
     getDesktopIcon(node) {
+        if (node.type === 'app') {
+            const app = this.apps.find(a => a.id === node.appId);
+            if (app) return app.icon;
+            const cfg = (typeof WindowManager !== 'undefined' && WindowManager.appConfigs) ? WindowManager.appConfigs[node.appId] : null;
+            return (cfg && cfg.icon) || 'Theme/Icon/App_icon/app_error.png';
+        }
         if (node.type === 'folder') {
             return 'Theme/Icon/Symbol_icon/colour/Folder.svg';
         }
@@ -294,30 +343,130 @@ const Desktop = {
         return colourIcons[ext] || 'Theme/Icon/Symbol_icon/fill/File.svg';
     },
 
+    /**
+     * 桌面网格：与小组件共用同一套（Widgets.GRID），
+     * 并标记出被小组件占用的格子，图标布局时避开。
+     */
+    _desktopGrid() {
+        const occupied = new Set();
+        if (typeof Widgets !== 'undefined' && Widgets.layers && Widgets.layers.desktop) {
+            const m = Widgets._metrics('desktop');
+            Widgets.getLayout().desktop.forEach(inst => {
+                const def = Widgets.registry.find(d => d.id === inst.widgetId);
+                if (!def) return;
+                for (let c = inst.col; c < inst.col + def.w; c++) {
+                    for (let r = inst.row; r < inst.row + def.h; r++) {
+                        occupied.add(`${c},${r}`);
+                    }
+                }
+            });
+            return { cols: m.cols, rows: m.rows, pitch: m.pitch, cell: m.cell, marginX: m.marginX, marginTop: m.marginTop, occupied };
+        }
+        // Widgets 尚未初始化时的后备网格（参数与 Widgets.GRID 一致）
+        const cell = 76, gap = 16, pitch = cell + gap, marginX = 28, marginTop = 28, marginBottom = 110;
+        const cols = Math.max(1, Math.floor((window.innerWidth - marginX * 2 + gap) / pitch));
+        const rows = Math.max(1, Math.floor((window.innerHeight - marginTop - marginBottom + gap) / pitch));
+        return { cols, rows, pitch, cell, marginX, marginTop, occupied };
+    },
+
+    /** 用户拖动过的图标位置映射（nodeId → { col, row }），持久化在设置中 */
+    _getIconPosMap() {
+        const map = State.settings && State.settings.desktopIconPos;
+        return (map && typeof map === 'object') ? { ...map } : {};
+    },
+
+    _saveIconPosMap(map) {
+        State.updateSettings({ desktopIconPos: map });
+    },
+
+    /** 在网格中找离 (nearCol, nearRow) 最近的空格；网格已满时溢出到右侧网格外 */
+    _findFreeCell(grid, occupied, nearCol, nearRow) {
+        let best = null;
+        let bestDist = Infinity;
+        for (let c = 0; c < grid.cols; c++) {
+            for (let r = 0; r < grid.rows; r++) {
+                if (occupied.has(`${c},${r}`)) continue;
+                const d = (c - nearCol) * (c - nearCol) + (r - nearRow) * (r - nearRow);
+                if (d < bestDist) { bestDist = d; best = { col: c, row: r }; }
+            }
+        }
+        if (best) return best;
+        let c = grid.cols, r = 0;
+        while (occupied.has(`${c},${r}`)) {
+            r++;
+            if (r >= grid.rows) { r = 0; c++; }
+        }
+        return { col: c, row: r };
+    },
+
     renderIcons() {
         this.iconsContainer.innerHTML = '';
         const desktop = State.findNode('desktop');
         const children = (desktop && desktop.children) ? desktop.children : [];
-        // 6 行一列，超出换到下一列
-        const maxRows = 6;
-        const columnGap = 24;
-        const rowGap = 12;
-        let column = 0;
-        let row = 0;
         this.iconsContainer.style.display = 'block';
         this.iconsContainer.style.position = 'absolute';
         this.iconsContainer.querySelectorAll('.desktop-icon').forEach(e => e.remove());
 
+        // 与小组件共用桌面网格
+        const grid = this._desktopGrid();
+        const ICON_SIZE = 90; // .desktop-icon 的固定尺寸，在格子（pitch）内居中
+        const iconOffset = (grid.cell - ICON_SIZE) / 2;
+        const posMap = this._getIconPosMap();
+        const occupied = new Set(grid.occupied);
+        const cells = new Map(); // nodeId → { col, row }
+        let posChanged = false;
+
+        // 清理已不在桌面上的残留位置记录
+        const childIds = new Set(children.map(n => n.id));
+        Object.keys(posMap).forEach(id => {
+            if (!childIds.has(id)) { delete posMap[id]; posChanged = true; }
+        });
+
+        // 第一遍：用户拖动过的图标使用记忆位置；越界或被小组件占用时挪到最近空格
+        children.forEach(node => {
+            const p = posMap[node.id];
+            if (!p) return;
+            let { col, row } = p;
+            if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows || occupied.has(`${col},${row}`)) {
+                const free = this._findFreeCell(grid, occupied, col, row);
+                col = free.col; row = free.row;
+                posMap[node.id] = { col, row };
+                posChanged = true;
+            }
+            cells.set(node.id, { col, row });
+            occupied.add(`${col},${row}`);
+        });
+
+        // 第二遍：其余图标按「先列后行」流式填充剩余空格
+        let column = 0;
+        let row = 0;
+        const advance = () => {
+            row++;
+            if (row >= grid.rows) { row = 0; column++; }
+        };
+        children.forEach(node => {
+            if (cells.has(node.id)) return;
+            while (occupied.has(`${column},${row}`)) advance();
+            cells.set(node.id, { col: column, row });
+            occupied.add(`${column},${row}`);
+            advance();
+        });
+
+        if (posChanged) this._saveIconPosMap(posMap);
+        this._iconCells = cells;
+
         children.forEach((node, index) => {
+            const cell = cells.get(node.id);
+
             const el = document.createElement('div');
             el.className = 'desktop-icon';
             el.dataset.nodeId = node.id;
             el.draggable = true;
             const icon = this.getDesktopIcon(node);
             el.innerHTML = `<img src="${icon}" alt="${node.name}"><span>${node.name}</span>`;
-            // 计算位置
-            const x = 20 + column * (100 + columnGap);
-            const y = 20 + row * (100 + rowGap);
+            // 计算位置：图标居中放在所属格子上
+            const x = grid.marginX + cell.col * grid.pitch + iconOffset;
+            const y = grid.marginTop + cell.row * grid.pitch + iconOffset;
             el.style.position = 'absolute';
             el.style.left = `${x}px`;
             el.style.top = `${y}px`;
@@ -354,8 +503,6 @@ const Desktop = {
             });
             
             this.iconsContainer.appendChild(el);
-            row++;
-            if (row >= maxRows) { row = 0; column++; }
         });
     },
 
@@ -457,6 +604,11 @@ const Desktop = {
                 const nodeId = icon.dataset.nodeId;
                 const node = State.findNode(nodeId);
                 if (!node) return;
+                if (node.type === 'app') {
+                    // 应用快捷方式：直接打开对应 App
+                    WindowManager.openApp(node.appId);
+                    return;
+                }
                 if (node.type === 'folder') {
                     WindowManager.openApp('files');
                     // 延时导航到该文件夹
@@ -668,6 +820,119 @@ const Desktop = {
         WindowManager.openApp(appId);
     },
 
+    /** 把 App 快捷方式固定到桌面（任务栏图标拖拽到桌面时调用） */
+    addAppShortcut(appId) {
+        const desktop = State.findNode('desktop');
+        if (!desktop) return false;
+        desktop.children = desktop.children || [];
+        const app = this.apps.find(a => a.id === appId);
+        const name = app ? this.getAppName(app) : appId;
+        if (desktop.children.some(c => c.type === 'app' && c.appId === appId)) {
+            if (window.FluentUI && FluentUI.Toast) {
+                FluentUI.Toast({ title: t('desktop.shortcut.title'), message: t('desktop.shortcut.exists'), type: 'info' });
+            }
+            return false;
+        }
+        desktop.children.push({
+            id: `app-${appId}-${Date.now()}`,
+            name,
+            type: 'app',
+            appId,
+            created: new Date().toISOString(),
+            modified: new Date().toISOString()
+        });
+        State.updateFS(State.fs);
+        if (window.FluentUI && FluentUI.Toast) {
+            FluentUI.Toast({ title: t('desktop.shortcut.title'), message: t('desktop.shortcut.added', { name }), type: 'success' });
+        }
+        return true;
+    },
+
+    /** 把桌面上的单个节点移入回收站 */
+    moveDesktopNodeToRecycle(nodeId) {
+        const desktop = State.findNode('desktop');
+        if (!desktop || !desktop.children) return false;
+        const idx = desktop.children.findIndex(c => c.id === nodeId);
+        if (idx === -1) return false;
+        const node = desktop.children.splice(idx, 1)[0];
+        node._recycle = { originalParentId: 'desktop' };
+        const recycle = State.findNode('recycle');
+        if (!recycle) return false;
+        recycle.children = recycle.children || [];
+        recycle.children.unshift(node);
+        State.updateFS(State.fs);
+        return true;
+    },
+
+    /** 右键删除 App 快捷方式：系统全局弹窗选择「从桌面删除 / 卸载 / 取消」 */
+    confirmDeleteAppShortcut(node) {
+        const app = this.apps.find(a => a.id === node.appId);
+        const name = app ? this.getAppName(app) : node.name;
+        // 系统应用不可卸载（与开始菜单右键菜单的限制保持一致）
+        const isSystemApp = (typeof StartMenu !== 'undefined' && Array.isArray(StartMenu.systemApps))
+            ? StartMenu.systemApps.includes(node.appId) : false;
+        const canUninstall = !isSystemApp && window.AppShop && typeof AppShop.uninstallApp === 'function';
+
+        const buttons = [
+            { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+            { text: t('desktop.appdel.remove'), variant: 'primary', value: 'remove' }
+        ];
+        if (canUninstall) {
+            buttons.push({ text: t('desktop.appdel.uninstall'), variant: 'danger', value: 'uninstall' });
+        }
+
+        FluentUI.Dialog({
+            type: 'warning',
+            title: t('desktop.appdel.title'),
+            content: canUninstall
+                ? t('desktop.appdel.content', { name })
+                : t('desktop.appdel.content-sys', { name }),
+            buttons,
+            onClose: (result) => {
+                if (result === 'remove') {
+                    // 仅从桌面移除：直接挪到回收站，无二次提示
+                    this.moveDesktopNodeToRecycle(node.id);
+                    this.deselectAll();
+                } else if (result === 'uninstall') {
+                    // 走系统既有的卸载弹窗流程（含运行中检测与确认）
+                    AppShop.uninstallApp(node.appId);
+                }
+            }
+        });
+    },
+
+    /** 卸载应用后清理桌面上对应的快捷方式（AppShop 卸载流程调用） */
+    removeAppShortcut(appId) {
+        const desktop = State.findNode('desktop');
+        if (!desktop || !desktop.children) return;
+        const before = desktop.children.length;
+        desktop.children = desktop.children.filter(c => !(c.type === 'app' && c.appId === appId));
+        if (desktop.children.length !== before) {
+            State.updateFS(State.fs);
+        }
+    },
+
+    /**
+     * 根据菜单实际尺寸自适应定位：
+     * 默认出现在鼠标右下角；右/下侧空间不足时翻转到左/上侧，避免被屏幕边缘吞掉。
+     */
+    positionContextMenu(x, y) {
+        const menu = this.contextMenu;
+        // 先显示出来才能测量真实尺寸
+        menu.classList.remove('hidden');
+        const margin = 8;
+        const w = menu.offsetWidth;
+        const h = menu.offsetHeight;
+        let left = x;
+        let top = y;
+        if (x + w > window.innerWidth - margin) left = x - w;
+        if (y + h > window.innerHeight - margin) top = y - h;
+        left = Math.max(margin, Math.min(left, window.innerWidth - w - margin));
+        top = Math.max(margin, Math.min(top, window.innerHeight - h - margin));
+        menu.style.left = `${left}px`;
+        menu.style.top = `${top}px`;
+    },
+
     showContextMenu(x, y) {
         // 构建菜单：刷新、新建文件夹、新建文本、个性化
         const totalIcons = this.iconsContainer ? this.iconsContainer.querySelectorAll('.desktop-icon').length : 0;
@@ -708,9 +973,7 @@ const Desktop = {
                     <span>${t('desktop.menu.personalize')}</span>
                 </div>`;
 
-        this.contextMenu.style.left = `${x}px`;
-        this.contextMenu.style.top = `${y}px`;
-        this.contextMenu.classList.remove('hidden');
+        this.positionContextMenu(x, y);
     },
 
     showDesktopItemMenu(x, y, nodeId) {
@@ -744,9 +1007,7 @@ const Desktop = {
                 <img src="Theme/Icon/Symbol_icon/stroke/Information Circle.svg" alt="">
                 <span>${t('desktop.menu.properties')}</span>
             </div>`;
-        this.contextMenu.style.left = `${x}px`;
-        this.contextMenu.style.top = `${y}px`;
-        this.contextMenu.classList.remove('hidden');
+        this.positionContextMenu(x, y);
     },
 
     handleContextMenuAction(action) {
@@ -875,18 +1136,13 @@ const Desktop = {
                 // 单选时删除单个文件
                 const id = this.contextTargetId;
                 if (!id) break;
-                // 移动到回收站
-                const desktop = State.findNode('desktop');
-                if (!desktop || !desktop.children) break;
-                const idx = desktop.children.findIndex(c => c.id === id);
-                if (idx === -1) break;
-                const node = desktop.children.splice(idx, 1)[0];
-                node._recycle = { originalParentId: 'desktop' };
-                const recycle = State.findNode('recycle');
-                if (!recycle) break;
-                recycle.children = recycle.children || [];
-                recycle.children.unshift(node);
-                State.updateFS(State.fs);
+                const targetNode = State.findNode(id);
+                // App 快捷方式：全局弹窗选择「从桌面删除 / 卸载 / 取消」
+                if (targetNode && targetNode.type === 'app') {
+                    this.confirmDeleteAppShortcut(targetNode);
+                    break;
+                }
+                this.moveDesktopNodeToRecycle(id);
                 this.deselectAll();
                 break;
             }

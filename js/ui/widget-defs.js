@@ -675,49 +675,113 @@ function wRenderHoliday(body, ctx, size) {
     });
 }
 
-/* ==================== 电影票房 ==================== */
+/* ==================== 答案之书 ==================== */
 
-async function wFetchBoxOffice() {
-    return WidgetData.getJSON('boxoffice', 10 * 60 * 1000,
-        'https://uapis.cn/api/v1/misc/movie-box-office');
-}
-
-function wRenderBoxOffice(body, ctx, size) {
-    wAsync(body, async () => {
-        const data = await wFetchBoxOffice();
-        if (!body.isConnected) return;
-        const list = (data.list || []).slice(0, size === 'l' ? 7 : 3);
-        const market = data.market || {};
-        body.innerHTML = `
-            <div class="w-list-head">
-                <span class="w-list-title">🎬 ${t('widgets.boxoffice.title')}</span>
-                <span class="w-list-sub">${t('widgets.boxoffice.total')} ${wEsc(market.box_office || '--')}</span>
+function wRenderAnswerBook(body, ctx) {
+    body.innerHTML = `
+        <div class="w-answer">
+            <div class="w-answer-tag">
+                <img src="Theme/Icon/Symbol_icon/stroke/Stars B.svg" alt="">
+                <span>${t('widgets.app.answerbook')}</span>
             </div>
-            <div class="w-list-body">
-                ${list.map(mv => `
-                    <div class="w-movie-row" data-url="${wEsc(mv.detail_url || '')}">
-                        <span class="w-news-rank r${mv.rank}">${mv.rank}</span>
-                        <span class="w-movie-name">${wEsc(mv.movie_name)}</span>
-                        <span class="w-movie-box">${wEsc(mv.box_office || '')}</span>
-                        ${size === 'l' ? `<span class="w-movie-rate">${wEsc(mv.box_office_rate || '')}</span>` : ''}
-                    </div>`).join('')}
-            </div>`;
-        body.querySelectorAll('.w-movie-row').forEach(row => {
-            row.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!wClickable(ctx)) return;
-                const url = row.dataset.url;
-                if (url) wOpenInBrowser(url, ctx);
-            });
-        });
+            <div class="w-answer-display">${t('widgets.answer.hint')}</div>
+            <div class="w-answer-bar">
+                <input type="text" placeholder="${t('widgets.answer.placeholder')}" maxlength="60" ${ctx.isPreview ? 'disabled' : ''}>
+                <button type="button">${t('widgets.answer.ask')}</button>
+            </div>
+        </div>`;
+    if (ctx.isPreview) return;
+
+    const input = body.querySelector('input');
+    const btn = body.querySelector('.w-answer-bar button');
+    const display = body.querySelector('.w-answer-display');
+    let asking = false;
+
+    const ask = async () => {
+        const q = input.value.trim();
+        if (!q || asking) return;
+        asking = true;
+        display.classList.remove('w-answer-reveal');
+        display.textContent = t('widgets.answer.thinking');
+        try {
+            const res = await fetch(`https://uapis.cn/api/v1/answerbook/ask?question=${encodeURIComponent(q)}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (!display.isConnected) return;
+            display.textContent = `「${data.answer || t('widgets.error')}」`;
+            display.classList.add('w-answer-reveal');
+        } catch (_) {
+            if (display.isConnected) display.textContent = t('widgets.error');
+        } finally {
+            asking = false;
+        }
+    };
+
+    input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') ask();
+    });
+    input.addEventListener('click', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ask();
     });
 }
 
 /* ==================== 每日单词 ==================== */
 
+/**
+ * 本地词库兜底：uapis 的 /daily/word 接口禁止浏览器跨域免 key 调用
+ * （返回 403 CORS_FORBIDDEN），所以接口失败时按日期从本地词库取词，
+ * 保证同一天取到的单词一致。
+ */
+const W_WORD_BANK = [
+    { word: 'serene', phonetic: '/səˈriːn/', translation: 'adj. 平静的，安详的', examples: [{ text: 'The lake was serene in the morning light.', translation: '晨光中的湖面一片宁静。' }] },
+    { word: 'diligent', phonetic: '/ˈdɪlɪdʒənt/', translation: 'adj. 勤奋的，用功的', examples: [{ text: 'She is a diligent student who never misses a class.', translation: '她是个从不缺课的勤奋学生。' }] },
+    { word: 'abundant', phonetic: '/əˈbʌndənt/', translation: 'adj. 丰富的，充裕的', examples: [{ text: 'The region has abundant natural resources.', translation: '这个地区自然资源丰富。' }] },
+    { word: 'genuine', phonetic: '/ˈdʒenjuɪn/', translation: 'adj. 真正的，真诚的', examples: [{ text: 'Her smile was warm and genuine.', translation: '她的微笑温暖而真诚。' }] },
+    { word: 'persist', phonetic: '/pəˈsɪst/', translation: 'v. 坚持，持续', examples: [{ text: 'If you persist, you will succeed.', translation: '只要坚持，你就会成功。' }] },
+    { word: 'crucial', phonetic: '/ˈkruːʃl/', translation: 'adj. 关键的，至关重要的', examples: [{ text: 'Timing is crucial to the success of the plan.', translation: '时机对计划的成功至关重要。' }] },
+    { word: 'embrace', phonetic: '/ɪmˈbreɪs/', translation: 'v. 拥抱；欣然接受', examples: [{ text: 'We should embrace new technologies.', translation: '我们应该欣然接受新技术。' }] },
+    { word: 'flourish', phonetic: '/ˈflʌrɪʃ/', translation: 'v. 繁荣，茁壮成长', examples: [{ text: 'Plants flourish in this warm climate.', translation: '植物在这种温暖的气候里长势喜人。' }] },
+    { word: 'insight', phonetic: '/ˈɪnsaɪt/', translation: 'n. 洞察力，深刻见解', examples: [{ text: 'The book offers great insight into human nature.', translation: '这本书对人性有深刻的洞察。' }] },
+    { word: 'modest', phonetic: '/ˈmɒdɪst/', translation: 'adj. 谦虚的；适度的', examples: [{ text: 'He remained modest despite his success.', translation: '尽管成功了，他依然保持谦逊。' }] },
+    { word: 'navigate', phonetic: '/ˈnævɪɡeɪt/', translation: 'v. 导航，驾驭；找到方向', examples: [{ text: 'Sailors used the stars to navigate at sea.', translation: '水手们靠星星在海上导航。' }] },
+    { word: 'optimistic', phonetic: '/ˌɒptɪˈmɪstɪk/', translation: 'adj. 乐观的', examples: [{ text: 'She is optimistic about the future.', translation: '她对未来很乐观。' }] },
+    { word: 'profound', phonetic: '/prəˈfaʊnd/', translation: 'adj. 深刻的，深远的', examples: [{ text: 'The discovery had a profound impact on science.', translation: '这一发现对科学产生了深远影响。' }] },
+    { word: 'resilient', phonetic: '/rɪˈzɪliənt/', translation: 'adj. 有韧性的，能快速恢复的', examples: [{ text: 'Children are often remarkably resilient.', translation: '孩子们往往有惊人的恢复力。' }] },
+    { word: 'subtle', phonetic: '/ˈsʌtl/', translation: 'adj. 微妙的，不易察觉的', examples: [{ text: 'There is a subtle difference between the two colors.', translation: '这两种颜色之间有细微的差别。' }] },
+    { word: 'thrive', phonetic: '/θraɪv/', translation: 'v. 茁壮成长，兴旺', examples: [{ text: 'Small businesses thrive in this city.', translation: '小企业在这座城市蓬勃发展。' }] },
+    { word: 'vivid', phonetic: '/ˈvɪvɪd/', translation: 'adj. 生动的，鲜明的', examples: [{ text: 'She gave a vivid description of the trip.', translation: '她对这次旅行做了生动的描述。' }] },
+    { word: 'wisdom', phonetic: '/ˈwɪzdəm/', translation: 'n. 智慧，才智', examples: [{ text: 'Age brings wisdom and experience.', translation: '年龄带来智慧和经验。' }] },
+    { word: 'curious', phonetic: '/ˈkjʊəriəs/', translation: 'adj. 好奇的，求知欲强的', examples: [{ text: 'Cats are naturally curious animals.', translation: '猫天生就是好奇的动物。' }] },
+    { word: 'elegant', phonetic: '/ˈelɪɡənt/', translation: 'adj. 优雅的，简洁巧妙的', examples: [{ text: 'The mathematician found an elegant solution.', translation: '这位数学家找到了一个简洁巧妙的解法。' }] },
+    { word: 'harmony', phonetic: '/ˈhɑːməni/', translation: 'n. 和谐，融洽', examples: [{ text: 'They live in harmony with nature.', translation: '他们与自然和谐相处。' }] },
+    { word: 'inspire', phonetic: '/ɪnˈspaɪə/', translation: 'v. 鼓舞，激励；赋予灵感', examples: [{ text: 'Her courage inspired everyone around her.', translation: '她的勇气鼓舞了身边的每一个人。' }] },
+    { word: 'journey', phonetic: '/ˈdʒɜːni/', translation: 'n. 旅程，历程', examples: [{ text: 'Life is a journey, not a destination.', translation: '人生是一段旅程，而非终点。' }] },
+    { word: 'keen', phonetic: '/kiːn/', translation: 'adj. 热衷的；敏锐的', examples: [{ text: 'She has a keen eye for detail.', translation: '她对细节有敏锐的眼光。' }] },
+    { word: 'luminous', phonetic: '/ˈluːmɪnəs/', translation: 'adj. 发光的，明亮的', examples: [{ text: 'The clock has a luminous dial.', translation: '这只钟有一个夜光表盘。' }] },
+    { word: 'mature', phonetic: '/məˈtʃʊə/', translation: 'adj. 成熟的 v. 成熟', examples: [{ text: 'He is very mature for his age.', translation: '就他的年龄而言，他非常成熟。' }] },
+    { word: 'noble', phonetic: '/ˈnəʊbl/', translation: 'adj. 高尚的，崇高的', examples: [{ text: 'Helping others is a noble cause.', translation: '帮助他人是一项高尚的事业。' }] },
+    { word: 'overcome', phonetic: '/ˌəʊvəˈkʌm/', translation: 'v. 克服，战胜', examples: [{ text: 'She overcame many difficulties to finish school.', translation: '她克服了重重困难完成了学业。' }] },
+    { word: 'patient', phonetic: '/ˈpeɪʃnt/', translation: 'adj. 耐心的 n. 病人', examples: [{ text: 'Be patient; good things take time.', translation: '耐心点，美好的事物需要时间。' }] },
+    { word: 'remarkable', phonetic: '/rɪˈmɑːkəbl/', translation: 'adj. 非凡的，值得注意的', examples: [{ text: 'The team made remarkable progress this year.', translation: '团队今年取得了非凡的进步。' }] },
+    { word: 'sincere', phonetic: '/sɪnˈsɪə/', translation: 'adj. 真诚的，诚挚的', examples: [{ text: 'Please accept my sincere apologies.', translation: '请接受我诚挚的歉意。' }] },
+    { word: 'tranquil', phonetic: '/ˈtræŋkwɪl/', translation: 'adj. 安静的，平静的', examples: [{ text: 'We spent a tranquil evening by the river.', translation: '我们在河边度过了一个宁静的夜晚。' }] }
+];
+
 async function wFetchDailyWord() {
-    return WidgetData.getJSON('dailyword', 6 * 60 * 60 * 1000,
-        'https://uapis.cn/api/v1/daily/word');
+    return WidgetData.get('dailyword', 6 * 60 * 60 * 1000, async () => {
+        try {
+            const res = await fetch('https://uapis.cn/api/v1/daily/word');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.words) && data.words.length) return data;
+            }
+        } catch (_) { /* 跨域被拒或网络错误，走本地词库 */ }
+        const idx = Math.floor(Date.now() / 86400000) % W_WORD_BANK.length;
+        return { words: [W_WORD_BANK[idx]] };
+    });
 }
 
 function wRenderWord(body, ctx, size) {
@@ -744,6 +808,184 @@ function wRenderWord(body, ctx, size) {
                     </div>` : ''}
             </div>`;
     });
+}
+
+/* ==================== 多媒体 ==================== */
+
+/** 无封面时的渐变占位（与多媒体 App 的渐变风格一致） */
+const W_MEDIA_GRADIENTS = [
+    'linear-gradient(135deg, #ff6b35 0%, #ffb347 52%, #ffe1c2 100%)',
+    'linear-gradient(135deg, #ff2d55 0%, #ff7aa2 50%, #ffd1dc 100%)',
+    'linear-gradient(135deg, #5856d6 0%, #8e8cf0 50%, #d6d5ff 100%)',
+    'linear-gradient(135deg, #0a84ff 0%, #5ac8fa 55%, #d2f0ff 100%)',
+    'linear-gradient(135deg, #34c759 0%, #7be495 55%, #d9f7e2 100%)'
+];
+
+/** themeColors 缺失时按 gradientIndex 取的兜底主题色 */
+const W_MEDIA_FALLBACK_COLORS = [
+    ['hsl(18, 76%, 56%)', 'hsl(28, 84%, 50%)'],
+    ['hsl(350, 80%, 55%)', 'hsl(338, 86%, 48%)'],
+    ['hsl(242, 64%, 60%)', 'hsl(250, 72%, 52%)'],
+    ['hsl(210, 92%, 52%)', 'hsl(200, 96%, 46%)'],
+    ['hsl(135, 58%, 48%)', 'hsl(150, 66%, 40%)']
+];
+
+/**
+ * 取「最近播放」曲目。
+ * 优先读运行中的 MediaApp（有封面 blob 与实时播放状态）；
+ * App 未打开时退回 localStorage 里的曲库清单（无封面，但有持久化的主题色）。
+ */
+function wMediaTrack() {
+    if (window.MediaApp && Array.isArray(MediaApp.library) && MediaApp.library.length) {
+        const lib = MediaApp.library;
+        const live = (MediaApp.currentIndex >= 0 && lib[MediaApp.currentIndex])
+            ? lib[MediaApp.currentIndex]
+            : lib.slice().sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0))[0];
+        const media = MediaApp.mediaElement;
+        const playing = !!(media && !media.paused && media.dataset.itemId === live.id);
+        return {
+            id: live.id,
+            title: live.title,
+            artist: live.artist,
+            coverUrl: live.coverUrl || '',
+            themeColors: live.themeColors,
+            gradientIndex: live.gradientIndex || 0,
+            playing
+        };
+    }
+    let manifest = [];
+    try {
+        manifest = JSON.parse(localStorage.getItem('fluentos.media.library.v1') || '[]');
+    } catch (_) { manifest = []; }
+    if (!Array.isArray(manifest) || !manifest.length) return null;
+    const item = manifest.slice().sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0))[0];
+    return {
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        coverUrl: '',
+        themeColors: item.themeColors,
+        gradientIndex: item.gradientIndex || 0,
+        playing: false
+    };
+}
+
+/** 取曲目主题色（两个），用于中尺寸卡片背景 */
+function wMediaColors(track) {
+    if (track && Array.isArray(track.themeColors) && track.themeColors.length >= 2) {
+        return [track.themeColors[0], track.themeColors[1]];
+    }
+    const idx = Math.abs(track?.gradientIndex || 0) % W_MEDIA_FALLBACK_COLORS.length;
+    return W_MEDIA_FALLBACK_COLORS[idx];
+}
+
+function wMediaCoverHtml(track, cls) {
+    if (track && track.coverUrl) {
+        return `<div class="${cls}" style="background-image:url('${track.coverUrl}')"></div>`;
+    }
+    const g = W_MEDIA_GRADIENTS[Math.abs(track?.gradientIndex || 0) % W_MEDIA_GRADIENTS.length];
+    return `
+        <div class="${cls} w-media-cover-fallback" style="background:${g}">
+            <img src="Theme/Icon/Symbol_icon/stroke/Music.svg" alt="">
+        </div>`;
+}
+
+/** 播放/暂停：App 已打开则直接切换；未打开则先打开 App，待曲库恢复后自动播放 */
+function wMediaTogglePlay(ctx) {
+    if (!wClickable(ctx) || ctx.surface !== 'desktop') return;
+    if (window.MediaApp && MediaApp.container && MediaApp.library.length) {
+        MediaApp.togglePlay();
+        return;
+    }
+    WindowManager.openApp('media');
+    let tries = 0;
+    const timer = setInterval(() => {
+        tries += 1;
+        if (window.MediaApp && MediaApp.container && MediaApp.library.length) {
+            clearInterval(timer);
+            MediaApp.togglePlay(true);
+        } else if (tries > 24) {
+            clearInterval(timer);
+        }
+    }, 250);
+}
+
+function wRenderMedia(body, ctx, size) {
+    const draw = (track) => {
+        body.classList.toggle('w-media-medium', size === 'm');
+        if (!track) {
+            body.style.removeProperty('--w-media-c1');
+            body.style.removeProperty('--w-media-c2');
+            body.innerHTML = `
+                <div class="w-media w-media-empty">
+                    <img class="w-media-empty-icon" src="Theme/Icon/Symbol_icon/stroke/Music.svg" alt="">
+                    <div class="w-media-empty-text">${t('widgets.media.empty')}</div>
+                </div>`;
+            return;
+        }
+        const [c1, c2] = wMediaColors(track);
+        body.style.setProperty('--w-media-c1', c1);
+        body.style.setProperty('--w-media-c2', c2);
+        const artist = track.artist || t('widgets.media.unknown');
+        const playBtn = `
+            <button class="w-media-play" type="button">
+                <img src="Theme/Icon/Symbol_icon/stroke/${track.playing ? 'Pause' : 'Play'}.svg" alt="">
+                <span>${track.playing ? t('widgets.media.pause') : t('widgets.media.play')}</span>
+            </button>`;
+        if (size === 's') {
+            // 小尺寸：封面铺满整张卡片，底部信息 + 羽化虚化的播放按钮
+            body.innerHTML = `
+                <div class="w-media w-media-s">
+                    ${wMediaCoverHtml(track, 'w-media-cover-full')}
+                    <div class="w-media-shade"></div>
+                    <span class="w-media-note"></span>
+                    <div class="w-media-overlay">
+                        <div class="w-media-title">${wEsc(track.title)}</div>
+                        <div class="w-media-artist">${wEsc(artist)}</div>
+                        ${playBtn}
+                    </div>
+                </div>`;
+        } else {
+            // 中尺寸：左侧封面 + 右侧信息，卡片背景使用封面主题色
+            body.innerHTML = `
+                <div class="w-media w-media-m">
+                    ${wMediaCoverHtml(track, 'w-media-cover-box')}
+                    <div class="w-media-info">
+                        <div class="w-media-tag">${t('widgets.media.recent')}</div>
+                        <div class="w-media-title">${wEsc(track.title)}</div>
+                        <div class="w-media-artist">${wEsc(artist)}</div>
+                        ${playBtn}
+                    </div>
+                    <span class="w-media-note"></span>
+                </div>`;
+        }
+        const btn = body.querySelector('.w-media-play');
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                wMediaTogglePlay(ctx);
+                // 播放状态变化后尽快刷新按钮
+                setTimeout(refresh, 300);
+                setTimeout(refresh, 800);
+            });
+        }
+    };
+
+    const refresh = () => {
+        if (body.dataset.mediaSig && !body.isConnected) return;
+        const track = wMediaTrack();
+        const sig = track ? `${track.id}|${track.playing}|${track.coverUrl}` : 'empty';
+        if (body.dataset.mediaSig === sig) return;
+        body.dataset.mediaSig = sig;
+        draw(track);
+    };
+
+    body.dataset.mediaSig = '';
+    wTick(body, 2000, refresh);
+}
+
+function wMediaOpenApp(ctx) {
+    WindowManager.openApp('media');
 }
 
 /* ==================== 注册表 ==================== */
@@ -792,6 +1034,16 @@ const WidgetDefs = {
                 { id: 'photos-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 's'); }, onClick() { WindowManager.openApp('photos'); } },
                 { id: 'photos-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 'm'); }, onClick() { WindowManager.openApp('photos'); } },
                 { id: 'photos-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 'l'); }, onClick() { WindowManager.openApp('photos'); } }
+            ]
+        },
+        {
+            id: 'media',
+            nameKey: 'widgets.app.media',
+            descKey: 'widgets.app.media.desc',
+            icon: 'Theme/Icon/Symbol_icon/stroke/Music.svg',
+            variants: [
+                { id: 'media-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 's'); }, onClick: wMediaOpenApp },
+                { id: 'media-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 'm'); }, onClick: wMediaOpenApp }
             ]
         },
         {
@@ -844,13 +1096,12 @@ const WidgetDefs = {
             ]
         },
         {
-            id: 'boxoffice',
-            nameKey: 'widgets.app.boxoffice',
-            descKey: 'widgets.app.boxoffice.desc',
-            icon: 'Theme/Icon/Symbol_icon/stroke/Video Player.svg',
+            id: 'answerbook',
+            nameKey: 'widgets.app.answerbook',
+            descKey: 'widgets.app.answerbook.desc',
+            icon: 'Theme/Icon/Symbol_icon/stroke/Stars B.svg',
             variants: [
-                { id: 'boxoffice-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-boxoffice', render(b, c) { wRenderBoxOffice(b, c, 'm'); } },
-                { id: 'boxoffice-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-boxoffice', render(b, c) { wRenderBoxOffice(b, c, 'l'); } }
+                { id: 'answerbook-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-answer-theme', render(b, c) { wRenderAnswerBook(b, c); } }
             ]
         },
         {
@@ -868,7 +1119,7 @@ const WidgetDefs = {
     /** 首页推荐的小组件形态 */
     recommended: [
         'weather-m', 'clock-analog', 'calendar-s', 'search-capsule',
-        'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'boxoffice-m'
+        'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'
     ],
 
     getApp(appId) {

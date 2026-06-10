@@ -412,8 +412,14 @@ const StartMenu = {
     },
 
     bindEvents() {
+        // 应用图标拖拽 → 固定到桌面（覆盖固定区与全部应用列表）
+        this.element.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
+        // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
+        this.element.addEventListener('dragstart', (e) => e.preventDefault());
+
         // 应用点击
         this.appsGrid.addEventListener('click', (e) => {
+            if (this._appDragging) return; // 拖拽结束后的 click 不触发打开
             const appEl = e.target.closest('.start-app');
             if (appEl) {
                 const appId = appEl.dataset.appId;
@@ -523,6 +529,7 @@ const StartMenu = {
 
         // 点击外部关闭
         this.element.addEventListener('click', (e) => {
+            if (this._appDragging) return; // 拖拽结束后的 click 不触发打开
             const appEl = e.target.closest('.start-all-app-row');
             if (!appEl || this.appsGrid.contains(appEl)) return;
             const appId = appEl.dataset.appId;
@@ -739,6 +746,58 @@ const StartMenu = {
                     break;
             }
         };
+    },
+
+    /**
+     * 开始菜单 App 图标的拖拽：超过阈值后菜单自动收起、
+     * 幽灵图标跟随鼠标，松手落在桌面区域时创建桌面快捷方式。
+     */
+    _onAppPointerDown(e) {
+        if (typeof e.button === 'number' && e.button !== 0) return;
+        const appEl = e.target.closest('.start-app');
+        if (!appEl || !appEl.dataset.appId) return;
+        // 阻止图标 img / 文字的原生拖拽与选区拖拽（click 不受影响）
+        e.preventDefault();
+        const appId = appEl.dataset.appId;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        let ghost = null;
+        let dragging = false;
+
+        const onMove = (ev) => {
+            if (!dragging) {
+                if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 10) return;
+                dragging = true;
+                this._appDragging = true;
+                // 收起开始菜单，露出桌面便于放置
+                this.close();
+                const app = Desktop.apps.find(a => a.id === appId);
+                ghost = document.createElement('div');
+                ghost.className = 'taskbar-drag-ghost';
+                ghost.innerHTML = `<img src="${app ? app.icon : ''}" alt="">`;
+                document.body.appendChild(ghost);
+            }
+            ghost.style.left = `${ev.clientX}px`;
+            ghost.style.top = `${ev.clientY}px`;
+            ghost.classList.toggle('droppable', Taskbar._isDesktopDropPoint(ev.clientX, ev.clientY));
+        };
+
+        const onUp = (ev) => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            if (!dragging) return;
+            if (ghost) ghost.remove();
+            if (ev.type === 'pointerup' && Taskbar._isDesktopDropPoint(ev.clientX, ev.clientY)) {
+                Desktop.addAppShortcut(appId);
+            }
+            // click 事件在 pointerup 之后同步派发，再之后才轮到定时器
+            setTimeout(() => { this._appDragging = false; }, 0);
+        };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
     },
 
     toggle() {

@@ -730,11 +730,17 @@ function startSystem() {
     scheduleAutoEnterFullscreen();
 }
 
+/** 同步当前视图对应的 body 状态类（供锁屏小组件景深等样式使用） */
+function syncViewBodyClasses(newView) {
+    document.body.classList.toggle('view-login', newView === 'login');
+}
+
 /**
  * 处理视图变化
  */
 function handleViewChange({ oldView, newView }) {
     console.log(`视图切换: ${oldView} → ${newView}`);
+    syncViewBodyClasses(newView);
 
     // 特殊处理：锁屏 → 登录的动画
     if (oldView === 'lock' && newView === 'login') {
@@ -935,9 +941,11 @@ window.handleLoginToLock = function() {
         loginCard.classList.add('exit-to-lock');
     }
     
-    // 3. 延迟 100ms 后移除模糊类，锁屏元素恢复清晰
+    // 3. 延迟 100ms 后移除模糊类，锁屏元素（时钟 + 小组件）同步恢复清晰
+    //    注意：此路径直接赋值 State.view，不会触发 viewChange，
+    //    因此 view-login 必须在这里手动移除，否则锁屏小组件会永久隐藏
     setTimeout(() => {
-        document.body.classList.remove('lock-to-login');
+        document.body.classList.remove('lock-to-login', 'view-login');
     }, 100);
     
     // 4. 动画完成后清理状态
@@ -948,6 +956,7 @@ window.handleLoginToLock = function() {
         }
         LoginScreen.hide();
         State.view = 'lock';
+        syncViewBodyClasses('lock');
     }, 500);
 };
 

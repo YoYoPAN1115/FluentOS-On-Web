@@ -492,6 +492,14 @@ input {
     will-change: transform, opacity, filter;
 }
 
+/* 锁屏小组件图层：与时间/提示文字一样参与锁屏↔登录的景深模糊过渡 */
+#lock-widgets-layer {
+    transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 600ms cubic-bezier(0.22, 0.61, 0.36, 1),
+                filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: transform, opacity, filter;
+}
+
 /* ============ 登录屏幕 ============ */
 #login-screen {
     z-index: 950; /* 高于锁屏，但只用于显示密码卡片 */
@@ -514,6 +522,7 @@ input {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    z-index: 10;
     background: var(--bg-secondary);
     backdrop-filter: blur(var(--blur-lg)) saturate(150%);
     border-radius: var(--radius-xl);
@@ -802,6 +811,46 @@ body.animations-enabled .login-card.show {
 
 .desktop-icons.dark-wallpaper .desktop-icon img {
     filter: none;
+}
+
+/* 禁用图标的浏览器原生拖拽，避免与指针拖拽（固定到桌面）冲突 */
+.taskbar-app img,
+.start-app img,
+.start-all-app-row img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+/* 任务栏图标拖拽到桌面时的幽灵图标 */
+.taskbar-drag-ghost {
+    position: fixed;
+    z-index: 12000;
+    width: 52px;
+    height: 52px;
+    margin: -26px 0 0 -26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
+    box-shadow: var(--shadow-lg);
+    opacity: 0.95;
+    transform: scale(0.9);
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+}
+
+.taskbar-drag-ghost.droppable {
+    transform: scale(1.08);
+}
+
+.taskbar-drag-ghost img {
+    width: 32px;
+    height: 32px;
+    pointer-events: none;
 }
 
 /* ============ 右键菜单 ============ */
@@ -2478,6 +2527,21 @@ body:not(.in-taskview) .desktop-icons {
     transition: filter 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+/* 多任务视图下桌面小组件层与图标同节奏进入景深模糊（实时过渡） */
+body.in-taskview #desktop-widgets-layer {
+    filter: blur(14px) saturate(120%);
+    opacity: .35;
+    pointer-events: none;
+}
+
+body.in-taskview #desktop-widgets-layer .fluent-widget {
+    pointer-events: none;
+}
+
+#desktop-widgets-layer {
+    transition: filter 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 /* 任务栏保持清晰可见 */
 body.in-taskview .taskbar,
 body.in-taskview .taskbar.hidden,
@@ -2504,18 +2568,36 @@ body.lock-to-login .lock-wallpaper {
     filter: blur(18px) brightness(0.82);
 }
 
-/* 时间容器缩小+模糊+淡出（双向过渡） */
+/* 时间容器：景深虚化（保留可见的失焦轮廓，与壁纸模糊程度一致，双向过渡） */
 body.lock-to-login .lock-time-container {
-    transform: scale(0.85) translateY(-20px);
-    opacity: 0;
-    filter: blur(8px);
+    transform: scale(0.96) translateY(-8px);
+    opacity: 0.55;
+    filter: blur(16px);
 }
 
-/* 底部提示文字缩小+模糊+淡出（双向过渡） */
+/* 底部提示文字：景深虚化（双向过渡） */
 body.lock-to-login .lock-hint {
-    transform: translateX(-50%) scale(0.85) translateY(20px);
-    opacity: 0;
-    filter: blur(8px);
+    transform: translateX(-50%) scale(0.96) translateY(8px);
+    opacity: 0.45;
+    filter: blur(12px);
+}
+
+/* 锁屏小组件：与时钟同节奏的景深虚化
+   （轻微缩小 + 重度模糊 + 半透明，背景里仍能隐约看到小组件失焦后的色块轮廓；
+   动画全部走 #lock-widgets-layer 上的 600ms 过渡，与时钟完全同步、双向可逆。
+   父级 filter 会把子树整体栅格化后再模糊，子元素的 backdrop-filter
+   也会一并被虚化，呈现统一的失焦效果。） */
+body.lock-to-login #lock-widgets-layer,
+body.view-login #lock-widgets-layer {
+    transform: scale(0.96);
+    opacity: 0.55;
+    filter: blur(16px) brightness(0.92);
+}
+
+/* .fluent-widget 自带 pointer-events: auto，需在子级一并禁用 */
+body.lock-to-login #lock-widgets-layer .fluent-widget,
+body.view-login #lock-widgets-layer .fluent-widget {
+    pointer-events: none;
 }
 
 /* 注意：移除 body.lock-to-login 后，所有元素会自动反向过渡回初始状态 */
@@ -2534,6 +2616,12 @@ body.login-to-lock .lock-time-container {
 }
 
 body.login-to-lock .lock-hint {
+    transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.4s ease-out,
+                filter 0.4s ease-out;
+}
+
+body.login-to-lock #lock-widgets-layer {
     transition: transform 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
                 opacity 0.4s ease-out,
                 filter 0.4s ease-out;
@@ -2563,7 +2651,8 @@ body.login-to-desktop-blur .lock-wallpaper {
 }
 
 body.login-to-desktop-blur .lock-time-container,
-body.login-to-desktop-blur .lock-hint {
+body.login-to-desktop-blur .lock-hint,
+body.login-to-desktop-blur #lock-widgets-layer {
     filter: blur(20px);
     opacity: 0.2;
     transition: filter 350ms cubic-bezier(0.22, 0.61, 0.36, 1),
@@ -2626,7 +2715,8 @@ body.lock-blur-in .lock-wallpaper {
 }
 
 body.lock-blur-in .lock-time-container,
-body.lock-blur-in .lock-hint {
+body.lock-blur-in .lock-hint,
+body.lock-blur-in #lock-widgets-layer {
     filter: blur(20px);
     opacity: 0.2;
 }
@@ -2639,7 +2729,8 @@ body.lock-unblur .lock-wallpaper {
 }
 
 body.lock-unblur .lock-time-container,
-body.lock-unblur .lock-hint {
+body.lock-unblur .lock-hint,
+body.lock-unblur #lock-widgets-layer {
     filter: none;
     opacity: 1;
     transition: filter 600ms cubic-bezier(0.22, 0.61, 0.36, 1),

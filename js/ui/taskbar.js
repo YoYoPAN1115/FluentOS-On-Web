@@ -148,8 +148,14 @@ const Taskbar = {
             StartMenu.toggle();
         });
 
+        // 应用图标拖拽 → 固定到桌面
+        this.appsContainer.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
+        // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
+        this.appsContainer.addEventListener('dragstart', (e) => e.preventDefault());
+
         // 应用图标点击
         this.appsContainer.addEventListener('click', (e) => {
+            if (this._appDragging) return; // 拖拽结束后的 click 不触发打开/切换
             const btn = e.target.closest('.taskbar-app');
             if (btn) {
                 const appId = btn.dataset.appId;
@@ -294,6 +300,63 @@ const Taskbar = {
                 this.unpinApp(appId);
                 break;
         }
+    },
+
+    /**
+     * 任务栏 App 图标的拖拽：超过阈值后出现跟随图标的幽灵，
+     * 松手时若落在桌面区域，则在桌面创建该 App 的快捷方式。
+     */
+    _onAppPointerDown(e) {
+        if (typeof e.button === 'number' && e.button !== 0) return;
+        const btn = e.target.closest('.taskbar-app');
+        if (!btn) return;
+        const appId = btn.dataset.appId;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        let ghost = null;
+        let dragging = false;
+
+        const onMove = (ev) => {
+            if (!dragging) {
+                if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 10) return;
+                dragging = true;
+                this._appDragging = true;
+                const app = Desktop.apps.find(a => a.id === appId);
+                ghost = document.createElement('div');
+                ghost.className = 'taskbar-drag-ghost';
+                ghost.innerHTML = `<img src="${app ? app.icon : ''}" alt="">`;
+                document.body.appendChild(ghost);
+            }
+            ghost.style.left = `${ev.clientX}px`;
+            ghost.style.top = `${ev.clientY}px`;
+            ghost.classList.toggle('droppable', this._isDesktopDropPoint(ev.clientX, ev.clientY));
+        };
+
+        const onUp = (ev) => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            if (!dragging) return;
+            if (ghost) ghost.remove();
+            if (ev.type === 'pointerup' && this._isDesktopDropPoint(ev.clientX, ev.clientY)) {
+                Desktop.addAppShortcut(appId);
+            }
+            // click 事件在 pointerup 之后同步派发，再之后才轮到定时器
+            setTimeout(() => { this._appDragging = false; }, 0);
+        };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
+    },
+
+    /** 判断坐标是否落在可放置快捷方式的桌面区域（开始菜单拖拽也复用） */
+    _isDesktopDropPoint(x, y) {
+        if (typeof State !== 'undefined' && State.view !== 'desktop') return false;
+        const el = document.elementFromPoint(x, y);
+        if (!el) return false;
+        if (el.closest('.taskbar') || el.closest('.window') || el.closest('#widgets-drawer') || el.closest('#start-menu')) return false;
+        return !!el.closest('#desktop-screen');
     },
 
     pinApp(appId) {
