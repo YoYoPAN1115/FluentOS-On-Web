@@ -1938,7 +1938,9 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     min-height: 300px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: center center;
-    will-change: transform, opacity;
+    /* 不使用 will-change/translateZ 强制分层:backdrop-filter 本身已强制分层,
+       多余的持久合成层会让 Chromium 在页面静止时走 render surface 缓存路径,
+       在非整数 DPR 下于模糊层边缘产生黑线。 */
 }
 
 /* 窗口调整大小的手柄 */
@@ -2022,9 +2024,6 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     background: var(--bg-secondary);
     backdrop-filter: blur(var(--blur-lg)) saturate(150%);
     -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
-    /* 修复色块渲染问题 */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 /* 窗口背景 - 纯色模式 */
@@ -2357,11 +2356,6 @@ body.window-blur-enabled .window {
     background: var(--bg-secondary);
     backdrop-filter: blur(var(--blur-lg)) saturate(150%);
     -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%);
-    /* 修复色块渲染问题 - 强制 GPU 加速 */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    will-change: transform;
-    isolation: isolate;
 }
 
 body.window-blur-disabled .window {

@@ -47,8 +47,6 @@ body.window-blur-disabled .window.fw-host,
     backdrop-filter: blur(40px) saturate(160%) !important;
     -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
     border-radius: var(--fw-window-radius) !important;
-    transform: translateZ(0);
-    isolation: isolate;
 }
 
 body.dark-mode.window-blur-enabled .window.fw-host,

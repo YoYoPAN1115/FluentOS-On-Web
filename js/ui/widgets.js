@@ -50,6 +50,7 @@ const Widgets = {
         this._createDrawer();
         this._createMenu();
         this.renderAll();
+        this._initStaticBlur();
 
         State.on('languageChange', () => {
             this.updateTexts();
@@ -60,7 +61,10 @@ const Widgets = {
 
         window.addEventListener('resize', () => {
             clearTimeout(this._resizeTimer);
-            this._resizeTimer = setTimeout(() => this.renderAll(), 150);
+            this._resizeTimer = setTimeout(() => {
+                this.renderAll();
+                this._refreshStaticBlurTexture();
+            }, 150);
         });
 
         document.addEventListener('keydown', (e) => {
@@ -96,6 +100,78 @@ const Widgets = {
                 if (body) this._renderContent(body, def, inst, surface);
             });
         });
+    },
+
+    /* ============ 小组件静态模糊(降低 GPU 实时模糊压力) ============
+       桌面小组件的 backdrop-filter 只会采样到壁纸(它们位于图标/窗口之下),
+       所以可以用一张预先模糊好的壁纸贴图代替实时模糊:
+       - 仅在壁纸更换/视口尺寸变化时重新生成一次;
+       - background-attachment: fixed 让贴图自动与壁纸对位;
+       - 实验室"强制始终实时模糊"开关可恢复旧行为(forceRealtimeBlur)。 */
+    _staticBlurUrl: null,
+
+    _initStaticBlur() {
+        State.on('settingsChange', (updates) => {
+            if (!updates) return;
+            if (updates.wallpaperDesktop !== undefined || updates.forceRealtimeBlur !== undefined) {
+                this._refreshStaticBlurTexture();
+            }
+        }, { key: 'Widgets.staticBlur' });
+        this._refreshStaticBlurTexture();
+    },
+
+    _applyStaticBlurMode() {
+        const enabled = State.settings.forceRealtimeBlur !== true && !!this._staticBlurUrl;
+        document.body.classList.toggle('widgets-static-blur', enabled);
+    },
+
+    _refreshStaticBlurTexture() {
+        if (State.settings.forceRealtimeBlur === true) {
+            this._applyStaticBlurMode();
+            return;
+        }
+        const src = State.settings && State.settings.wallpaperDesktop;
+        if (!src) return;
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const vw = Math.max(1, window.innerWidth);
+                const vh = Math.max(1, window.innerHeight);
+                const scale = Math.min(1, 1600 / vw);
+                const cw = Math.max(1, Math.round(vw * scale));
+                const ch = Math.max(1, Math.round(vh * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = cw;
+                canvas.height = ch;
+                const ctx = canvas.getContext('2d');
+                // 与 .fluent-widget-body 的 blur(var(--blur-lg)) saturate(150%) 保持观感一致
+                const blurPx = Math.max(6, Math.round(16 * scale));
+                ctx.filter = `saturate(150%) blur(${blurPx}px)`;
+                // cover 布局 + 向外扩边,避免画布边缘被模糊出透明黑边
+                const cover = Math.max(cw / img.width, ch / img.height);
+                const dw = img.width * cover;
+                const dh = img.height * cover;
+                const bleed = blurPx * 2;
+                ctx.drawImage(img, (cw - dw) / 2 - bleed, (ch - dh) / 2 - bleed, dw + bleed * 2, dh + bleed * 2);
+                canvas.toBlob((blob) => {
+                    if (!blob) { this._applyStaticBlurMode(); return; }
+                    if (this._staticBlurUrl) URL.revokeObjectURL(this._staticBlurUrl);
+                    this._staticBlurUrl = URL.createObjectURL(blob);
+                    document.documentElement.style.setProperty('--widgets-static-blur', `url("${this._staticBlurUrl}")`);
+                    this._applyStaticBlurMode();
+                }, 'image/jpeg', 0.85);
+            } catch (err) {
+                // 跨域壁纸等无法读取像素时,保持实时模糊回退
+                this._staticBlurUrl = null;
+                this._applyStaticBlurMode();
+            }
+        };
+        img.onerror = () => {
+            this._staticBlurUrl = null;
+            this._applyStaticBlurMode();
+        };
+        img.src = src;
     },
 
     _createLayers() {

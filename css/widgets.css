@@ -2007,3 +2007,21 @@ body.has-foreground-window #desktop-widgets-layer .w-clock-pin {
 body.has-foreground-window #desktop-widgets-layer .w-clock-tick::before {
     background: rgba(128, 128, 128, 0.4);
 }
+
+/* ============ 小组件静态模糊(GPU 减压) ============
+   桌面小组件位于图标/窗口之下,其 backdrop-filter 只能采样到壁纸,
+   因此用 JS 预生成的模糊壁纸贴图(--widgets-static-blur)替代实时模糊:
+   background-attachment: fixed 让贴图按视口对位,与真壁纸严丝合缝。
+   贴图仅在更换壁纸/调整窗口尺寸时重新生成;
+   实验室"强制始终实时模糊"开启时 body 不会带 widgets-static-blur 类。 */
+/* 贴图画在外壳 .fluent-widget 上,内层 .fluent-widget-body 保留各自的
+   主题色/半透明底色(w-weather 等渐变),叠加顺序与实时模糊完全一致:
+   壁纸模糊贴图 → 主题/半透明底色 → 内容。 */
+body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget {
+    background: var(--widgets-static-blur, none) center center / cover no-repeat fixed;
+}
+
+body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget-body {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}

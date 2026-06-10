@@ -187,6 +187,7 @@ const State = {
             fingoApiSaveMode: 'temporary',
             autoEnterFullscreen: true,
             enableExternalFileImport: false,
+            forceRealtimeBlur: false,
             enableWindowBlur: false,
             enableFluentV2: true,
             materialType: 'gaussian',

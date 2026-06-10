@@ -3475,6 +3475,24 @@ const SettingsApp = {
                 }
             })
         }));
+
+        // 强制始终实时模糊开关(默认关闭:桌面小组件使用静态模糊贴图降低 GPU 压力)
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.lab-realtime-blur'),
+            description: t('settings.lab-realtime-blur-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.forceRealtimeBlur === true,
+                onChange: (v) => {
+                    State.updateSettings({ forceRealtimeBlur: v });
+                    this.addRecentSetting(t('settings.lab-realtime-blur'), v ? t('settings.on') : t('settings.off'), 'lab');
+                    State.addNotification({
+                        title: t('settings.lab-title'),
+                        message: `${t('settings.lab-realtime-blur')}：${v ? t('settings.on') : t('settings.off')}`,
+                        type: 'info'
+                    });
+                }
+            })
+        }));
         
         // ========== 灵翼交互 ==========
         const lingyiSection = this.createSection(t('settings.lingyi'));

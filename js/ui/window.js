@@ -63,6 +63,7 @@ const WindowManager = {
     init() {
         this.container = document.getElementById('windows-container');
         this._bindDesktopInactivityListener();
+
         State.on('languageChange', () => {
             this.windows.forEach(w => {
                 const cfg = this.getAppConfig(w.appId);
