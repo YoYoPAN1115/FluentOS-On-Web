@@ -1345,7 +1345,7 @@ body.fluent-v2 .settings-section {
     background: transparent !important;
 }
 
-body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
+body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
     background-color: transparent;
 }
 
@@ -1355,7 +1355,7 @@ body.fluent-v2 .settings-content > div:not(.settings-section):not(.settings-over
 }
 
 /* 修复V2模式下窗口重叠时的白条问题 */
-body.fluent-v2 .window *:not(.fluent-setting-item):not(.fw-nav-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
+body.fluent-v2 .window *:not(.fluent-setting-item):not(.fw-nav-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
     background-color: transparent;
 }
 

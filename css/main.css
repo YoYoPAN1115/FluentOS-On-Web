@@ -650,6 +650,12 @@ body.animations-enabled .login-card.show {
     overflow: hidden;
 }
 
+/* 全局按钮高光会给 .button-glow-target 写入 position:relative，
+   会覆盖上方绝对定位，导致图标跳到输入框左下角 */
+body.button-glow-enabled .pin-toggle.button-glow-target {
+    position: absolute;
+}
+
 .pin-toggle img {
     position: absolute;
     top: 50%;

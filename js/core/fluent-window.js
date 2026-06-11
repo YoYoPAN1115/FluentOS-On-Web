@@ -507,6 +507,27 @@ const FluentWindow = {
             return null;
         }
 
+        const sidebarSearchSource = opts.sidebarSearch === true ? {} : opts.sidebarSearch;
+        const sidebarSearchConfig = sidebarSearchSource && typeof sidebarSearchSource === 'object'
+            ? {
+                enabled: sidebarSearchSource.enabled !== false,
+                placeholder: sidebarSearchSource.placeholder || 'Search',
+                resultsTitle: sidebarSearchSource.resultsTitle || '',
+                emptyText: sidebarSearchSource.emptyText || '',
+                loadingText: sidebarSearchSource.loadingText || '',
+                minQueryLength: Number.isFinite(Number(sidebarSearchSource.minQueryLength))
+                    ? Math.max(0, Number(sidebarSearchSource.minQueryLength))
+                    : 1,
+                debounceMs: Number.isFinite(Number(sidebarSearchSource.debounceMs))
+                    ? Math.max(0, Number(sidebarSearchSource.debounceMs))
+                    : 180,
+                search: typeof sidebarSearchSource.search === 'function' ? sidebarSearchSource.search : null,
+                onResultClick: typeof sidebarSearchSource.onResultClick === 'function' ? sidebarSearchSource.onResultClick : null,
+                onResultAction: typeof sidebarSearchSource.onResultAction === 'function' ? sidebarSearchSource.onResultAction : null
+            }
+            : null;
+        const sidebarSearchConfigured = !!sidebarSearchConfig;
+
         const instanceId = `fw-${Date.now()}-${++this._seq}`;
         const hostWindow = container.closest('.window');
 
@@ -517,6 +538,7 @@ const FluentWindow = {
         // ---------- 构建 DOM ----------
         const frame = document.createElement('div');
         const showSidebar = opts.showSidebar !== false && (
+            sidebarSearchConfigured ||
             (Array.isArray(opts.items) && opts.items.length > 0) ||
             (Array.isArray(opts.footerItems) && opts.footerItems.length > 0)
         );
@@ -528,6 +550,51 @@ const FluentWindow = {
 
         const sidebar = document.createElement('nav');
         sidebar.className = 'fw-sidebar';
+
+        let sidebarSearchRoot = null;
+        let sidebarSearchInput = null;
+        let sidebarSearchResults = null;
+        let sidebarSearchTitle = null;
+        let sidebarSearchList = null;
+        if (sidebarSearchConfigured) {
+            sidebarSearchRoot = document.createElement('div');
+            sidebarSearchRoot.className = 'fw-sidebar-search';
+            sidebarSearchRoot.hidden = !sidebarSearchConfig.enabled;
+
+            const sidebarSearchBox = document.createElement('div');
+            sidebarSearchBox.className = 'fw-sidebar-search-box';
+
+            const sidebarSearchIcon = document.createElement('img');
+            sidebarSearchIcon.className = 'fw-sidebar-search-icon';
+            sidebarSearchIcon.src = FluentWindow._iconPath('Search', 'stroke');
+            sidebarSearchIcon.alt = '';
+            sidebarSearchIcon.draggable = false;
+            sidebarSearchBox.appendChild(sidebarSearchIcon);
+
+            sidebarSearchInput = document.createElement('input');
+            sidebarSearchInput.className = 'fw-sidebar-search-input';
+            sidebarSearchInput.type = 'search';
+            sidebarSearchInput.autocomplete = 'off';
+            sidebarSearchInput.spellcheck = false;
+            sidebarSearchInput.placeholder = sidebarSearchConfig.placeholder;
+            sidebarSearchInput.setAttribute('aria-label', sidebarSearchConfig.placeholder);
+            sidebarSearchBox.appendChild(sidebarSearchInput);
+
+            sidebarSearchResults = document.createElement('div');
+            sidebarSearchResults.className = 'fw-sidebar-search-results hidden';
+
+            sidebarSearchTitle = document.createElement('div');
+            sidebarSearchTitle.className = 'fw-sidebar-search-title';
+            sidebarSearchResults.appendChild(sidebarSearchTitle);
+
+            sidebarSearchList = document.createElement('div');
+            sidebarSearchList.className = 'fw-sidebar-search-list';
+            sidebarSearchResults.appendChild(sidebarSearchList);
+
+            sidebarSearchRoot.appendChild(sidebarSearchBox);
+            sidebarSearchRoot.appendChild(sidebarSearchResults);
+            sidebar.appendChild(sidebarSearchRoot);
+        }
 
         const navList = document.createElement('div');
         navList.className = 'fw-nav';
@@ -574,6 +641,9 @@ const FluentWindow = {
             footerItems: [...(opts.footerItems || [])],
             activeId: opts.activeId || (opts.items && opts.items[0] && opts.items[0].id) || null,
             onNavigate: typeof opts.onNavigate === 'function' ? opts.onNavigate : () => {},
+            sidebarSearchEl: sidebarSearchRoot,
+            sidebarSearchInputEl: sidebarSearchInput,
+            sidebarSearchResultsEl: sidebarSearchResults,
             _collapsed: false,
             _switching: false,
             _expandedWidth: opts.expandedWidth,
@@ -584,8 +654,244 @@ const FluentWindow = {
             _container: container,
             _scrollPositions: new Map(),
             _scrollRestoreRaf: null,
-            _scrollRestoreTimer: null
+            _scrollRestoreTimer: null,
+            _suppressScrollSave: false,
+            _sidebarSearchConfigured: sidebarSearchConfigured,
+            _sidebarSearchEnabled: !!(sidebarSearchConfig && sidebarSearchConfig.enabled),
+            _sidebarSearchResults: [],
+            _sidebarSearchTimer: null,
+            _sidebarSearchSeq: 0
         };
+
+        const setSidebarSearchPanelVisible = (visible) => {
+            if (!sidebarSearchResults) return;
+            sidebarSearchResults.classList.toggle('hidden', !visible);
+        };
+
+        const normalizeSidebarSearchResults = (results) => {
+            if (!Array.isArray(results)) return [];
+            return results.filter(Boolean).map((result, index) => ({
+                id: result.id != null ? String(result.id) : `result-${index}`,
+                title: result.title != null ? String(result.title) : '',
+                subtitle: result.subtitle != null ? String(result.subtitle) : '',
+                icon: result.icon || '',
+                iconSrc: result.iconSrc || '',
+                data: result.data,
+                disabled: !!result.disabled,
+                actions: Array.isArray(result.actions) ? result.actions.filter(Boolean) : [],
+                onClick: typeof result.onClick === 'function' ? result.onClick : null
+            }));
+        };
+
+        const renderSidebarSearchMessage = (message, className = '') => {
+            if (!sidebarSearchList || !sidebarSearchTitle) return;
+            sidebarSearchTitle.textContent = sidebarSearchConfig.resultsTitle || '';
+            sidebarSearchTitle.hidden = !sidebarSearchTitle.textContent;
+            sidebarSearchList.innerHTML = '';
+            const row = document.createElement('div');
+            row.className = `fw-sidebar-search-message${className ? ` ${className}` : ''}`;
+            row.textContent = message || '';
+            sidebarSearchList.appendChild(row);
+            setSidebarSearchPanelVisible(!!message);
+        };
+
+        const renderSidebarSearchResults = (results, renderOptions = {}) => {
+            if (!sidebarSearchList || !sidebarSearchTitle) return;
+            const normalized = normalizeSidebarSearchResults(results);
+            instance._sidebarSearchResults = normalized;
+            sidebarSearchTitle.textContent = sidebarSearchConfig.resultsTitle || '';
+            sidebarSearchTitle.hidden = !sidebarSearchTitle.textContent;
+            sidebarSearchList.innerHTML = '';
+
+            if (!normalized.length) {
+                const message = renderOptions.message || '';
+                if (message) {
+                    renderSidebarSearchMessage(message, renderOptions.className || '');
+                } else {
+                    setSidebarSearchPanelVisible(false);
+                }
+                return;
+            }
+
+            normalized.forEach(result => {
+                const row = document.createElement('div');
+                row.className = 'fw-sidebar-search-result';
+                row.dataset.id = result.id;
+                row.tabIndex = result.disabled ? -1 : 0;
+                row.setAttribute('role', 'button');
+                row.setAttribute('aria-disabled', result.disabled ? 'true' : 'false');
+                if (result.disabled) row.classList.add('disabled');
+
+                const iconWrap = document.createElement('span');
+                iconWrap.className = 'fw-sidebar-search-result-icon';
+                if (result.iconSrc) {
+                    iconWrap.classList.add('fw-sidebar-search-result-image');
+                    const iconImg = document.createElement('img');
+                    iconImg.src = result.iconSrc;
+                    iconImg.alt = '';
+                    iconImg.draggable = false;
+                    iconWrap.appendChild(iconImg);
+                } else if (result.icon) {
+                    iconWrap.style.setProperty('--fw-icon-url', `url("${FluentWindow._iconPath(result.icon, 'stroke')}")`);
+                } else {
+                    iconWrap.textContent = (result.title || '?').charAt(0);
+                    iconWrap.classList.add('fw-sidebar-search-result-initial');
+                }
+                row.appendChild(iconWrap);
+
+                const textWrap = document.createElement('span');
+                textWrap.className = 'fw-sidebar-search-result-text';
+                const title = document.createElement('span');
+                title.className = 'fw-sidebar-search-result-title';
+                title.textContent = result.title;
+                textWrap.appendChild(title);
+                if (result.subtitle) {
+                    const subtitle = document.createElement('span');
+                    subtitle.className = 'fw-sidebar-search-result-subtitle';
+                    subtitle.textContent = result.subtitle;
+                    textWrap.appendChild(subtitle);
+                }
+                row.appendChild(textWrap);
+
+                if (result.actions.length) {
+                    const actionsWrap = document.createElement('span');
+                    actionsWrap.className = 'fw-sidebar-search-result-actions';
+                    result.actions.forEach(action => {
+                        const actionButton = document.createElement('button');
+                        actionButton.type = 'button';
+                        actionButton.className = 'fw-sidebar-search-action';
+                        actionButton.dataset.actionId = action.id || '';
+                        actionButton.disabled = !!action.disabled;
+                        actionButton.title = action.title || action.label || '';
+                        if (!action.label) actionButton.classList.add('icon-only');
+                        if (action.iconSrc) {
+                            const actionIconImg = document.createElement('img');
+                            actionIconImg.className = 'fw-sidebar-search-action-icon-img';
+                            actionIconImg.src = action.iconSrc;
+                            actionIconImg.alt = '';
+                            actionIconImg.draggable = false;
+                            actionButton.appendChild(actionIconImg);
+                        } else if (action.icon) {
+                            const actionIcon = document.createElement('span');
+                            actionIcon.className = 'fw-sidebar-search-action-icon';
+                            actionIcon.style.setProperty('--fw-icon-url', `url("${FluentWindow._iconPath(action.icon, 'stroke')}")`);
+                            actionIcon.setAttribute('aria-hidden', 'true');
+                            actionButton.appendChild(actionIcon);
+                        }
+                        if (action.label) {
+                            const actionLabel = document.createElement('span');
+                            actionLabel.className = 'fw-sidebar-search-action-label';
+                            actionLabel.textContent = action.label;
+                            actionButton.appendChild(actionLabel);
+                        }
+                        actionButton.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (actionButton.disabled) return;
+                            if (typeof action.onClick === 'function') {
+                                action.onClick(result, instance, event);
+                                return;
+                            }
+                            if (sidebarSearchConfig.onResultAction) {
+                                sidebarSearchConfig.onResultAction(action, result, instance, event);
+                            }
+                        });
+                        actionsWrap.appendChild(actionButton);
+                    });
+                    row.appendChild(actionsWrap);
+                }
+
+                const activate = (event) => {
+                    if (result.disabled) return;
+                    if (result.onClick) {
+                        result.onClick(result, instance, event);
+                    } else if (sidebarSearchConfig.onResultClick) {
+                        sidebarSearchConfig.onResultClick(result, instance, event);
+                    }
+                };
+                row.addEventListener('click', activate);
+                row.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    activate(event);
+                });
+
+                sidebarSearchList.appendChild(row);
+            });
+
+            setSidebarSearchPanelVisible(true);
+        };
+
+        const runSidebarSearch = async (query) => {
+            if (!sidebarSearchConfig || !sidebarSearchConfig.search || !instance._sidebarSearchEnabled) return;
+            const cleanQuery = String(query || '').trim();
+            if (cleanQuery.length < sidebarSearchConfig.minQueryLength) {
+                renderSidebarSearchResults([]);
+                return;
+            }
+            const seq = ++instance._sidebarSearchSeq;
+            if (sidebarSearchConfig.loadingText) {
+                renderSidebarSearchMessage(sidebarSearchConfig.loadingText, 'loading');
+            }
+            try {
+                const results = await sidebarSearchConfig.search(cleanQuery, instance);
+                if (seq !== instance._sidebarSearchSeq) return;
+                const normalized = normalizeSidebarSearchResults(results);
+                renderSidebarSearchResults(normalized, {
+                    message: normalized.length ? '' : sidebarSearchConfig.emptyText
+                });
+            } catch (err) {
+                if (seq !== instance._sidebarSearchSeq) return;
+                console.error('[FluentWindow] sidebarSearch error:', err);
+                renderSidebarSearchResults([], { message: sidebarSearchConfig.emptyText });
+            }
+        };
+
+        const scheduleSidebarSearch = () => {
+            if (!sidebarSearchInput) return;
+            if (instance._sidebarSearchTimer) {
+                clearTimeout(instance._sidebarSearchTimer);
+                instance._sidebarSearchTimer = null;
+            }
+            instance._sidebarSearchTimer = setTimeout(() => {
+                instance._sidebarSearchTimer = null;
+                runSidebarSearch(sidebarSearchInput.value);
+            }, sidebarSearchConfig.debounceMs);
+        };
+
+        const setSidebarSearchEnabled = (enabled) => {
+            if (!sidebarSearchRoot || !sidebarSearchInput) return false;
+            instance._sidebarSearchEnabled = !!enabled;
+            sidebarSearchRoot.hidden = !instance._sidebarSearchEnabled;
+            sidebarSearchInput.disabled = !instance._sidebarSearchEnabled;
+            if (!instance._sidebarSearchEnabled) {
+                if (instance._sidebarSearchTimer) {
+                    clearTimeout(instance._sidebarSearchTimer);
+                    instance._sidebarSearchTimer = null;
+                }
+                instance._sidebarSearchSeq += 1;
+                sidebarSearchInput.value = '';
+                renderSidebarSearchResults([]);
+            }
+            return instance._sidebarSearchEnabled;
+        };
+
+        if (sidebarSearchConfigured && sidebarSearchInput) {
+            sidebarSearchInput.addEventListener('input', scheduleSidebarSearch);
+            sidebarSearchInput.addEventListener('focus', () => {
+                if (sidebarSearchRoot) sidebarSearchRoot.classList.add('is-active');
+            });
+            sidebarSearchInput.addEventListener('blur', () => {
+                if (sidebarSearchRoot) sidebarSearchRoot.classList.remove('is-active');
+            });
+            sidebarSearchInput.addEventListener('keydown', (event) => {
+                if (event.key !== 'Escape') return;
+                sidebarSearchInput.value = '';
+                renderSidebarSearchResults([]);
+                sidebarSearchInput.blur();
+            });
+            setSidebarSearchEnabled(sidebarSearchConfig.enabled);
+        }
 
         // ---------- 渲染导航项 ----------
         const renderNavItems = () => {
@@ -697,6 +1003,7 @@ const FluentWindow = {
 
         const saveScrollPosition = () => {
             if (!opts.preserveScrollPositions) return;
+            if (instance._suppressScrollSave) return;
             instance._scrollPositions.set(getScrollKey(), instance.cardEl.scrollTop);
         };
 
@@ -749,6 +1056,7 @@ const FluentWindow = {
                 if (id === instance.activeId) return;
             }
             saveScrollPosition();
+            instance._suppressScrollSave = true;
             instance.activeId = id;
             syncActiveStyles();
 
@@ -770,6 +1078,7 @@ const FluentWindow = {
                         instance.pageEl.classList.remove('fw-page-enter');
                         setTimeout(() => {
                             instance._switching = false;
+                            instance._suppressScrollSave = false;
                         }, fadeMs + 90);
                     });
                 });
@@ -783,6 +1092,31 @@ const FluentWindow = {
         instance.saveScrollPosition = saveScrollPosition;
 
         instance.restoreScrollPosition = restoreScrollPosition;
+
+        instance.setSidebarSearchEnabled = setSidebarSearchEnabled;
+
+        instance.setSidebarSearchResults = (results, renderOptions = {}) => {
+            if (!sidebarSearchConfigured) return;
+            renderSidebarSearchResults(results, renderOptions);
+        };
+
+        instance.clearSidebarSearch = () => {
+            if (sidebarSearchInput) sidebarSearchInput.value = '';
+            if (instance._sidebarSearchTimer) {
+                clearTimeout(instance._sidebarSearchTimer);
+                instance._sidebarSearchTimer = null;
+            }
+            instance._sidebarSearchSeq += 1;
+            renderSidebarSearchResults([]);
+        };
+
+        instance.focusSidebarSearch = () => {
+            if (!sidebarSearchInput || !instance._sidebarSearchEnabled) return false;
+            sidebarSearchInput.focus();
+            return true;
+        };
+
+        instance.getSidebarSearchQuery = () => sidebarSearchInput ? sidebarSearchInput.value : '';
 
         instance.cardEl.addEventListener('scroll', saveScrollPosition, { passive: true });
 
@@ -863,6 +1197,10 @@ const FluentWindow = {
             if (instance._resizeHandler) {
                 window.removeEventListener('resize', instance._resizeHandler);
                 instance._resizeHandler = null;
+            }
+            if (instance._sidebarSearchTimer) {
+                clearTimeout(instance._sidebarSearchTimer);
+                instance._sidebarSearchTimer = null;
             }
             cancelScrollRestore();
             if (instance._sidebarResizeMove) {

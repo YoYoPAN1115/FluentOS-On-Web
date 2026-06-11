@@ -56,6 +56,81 @@ const WidgetData = {
     }
 };
 
+const W_UAPIS_ORIGIN = 'https://uapis.cn';
+
+function wUapisUrl(path) {
+    if (/^https?:\/\//i.test(path)) return path;
+    return `${W_UAPIS_ORIGIN}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
+function wProxyUrls(url) {
+    return [
+        `https://r.jina.ai/http://${url}`,
+        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+    ];
+}
+
+function wJsonFromText(text) {
+    const raw = String(text || '').trim();
+    if (!raw) throw new Error('Empty response');
+    try {
+        const wrapped = JSON.parse(raw);
+        if (wrapped && typeof wrapped.contents === 'string') {
+            return wJsonFromText(wrapped.contents);
+        }
+        return wrapped;
+    } catch (_) {
+        let source = raw;
+        const marker = 'Markdown Content:';
+        const markerIndex = source.indexOf(marker);
+        if (markerIndex >= 0) source = source.slice(markerIndex + marker.length).trim();
+
+        const firstObject = source.indexOf('{');
+        const firstArray = source.indexOf('[');
+        let start = -1;
+        if (firstObject >= 0 && firstArray >= 0) start = Math.min(firstObject, firstArray);
+        else start = Math.max(firstObject, firstArray);
+        if (start < 0) throw new Error('Invalid JSON response');
+
+        const endObject = source.lastIndexOf('}');
+        const endArray = source.lastIndexOf(']');
+        const end = Math.max(endObject, endArray);
+        if (end < start) throw new Error('Invalid JSON response');
+        return JSON.parse(source.slice(start, end + 1));
+    }
+}
+
+async function wFetchText(url) {
+    const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json,text/plain,*/*' }
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try {
+            const json = wJsonFromText(text);
+            msg = json.message || json.error || msg;
+        } catch (_) { /* keep the HTTP status */ }
+        throw new Error(msg);
+    }
+    return text;
+}
+
+async function wFetchUapisJSON(path) {
+    const url = wUapisUrl(path);
+    const urls = [...wProxyUrls(url), url];
+    let lastErr = null;
+    for (const candidate of urls) {
+        try {
+            return wJsonFromText(await wFetchText(candidate));
+        } catch (err) {
+            lastErr = err;
+        }
+    }
+    throw lastErr || new Error('Uapis request failed');
+}
+
 /** HTML 转义 */
 function wEsc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
@@ -447,8 +522,8 @@ function wRenderSearch(body, ctx) {
 /* ==================== 今日新闻（热榜） ==================== */
 
 async function wFetchHotboard() {
-    return WidgetData.getJSON('hotboard-weibo', 10 * 60 * 1000,
-        'https://uapis.cn/api/v1/misc/hotboard?type=weibo');
+    return WidgetData.get('hotboard-weibo', 10 * 60 * 1000, () =>
+        wFetchUapisJSON('/api/v1/misc/hotboard?type=weibo'));
 }
 
 function wRenderNews(body, ctx, size) {
@@ -489,8 +564,8 @@ function wFormatHot(v) {
 /* ==================== 农历 ==================== */
 
 async function wFetchLunar() {
-    return WidgetData.getJSON('lunartime', 30 * 60 * 1000,
-        'https://uapis.cn/api/v1/misc/lunartime');
+    return WidgetData.get('lunartime', 30 * 60 * 1000, () =>
+        wFetchUapisJSON('/api/v1/misc/lunartime'));
 }
 
 function wRenderLunar(body, ctx, size) {
@@ -521,10 +596,7 @@ function wRenderLunar(body, ctx, size) {
 
 async function wFetchTracking(no) {
     return WidgetData.get(`tracking-${no}`, 5 * 60 * 1000, async () => {
-        const res = await fetch(`https://uapis.cn/api/v1/misc/tracking/query?tracking_number=${encodeURIComponent(no)}`);
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
-        return json;
+        return wFetchUapisJSON(`/api/v1/misc/tracking/query?tracking_number=${encodeURIComponent(no)}`);
     });
 }
 
@@ -616,8 +688,8 @@ function wRenderTracking(body, ctx, size) {
 async function wFetchHoliday() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${wPad(now.getMonth() + 1)}-${wPad(now.getDate())}`;
-    return WidgetData.getJSON(`holiday-${dateStr}`, 6 * 60 * 60 * 1000,
-        `https://uapis.cn/api/v1/misc/holiday-calendar?date=${dateStr}&include_nearby=true&nearby_limit=8&exclude_past=true`);
+    return WidgetData.get(`holiday-${dateStr}`, 6 * 60 * 60 * 1000, () =>
+        wFetchUapisJSON(`/api/v1/misc/holiday-calendar?date=${dateStr}&include_nearby=true&nearby_limit=8&exclude_past=true`));
 }
 
 const W_HOLIDAY_TYPE_KEYS = {
@@ -704,9 +776,7 @@ function wRenderAnswerBook(body, ctx) {
         display.classList.remove('w-answer-reveal');
         display.textContent = t('widgets.answer.thinking');
         try {
-            const res = await fetch(`https://uapis.cn/api/v1/answerbook/ask?question=${encodeURIComponent(q)}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
+            const data = await wFetchUapisJSON(`/api/v1/answerbook/ask?question=${encodeURIComponent(q)}`);
             if (!display.isConnected) return;
             display.textContent = `「${data.answer || t('widgets.error')}」`;
             display.classList.add('w-answer-reveal');
@@ -773,11 +843,8 @@ const W_WORD_BANK = [
 async function wFetchDailyWord() {
     return WidgetData.get('dailyword', 6 * 60 * 60 * 1000, async () => {
         try {
-            const res = await fetch('https://uapis.cn/api/v1/daily/word');
-            if (res.ok) {
-                const data = await res.json();
-                if (data && Array.isArray(data.words) && data.words.length) return data;
-            }
+            const data = await wFetchUapisJSON('/api/v1/daily/word');
+            if (data && Array.isArray(data.words) && data.words.length) return data;
         } catch (_) { /* 跨域被拒或网络错误，走本地词库 */ }
         const idx = Math.floor(Date.now() / 86400000) % W_WORD_BANK.length;
         return { words: [W_WORD_BANK[idx]] };

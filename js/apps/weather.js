@@ -8,46 +8,129 @@ const WeatherApp = {
     container: null,
     frame: null,
     currentCity: null,
-    coords: { lat: 39.9042, lon: 116.4074 }, // 默认北京
+    coords: { lat: 39.9042, lon: 116.4074 }, // 当前位置失败时回退到北京
+    currentCoords: { lat: 39.9042, lon: 116.4074 },
     data: null,
     hourly: [],
     daily: [],
-    currentLocKey: 'beijing',
+    searchResults: [],
+    currentLocKey: 'current',
+    contextMenu: null,
+    _weatherRequestToken: 0,
+    _currentLocationToken: 0,
+    defaultLocations: {
+        beijing: { nameKey: 'weather.beijing', widgetId: null, lat: 39.9042, lon: 116.4074, isDefault: true },
+        shanghai: { nameKey: 'weather.shanghai', widgetId: 'wl4480', lat: 31.2304, lon: 121.4737, isDefault: true },
+        hangzhou: { nameKey: 'weather.hangzhou', widgetId: 'wl3562', lat: 30.2741, lon: 120.1551, isDefault: true },
+        xian: { nameKey: 'weather.xian', widgetId: 'wl11434', lat: 34.3416, lon: 108.9398, isDefault: true },
+        hainan: { nameKey: 'weather.hainan', widgetId: 'wl11607', lat: 20.0174, lon: 110.3492, isDefault: true },
+        lanzhou: { nameKey: 'weather.lanzhou', widgetId: 'wl11457', lat: 36.0611, lon: 103.8343, isDefault: true }
+    },
     locations: {
-        beijing: { nameKey: 'weather.beijing', widgetId: null, lat: 39.9042, lon: 116.4074 },
-        hangzhou: { nameKey: 'weather.hangzhou', widgetId: 'wl3562', lat: 30.2741, lon: 120.1551 },
-        shanghai: { nameKey: 'weather.shanghai', widgetId: 'wl4480', lat: 31.2304, lon: 121.4737 },
-        xian: { nameKey: 'weather.xian', widgetId: 'wl11434', lat: 34.3416, lon: 108.9398 },
-        sichuan: { nameKey: 'weather.sichuan', widgetId: 'wl11585', lat: 30.5728, lon: 104.0668 },
-        chengdu: { nameKey: 'weather.chengdu', widgetId: 'wl2815', lat: 30.5728, lon: 104.0668 },
-        hainan: { nameKey: 'weather.hainan', widgetId: 'wl11607', lat: 20.0174, lon: 110.3492 },
-        yunnan: { nameKey: 'weather.yunnan', widgetId: 'wl11597', lat: 25.0453, lon: 102.7097 },
-        xinjiang: { nameKey: 'weather.xinjiang', widgetId: 'wl11599', lat: 43.8256, lon: 87.6168 },
-        lanzhou: { nameKey: 'weather.lanzhou', widgetId: 'wl11457', lat: 36.0611, lon: 103.8343 }
+        current: { nameKey: 'weather.current-location', widgetId: null, lat: 39.9042, lon: 116.4074, isDefault: true, isCurrent: true },
+        beijing: { nameKey: 'weather.beijing', widgetId: null, lat: 39.9042, lon: 116.4074, isDefault: true },
+        shanghai: { nameKey: 'weather.shanghai', widgetId: 'wl4480', lat: 31.2304, lon: 121.4737, isDefault: true },
+        hangzhou: { nameKey: 'weather.hangzhou', widgetId: 'wl3562', lat: 30.2741, lon: 120.1551, isDefault: true },
+        xian: { nameKey: 'weather.xian', widgetId: 'wl11434', lat: 34.3416, lon: 108.9398, isDefault: true },
+        hainan: { nameKey: 'weather.hainan', widgetId: 'wl11607', lat: 20.0174, lon: 110.3492, isDefault: true },
+        lanzhou: { nameKey: 'weather.lanzhou', widgetId: 'wl11457', lat: 36.0611, lon: 103.8343, isDefault: true }
     },
 
     init(windowId) {
         this.windowId = windowId || `window-${Date.now()}`;
         this.container = document.getElementById(`${this.windowId}-content`);
+        this.currentLocKey = 'current';
+        this.searchResults = [];
+        this.rebuildLocations();
         this.renderSkeleton();
         this.addStyles();
         this.bindEvents();
-        this.fetchWeatherByCoords(this.coords.lat, this.coords.lon);
         this.updateSidebarIcons();
 
         // 监听语言切换
         this._langHandler = () => {
+            this.rebuildLocations();
+            if (!this.locations[this.currentLocKey]) this.currentLocKey = 'current';
             this.renderSkeleton();
             this.addStyles();
             this.bindEvents();
-            if (this.data) this.renderWeather();
-            else this.fetchWeatherByCoords(this.coords.lat, this.coords.lon);
             this.updateSidebarIcons();
         };
-        State.on('languageChange', this._langHandler);
+        State.on('languageChange', this._langHandler, { key: 'WeatherApp.languageChange' });
+    },
+
+    rebuildLocations() {
+        const currentCoords = this.currentCoords || { lat: 39.9042, lon: 116.4074 };
+        const next = {
+            current: {
+                nameKey: 'weather.current-location',
+                widgetId: null,
+                lat: currentCoords.lat,
+                lon: currentCoords.lon,
+                isDefault: true,
+                isCurrent: true
+            },
+            ...this.defaultLocations
+        };
+        this.getPinnedCities().forEach(city => {
+            next[city.id] = {
+                id: city.id,
+                name: city.name,
+                nameKey: city.name,
+                admin1: city.admin1,
+                country: city.country,
+                widgetId: null,
+                lat: city.lat,
+                lon: city.lon,
+                isPinned: true
+            };
+        });
+        this.locations = next;
+    },
+
+    getPinnedCities() {
+        const settings = typeof State !== 'undefined' ? State.settings : null;
+        const saved = settings && Array.isArray(settings.weatherPinnedCities)
+            ? settings.weatherPinnedCities
+            : [];
+        const seen = new Set();
+        return saved
+            .map(city => this.normalizePinnedCity(city))
+            .filter(Boolean)
+            .filter(city => {
+                if (seen.has(city.id) || this.isDefaultCityLike(city)) return false;
+                seen.add(city.id);
+                return true;
+            });
+    },
+
+    normalizePinnedCity(city) {
+        if (!city || typeof city !== 'object') return null;
+        const lat = Number(city.lat ?? city.latitude);
+        const lon = Number(city.lon ?? city.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        const name = String(city.name || '').trim();
+        if (!name) return null;
+        return {
+            id: this.makeCityKey(city),
+            name,
+            admin1: String(city.admin1 || '').trim(),
+            country: String(city.country || '').trim(),
+            lat,
+            lon
+        };
+    },
+
+    makeCityKey(city) {
+        if (city && typeof city.id === 'string' && city.id.startsWith('custom-')) return city.id;
+        const lat = Number(city.lat ?? city.latitude);
+        const lon = Number(city.lon ?? city.longitude);
+        const raw = `${String(city.name || 'city').trim()}-${lat.toFixed(4)}-${lon.toFixed(4)}`;
+        return `custom-${raw.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5_-]+/gi, '-')}`;
     },
 
     renderSkeleton() {
+        if (!this.container) return;
         this.container.innerHTML = '';
 
         if (this.frame && typeof this.frame.destroy === 'function') {
@@ -64,17 +147,54 @@ const WeatherApp = {
             container: this.container,
             items: Object.entries(this.locations).map(([key, loc]) => ({
                 id: key,
-                label: t(loc.nameKey),
+                label: this.getLocationName(loc),
                 icon: 'Earth'
             })),
             activeId: this.currentLocKey,
+            sidebarSearch: {
+                enabled: true,
+                placeholder: t('weather.search-placeholder'),
+                resultsTitle: t('weather.search-results'),
+                emptyText: t('weather.try-other'),
+                loadingText: t('weather.searching'),
+                minQueryLength: 1,
+                debounceMs: 250,
+                search: (query) => this.searchCity(query),
+                onResultClick: (result) => {
+                    const city = result && result.data;
+                    if (!city) return;
+                    if (this.frame && typeof this.frame.clearSidebarSearch === 'function') {
+                        this.frame.clearSidebarSearch();
+                    }
+                    const existingKey = this.findExistingLocationKey(city);
+                    if (existingKey) {
+                        this.navigateToLocationKey(existingKey);
+                    } else {
+                        this.selectSearchCity(city);
+                    }
+                },
+                onResultAction: (action, result) => {
+                    if (!action || action.id !== 'pin' || !result || !result.data) return;
+                    if (this.frame && typeof this.frame.clearSidebarSearch === 'function') {
+                        this.frame.clearSidebarSearch();
+                    }
+                    this.pinCity(result.data);
+                }
+            },
             onNavigate: (key, pageEl) => {
                 pageEl.classList.add('weather-content');
                 pageEl.id = 'weather-content';
                 this.currentLocKey = key;
                 const loc = this.locations[key];
                 this.renderWeatherSkeleton(pageEl);
-                if (loc) this.fetchWeatherByCoords(loc.lat, loc.lon);
+                this.injectWidget(loc?.widgetId);
+                if (key === 'current') {
+                    this.fetchCurrentLocationWeather();
+                } else if (loc) {
+                    this.currentCity = null;
+                    this.coords = { lat: loc.lat, lon: loc.lon };
+                    this.fetchWeatherByCoords(loc.lat, loc.lon, key);
+                }
             }
         });
     },
@@ -112,6 +232,21 @@ const WeatherApp = {
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
             this.frame = null;
+        }
+        if (this.contextMenu && this.contextMenu.parentElement) {
+            this.contextMenu.remove();
+        }
+        this.contextMenu = null;
+        if (this._sidebarContextHandler && this.container) {
+            this.container.removeEventListener('contextmenu', this._sidebarContextHandler);
+            this._sidebarContextHandler = null;
+        }
+        if (this._hideContextMenuHandler) {
+            document.removeEventListener('click', this._hideContextMenuHandler);
+            this._hideContextMenuHandler = null;
+        }
+        if (typeof State !== 'undefined' && typeof State.off === 'function') {
+            State.off('languageChange', 'WeatherApp.languageChange');
         }
         this.container = null;
         this.windowId = null;
@@ -165,32 +300,50 @@ const WeatherApp = {
     },
 
     bindEvents() {
-        // 注入第三方天气小部件
-        this.injectWidget();
+        this.ensureContextMenu();
+        if (!this.container) return;
+        if (this._sidebarContextHandler) {
+            this.container.removeEventListener('contextmenu', this._sidebarContextHandler);
+        }
+        this._sidebarContextHandler = (e) => {
+            const item = e.target.closest('.fw-nav-item');
+            if (!item || !this.container.contains(item)) return;
+            const key = item.dataset.id;
+            const loc = this.locations[key];
+            if (!loc || !loc.isPinned) return;
+            e.preventDefault();
+            e.stopPropagation();
+            this.showLocationContextMenu(key, e.clientX, e.clientY);
+        };
+        this.container.addEventListener('contextmenu', this._sidebarContextHandler);
     },
 
     // 深度链接：WindowManager.openApp('weather', { city: 'beijing' })
     openData(data) {
         if (!data || !data.city || !this.locations[data.city]) return;
-        if (this.frame && typeof this.frame.navigate === 'function') {
-            this.frame.navigate(data.city);
-        }
+        this.navigateToLocationKey(data.city);
     },
 
     setLocationByKey(key) {
         if (!this.locations[key]) return;
+        this.navigateToLocationKey(key);
+    },
+
+    navigateToLocationKey(key) {
+        if (!this.locations[key]) return;
         this.currentLocKey = key;
-        const loc = this.locations[key];
-        // 更新标题文本
-        const title = document.getElementById('hero-location');
-        if (title) title.textContent = t('weather.location', { name: t(loc.nameKey) });
-        // 更新坐标并获取数据
-        this.coords = { lat: loc.lat, lon: loc.lon };
-        this.fetchWeatherByCoords(loc.lat, loc.lon);
-        // 重新注入 widget（切换城市）
-        this.injectWidget(loc.widgetId);
-        // 刷新侧栏激活状态
-        this.renderLocations();
+        if (this.frame && typeof this.frame.navigate === 'function') {
+            const wasActive = this.frame.activeId === key;
+            this.frame.navigate(key, { preserveScroll: false });
+            if (wasActive) {
+                const loc = this.locations[key];
+                if (key === 'current') this.fetchCurrentLocationWeather();
+                else if (loc) this.fetchWeatherByCoords(loc.lat, loc.lon, key);
+            }
+            return;
+        }
+        this.renderSkeleton();
+        this.updateSidebarIcons();
     },
 
     injectWidget(widgetId) {
@@ -208,8 +361,60 @@ const WeatherApp = {
         host.appendChild(s);
     },
 
+    ensureContextMenu() {
+        if (this.contextMenu && this.contextMenu.isConnected) return;
+        const menu = document.createElement('div');
+        menu.className = 'context-menu hidden weather-context-menu';
+        menu.id = `${this.windowId}-weather-context-menu`;
+        menu.addEventListener('contextmenu', (e) => e.preventDefault());
+        menu.addEventListener('click', (e) => {
+            const item = e.target.closest('.context-menu-item');
+            if (!item || item.classList.contains('disabled')) return;
+            const key = menu.dataset.locationKey;
+            if (item.dataset.action === 'delete' && key) {
+                this.removePinnedCity(key);
+            }
+            this.hideLocationContextMenu();
+        });
+        document.body.appendChild(menu);
+        this.contextMenu = menu;
+
+        if (!this._hideContextMenuHandler) {
+            this._hideContextMenuHandler = (e) => {
+                if (this.contextMenu && !this.contextMenu.contains(e.target)) {
+                    this.hideLocationContextMenu();
+                }
+            };
+            document.addEventListener('click', this._hideContextMenuHandler);
+        }
+    },
+
+    showLocationContextMenu(key, x, y) {
+        this.ensureContextMenu();
+        const loc = this.locations[key];
+        if (!this.contextMenu || !loc || !loc.isPinned) return;
+        this.contextMenu.dataset.locationKey = key;
+        this.contextMenu.innerHTML = `
+            <div class="context-menu-item" data-action="delete">
+                <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
+                <span>${t('weather.delete-city')}</span>
+            </div>
+        `;
+        this.contextMenu.classList.remove('hidden');
+        const rect = this.contextMenu.getBoundingClientRect();
+        this.contextMenu.style.left = `${Math.min(x, window.innerWidth - rect.width - 8)}px`;
+        this.contextMenu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
+    },
+
+    hideLocationContextMenu() {
+        if (this.contextMenu) this.contextMenu.classList.add('hidden');
+    },
+
     async searchCity(query) {
-        if (!query) return;
+        if (!query) {
+            this.searchResults = [];
+            return [];
+        }
         const lang = (typeof I18n !== 'undefined') ? I18n.currentLang : 'zh';
         const langParam = lang === 'en' ? 'en' : 'zh';
         try {
@@ -217,31 +422,176 @@ const WeatherApp = {
             const res = await fetch(url);
             const json = await res.json();
             if (!json.results || json.results.length === 0) {
-                State.addNotification(t('weather.city-not-found'), t('weather.try-other'));
-                return;
+                this.searchResults = [];
+                return [];
             }
-            const city = json.results[0];
-            this.currentCity = city;
-            this.coords = { lat: city.latitude, lon: city.longitude };
-            this.fetchWeatherByCoords(city.latitude, city.longitude);
-            this.addSavedCity(city);
+            this.searchResults = json.results
+                .map(city => this.normalizeSearchCity(city))
+                .filter(Boolean);
+            return this.searchResults.map(city => this.buildSidebarSearchResult(city));
         } catch (e) {
             console.error('[Weather] search error', e);
-            State.addNotification(t('weather.network-error'), t('weather.search-fail'));
+            this.searchResults = [];
+            if (typeof State !== 'undefined' && State.addNotification) {
+                State.addNotification({ title: t('weather.network-error'), message: t('weather.search-fail'), type: 'error' });
+            }
+            return [];
         }
     },
 
-    addSavedCity(city) {
-        const saved = document.getElementById('weather-saved');
-        const item = document.createElement('div');
-        item.className = 'saved-item';
-        item.innerHTML = `<span>${city.name}, ${city.country || ''}</span><span>${city.latitude.toFixed(2)},${city.longitude.toFixed(2)}</span>`;
-        item.addEventListener('click', () => {
-            this.currentCity = city;
-            this.coords = { lat: city.latitude, lon: city.longitude };
-            this.fetchWeatherByCoords(city.latitude, city.longitude);
-        });
-        saved.prepend(item);
+    normalizeSearchCity(city) {
+        if (!city) return null;
+        const lat = Number(city.latitude);
+        const lon = Number(city.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+        return {
+            id: this.makeCityKey(city),
+            name: String(city.name || '').trim(),
+            admin1: String(city.admin1 || '').trim(),
+            country: String(city.country || '').trim(),
+            lat,
+            lon
+        };
+    },
+
+    buildSidebarSearchResult(city) {
+        const existingKey = this.findExistingLocationKey(city);
+        const isPinned = !!existingKey;
+        return {
+            id: city.id,
+            title: this.formatCityName(city),
+            subtitle: `${city.lat.toFixed(2)}, ${city.lon.toFixed(2)}`,
+            icon: 'Earth',
+            data: city,
+            actions: [{
+                id: 'pin',
+                iconSrc: 'Theme/Icon/Symbol_icon/stroke/Pin.svg',
+                disabled: isPinned,
+                title: isPinned ? t('weather.pinned') : t('weather.pin')
+            }]
+        };
+    },
+
+    selectSearchCity(city) {
+        this.currentCity = city;
+        this.currentLocKey = 'search';
+        this.coords = { lat: city.lat, lon: city.lon };
+        if (this.frame) this.frame.activeId = 'search';
+        if (this.container) {
+            this.container.querySelectorAll('.fw-nav-item.active').forEach(item => item.classList.remove('active'));
+        }
+        this.injectWidget(null);
+        this.fetchWeatherByCoords(city.lat, city.lon, 'search');
+    },
+
+    pinCity(city) {
+        const normalized = this.normalizePinnedCity(city);
+        if (!normalized) return null;
+        const existingKey = this.findExistingLocationKey(normalized);
+        if (existingKey) {
+            State.addNotification({ title: t('weather.title'), message: t('weather.city-already-pinned'), type: 'info' });
+            this.navigateToLocationKey(existingKey);
+            return existingKey;
+        }
+        const pinned = this.getPinnedCities();
+        const next = [...pinned, normalized];
+        State.updateSettings({ weatherPinnedCities: next });
+        this.rebuildLocations();
+        this._sidebarCodes = null;
+        State.addNotification({ title: t('weather.title'), message: t('weather.city-pinned', { name: normalized.name }), type: 'success' });
+        this.currentLocKey = normalized.id;
+        this.renderSkeleton();
+        this.bindEvents();
+        this.updateSidebarIcons();
+        return normalized.id;
+    },
+
+    removePinnedCity(key) {
+        const loc = this.locations[key];
+        if (!loc || !loc.isPinned) return;
+        const next = this.getPinnedCities().filter(city => city.id !== key);
+        State.updateSettings({ weatherPinnedCities: next });
+        this.rebuildLocations();
+        this._sidebarCodes = null;
+        State.addNotification({ title: t('weather.title'), message: t('weather.city-removed', { name: this.getLocationName(loc) }), type: 'success' });
+        if (this.currentLocKey === key || !this.locations[this.currentLocKey]) {
+            this.currentLocKey = 'current';
+        }
+        this.renderSkeleton();
+        this.bindEvents();
+        this.updateSidebarIcons();
+    },
+
+    findExistingLocationKey(city) {
+        const normalizedName = String(city.name || '').trim().toLowerCase();
+        return Object.entries(this.locations).find(([, loc]) => {
+            if (loc.isCurrent) return false;
+            const sameCoords = Math.abs(Number(loc.lat) - Number(city.lat)) < 0.05
+                && Math.abs(Number(loc.lon) - Number(city.lon)) < 0.05;
+            const locName = this.getLocationName(loc).trim().toLowerCase();
+            return sameCoords || (normalizedName && locName === normalizedName);
+        })?.[0] || null;
+    },
+
+    isDefaultCityLike(city) {
+        return Object.values(this.defaultLocations).some(loc => (
+            Math.abs(Number(loc.lat) - Number(city.lat)) < 0.05 &&
+            Math.abs(Number(loc.lon) - Number(city.lon)) < 0.05
+        ));
+    },
+
+    getLocationName(loc) {
+        if (!loc) return '';
+        if (loc.name) return this.formatCityName(loc);
+        if (loc.nameKey) return t(loc.nameKey);
+        return loc.id || '';
+    },
+
+    formatCityName(city) {
+        const parts = [city.name, city.admin1, city.country]
+            .map(part => String(part || '').trim())
+            .filter(Boolean);
+        return [...new Set(parts)].join(', ');
+    },
+
+    async fetchCurrentLocationWeather() {
+        const token = ++this._currentLocationToken;
+        const fallback = { ...this.currentCoords };
+        const applyCoords = (coords, isFallback = false) => {
+            if (token !== this._currentLocationToken || this.currentLocKey !== 'current') return;
+            this.currentCoords = coords;
+            this.coords = coords;
+            if (this.locations.current) {
+                this.locations.current.lat = coords.lat;
+                this.locations.current.lon = coords.lon;
+            }
+            this._sidebarCodes = null;
+            this.fetchWeatherByCoords(coords.lat, coords.lon, 'current');
+            if (isFallback) {
+                State.addNotification({
+                    title: t('weather.current-location'),
+                    message: t('weather.current-location-fail'),
+                    type: 'warning'
+                });
+            }
+        };
+
+        if (!navigator.geolocation) {
+            applyCoords(fallback, true);
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const coords = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+                applyCoords(coords, false);
+            },
+            () => applyCoords(fallback, true),
+            { enableHighAccuracy: false, timeout: 7000, maximumAge: 30 * 60 * 1000 }
+        );
     },
 
     /* ===== 天气数据缓存（App 与小组件共用） =====
@@ -288,15 +638,21 @@ const WeatherApp = {
         return this._inflight[key];
     },
 
-    async fetchWeatherByCoords(lat, lon) {
+    async fetchWeatherByCoords(lat, lon, locKey = this.currentLocKey) {
+        const token = ++this._weatherRequestToken;
         try {
             const json = await this.getWeather(lat, lon);
+            if (token !== this._weatherRequestToken || locKey !== this.currentLocKey) return;
             this.data = json;
             this.prepareData(json);
             this.renderWeather();
+            const code = json?.current_weather?.weathercode;
+            if (code !== undefined && code !== null) {
+                this._setNavWeatherIcon(locKey, this.codeToIconName(code));
+            }
         } catch (e) {
             console.error('[Weather] fetch error', e);
-            State.addNotification(t('weather.network-error'), t('weather.fetch-fail'));
+            State.addNotification({ title: t('weather.network-error'), message: t('weather.fetch-fail'), type: 'error' });
         }
     },
 
@@ -308,6 +664,7 @@ const WeatherApp = {
                 time: hours[i].slice(11, 16),
                 temp: json.hourly.temperature_2m[i],
                 feels: json.hourly.apparent_temperature?.[i],
+                humidity: json.hourly.relativehumidity_2m?.[i],
                 code: json.hourly.weathercode?.[i]
             });
         }
@@ -328,17 +685,29 @@ const WeatherApp = {
     renderWeather() {
         const { current_weather } = this.data || {};
         const locData = this.locations[this.currentLocKey];
-        const locName = locData ? t(locData.nameKey) : t('weather.beijing');
-        document.getElementById('hero-location').textContent = t('weather.location', { name: locName });
-        document.getElementById('hero-desc').innerHTML =
-            `<img class="wx-icon wx-icon-hero" src="${this.codeToIcon(current_weather?.weathercode)}" alt=""> ${this.codeToDesc(current_weather?.weathercode)}`;
-        document.getElementById('hero-temp').textContent = `${Math.round(current_weather?.temperature || 0)}°`;
-        document.getElementById('hero-feels').textContent = t('weather.feels-like', { temp: Math.round(this.hourly?.[0]?.feels ?? current_weather?.temperature) });
-        document.getElementById('hero-wind').textContent = `${Math.round(current_weather?.windspeed || 0)} km/h`;
-        document.getElementById('hero-humidity').textContent = `${Math.round(this.hourly?.[0]?.humidity || 0)}%`;
-        document.getElementById('hero-visibility').textContent = `${Math.round((this.data?.hourly?.visibility?.[0] || 0) / 1000)} km`;
-
+        const locName = this.currentLocKey === 'search' && this.currentCity
+            ? this.formatCityName(this.currentCity)
+            : (locData ? this.getLocationName(locData) : t('weather.beijing'));
+        const heroLocation = document.getElementById('hero-location');
+        const heroDesc = document.getElementById('hero-desc');
+        const heroTemp = document.getElementById('hero-temp');
+        const heroFeels = document.getElementById('hero-feels');
+        const heroWind = document.getElementById('hero-wind');
+        const heroHumidity = document.getElementById('hero-humidity');
+        const heroVisibility = document.getElementById('hero-visibility');
         const hourlyStrip = document.getElementById('hourly-strip');
+        const dailyList = document.getElementById('daily-list');
+        if (!heroLocation || !heroDesc || !heroTemp || !heroFeels || !heroWind || !heroHumidity || !heroVisibility || !hourlyStrip || !dailyList) return;
+
+        heroLocation.textContent = t('weather.location', { name: locName });
+        heroDesc.innerHTML =
+            `<img class="wx-icon wx-icon-hero" src="${this.codeToIcon(current_weather?.weathercode)}" alt=""> ${this.codeToDesc(current_weather?.weathercode)}`;
+        heroTemp.textContent = `${Math.round(current_weather?.temperature || 0)}°`;
+        heroFeels.textContent = t('weather.feels-like', { temp: Math.round(this.hourly?.[0]?.feels ?? current_weather?.temperature) });
+        heroWind.textContent = `${Math.round(current_weather?.windspeed || 0)} km/h`;
+        heroHumidity.textContent = `${Math.round(this.hourly?.[0]?.humidity || 0)}%`;
+        heroVisibility.textContent = `${Math.round((this.data?.hourly?.visibility?.[0] || 0) / 1000)} km`;
+
         hourlyStrip.innerHTML = this.hourly.map(h => `
             <div class="hour-card">
                 <div class="hour-time">${h.time}</div>
@@ -348,7 +717,8 @@ const WeatherApp = {
             </div>
         `).join('');
 
-        const dailyList = document.getElementById('daily-list');
+        this.bindHourlyWheelScroll(hourlyStrip);
+
         dailyList.innerHTML = this.daily.map(d => `
             <div class="day-row">
                 <div class="day-name">${this.formatDay(d.date)}</div>
@@ -356,6 +726,25 @@ const WeatherApp = {
                 <div class="day-desc"><span>${this.codeToDesc(d.code)}</span><img class="wx-icon wx-icon-day" src="${this.codeToIcon(d.code)}" alt=""></div>
             </div>
         `).join('');
+    },
+
+    bindHourlyWheelScroll(strip) {
+        if (!strip || strip._weatherWheelBound) return;
+        strip._weatherWheelBound = true;
+        strip.addEventListener('wheel', (event) => {
+            const verticalDelta = event.deltaY || 0;
+            if (!verticalDelta || Math.abs(event.deltaX || 0) > Math.abs(verticalDelta)) return;
+
+            const maxScroll = Math.max(0, strip.scrollWidth - strip.clientWidth);
+            if (maxScroll <= 0) return;
+
+            const atStart = strip.scrollLeft <= 0;
+            const atEnd = strip.scrollLeft >= maxScroll - 1;
+            if ((verticalDelta < 0 && atStart) || (verticalDelta > 0 && atEnd)) return;
+
+            event.preventDefault();
+            strip.scrollLeft = Math.max(0, Math.min(maxScroll, strip.scrollLeft + verticalDelta));
+        }, { passive: false });
     },
 
     codeToDesc(code) {

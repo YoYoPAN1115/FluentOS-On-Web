@@ -117,6 +117,30 @@ const SettingsApp = {
         }
     },
 
+    refreshCurrentPage(options = {}) {
+        if (!this.frame || typeof this.frame.refresh !== 'function') {
+            this.render();
+            return;
+        }
+
+        const preserveScroll = options.preserveScroll !== false;
+        const card = this.frame.cardEl;
+        const scrollTop = preserveScroll && card ? card.scrollTop : 0;
+        this.frame.refresh();
+
+        if (!preserveScroll || !card) return;
+        const restore = () => {
+            if (!card.isConnected) return;
+            const maxScroll = Math.max(0, card.scrollHeight - card.clientHeight);
+            card.scrollTop = Math.min(scrollTop, maxScroll);
+        };
+        requestAnimationFrame(() => {
+            restore();
+            requestAnimationFrame(restore);
+        });
+        setTimeout(restore, 180);
+    },
+
     getAppDetailData(appId) {
         const desktopApp = typeof Desktop !== 'undefined'
             ? Desktop.apps.find(app => app.id === appId)
@@ -192,6 +216,7 @@ const SettingsApp = {
                 }
 
                 this.renderPage(pageEl);
+                pageEl.classList.add('fw-page', 'settings-content', 'settings-fw-content');
                 this.addStyles();
             }
         });
@@ -204,7 +229,7 @@ const SettingsApp = {
         style.id = 'settings-app-styles';
         style.textContent = `
             .settings-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
-            .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
+            .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 100%; box-sizing: border-box; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
             .settings-appearance-section > .fluent-setting-item,
@@ -737,21 +762,33 @@ const SettingsApp = {
             
             .storage-bar-wrapper {
                 height: 10px;
-                background: var(--bg-hover);
+                background: #d3d3d3;
                 border-radius: 5px;
                 overflow: hidden;
                 display: flex;
                 margin-bottom: 14px;
             }
             
+            .dark-mode .storage-bar-wrapper {
+                background: #5a5a5a;
+            }
+            
             .storage-bar-fill.apps {
-                background: linear-gradient(90deg, #ff6b6b, #ff8787);
+                background: linear-gradient(90deg, #ff6b6b, #ff8787) !important;
                 height: 100%;
             }
             
             .storage-bar-fill.system {
-                background: linear-gradient(90deg, #868e96, #adb5bd);
+                background: linear-gradient(90deg, #868e96, #adb5bd) !important;
                 height: 100%;
+            }
+            
+            body.fluent-v2 .storage-bar-wrapper {
+                background: #d3d3d3 !important;
+            }
+            
+            body.fluent-v2.dark-mode .storage-bar-wrapper {
+                background: #5a5a5a !important;
             }
             
             .storage-legend {
@@ -770,12 +807,23 @@ const SettingsApp = {
             .legend-dot {
                 width: 10px;
                 height: 10px;
+                min-width: 10px;
+                min-height: 10px;
                 border-radius: 50%;
+                flex-shrink: 0;
+                display: inline-block;
             }
             
-            .legend-dot.apps { background: #ff6b6b; }
-            .legend-dot.system { background: #868e96; }
-            .legend-dot.available { background: var(--bg-hover); border: 1px solid var(--border-color); }
+            .legend-dot-apps { background-color: #ff6b6b !important; }
+            .legend-dot-system { background-color: #868e96 !important; }
+            .legend-dot-available {
+                background-color: #d3d3d3 !important;
+                border: 1px solid var(--border-color);
+            }
+            
+            .dark-mode .legend-dot-available {
+                background-color: #5a5a5a !important;
+            }
             
             .apps-list-header {
                 display: flex;
@@ -3333,8 +3381,7 @@ const SettingsApp = {
         });
         advancedItem.style.cursor = 'pointer';
         advancedItem.addEventListener('click', () => {
-            this.currentPage = 'personalization-advanced';
-            this.render();
+            this.navigateToPage('personalization-advanced');
         });
         advancedSection.appendChild(advancedItem);
         container.appendChild(advancedSection);
@@ -3351,8 +3398,7 @@ const SettingsApp = {
             <span>${t('settings.personalization')}</span>
         `;
         backBtn.addEventListener('click', () => {
-            this.currentPage = 'personalization';
-            this.render();
+            this.navigateToPage('personalization');
         });
         container.appendChild(backBtn);
 
@@ -3798,7 +3844,7 @@ const SettingsApp = {
         
         // 存储信息
         const totalStorage = 10 * 1024; // 10 GB in MB
-        const systemSize = 486; // 系统占用 486 MB
+        const systemSize = 1126; // 系统占用 1.1 GB
         
         // 获取系统应用列表
         const systemApps = [
@@ -3860,9 +3906,9 @@ const SettingsApp = {
                     <div class="storage-bar-fill system" style="width: ${systemPercent.toFixed(1)}%"></div>
                 </div>
                 <div class="storage-legend">
-                    <span class="storage-legend-item"><span class="legend-dot apps"></span>${t('settings.storage-apps')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot system"></span>${t('settings.storage-system')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot available"></span>${t('settings.storage-available')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-apps"></span>${t('settings.storage-apps')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-system"></span>${t('settings.storage-system')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-available"></span>${t('settings.storage-available')}</span>
                 </div>
             </div>
         `;
@@ -4389,12 +4435,12 @@ const SettingsApp = {
                     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 setTimeout(() => {
                     State.updateSettings({ accentColorExpanded: false });
-                    this.render();
+                    this.refreshCurrentPage();
                 }, reducedMotion ? 0 : 260);
                 return;
             }
             State.updateSettings({ accentColorExpanded: true });
-            this.render();
+            this.refreshCurrentPage();
         });
         wrapper.appendChild(entry);
 
@@ -4407,7 +4453,7 @@ const SettingsApp = {
             });
             this.addRecentSetting(t('settings.accent-color'), normalized, 'personalization');
             State.addNotification({ title: t('settings.accent-color'), message: t('settings.accent-color-changed'), type: 'success' });
-            this.render();
+            this.refreshCurrentPage();
         };
 
         const createSwatch = (color) => {
@@ -4447,11 +4493,11 @@ const SettingsApp = {
                 if (next && State.updateAccentFromWallpaper) {
                     const color = await State.updateAccentFromWallpaper(State.settings.wallpaperDesktop);
                     if (color) {
-                        this.render();
+                        this.refreshCurrentPage();
                         return;
                     }
                 }
-                this.render();
+                this.refreshCurrentPage();
             }
         });
         autoRow.appendChild(autoToggle);
@@ -4470,7 +4516,7 @@ const SettingsApp = {
                     message: next ? t('settings.accent-readability-on') : t('settings.accent-readability-off'),
                     type: next ? 'info' : 'success'
                 });
-                this.render();
+                this.refreshCurrentPage();
             }
         });
         readabilityRow.appendChild(readabilityToggle);

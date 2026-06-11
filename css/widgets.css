@@ -160,8 +160,8 @@ body.widgets-edit-mode .fluent-widget:hover .fluent-widget-body {
 
 /* 编辑模式下已放置的小组件抖动（仿 iOS 编辑 App 图标）
    抖动只加在内层 body/移除按钮上，外壳 .fluent-widget 保持不动：
-   外壳承载静态模糊贴图(background-attachment:fixed / 锁屏坐标裁切)，
-   若在外壳上施加 transform 动画，浏览器会降级为实时 backdrop 采样。 */
+   外壳承载静态模糊贴图（坐标裁切），若在外壳上施加 transform 动画，
+   浏览器会降级为实时 backdrop 采样。 */
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-body,
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-remove {
     animation: widgetJiggleA 0.3s ease-in-out infinite;
@@ -2178,14 +2178,18 @@ body.has-foreground-window #desktop-widgets-layer .w-clock-tick::before {
 /* ============ 小组件静态模糊(GPU 减压) ============
    桌面小组件位于图标/窗口之下,其 backdrop-filter 只能采样到壁纸,
    因此用 JS 预生成的模糊壁纸贴图(--widgets-static-blur)替代实时模糊:
-   background-attachment: fixed 让贴图按视口对位,与真壁纸严丝合缝。
+   每张卡片按自身坐标裁切视口大小的贴图,避免 background-attachment:fixed
+   在父级 filter/transform 动画下突然失效。
    贴图仅在更换壁纸/调整窗口尺寸时重新生成;
    实验室"强制始终实时模糊"开启时 body 不会带 widgets-static-blur 类。 */
 /* 贴图画在外壳 .fluent-widget 上,内层 .fluent-widget-body 保留各自的
    主题色/半透明底色(w-weather 等渐变),叠加顺序与实时模糊完全一致:
    壁纸模糊贴图 → 主题/半透明底色 → 内容。 */
 body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget {
-    background: var(--widgets-static-blur, none) center center / cover no-repeat fixed;
+    background-image: var(--widgets-static-blur, none);
+    background-size: var(--widget-blur-viewport-w, 100vw) var(--widget-blur-viewport-h, 100vh);
+    background-position: var(--widget-blur-offset-x, 0px) var(--widget-blur-offset-y, 0px);
+    background-repeat: no-repeat;
 }
 
 body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget-body {

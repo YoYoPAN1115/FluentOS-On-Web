@@ -108,10 +108,12 @@ const Widgets = {
        壁纸贴图代替实时模糊;锁屏图层存在景深 filter/transform 过渡,
        使用静态贴图也能避免卡片采样不到背后的锁屏壁纸:
        - 仅在壁纸更换/视口尺寸变化时重新生成一次;
-       - background-attachment: fixed 让贴图自动与壁纸对位;
+       - 每张卡片按坐标裁切视口大小的模糊贴图,与壁纸对位;
        - 实验室"强制始终实时模糊"开关可恢复旧行为(forceRealtimeBlur)。 */
     _staticBlurUrls: { desktop: null, lock: null },
     _staticBlurSources: { desktop: null, lock: null },
+    _staticBlurCacheSrc: { desktop: null, lock: null },
+    _staticBlurGeneration: { desktop: 0, lock: 0 },
 
     _initStaticBlur() {
         State.on('settingsChange', (updates) => {
@@ -145,17 +147,36 @@ const Widgets = {
         this._refreshStaticBlurTextureFor('lock', State.settings && State.settings.wallpaperLock);
     },
 
+    _isCurrentStaticBlurGen(surface, generation) {
+        return generation === this._staticBlurGeneration[surface];
+    },
+
+    _failStaticBlurRefresh(surface, src) {
+        // 壁纸已更换时丢弃旧贴图；同壁纸仅尺寸刷新失败时保留旧贴图避免突然失效
+        if (this._staticBlurCacheSrc[surface] !== src) {
+            this._clearStaticBlurUrl(surface);
+        }
+        this._applyStaticBlurMode();
+    },
+
     _refreshStaticBlurTextureFor(surface, src) {
         this._setStaticBlurSource(surface, src);
         if (!src) {
             this._clearStaticBlurUrl(surface);
+            this._staticBlurCacheSrc[surface] = null;
             this._applyStaticBlurMode();
             return;
+        }
+        const prevSrc = this._staticBlurCacheSrc[surface];
+        const generation = ++this._staticBlurGeneration[surface];
+        if (prevSrc && prevSrc !== src) {
+            this._clearStaticBlurUrl(surface);
         }
         this._applyStaticBlurMode();
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
+            if (!this._isCurrentStaticBlurGen(surface, generation)) return;
             try {
                 const vw = Math.max(1, window.innerWidth);
                 const vh = Math.max(1, window.innerHeight);
@@ -176,26 +197,27 @@ const Widgets = {
                 const bleed = blurPx * 2;
                 ctx.drawImage(img, (cw - dw) / 2 - bleed, (ch - dh) / 2 - bleed, dw + bleed * 2, dh + bleed * 2);
                 canvas.toBlob((blob) => {
+                    if (!this._isCurrentStaticBlurGen(surface, generation)) return;
                     if (!blob) {
-                        this._clearStaticBlurUrl(surface);
-                        this._applyStaticBlurMode();
+                        this._failStaticBlurRefresh(surface, src);
                         return;
                     }
                     if (this._staticBlurUrls[surface]) URL.revokeObjectURL(this._staticBlurUrls[surface]);
                     this._staticBlurUrls[surface] = URL.createObjectURL(blob);
+                    this._staticBlurCacheSrc[surface] = src;
                     const cssVar = surface === 'lock' ? '--lock-widgets-static-blur' : '--widgets-static-blur';
                     document.documentElement.style.setProperty(cssVar, `url("${this._staticBlurUrls[surface]}")`);
                     this._applyStaticBlurMode();
                 }, 'image/jpeg', 0.85);
             } catch (err) {
+                if (!this._isCurrentStaticBlurGen(surface, generation)) return;
                 // 跨域壁纸等无法读取像素时,锁屏改用 CSS 壁纸回退,桌面保持实时模糊回退
-                this._clearStaticBlurUrl(surface);
-                this._applyStaticBlurMode();
+                this._failStaticBlurRefresh(surface, src);
             }
         };
         img.onerror = () => {
-            this._clearStaticBlurUrl(surface);
-            this._applyStaticBlurMode();
+            if (!this._isCurrentStaticBlurGen(surface, generation)) return;
+            this._failStaticBlurRefresh(surface, src);
         };
         img.src = src;
     },
@@ -217,6 +239,7 @@ const Widgets = {
             URL.revokeObjectURL(this._staticBlurUrls[surface]);
         }
         this._staticBlurUrls[surface] = null;
+        this._staticBlurCacheSrc[surface] = null;
         const cssVar = surface === 'lock' ? '--lock-widgets-static-blur' : '--widgets-static-blur';
         document.documentElement.style.removeProperty(cssVar);
     },
@@ -763,7 +786,7 @@ const Widgets = {
         el.style.top = `${px.y}px`;
         el.style.width = `${px.w}px`;
         el.style.height = `${px.h}px`;
-        if (surface === 'lock') {
+        if (surface === 'desktop' || surface === 'lock') {
             el.style.setProperty('--widget-blur-left', `${px.x}px`);
             el.style.setProperty('--widget-blur-top', `${px.y}px`);
             el.style.setProperty('--widget-blur-offset-x', `${-px.x}px`);
