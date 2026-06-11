@@ -923,7 +923,8 @@ const State = {
             '.settings-recent-item',
             '.network-option-item',
             '.app-list-item',
-            '.wallpaper-item'
+            '.wallpaper-item',
+            '.widgets-sidebar-item'
         ].join(',');
 
         document.addEventListener('pointermove', (event) => this.handleButtonGlowPointerMove(event), { passive: true });

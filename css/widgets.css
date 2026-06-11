@@ -74,10 +74,129 @@ body.widgets-edit-mode .fluent-widget .fluent-widget-body * {
     -webkit-backdrop-filter: none;
 }
 
+/* 小组件专用高光反馈：独立于通用按钮高光，开关仍跟随设置里的高光反馈。 */
+body.button-glow-enabled .widget-glow-target {
+    --widget-glow-x: 50%;
+    --widget-glow-y: 50%;
+}
+
+body.button-glow-enabled .widget-edge-glow,
+body.button-glow-enabled .widget-glow-ripple {
+    position: absolute;
+    pointer-events: none;
+    border-radius: 999px;
+    mix-blend-mode: screen;
+}
+
+body.button-glow-enabled .widget-edge-glow {
+    left: var(--widget-glow-x);
+    top: var(--widget-glow-y);
+    width: 190px;
+    height: 190px;
+    z-index: 6;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+    /* 不用 screen 混合：日历等浅色半透明卡片上白色高光会完全看不见 */
+    background:
+        radial-gradient(circle,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.34) 0%,
+            rgba(255, 255, 255, 0.38) 26%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.14) 50%,
+            transparent 74%);
+    filter: blur(8px);
+    mix-blend-mode: soft-light;
+    transition: opacity 150ms ease;
+}
+
+body.button-glow-enabled .widget-glow-target.widget-glow-hover > .widget-edge-glow {
+    opacity: 0.78;
+}
+
+body.button-glow-enabled .widget-glow-ripple {
+    z-index: 5;
+    transform: translate(-50%, -50%) scale(0);
+    background:
+        radial-gradient(circle,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.28) 0%,
+            rgba(255, 255, 255, 0.30) 32%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.10) 54%,
+            transparent 74%);
+    mix-blend-mode: soft-light;
+    animation: widget-glow-ripple-out 640ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+body.button-glow-enabled.dark-mode .widget-edge-glow {
+    background:
+        radial-gradient(circle,
+            rgba(255, 255, 255, 0.36) 0%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.24) 30%,
+            rgba(var(--accent-rgb, 0, 120, 212), 0.10) 52%,
+            transparent 76%);
+    mix-blend-mode: screen;
+}
+
+@keyframes widget-glow-ripple-out {
+    0% {
+        opacity: 0.8;
+        transform: translate(-50%, -50%) scale(0.12);
+        filter: blur(1px);
+    }
+    58% {
+        opacity: 0.34;
+        filter: blur(5px);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+        filter: blur(10px);
+    }
+}
+
 /* 编辑模式悬停高亮 */
 body.widgets-edit-mode .fluent-widget:hover .fluent-widget-body {
     outline: 2px solid rgba(255, 255, 255, 0.7);
     outline-offset: 2px;
+}
+
+/* 编辑模式下已放置的小组件抖动（仿 iOS 编辑 App 图标）
+   抖动只加在内层 body/移除按钮上，外壳 .fluent-widget 保持不动：
+   外壳承载静态模糊贴图(background-attachment:fixed / 锁屏坐标裁切)，
+   若在外壳上施加 transform 动画，浏览器会降级为实时 backdrop 采样。 */
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-body,
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-remove {
+    animation: widgetJiggleA 0.3s ease-in-out infinite;
+    transform-origin: 50% 50%;
+}
+
+/* 相邻小组件错相位 + 微调时长，避免整齐划一的机械感 */
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(2n) .fluent-widget-body,
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(2n) .fluent-widget-remove {
+    animation-name: widgetJiggleB;
+    animation-duration: 0.34s;
+    animation-delay: -0.1s;
+}
+
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(3n) .fluent-widget-body,
+body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(3n) .fluent-widget-remove {
+    animation-delay: -0.18s;
+}
+
+/* 拖动中（源组件已隐藏）与按下时停止抖动，方便瞄准 */
+body.widgets-edit-mode .widgets-layer .fluent-widget.dragging-source .fluent-widget-body,
+body.widgets-edit-mode .widgets-layer .fluent-widget.dragging-source .fluent-widget-remove,
+body.widgets-edit-mode .widgets-layer .fluent-widget:active .fluent-widget-body,
+body.widgets-edit-mode .widgets-layer .fluent-widget:active .fluent-widget-remove {
+    animation: none;
+}
+
+@keyframes widgetJiggleA {
+    0%, 100% { transform: rotate(-0.6deg) translateY(0.5px); }
+    50% { transform: rotate(0.7deg) translateY(-0.5px); }
+}
+
+@keyframes widgetJiggleB {
+    0%, 100% { transform: rotate(0.65deg) translateY(-0.4px); }
+    50% { transform: rotate(-0.7deg) translateY(0.5px); }
 }
 
 /* 正在被拖动的源组件隐藏 */
@@ -319,7 +438,7 @@ body:not(.animations-enabled) #widgets-collapsed-bar {
 .widgets-drawer-main {
     display: flex;
     gap: 14px;
-    height: clamp(280px, 44vh, 430px);
+    height: clamp(320px, 52vh, 500px);
     min-height: 0;
 }
 
@@ -448,6 +567,27 @@ body.accent-deep .widgets-sidebar-item.active img {
     display: none;
 }
 
+.widgets-variant-pager {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 28px;
+    overflow: hidden;
+}
+
+.widgets-variant-stage {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .widgets-variant-slide {
     flex: 0 0 auto;
     display: flex;
@@ -455,6 +595,10 @@ body.accent-deep .widgets-sidebar-item.active img {
     align-items: center;
     gap: 10px;
     scroll-snap-align: center;
+}
+
+.widgets-variant-active.switching {
+    animation: widgetVariantSwitchIn 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .widgets-variant-caption {
@@ -476,8 +620,7 @@ body.accent-deep .widgets-sidebar-item.active img {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 6px 0 2px;
+    padding: 2px 0 0;
 }
 
 .widgets-dots {
@@ -499,32 +642,14 @@ body.accent-deep .widgets-sidebar-item.active img {
     transform: scale(1.25);
 }
 
-.widgets-add-btn {
-    border: none;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 9px 28px;
-    cursor: pointer;
-    transition: background var(--transition-fast, 0.15s), transform var(--transition-fast, 0.15s);
-}
-
-.widgets-add-btn:hover {
-    background: var(--accent-hover);
-}
-
-.widgets-add-btn:active {
-    transform: scale(0.96);
-}
-
 /* —— 实时预览 —— */
 .widgets-preview-wrap {
     position: relative;
     overflow: visible;
     cursor: grab;
     flex-shrink: 0;
+    perspective: 900px;
+    transform-style: preserve-3d;
 }
 
 .widgets-preview-wrap:active {
@@ -537,6 +662,33 @@ body.accent-deep .widgets-sidebar-item.active img {
     left: 0;
     transform-origin: top left;
     pointer-events: none;
+    will-change: transform;
+    transform:
+        perspective(900px)
+        translateY(var(--widget-preview-lift, 0px))
+        rotateX(var(--widget-preview-tilt-x, 0deg))
+        rotateY(var(--widget-preview-tilt-y, 0deg))
+        scale(var(--widget-preview-scale, 1));
+    transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.widget-preview-inner .fluent-widget-body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        radial-gradient(circle at var(--widget-preview-glare-x, 50%) var(--widget-preview-glare-y, 50%),
+            rgba(255, 255, 255, 0.22),
+            transparent 44%);
+    opacity: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+}
+
+.widgets-preview-wrap:hover .widget-preview-inner .fluent-widget-body::after {
+    opacity: 0.72;
 }
 
 .widget-preview-inner .fluent-widget-body,
@@ -544,11 +696,20 @@ body.accent-deep .widgets-sidebar-item.active img {
     pointer-events: none;
 }
 
-.widgets-drawer-hint {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    text-align: center;
-    padding-bottom: 2px;
+body:not(.animations-enabled) .widget-preview-inner,
+body:not(.animations-enabled) .widget-preview-inner .fluent-widget-body::after {
+    transition: none;
+}
+
+@keyframes widgetVariantSwitchIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 /* ===== 5. 拖拽幽灵 ===== */
@@ -1932,6 +2093,12 @@ body.has-foreground-window #desktop-widgets-layer .fluent-widget-body * {
     text-shadow: none !important;
 }
 
+/* 退避期间小组件高光同步关闭（已存在的高光/波纹立即隐藏） */
+body.has-foreground-window #desktop-widgets-layer .widget-edge-glow,
+body.has-foreground-window #desktop-widgets-layer .widget-glow-ripple {
+    display: none !important;
+}
+
 /* 彩色子元素背景统一中性化 */
 body.has-foreground-window #desktop-widgets-layer .w-cal-item {
     background: rgba(128, 128, 128, 0.1) !important;
@@ -2022,6 +2189,49 @@ body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widg
 }
 
 body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget-body {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.widgets-lock-static-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget {
+    background-image: var(--lock-widgets-static-blur, none);
+    background-size: var(--widget-blur-viewport-w, 100vw) var(--widget-blur-viewport-h, 100vh);
+    background-position: var(--widget-blur-offset-x, 0px) var(--widget-blur-offset-y, 0px);
+    background-repeat: no-repeat;
+}
+
+body.widgets-lock-static-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget-body {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Canvas 无法读取跨域锁屏壁纸时，使用卡片内壁纸层代替实时 backdrop-filter。 */
+body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget {
+    isolation: isolate;
+}
+
+body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background-image: var(--lock-widgets-blur-source, none);
+    background-size: var(--widget-blur-viewport-w, 100vw) var(--widget-blur-viewport-h, 100vh);
+    background-position: var(--widget-blur-offset-x, 0px) var(--widget-blur-offset-y, 0px);
+    background-repeat: no-repeat;
+    filter: blur(var(--blur-lg)) saturate(150%);
+    transform: scale(1.12);
+    clip-path: inset(0 round 20px);
+    pointer-events: none;
+}
+
+body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget.capsule::before {
+    clip-path: inset(0 round 999px);
+}
+
+body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget-body {
+    z-index: 1;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }

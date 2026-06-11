@@ -51,6 +51,7 @@ const Widgets = {
         this._createMenu();
         this.renderAll();
         this._initStaticBlur();
+        this._initWidgetGlow();
 
         State.on('languageChange', () => {
             this.updateTexts();
@@ -103,17 +104,23 @@ const Widgets = {
     },
 
     /* ============ 小组件静态模糊(降低 GPU 实时模糊压力) ============
-       桌面小组件的 backdrop-filter 只会采样到壁纸(它们位于图标/窗口之下),
-       所以可以用一张预先模糊好的壁纸贴图代替实时模糊:
+       小组件的 backdrop-filter 只需要采样壁纸,所以可以用一张预先模糊好的
+       壁纸贴图代替实时模糊;锁屏图层存在景深 filter/transform 过渡,
+       使用静态贴图也能避免卡片采样不到背后的锁屏壁纸:
        - 仅在壁纸更换/视口尺寸变化时重新生成一次;
        - background-attachment: fixed 让贴图自动与壁纸对位;
        - 实验室"强制始终实时模糊"开关可恢复旧行为(forceRealtimeBlur)。 */
-    _staticBlurUrl: null,
+    _staticBlurUrls: { desktop: null, lock: null },
+    _staticBlurSources: { desktop: null, lock: null },
 
     _initStaticBlur() {
         State.on('settingsChange', (updates) => {
             if (!updates) return;
-            if (updates.wallpaperDesktop !== undefined || updates.forceRealtimeBlur !== undefined) {
+            if (
+                updates.wallpaperDesktop !== undefined ||
+                updates.wallpaperLock !== undefined ||
+                updates.forceRealtimeBlur !== undefined
+            ) {
                 this._refreshStaticBlurTexture();
             }
         }, { key: 'Widgets.staticBlur' });
@@ -121,8 +128,12 @@ const Widgets = {
     },
 
     _applyStaticBlurMode() {
-        const enabled = State.settings.forceRealtimeBlur !== true && !!this._staticBlurUrl;
-        document.body.classList.toggle('widgets-static-blur', enabled);
+        const enabled = State.settings.forceRealtimeBlur !== true;
+        const hasLockStaticBlur = !!this._staticBlurUrls.lock;
+        const hasLockFallbackBlur = !hasLockStaticBlur && !!this._staticBlurSources.lock;
+        document.body.classList.toggle('widgets-static-blur', enabled && !!this._staticBlurUrls.desktop);
+        document.body.classList.toggle('widgets-lock-static-blur', enabled && hasLockStaticBlur);
+        document.body.classList.toggle('widgets-lock-fallback-blur', enabled && hasLockFallbackBlur);
     },
 
     _refreshStaticBlurTexture() {
@@ -130,8 +141,18 @@ const Widgets = {
             this._applyStaticBlurMode();
             return;
         }
-        const src = State.settings && State.settings.wallpaperDesktop;
-        if (!src) return;
+        this._refreshStaticBlurTextureFor('desktop', State.settings && State.settings.wallpaperDesktop);
+        this._refreshStaticBlurTextureFor('lock', State.settings && State.settings.wallpaperLock);
+    },
+
+    _refreshStaticBlurTextureFor(surface, src) {
+        this._setStaticBlurSource(surface, src);
+        if (!src) {
+            this._clearStaticBlurUrl(surface);
+            this._applyStaticBlurMode();
+            return;
+        }
+        this._applyStaticBlurMode();
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
@@ -155,23 +176,49 @@ const Widgets = {
                 const bleed = blurPx * 2;
                 ctx.drawImage(img, (cw - dw) / 2 - bleed, (ch - dh) / 2 - bleed, dw + bleed * 2, dh + bleed * 2);
                 canvas.toBlob((blob) => {
-                    if (!blob) { this._applyStaticBlurMode(); return; }
-                    if (this._staticBlurUrl) URL.revokeObjectURL(this._staticBlurUrl);
-                    this._staticBlurUrl = URL.createObjectURL(blob);
-                    document.documentElement.style.setProperty('--widgets-static-blur', `url("${this._staticBlurUrl}")`);
+                    if (!blob) {
+                        this._clearStaticBlurUrl(surface);
+                        this._applyStaticBlurMode();
+                        return;
+                    }
+                    if (this._staticBlurUrls[surface]) URL.revokeObjectURL(this._staticBlurUrls[surface]);
+                    this._staticBlurUrls[surface] = URL.createObjectURL(blob);
+                    const cssVar = surface === 'lock' ? '--lock-widgets-static-blur' : '--widgets-static-blur';
+                    document.documentElement.style.setProperty(cssVar, `url("${this._staticBlurUrls[surface]}")`);
                     this._applyStaticBlurMode();
                 }, 'image/jpeg', 0.85);
             } catch (err) {
-                // 跨域壁纸等无法读取像素时,保持实时模糊回退
-                this._staticBlurUrl = null;
+                // 跨域壁纸等无法读取像素时,锁屏改用 CSS 壁纸回退,桌面保持实时模糊回退
+                this._clearStaticBlurUrl(surface);
                 this._applyStaticBlurMode();
             }
         };
         img.onerror = () => {
-            this._staticBlurUrl = null;
+            this._clearStaticBlurUrl(surface);
             this._applyStaticBlurMode();
         };
         img.src = src;
+    },
+
+    _setStaticBlurSource(surface, src) {
+        const cssVar = surface === 'lock' ? '--lock-widgets-blur-source' : '--widgets-blur-source';
+        if (!src) {
+            this._staticBlurSources[surface] = null;
+            document.documentElement.style.removeProperty(cssVar);
+            return;
+        }
+        const safeSrc = String(src).replace(/\\/g, '/').replace(/"/g, '\\"');
+        this._staticBlurSources[surface] = safeSrc;
+        document.documentElement.style.setProperty(cssVar, `url("${safeSrc}")`);
+    },
+
+    _clearStaticBlurUrl(surface) {
+        if (this._staticBlurUrls[surface]) {
+            URL.revokeObjectURL(this._staticBlurUrls[surface]);
+        }
+        this._staticBlurUrls[surface] = null;
+        const cssVar = surface === 'lock' ? '--lock-widgets-static-blur' : '--widgets-static-blur';
+        document.documentElement.style.removeProperty(cssVar);
     },
 
     _createLayers() {
@@ -216,7 +263,6 @@ const Widgets = {
                     <div class="widgets-sidebar"></div>
                     <div class="widgets-page"></div>
                 </div>
-                <div class="widgets-drawer-hint"></div>
             </div>`;
         document.body.appendChild(wrap);
         this.drawer = wrap;
@@ -317,7 +363,7 @@ const Widgets = {
         page.appendChild(grid);
     },
 
-    /** 应用页：单个小组件多形态横向选择 */
+    /** 应用页：一个形态一页，滚轮切换 */
     _renderAppPage(page, app) {
         if (!app) return;
         page.innerHTML = `
@@ -325,73 +371,64 @@ const Widgets = {
                 <div class="widgets-app-name">${t(app.nameKey)}</div>
                 <div class="widgets-app-desc">${t(app.descKey)}</div>
             </div>
-            <div class="widgets-variant-scroller"></div>
+            <div class="widgets-variant-pager">
+                <div class="widgets-variant-stage"></div>
+            </div>
             <div class="widgets-app-footer">
                 <div class="widgets-dots"></div>
-                <button class="widgets-add-btn">＋ ${t('widgets.drawer.add')}</button>
             </div>`;
 
-        const scroller = page.querySelector('.widgets-variant-scroller');
+        const pager = page.querySelector('.widgets-variant-pager');
+        const stage = page.querySelector('.widgets-variant-stage');
         const dotsEl = page.querySelector('.widgets-dots');
+        const variants = app.variants || [];
+        if (variants.length === 0) return;
 
-        app.variants.forEach((variant, idx) => {
+        const renderVariant = (idx, animate = true) => {
+            const total = variants.length;
+            this._currentVariantIdx = ((idx % total) + total) % total;
+            const variant = variants[this._currentVariantIdx];
+            stage.innerHTML = '';
             const slide = document.createElement('div');
-            slide.className = 'widgets-variant-slide';
-            slide.dataset.idx = idx;
+            slide.className = 'widgets-variant-slide widgets-variant-active';
+            slide.dataset.idx = this._currentVariantIdx;
+            if (animate) slide.classList.add('switching');
             const pitch = this.GRID.cell + this.GRID.gap;
             const wpx = variant.w * pitch - this.GRID.gap;
             const hpx = variant.h * pitch - this.GRID.gap;
-            const scale = Math.min(1, 210 / hpx, 330 / wpx);
+            const scale = Math.min(1, 310 / hpx, 430 / wpx);
             slide.appendChild(this._buildPreview(variant, scale));
             const cap = document.createElement('div');
             cap.className = 'widgets-variant-caption';
             cap.innerHTML = `<span>${t(variant.sizeKey)}</span><span class="dim">${variant.w} × ${variant.h}</span>`;
             slide.appendChild(cap);
-            scroller.appendChild(slide);
+            stage.appendChild(slide);
 
+            dotsEl.querySelectorAll('.widgets-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === this._currentVariantIdx);
+            });
+        };
+
+        variants.forEach((variant, idx) => {
             const dot = document.createElement('div');
             dot.className = 'widgets-dot';
-            dot.addEventListener('click', () => {
-                slide.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            });
+            dot.title = `${t(variant.sizeKey)} ${variant.w} × ${variant.h}`;
+            dot.addEventListener('click', () => renderVariant(idx));
             dotsEl.appendChild(dot);
         });
 
-        // 鼠标滚轮纵向滚动 → 横向滚动选择不同尺寸
-        scroller.addEventListener('wheel', (e) => {
-            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-                e.preventDefault();
-                scroller.scrollLeft += e.deltaY;
-            }
+        let lastWheelAt = 0;
+        pager.addEventListener('wheel', (e) => {
+            const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+            if (!delta || variants.length <= 1) return;
+            e.preventDefault();
+            const now = performance.now();
+            if (now - lastWheelAt < 260) return;
+            lastWheelAt = now;
+            renderVariant(this._currentVariantIdx + (delta > 0 ? 1 : -1));
         }, { passive: false });
 
-        // 滚动时更新当前形态指示
-        const syncDots = () => {
-            const center = scroller.scrollLeft + scroller.clientWidth / 2;
-            let best = 0;
-            let bestDist = Infinity;
-            scroller.querySelectorAll('.widgets-variant-slide').forEach((slide, idx) => {
-                const slideCenter = slide.offsetLeft + slide.offsetWidth / 2;
-                const dist = Math.abs(slideCenter - center);
-                if (dist < bestDist) { bestDist = dist; best = idx; }
-            });
-            this._currentVariantIdx = best;
-            dotsEl.querySelectorAll('.widgets-dot').forEach((d, i) => {
-                d.classList.toggle('active', i === best);
-            });
-        };
-        let rafPending = false;
-        scroller.addEventListener('scroll', () => {
-            if (rafPending) return;
-            rafPending = true;
-            requestAnimationFrame(() => { rafPending = false; syncDots(); });
-        });
-        requestAnimationFrame(syncDots);
-
-        page.querySelector('.widgets-add-btn').addEventListener('click', () => {
-            const variant = app.variants[this._currentVariantIdx];
-            if (variant) this._addToFirstFreeSlot(variant);
-        });
+        renderVariant(this._currentVariantIdx, false);
     },
 
     /** 构建一个可拖动的实时预览 */
@@ -411,7 +448,7 @@ const Widgets = {
         if (variant.h === 1) inner.classList.add('capsule');
         inner.style.width = `${wpx}px`;
         inner.style.height = `${hpx}px`;
-        inner.style.transform = `scale(${scale})`;
+        inner.style.setProperty('--widget-preview-scale', scale);
         wrap.appendChild(inner);
 
         const body = document.createElement('div');
@@ -432,7 +469,145 @@ const Widgets = {
             this._bindDragListeners();
         });
 
+        this._bindPreviewMotion(wrap, inner);
         return wrap;
+    },
+
+    _bindPreviewMotion(wrap, inner) {
+        const reset = () => {
+            inner.style.setProperty('--widget-preview-tilt-x', '0deg');
+            inner.style.setProperty('--widget-preview-tilt-y', '0deg');
+            inner.style.setProperty('--widget-preview-lift', '0px');
+            inner.style.setProperty('--widget-preview-glare-x', '50%');
+            inner.style.setProperty('--widget-preview-glare-y', '50%');
+        };
+        reset();
+
+        wrap.addEventListener('pointermove', (e) => {
+            if (this._drag || this._pendingDrag) return;
+            const rect = wrap.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+            const px = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const py = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+            inner.style.setProperty('--widget-preview-tilt-x', `${((0.5 - py) * 11).toFixed(2)}deg`);
+            inner.style.setProperty('--widget-preview-tilt-y', `${((px - 0.5) * 13).toFixed(2)}deg`);
+            inner.style.setProperty('--widget-preview-lift', '-7px');
+            inner.style.setProperty('--widget-preview-glare-x', `${(px * 100).toFixed(1)}%`);
+            inner.style.setProperty('--widget-preview-glare-y', `${(py * 100).toFixed(1)}%`);
+        });
+        wrap.addEventListener('pointerleave', reset);
+        wrap.addEventListener('pointercancel', reset);
+    },
+
+    _initWidgetGlow() {
+        if (this._widgetGlowReady || typeof document === 'undefined') return;
+        this._widgetGlowReady = true;
+        this._widgetGlowTarget = null;
+        this._widgetGlowHost = null;
+
+        document.addEventListener('pointermove', (event) => this._handleWidgetGlowMove(event), { passive: true });
+        document.addEventListener('pointerout', (event) => this._handleWidgetGlowOut(event), { passive: true });
+        document.addEventListener('pointerdown', (event) => this._handleWidgetGlowDown(event), { passive: true });
+
+        State.on('settingsChange', (updates) => {
+            if (updates && updates.enableButtonGlowEffect === false) {
+                this._clearWidgetGlowTarget();
+            }
+        }, { key: 'Widgets.glow' });
+    },
+
+    _getWidgetGlowHit(source) {
+        if (!source || !document.body.classList.contains('button-glow-enabled')) return null;
+
+        const preview = source.closest ? source.closest('.widgets-preview-wrap') : null;
+        if (preview) {
+            const target = preview.querySelector('.fluent-widget-body');
+            return target ? { host: preview, target } : null;
+        }
+
+        const widget = source.closest ? source.closest('.fluent-widget') : null;
+        if (!widget || widget.classList.contains('widget-ghost')) return null;
+        // 前台有未最小化窗口时，桌面小组件处于半透明退避状态，
+        // 高光与该状态同步暂时关闭（窗口全部关闭/最小化后自动恢复）
+        if (document.body.classList.contains('has-foreground-window') &&
+            widget.closest('#desktop-widgets-layer')) {
+            return null;
+        }
+        const target = widget.querySelector('.fluent-widget-body');
+        return target ? { host: widget, target } : null;
+    },
+
+    _prepareWidgetGlowTarget(target) {
+        if (!target) return;
+        target.classList.add('widget-glow-target');
+        // 日历等小组件会定时重写 body.innerHTML，需检测并补回被清掉的高光层
+        if (!target.querySelector(':scope > .widget-edge-glow')) {
+            const edge = document.createElement('span');
+            edge.className = 'widget-edge-glow';
+            edge.setAttribute('aria-hidden', 'true');
+            target.appendChild(edge);
+        }
+        target.dataset.widgetGlowReady = 'true';
+    },
+
+    _clearWidgetGlowTarget(target = this._widgetGlowTarget) {
+        if (!target) return;
+        target.classList.remove('widget-glow-hover');
+        if (this._widgetGlowTarget === target) {
+            this._widgetGlowTarget = null;
+            this._widgetGlowHost = null;
+        }
+    },
+
+    _updateWidgetGlowPosition(target, event) {
+        const rect = target.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+        target.style.setProperty('--widget-glow-x', `${x}px`);
+        target.style.setProperty('--widget-glow-y', `${y}px`);
+    },
+
+    _handleWidgetGlowMove(event) {
+        const hit = this._getWidgetGlowHit(event.target);
+        if (!hit) {
+            this._clearWidgetGlowTarget();
+            return;
+        }
+        this._prepareWidgetGlowTarget(hit.target);
+        if (this._widgetGlowTarget && this._widgetGlowTarget !== hit.target) {
+            this._clearWidgetGlowTarget(this._widgetGlowTarget);
+        }
+        this._widgetGlowTarget = hit.target;
+        this._widgetGlowHost = hit.host;
+        this._updateWidgetGlowPosition(hit.target, event);
+        hit.target.classList.add('widget-glow-hover');
+    },
+
+    _handleWidgetGlowOut(event) {
+        if (!this._widgetGlowTarget) return;
+        const related = event.relatedTarget;
+        if (related && this._widgetGlowHost && this._widgetGlowHost.contains(related)) return;
+        this._clearWidgetGlowTarget();
+    },
+
+    _handleWidgetGlowDown(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        const hit = this._getWidgetGlowHit(event.target);
+        if (!hit) return;
+        this._prepareWidgetGlowTarget(hit.target);
+        this._updateWidgetGlowPosition(hit.target, event);
+        const rect = hit.target.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height) * 1.9;
+        const ripple = document.createElement('span');
+        ripple.className = 'widget-glow-ripple';
+        ripple.setAttribute('aria-hidden', 'true');
+        ripple.style.width = `${size}px`;
+        ripple.style.height = `${size}px`;
+        ripple.style.left = `${event.clientX - rect.left}px`;
+        ripple.style.top = `${event.clientY - rect.top}px`;
+        hit.target.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     },
 
     /** 「添加」按钮：放到当前编辑表面的第一个空位 */
@@ -466,8 +641,6 @@ const Widgets = {
         this.drawer.querySelector('#widgets-lock-btn').textContent =
             this.lockEditMode ? t('widgets.drawer.back-desktop') : t('widgets.drawer.edit-lock');
         this.drawer.querySelector('#widgets-done-btn').textContent = t('widgets.drawer.done');
-        this.drawer.querySelector('.widgets-drawer-hint').textContent =
-            this.lockEditMode ? t('widgets.drawer.hint-lock') : t('widgets.drawer.hint-desktop');
 
         this.drawer.querySelector('#widgets-collapse-btn').textContent = t('widgets.drawer.collapse');
         if (this.collapsedBar) {
@@ -590,6 +763,14 @@ const Widgets = {
         el.style.top = `${px.y}px`;
         el.style.width = `${px.w}px`;
         el.style.height = `${px.h}px`;
+        if (surface === 'lock') {
+            el.style.setProperty('--widget-blur-left', `${px.x}px`);
+            el.style.setProperty('--widget-blur-top', `${px.y}px`);
+            el.style.setProperty('--widget-blur-offset-x', `${-px.x}px`);
+            el.style.setProperty('--widget-blur-offset-y', `${-px.y}px`);
+            el.style.setProperty('--widget-blur-viewport-w', `${window.innerWidth}px`);
+            el.style.setProperty('--widget-blur-viewport-h', `${window.innerHeight}px`);
+        }
 
         const body = document.createElement('div');
         body.className = `fluent-widget-body ${def.theme || ''}`;
@@ -718,6 +899,7 @@ const Widgets = {
         if (this.isOpen) return;
         this.isOpen = true;
         this.collapsed = false;
+        clearTimeout(this._pageClearTimer);
         if (this.collapsedBar) this.collapsedBar.classList.remove('show');
         this._minimizeOpenWindows();
         document.body.classList.add('widgets-edit-mode');
@@ -746,9 +928,14 @@ const Widgets = {
         this.drawer.classList.remove('open');
         if (this.collapsedBar) this.collapsedBar.classList.remove('show');
         document.body.classList.remove('widgets-edit-mode');
-        // 清空页面内容，停止预览中的定时器
-        const page = this.drawer.querySelector('.widgets-page');
-        if (page) page.innerHTML = '';
+        // 等滑出过渡（0.62s）结束后再清空页面内容（停止预览中的定时器），
+        // 避免收起过程中抽屉里的小组件预览瞬间消失
+        clearTimeout(this._pageClearTimer);
+        this._pageClearTimer = setTimeout(() => {
+            if (this.isOpen) return;
+            const page = this.drawer.querySelector('.widgets-page');
+            if (page) page.innerHTML = '';
+        }, 650);
         this._restoreMinimizedWindows();
     },
 
