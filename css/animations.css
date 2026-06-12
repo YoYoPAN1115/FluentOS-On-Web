@@ -355,9 +355,28 @@ body.animations-enabled .control-center.closing {
     }
 }
 
+@keyframes windowForegroundSwitch {
+    0% {
+        opacity: 0.72;
+        transform: translateY(7px) scale(0.985);
+    }
+    58% {
+        opacity: 1;
+        transform: translateY(-1px) scale(1.006);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 /* 窗口打开动画 */
 body.animations-enabled .window.opening {
     animation: windowOpen 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.animations-enabled .window.window-foreground-switch {
+    animation: windowForegroundSwitch 0.26s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* 窗口关闭动画 */

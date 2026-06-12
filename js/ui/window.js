@@ -367,6 +367,19 @@ const WindowManager = {
         });
     },
 
+    _playForegroundSwitchMotion(windowData) {
+        if (!windowData || !windowData.element || !this._isAnimationEnabled()) return;
+        const el = windowData.element;
+        el.classList.remove('window-foreground-switch');
+        void el.offsetWidth;
+        el.classList.add('window-foreground-switch');
+        clearTimeout(windowData._foregroundSwitchTimer);
+        windowData._foregroundSwitchTimer = setTimeout(() => {
+            el.classList.remove('window-foreground-switch');
+            windowData._foregroundSwitchTimer = null;
+        }, 280);
+    },
+
     _bindDesktopInactivityListener() {
         if (this._desktopInactivityBound || typeof document === 'undefined') return;
         this._desktopInactivityBound = true;
@@ -1552,12 +1565,22 @@ const WindowManager = {
             return;
         }
 
-        this._syncZIndexCounter();
-        windowData.element.style.zIndex = ++this.zIndexCounter;
+        const previousActiveId = this.activeWindowId;
+        const alreadyActive = previousActiveId === windowId &&
+            windowData.element &&
+            !windowData.element.classList.contains('window-inactive');
+
+        if (!alreadyActive) {
+            this._syncZIndexCounter();
+            windowData.element.style.zIndex = ++this.zIndexCounter;
+        }
         this._setActiveWindow(windowId);
         this._syncAllTaskbarAppStates();
         this._syncWidgetDimState();
         this._setTaskbarIndicatorForWindow(windowData, true);
+        if (previousActiveId && previousActiveId !== windowId) {
+            this._playForegroundSwitchMotion(windowData);
+        }
 
         if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
             Fingo._ensurePanelForeground();

@@ -1964,6 +1964,7 @@ const AppShop = {
 
     // 只更新应用列表（不重新渲染搜索框）
     updateAppsList() {
+        if (!this.container) return;
         this.render({ preserveScroll: true });
     },
     

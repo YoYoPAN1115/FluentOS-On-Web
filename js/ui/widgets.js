@@ -41,6 +41,8 @@ const Widgets = {
     _resizeTimer: null,
     _listenersBound: false,
     _menuEl: null,
+    _editorOverlay: null,
+    _editingWidget: null,
 
     /* ==================== 初始化 ==================== */
 
@@ -69,6 +71,10 @@ const Widgets = {
         });
 
         document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this._editorOverlay) {
+                this.closeWidgetEditor();
+                return;
+            }
             if (e.key === 'Escape' && this.isOpen && !this._drag) {
                 this.done();
             }
@@ -131,9 +137,12 @@ const Widgets = {
 
     _applyStaticBlurMode() {
         const enabled = State.settings.forceRealtimeBlur !== true;
+        const hasDesktopStaticBlur = !!this._staticBlurUrls.desktop;
+        const hasDesktopFallbackBlur = !hasDesktopStaticBlur && !!this._staticBlurSources.desktop;
         const hasLockStaticBlur = !!this._staticBlurUrls.lock;
         const hasLockFallbackBlur = !hasLockStaticBlur && !!this._staticBlurSources.lock;
-        document.body.classList.toggle('widgets-static-blur', enabled && !!this._staticBlurUrls.desktop);
+        document.body.classList.toggle('widgets-static-blur', enabled && hasDesktopStaticBlur);
+        document.body.classList.toggle('widgets-desktop-fallback-blur', enabled && hasDesktopFallbackBlur);
         document.body.classList.toggle('widgets-lock-static-blur', enabled && hasLockStaticBlur);
         document.body.classList.toggle('widgets-lock-fallback-blur', enabled && hasLockFallbackBlur);
     },
@@ -149,6 +158,18 @@ const Widgets = {
 
     _isCurrentStaticBlurGen(surface, generation) {
         return generation === this._staticBlurGeneration[surface];
+    },
+
+    /** file:// 或同源相对路径无需 CORS；跨域 http(s) 壁纸才需要 anonymous */
+    _useCrossOriginForStaticBlur(src) {
+        if (!src || typeof location === 'undefined') return false;
+        if (location.protocol === 'file:') return false;
+        try {
+            const resolved = new URL(src, location.href);
+            return resolved.origin !== location.origin;
+        } catch {
+            return false;
+        }
     },
 
     _failStaticBlurRefresh(surface, src) {
@@ -174,7 +195,9 @@ const Widgets = {
         }
         this._applyStaticBlurMode();
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (this._useCrossOriginForStaticBlur(src)) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => {
             if (!this._isCurrentStaticBlurGen(surface, generation)) return;
             try {
@@ -809,6 +832,18 @@ const Widgets = {
         });
         el.appendChild(removeBtn);
 
+        if (typeof def.renderEditor === 'function') {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'fluent-widget-edit';
+            editBtn.title = '编辑小组件';
+            editBtn.innerHTML = `<img src="Theme/Icon/Symbol_icon/stroke/Dots Horizontal.svg" alt="...">`;
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openWidgetEditor(surface, inst.id);
+            });
+            el.appendChild(editBtn);
+        }
+
         const ctx = this._renderContent(body, def, inst, surface);
 
         if (def.onClick && surface === 'desktop') {
@@ -828,17 +863,16 @@ const Widgets = {
         el.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const items = def.getMenu ? def.getMenu(ctx) : null;
-            if (items && items.length > 0) {
-                this._showWidgetMenu(e.clientX, e.clientY, items);
-            }
+            if (this.isOpen) return;
+            const items = this._getWidgetContextItems(def, inst, surface);
+            this._showWidgetMenu(e.clientX, e.clientY, items);
         });
 
         // 拖动调整位置：编辑模式下全部可拖；桌面上的小组件平时也可随时拖动
         el.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
             if (!this.isOpen && surface !== 'desktop') return;
-            if (e.target.closest('.fluent-widget-remove')) return;
+            if (e.target.closest('.fluent-widget-remove, .fluent-widget-edit')) return;
             // 普通模式下不抢占小组件内部交互（输入框、按钮等）
             if (!this.isOpen && e.target.closest('input, textarea, select, button, a')) return;
             e.preventDefault();
@@ -887,6 +921,120 @@ const Widgets = {
 
     /* ==================== 小组件右键菜单 ==================== */
 
+    _getWidgetContextItems(def, inst, surface) {
+        const items = [];
+        if (typeof def.renderEditor === 'function') {
+            items.push({
+                label: '编辑小组件',
+                icon: 'Theme/Icon/Symbol_icon/stroke/Edit.svg',
+                action: () => this.openWidgetEditor(surface, inst.id)
+            });
+        }
+        items.push({
+            label: '删除',
+            icon: 'Theme/Icon/Symbol_icon/stroke/Trash.svg',
+            danger: true,
+            action: () => this.removeWidget(surface, inst.id)
+        });
+        return items;
+    },
+
+    _createEditorContext(def, instance, surface) {
+        return {
+            instance,
+            surface,
+            isPreview: false,
+            setSettings: (patch, opts = {}) => {
+                if (!instance) return;
+                instance.settings = Object.assign({}, instance.settings, patch);
+                this.saveLayout(this.getLayout());
+                if (!opts.silent) this.renderSurface(surface);
+            },
+            closeEditor: () => this.closeWidgetEditor()
+        };
+    },
+
+    openWidgetEditor(surface, instanceId) {
+        if (this._editorOverlay) return;
+        const layout = this.getLayout();
+        const inst = layout[surface]?.find(item => item.id === instanceId);
+        const def = inst ? this.registry.find(item => item.id === inst.widgetId) : null;
+        if (!inst || !def || typeof def.renderEditor !== 'function') return;
+
+        const sourceEl = this.layers[surface]?.querySelector(`.fluent-widget[data-instance-id="${instanceId}"]`);
+        if (!sourceEl) return;
+
+        const rect = sourceEl.getBoundingClientRect();
+        const overlay = document.createElement('div');
+        overlay.className = 'widget-edit-overlay';
+        overlay.innerHTML = `
+            <div class="widget-edit-backdrop"></div>
+            <button class="widget-edit-done" type="button" title="完成">
+                <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="完成">
+            </button>
+            <div class="widget-edit-card">
+                <div class="widget-edit-flipper">
+                    <div class="widget-edit-face widget-edit-front"></div>
+                    <div class="widget-edit-face widget-edit-back"></div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const card = overlay.querySelector('.widget-edit-card');
+        const front = overlay.querySelector('.widget-edit-front');
+        const back = overlay.querySelector('.widget-edit-back');
+        const targetW = Math.min(window.innerWidth - 40, Math.max(rect.width * 1.22, def.h === 1 ? 520 : 420));
+        const targetH = Math.min(window.innerHeight - 120, Math.max(rect.height * 1.28, def.h === 1 ? 260 : 360));
+        card.style.setProperty('--edit-start-left', `${rect.left}px`);
+        card.style.setProperty('--edit-start-top', `${rect.top}px`);
+        card.style.setProperty('--edit-start-width', `${rect.width}px`);
+        card.style.setProperty('--edit-start-height', `${rect.height}px`);
+        card.style.setProperty('--edit-target-width', `${Math.round(targetW)}px`);
+        card.style.setProperty('--edit-target-height', `${Math.round(targetH)}px`);
+
+        const frontBody = document.createElement('div');
+        frontBody.className = `fluent-widget-body ${def.theme || ''}`;
+        front.appendChild(frontBody);
+        this._renderContent(frontBody, def, inst, 'preview');
+
+        const ctx = this._createEditorContext(def, inst, surface);
+        try {
+            def.renderEditor(back, ctx);
+        } catch (err) {
+            console.warn('[Widgets] editor render error:', def.id, err);
+            back.innerHTML = `<div class="widget-edit-panel"><div class="w-loading">${t('widgets.error')}</div></div>`;
+        }
+
+        const resumeDrawer = this.isOpen && !this.collapsed;
+        if (resumeDrawer) this._hideDrawerTemp();
+        sourceEl.classList.add('widget-edit-source-hidden');
+        document.body.classList.add('widget-editor-active');
+        this._editingWidget = { surface, instanceId, sourceEl, resumeDrawer };
+        this._editorOverlay = overlay;
+
+        overlay.querySelector('.widget-edit-done').addEventListener('click', () => this.closeWidgetEditor());
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => overlay.classList.add('active'));
+        });
+    },
+
+    closeWidgetEditor(options = {}) {
+        const overlay = this._editorOverlay;
+        const editing = this._editingWidget;
+        if (!overlay || !editing) return;
+
+        overlay.classList.remove('active');
+        overlay.classList.add('closing');
+        document.body.classList.remove('widget-editor-active');
+        editing.sourceEl?.classList.remove('widget-edit-source-hidden');
+        this.renderSurface(editing.surface);
+        if (editing.resumeDrawer && options.resumeDrawer !== false) this._showDrawerAgain(300);
+
+        this._editorOverlay = null;
+        this._editingWidget = null;
+        setTimeout(() => overlay.remove(), 360);
+    },
+
     _createMenu() {
         const menu = document.createElement('div');
         menu.className = 'context-menu hidden';
@@ -902,7 +1050,10 @@ const Widgets = {
         items.forEach(item => {
             const row = document.createElement('div');
             row.className = 'context-menu-item';
-            row.innerHTML = `<span class="widget-menu-check">${item.checked ? '✓' : ''}</span><span>${item.label}</span>`;
+            if (item.danger) row.classList.add('danger');
+            row.innerHTML = item.icon
+                ? `<img src="${item.icon}" alt=""><span>${item.label}</span>`
+                : `<span class="widget-menu-check">${item.checked ? '&#10003;' : ''}</span><span>${item.label}</span>`;
             row.addEventListener('click', () => {
                 menu.classList.add('hidden');
                 if (item.action) item.action();
@@ -910,7 +1061,6 @@ const Widgets = {
             menu.appendChild(row);
         });
         menu.classList.remove('hidden');
-        // 防止超出视口
         const rect = menu.getBoundingClientRect();
         menu.style.left = `${Math.min(x, window.innerWidth - rect.width - 8)}px`;
         menu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
@@ -942,6 +1092,7 @@ const Widgets = {
     /** 「完成」：退出编辑、收起抽屉、恢复之前最小化的窗口 */
     done() {
         if (!this.isOpen) return;
+        if (this._editorOverlay) this.closeWidgetEditor({ resumeDrawer: false });
         this.isOpen = false;
         this.collapsed = false;
         clearTimeout(this._reopenTimer);

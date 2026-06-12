@@ -92,12 +92,41 @@ const BrowserApp = {
             }
         });
 
-        bookmarkBtn?.addEventListener('click', () => {
-            State.addNotification({
-                title: t('browser.title'),
-                message: t('browser.bookmark-coming'),
-                type: 'info'
-            });
+        bookmarkBtn?.addEventListener('click', async () => {
+            const tab = this.getActiveTab();
+            if (!tab || !tab.url || tab.url === 'about:blank') {
+                State.addNotification({
+                    title: t('browser.title'),
+                    message: '当前页面无法收藏',
+                    type: 'info'
+                });
+                return;
+            }
+
+            try {
+                if (!window.FavoriteSites) throw new Error('FavoriteSites unavailable');
+                await FavoriteSites.addFromUrl(tab.url, tab.title);
+                if (typeof Widgets !== 'undefined' && Widgets.renderAll) Widgets.renderAll();
+                if (window.FluentUI && FluentUI.Toast) {
+                    FluentUI.Toast({
+                        title: t('browser.title'),
+                        message: `已收藏 ${tab.title || tab.url}`,
+                        type: 'success'
+                    });
+                } else {
+                    State.addNotification({
+                        title: t('browser.title'),
+                        message: `已收藏 ${tab.title || tab.url}`,
+                        type: 'success'
+                    });
+                }
+            } catch (error) {
+                State.addNotification({
+                    title: t('browser.title'),
+                    message: '收藏失败，请稍后重试',
+                    type: 'error'
+                });
+            }
         });
     },
 

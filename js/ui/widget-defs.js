@@ -331,6 +331,35 @@ function wWeatherMenu(ctx) {
 
 /* ==================== 时钟 ==================== */
 
+function wRenderWeatherEditor(container, ctx) {
+    const cur = wWeatherCity(ctx);
+    container.innerHTML = `
+        <div class="widget-edit-panel">
+            <div class="widget-edit-head">
+                <img src="Theme/Icon/Symbol_icon/stroke/Sun.svg" alt="">
+                <div>
+                    <div class="widget-edit-title">天气地点</div>
+                    <div class="widget-edit-subtitle">选择天气小组件显示的城市。</div>
+                </div>
+            </div>
+            <div class="widget-edit-options">
+                ${Object.entries(wWeatherLocations()).map(([key, loc]) => `
+                    <button class="widget-edit-option ${key === cur ? 'selected' : ''}" data-city="${key}" type="button">
+                        <span>${wEsc(t(loc.nameKey))}</span>
+                        <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="">
+                    </button>
+                `).join('')}
+            </div>
+        </div>`;
+    container.querySelectorAll('[data-city]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.widget-edit-option').forEach(item => item.classList.remove('selected'));
+            btn.classList.add('selected');
+            ctx.setSettings({ city: btn.dataset.city }, { silent: true });
+        });
+    });
+}
+
 function wBuildClockFace(size) {
     let ticks = '';
     for (let i = 0; i < 12; i++) {
@@ -484,12 +513,30 @@ function wRenderPhotos(body, ctx, size) {
 
 /* ==================== 搜索 ==================== */
 
+const W_SEARCH_ENGINES = {
+    bing: { name: 'Bing', url: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}` },
+    baidu: { name: '\u767e\u5ea6', url: q => `https://www.baidu.com/s?wd=${encodeURIComponent(q)}` },
+    google: { name: 'Google', url: q => `https://www.google.com/search?q=${encodeURIComponent(q)}` },
+    duckduckgo: { name: 'DuckDuckGo', url: q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}` },
+    yandex: { name: 'Yandex', url: q => `https://yandex.com/search/?text=${encodeURIComponent(q)}` }
+};
+
+function wSearchEngine(ctx) {
+    const engine = ctx.instance?.settings?.engine || 'bing';
+    return W_SEARCH_ENGINES[engine] ? engine : 'bing';
+}
+
+function wSearchUrl(query, ctx) {
+    return W_SEARCH_ENGINES[wSearchEngine(ctx)].url(query);
+}
+
 function wRenderSearch(body, ctx) {
+    const engine = wSearchEngine(ctx);
     body.innerHTML = `
         <div class="w-search-pill">
             <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
-            <input type="text" placeholder="${t('widgets.search.placeholder')}" ${ctx.isPreview ? 'disabled' : ''}>
-            <button class="w-search-go">${t('widgets.search.go')}</button>
+            <input type="text" placeholder="${W_SEARCH_ENGINES[engine].name} ${t('widgets.search.placeholder')}" ${ctx.isPreview ? 'disabled' : ''}>
+            <button class="w-search-go">${W_SEARCH_ENGINES[engine].name}</button>
         </div>`;
     if (ctx.isPreview) return;
 
@@ -497,12 +544,11 @@ function wRenderSearch(body, ctx) {
     const go = () => {
         const q = input.value.trim();
         if (!q) return;
+        const searchUrl = wSearchUrl(q, ctx);
         if (ctx.surface === 'lock') {
-            // 锁屏搜索：跳转外部浏览器
-            window.open(`https://www.bing.com/search?q=${encodeURIComponent(q)}`, '_blank');
+            window.open(searchUrl, '_blank');
         } else {
-            // 桌面搜索：使用内置浏览器 App
-            wOpenInBrowser(q, ctx);
+            wOpenInBrowser(searchUrl, ctx);
         }
         input.value = '';
         input.blur();
@@ -516,6 +562,35 @@ function wRenderSearch(body, ctx) {
     body.querySelector('.w-search-go').addEventListener('click', (e) => {
         e.stopPropagation();
         go();
+    });
+}
+
+function wRenderSearchEditor(container, ctx) {
+    const current = wSearchEngine(ctx);
+    container.innerHTML = `
+        <div class="widget-edit-panel">
+            <div class="widget-edit-head">
+                <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
+                <div>
+                    <div class="widget-edit-title">\u641c\u7d22\u5f15\u64ce</div>
+                    <div class="widget-edit-subtitle">\u9009\u62e9\u641c\u7d22\u5c0f\u7ec4\u4ef6\u9ed8\u8ba4\u4f7f\u7528\u7684\u641c\u7d22\u670d\u52a1\u3002</div>
+                </div>
+            </div>
+            <div class="widget-edit-options">
+                ${Object.entries(W_SEARCH_ENGINES).map(([key, engine]) => `
+                    <button class="widget-edit-option ${key === current ? 'selected' : ''}" data-engine="${key}" type="button">
+                        <span>${wEsc(engine.name)}</span>
+                        <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="">
+                    </button>
+                `).join('')}
+            </div>
+        </div>`;
+    container.querySelectorAll('[data-engine]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.widget-edit-option').forEach(item => item.classList.remove('selected'));
+            btn.classList.add('selected');
+            ctx.setSettings({ engine: btn.dataset.engine }, { silent: true });
+        });
     });
 }
 
@@ -1055,7 +1130,134 @@ function wMediaOpenApp(ctx) {
     WindowManager.openApp('media');
 }
 
+function wFavoriteLimit(size) {
+    if (size === 's') return 4;
+    if (size === 'l') return 16;
+    return 8;
+}
+
+function wFavoriteGridClass(size) {
+    if (size === 's') return 'small';
+    if (size === 'tall') return 'tall';
+    if (size === 'l') return 'large';
+    return 'medium';
+}
+
+function wRenderFavoriteSites(body, ctx, size) {
+    body.classList.toggle('w-favorites-small', size === 's');
+    body.classList.toggle('w-favorites-tall', size === 'tall');
+    body.classList.toggle('w-favorites-large', size === 'l');
+    wAsync(body, async () => {
+        const service = window.FavoriteSites;
+        const limit = wFavoriteLimit(size);
+        const sites = service ? await service.getDisplaySites(limit) : [];
+        if (!body.isConnected) return;
+
+        if (!sites.length) {
+            const emptyText = t('widgets.favorites.empty');
+            body.innerHTML = `<div class="w-loading">${emptyText === 'widgets.favorites.empty' ? '暂无收藏网站' : emptyText}</div>`;
+            return;
+        }
+
+        const gridClass = wFavoriteGridClass(size);
+        body.innerHTML = `
+            <div class="w-favorites-grid ${gridClass}">
+                ${sites.map((site, index) => `
+                    <button class="w-favorite-site" type="button" data-site-index="${index}">
+                        <span class="w-favorite-icon">
+                            <span class="w-favorite-letter">${wEsc((site.title || site.url || '?').trim().slice(0, 1).toUpperCase())}</span>
+                            ${site.icon ? `<img src="${wEsc(site.icon)}" alt="">` : ''}
+                        </span>
+                        <span class="w-favorite-name">${wEsc(site.title || site.url)}</span>
+                    </button>
+                `).join('')}
+            </div>`;
+
+        body.querySelectorAll('.w-favorite-icon img').forEach(img => {
+            img.addEventListener('error', () => {
+                img.remove();
+            }, { once: true });
+        });
+
+        body.querySelectorAll('.w-favorite-site').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (ctx.isPreview || (typeof Widgets !== 'undefined' && Widgets.isOpen)) return;
+                const site = sites[Number(btn.dataset.siteIndex)];
+                if (site && service) service.openSite(site, { surface: ctx.surface });
+            });
+        });
+    });
+}
+
 /* ==================== 注册表 ==================== */
+
+function wRenderFavoriteSitesEditor(container, ctx) {
+    const service = window.FavoriteSites;
+    if (!service) {
+        container.innerHTML = `<div class="widget-edit-panel"><div class="w-loading">收藏服务不可用</div></div>`;
+        return;
+    }
+
+    const draw = async () => {
+        const sites = await service.getDisplaySites(64);
+        if (!container.isConnected) return;
+        container.innerHTML = `
+            <div class="widget-edit-panel widget-edit-favorites">
+                <div class="widget-edit-head">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Bookmark.svg" alt="">
+                    <div>
+                        <div class="widget-edit-title">收藏网站</div>
+                        <div class="widget-edit-subtitle">添加或删除会同步到收藏网站小组件。</div>
+                    </div>
+                </div>
+                <div class="widget-edit-add-row">
+                    <input class="widget-edit-input" type="url" placeholder="输入网站地址，例如 example.com">
+                    <button class="widget-edit-add-btn" type="button">添加</button>
+                </div>
+                <div class="widget-edit-sites-list">
+                    ${sites.map(site => `
+                        <div class="widget-edit-site" data-site-id="${wEsc(site.id)}">
+                            <span class="widget-edit-site-icon">
+                                ${site.icon ? `<img src="${wEsc(site.icon)}" alt="">` : ''}
+                            </span>
+                            <span class="widget-edit-site-name">${wEsc(site.title || site.url)}</span>
+                            <button class="widget-edit-site-remove" type="button" title="删除">
+                                <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+
+        const input = container.querySelector('.widget-edit-input');
+        const addBtn = container.querySelector('.widget-edit-add-btn');
+        const addSite = async () => {
+            const url = input.value.trim();
+            if (!url) return;
+            addBtn.disabled = true;
+            await service.addFromUrl(url);
+            input.value = '';
+            if (typeof Widgets !== 'undefined' && Widgets.renderAll) Widgets.renderAll();
+            await draw();
+        };
+        addBtn.addEventListener('click', addSite);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addSite();
+        });
+        container.querySelectorAll('.widget-edit-site-remove').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const row = btn.closest('.widget-edit-site');
+                if (!row) return;
+                service.removeSite(row.dataset.siteId);
+                if (typeof Widgets !== 'undefined' && Widgets.renderAll) Widgets.renderAll();
+                await draw();
+            });
+        });
+    };
+
+    draw();
+}
 
 const WidgetDefs = {
     apps: [
@@ -1065,9 +1267,9 @@ const WidgetDefs = {
             descKey: 'widgets.app.weather.desc',
             icon: 'Theme/Icon/Symbol_icon/stroke/Sun.svg',
             variants: [
-                { id: 'weather-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 's'); }, onClick: wWeatherClick, getMenu: wWeatherMenu },
-                { id: 'weather-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 'm'); }, onClick: wWeatherClick, getMenu: wWeatherMenu },
-                { id: 'weather-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 'l'); }, onClick: wWeatherClick, getMenu: wWeatherMenu }
+                { id: 'weather-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 's'); }, renderEditor: wRenderWeatherEditor, onClick: wWeatherClick, getMenu: wWeatherMenu },
+                { id: 'weather-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 'm'); }, renderEditor: wRenderWeatherEditor, onClick: wWeatherClick, getMenu: wWeatherMenu },
+                { id: 'weather-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-weather', defaultSettings: { city: 'beijing' }, render(b, c) { wRenderWeather(b, c, 'l'); }, renderEditor: wRenderWeatherEditor, onClick: wWeatherClick, getMenu: wWeatherMenu }
             ]
         },
         {
@@ -1119,7 +1321,19 @@ const WidgetDefs = {
             descKey: 'widgets.app.search.desc',
             icon: 'Theme/Icon/Symbol_icon/stroke/Search.svg',
             variants: [
-                { id: 'search-capsule', w: 4, h: 1, sizeKey: 'widgets.size.capsule', theme: 'w-search', render(b, c) { wRenderSearch(b, c); } }
+                { id: 'search-capsule', w: 4, h: 1, sizeKey: 'widgets.size.capsule', theme: 'w-search', defaultSettings: { engine: 'bing' }, render(b, c) { wRenderSearch(b, c); }, renderEditor: wRenderSearchEditor }
+            ]
+        },
+        {
+            id: 'favorites',
+            nameKey: '收藏网站',
+            descKey: '显示常用收藏网站，自动匹配 App Shop 图标',
+            icon: 'Theme/Icon/Symbol_icon/stroke/Bookmark.svg',
+            variants: [
+                { id: 'favorites-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 's'); }, renderEditor: wRenderFavoriteSitesEditor },
+                { id: 'favorites-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 'm'); }, renderEditor: wRenderFavoriteSitesEditor },
+                { id: 'favorites-tall', w: 2, h: 4, sizeKey: 'widgets.size.tall', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 'tall'); }, renderEditor: wRenderFavoriteSitesEditor },
+                { id: 'favorites-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 'l'); }, renderEditor: wRenderFavoriteSitesEditor }
             ]
         },
         {
@@ -1186,7 +1400,7 @@ const WidgetDefs = {
     /** 首页推荐的小组件形态 */
     recommended: [
         'weather-m', 'clock-analog', 'calendar-s', 'search-capsule',
-        'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'
+        'favorites-m', 'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'
     ],
 
     getApp(appId) {
