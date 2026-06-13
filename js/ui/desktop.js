@@ -1051,7 +1051,7 @@ const Desktop = {
                 this.deselectAll();
                 break;
             case 'personalize':
-                this.openApp('settings');
+                WindowManager.openApp('settings', { page: 'personalization' });
                 break;
             case 'add-widget':
                 if (typeof Widgets !== 'undefined') {

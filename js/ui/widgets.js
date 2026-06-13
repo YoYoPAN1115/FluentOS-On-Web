@@ -564,6 +564,7 @@ const Widgets = {
 
     _getWidgetGlowHit(source) {
         if (!source || !document.body.classList.contains('button-glow-enabled')) return null;
+        if (source.closest?.('.fluent-widget-remove, .fluent-widget-edit')) return null;
 
         const preview = source.closest ? source.closest('.widgets-preview-wrap') : null;
         if (preview) {
@@ -823,7 +824,7 @@ const Widgets = {
         el.appendChild(body);
 
         const removeBtn = document.createElement('button');
-        removeBtn.className = 'fluent-widget-remove';
+        removeBtn.className = 'fluent-widget-remove button-glow-disabled';
         removeBtn.title = t('widgets.remove');
         removeBtn.innerHTML = `<img src="Theme/Icon/Symbol_icon/stroke/Minus.svg" alt="-">`;
         removeBtn.addEventListener('click', (e) => {
@@ -834,7 +835,7 @@ const Widgets = {
 
         if (typeof def.renderEditor === 'function') {
             const editBtn = document.createElement('button');
-            editBtn.className = 'fluent-widget-edit';
+            editBtn.className = 'fluent-widget-edit button-glow-disabled';
             editBtn.title = '编辑小组件';
             editBtn.innerHTML = `<img src="Theme/Icon/Symbol_icon/stroke/Dots Horizontal.svg" alt="...">`;
             editBtn.addEventListener('click', (e) => {
@@ -969,13 +970,10 @@ const Widgets = {
         overlay.className = 'widget-edit-overlay';
         overlay.innerHTML = `
             <div class="widget-edit-backdrop"></div>
-            <button class="widget-edit-done" type="button" title="完成">
-                <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="完成">
-            </button>
             <div class="widget-edit-card">
                 <div class="widget-edit-flipper">
                     <div class="widget-edit-face widget-edit-front"></div>
-                    <div class="widget-edit-face widget-edit-back"></div>
+                    <div class="widget-edit-face widget-edit-back ${def.theme || ''}"></div>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
@@ -1012,7 +1010,7 @@ const Widgets = {
         this._editingWidget = { surface, instanceId, sourceEl, resumeDrawer };
         this._editorOverlay = overlay;
 
-        overlay.querySelector('.widget-edit-done').addEventListener('click', () => this.closeWidgetEditor());
+        overlay.querySelector('.widget-edit-backdrop').addEventListener('click', () => this.closeWidgetEditor());
         requestAnimationFrame(() => {
             requestAnimationFrame(() => overlay.classList.add('active'));
         });

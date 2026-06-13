@@ -96,7 +96,16 @@ const SettingsApp = {
     },
 
     openData(data) {
-        if (!data || data.page !== 'app-detail' || !data.appId) return;
+        if (!data || !data.page) return;
+        if (data.page !== 'app-detail') {
+            const hasPage = this.getPages().some(page => page.id === data.page);
+            if (hasPage || data.page === 'personalization-advanced') {
+                this.currentAppDetail = null;
+                this.navigateToPage(data.page);
+            }
+            return;
+        }
+        if (!data.appId) return;
         const app = this.getAppDetailData(data.appId);
         if (!app) return;
         this.currentAppDetail = app;

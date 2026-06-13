@@ -596,19 +596,77 @@ function wRenderSearchEditor(container, ctx) {
 
 /* ==================== 今日新闻（热榜） ==================== */
 
-async function wFetchHotboard() {
-    return WidgetData.get('hotboard-weibo', 10 * 60 * 1000, () =>
-        wFetchUapisJSON('/api/v1/misc/hotboard?type=weibo'));
+const W_HOTBOARD_SOURCES = {
+    bilibili: '哔哩哔哩',
+    acfun: 'A站',
+    weibo: '微博热搜',
+    'zhihu': '知乎热榜',
+    'zhihu-daily': '知乎日报',
+    douyin: '抖音',
+    xiaohongshu: '小红书',
+    kuaishou: '快手',
+    'douban-movie': '豆瓣电影',
+    'douban-group': '豆瓣小组',
+    tieba: '百度贴吧',
+    hupu: '虎扑',
+    ngabbs: 'NGA论坛',
+    v2ex: 'V2EX',
+    '52pojie': '吾爱破解',
+    hostloc: '全球主机交流',
+    coolapk: '酷安',
+    baidu: '百度热搜',
+    thepaper: '澎湃新闻',
+    toutiao: '今日头条',
+    'qq-news': '腾讯新闻',
+    sina: '新浪热搜',
+    'sina-news': '新浪新闻',
+    'netease-news': '网易新闻',
+    huxiu: '虎嗅',
+    ifanr: '爱范儿',
+    sspai: '少数派',
+    ithome: 'IT之家',
+    'ithome-xijiayi': 'IT之家喜加一',
+    juejin: '掘金',
+    jianshu: '简书',
+    guokr: '果壳',
+    '36kr': '36氪',
+    '51cto': '51CTO',
+    csdn: 'CSDN',
+    nodeseek: 'NodeSeek',
+    hellogithub: 'HelloGitHub',
+    lol: '英雄联盟',
+    genshin: '原神',
+    honkai: '崩坏3',
+    starrail: '星穹铁道',
+    'netease-music': '网易云音乐热歌榜',
+    'qq-music': 'QQ音乐热歌榜',
+    weread: '微信读书',
+    weatheralarm: '天气预警',
+    earthquake: '地震速报',
+    history: '历史上的今天'
+};
+
+function wHotboardSource(ctx) {
+    const source = ctx.instance?.settings?.source || 'weibo';
+    return W_HOTBOARD_SOURCES[source] ? source : 'weibo';
+}
+
+async function wFetchHotboard(source = 'weibo') {
+    const type = W_HOTBOARD_SOURCES[source] ? source : 'weibo';
+    return WidgetData.get(`hotboard-${type}`, 10 * 60 * 1000, () =>
+        wFetchUapisJSON(`/api/v1/misc/hotboard?type=${encodeURIComponent(type)}`));
 }
 
 function wRenderNews(body, ctx, size) {
     wAsync(body, async () => {
-        const data = await wFetchHotboard();
+        const source = wHotboardSource(ctx);
+        const data = await wFetchHotboard(source);
         if (!body.isConnected) return;
         const list = (data.list || []).slice(0, size === 'l' ? 9 : 4);
+        const sourceName = W_HOTBOARD_SOURCES[source];
         body.innerHTML = `
             <div class="w-list-head">
-                <span class="w-list-title">📰 ${t('widgets.news.title')}</span>
+                <span class="w-list-title">📰 ${wEsc(sourceName || t('widgets.news.title'))}</span>
                 <span class="w-list-sub">${wEsc((data.update_time || '').slice(11, 16))}</span>
             </div>
             <div class="w-list-body">
@@ -626,6 +684,35 @@ function wRenderNews(body, ctx, size) {
                 const url = row.dataset.url;
                 if (url) wOpenInBrowser(url, ctx);
             });
+        });
+    });
+}
+
+function wRenderNewsEditor(container, ctx) {
+    const current = wHotboardSource(ctx);
+    container.innerHTML = `
+        <div class="widget-edit-panel">
+            <div class="widget-edit-head">
+                <img src="Theme/Icon/Symbol_icon/stroke/Broadcast.svg" alt="">
+                <div>
+                    <div class="widget-edit-title">热榜来源</div>
+                    <div class="widget-edit-subtitle">选择今日热榜小组件展示的数据来源。</div>
+                </div>
+            </div>
+            <div class="widget-edit-options widget-edit-hotboard-options">
+                ${Object.entries(W_HOTBOARD_SOURCES).map(([key, name]) => `
+                    <button class="widget-edit-option ${key === current ? 'selected' : ''}" data-source="${key}" type="button">
+                        <span>${wEsc(name)}</span>
+                        <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="">
+                    </button>
+                `).join('')}
+            </div>
+        </div>`;
+    container.querySelectorAll('[data-source]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.widget-edit-option').forEach(item => item.classList.remove('selected'));
+            btn.classList.add('selected');
+            ctx.setSettings({ source: btn.dataset.source }, { silent: true });
         });
     });
 }
@@ -1342,8 +1429,8 @@ const WidgetDefs = {
             descKey: 'widgets.app.news.desc',
             icon: 'Theme/Icon/Symbol_icon/stroke/Broadcast.svg',
             variants: [
-                { id: 'news-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-news', render(b, c) { wRenderNews(b, c, 'm'); } },
-                { id: 'news-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-news', render(b, c) { wRenderNews(b, c, 'l'); } }
+                { id: 'news-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-news', defaultSettings: { source: 'weibo' }, render(b, c) { wRenderNews(b, c, 'm'); }, renderEditor: wRenderNewsEditor },
+                { id: 'news-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-news', defaultSettings: { source: 'weibo' }, render(b, c) { wRenderNews(b, c, 'l'); }, renderEditor: wRenderNewsEditor }
             ]
         },
         {
