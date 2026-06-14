@@ -71,7 +71,7 @@ Object.assign(StartMenu, {
     renderRecentFiles() {
         if (!this.recentItemsContainer) return;
         
-        const recentFiles = RecentFiles.getRecentFiles().slice(0, 6);
+        const recentFiles = RecentFiles.getRecentFiles().slice(0, 4);
         
         if (recentFiles.length === 0) {
             this.recentItemsContainer.innerHTML = `
@@ -95,8 +95,7 @@ Object.assign(StartMenu, {
         // 绑定点击事件
         this.recentItemsContainer.querySelectorAll('.recent-item').forEach(item => {
             item.addEventListener('click', () => {
-                const filePath = item.dataset.filePath;
-                this.openRecentFile(filePath);
+                this.openRecentFile(item.dataset.fileId, item.dataset.filePath);
                 this.close();
             });
         });
@@ -130,8 +129,7 @@ Object.assign(StartMenu, {
         // 绑定点击事件
         this.recentItemsContainer.querySelectorAll('.recent-item').forEach(item => {
             item.addEventListener('click', () => {
-                const filePath = item.dataset.filePath;
-                this.openRecentFile(filePath);
+                this.openRecentFile(item.dataset.fileId, item.dataset.filePath);
                 this.close();
             });
         });
@@ -166,16 +164,31 @@ Object.assign(StartMenu, {
     },
     
     // 打开最近文件
-    openRecentFile(filePath) {
+    openRecentFile(fileId, filePath) {
         State.addNotification({
             title: '打开文件',
             message: filePath,
             type: 'info'
         });
         
+        const node = fileId && State.findNode ? State.findNode(fileId) : null;
+        if (node && node.type === 'file') {
+            if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
+                const opened = FilesApp.openNodeWithDefaultApp(node);
+                if (opened) return;
+            }
+            WindowManager.openApp('notes', { fileId });
+            return;
+        }
+
+        if (node && node.type === 'folder') {
+            this.openFolder(fileId);
+            return;
+        }
+
         // 根据文件类型打开对应应用
-        if (filePath.endsWith('.txt') || filePath.endsWith('.html')) {
-            WindowManager.openApp('notes');
+        if ((filePath || '').endsWith('.txt') || (filePath || '').endsWith('.html') || (filePath || '').endsWith('.md')) {
+            WindowManager.openApp('notes', { fileId });
         } else {
             WindowManager.openApp('files');
         }

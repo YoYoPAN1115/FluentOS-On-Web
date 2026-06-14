@@ -42,7 +42,7 @@ const WindowManager = {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
         calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 400, height: 550, minHeight: 550, component: 'CalculatorApp' },
-        notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 700, height: 500, component: 'NotesApp' },
+        notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 920, height: 640, minWidth: 560, minHeight: 420, component: 'NotesApp' },
         browser: { titleKey: 'browser.title', icon: 'Theme/Icon/App_icon/browser.png', width: 1000, height: 700, component: 'BrowserApp' },
         clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/clock.png', width: 900, height: 650, component: 'ClockApp' },
         weather: { titleKey: 'weather.title', icon: 'Theme/Icon/App_icon/weather.png', width: 920, height: 640, component: 'WeatherApp' },

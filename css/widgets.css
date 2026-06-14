@@ -2812,3 +2812,96 @@ body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
+
+/* 快记小组件 */
+.fluent-widget-body.w-quicknotes {
+    background:
+        linear-gradient(150deg, rgba(255, 248, 179, 0.78), rgba(231, 244, 255, 0.72)),
+        rgba(255, 255, 255, 0.28);
+}
+
+.dark-mode .fluent-widget-body.w-quicknotes {
+    background:
+        linear-gradient(150deg, rgba(101, 86, 18, 0.52), rgba(22, 58, 82, 0.55)),
+        rgba(255, 255, 255, 0.08);
+}
+
+.w-quicknotes-shell {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.w-quicknotes-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.w-quicknotes-head img {
+    width: 17px;
+    height: 17px;
+}
+
+.w-quicknotes-text {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    resize: none;
+    border: 0;
+    outline: 0;
+    border-radius: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.45);
+    font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+}
+
+.dark-mode .w-quicknotes-text {
+    background: rgba(0, 0, 0, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.w-quicknotes-small .w-quicknotes-shell {
+    padding: 10px;
+    gap: 6px;
+}
+
+.w-quicknotes-small .w-quicknotes-head {
+    font-size: 12px;
+}
+
+.w-quicknotes-small .w-quicknotes-text {
+    padding: 8px;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.w-quicknotes-medium .w-quicknotes-text {
+    font-size: 13.5px;
+}
+
+.w-quicknotes-tall .w-quicknotes-shell,
+.w-quicknotes-large .w-quicknotes-shell {
+    padding: 14px;
+}
+
+.w-quicknotes-large .w-quicknotes-head {
+    font-size: 14px;
+}
+
+.w-quicknotes-large .w-quicknotes-text {
+    padding: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+}

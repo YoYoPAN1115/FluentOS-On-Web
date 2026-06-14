@@ -345,7 +345,6 @@ body.animations-enabled .control-center.closing {
         border-radius: 0;
     }
 }
-
 @keyframes windowRestore {
     from {
         border-radius: 0;

@@ -4306,7 +4306,7 @@ const SettingsApp = {
         const list = FluentUI.List({
             items: [
                 { id: 'version', title: t('settings.version'), description: '2.0.0.2 BETA', icon: 'Information Circle' },
-                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260609', icon: 'Information Circle' },
+                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260613', icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
             ]

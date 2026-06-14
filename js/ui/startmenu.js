@@ -606,7 +606,7 @@ const StartMenu = {
 
     renderRecent() {
         if (!this.recentContainer) return;
-        const list = RecentFiles.getRecentFiles();
+        const list = RecentFiles.getRecentFiles().slice(0, 4);
         if (!list || list.length === 0) {
             this.recentContainer.innerHTML = `<div style="color: var(--text-tertiary); padding: 12px 0;">${t('notification.empty')}</div>`;
             return;

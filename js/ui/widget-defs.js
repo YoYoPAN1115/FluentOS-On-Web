@@ -1217,6 +1217,61 @@ function wMediaOpenApp(ctx) {
     WindowManager.openApp('media');
 }
 
+function wQuickNotesText() {
+    if (window.NotesApp && typeof NotesApp.getQuickNoteContent === 'function') {
+        return NotesApp.getQuickNoteContent();
+    }
+    return (State && State.settings && State.settings.notesQuickContent) || '';
+}
+
+function wSetQuickNotesText(value) {
+    const text = String(value || '');
+    if (window.NotesApp && typeof NotesApp.setQuickNoteContent === 'function') {
+        NotesApp.setQuickNoteContent(text, { source: 'widget' });
+        return;
+    }
+    if (State && typeof State.updateSettings === 'function') {
+        State.updateSettings({
+            notesQuickContent: text,
+            notesQuickModified: new Date().toISOString()
+        });
+    }
+}
+
+function wQuickNotesOpenApp(ctx) {
+    if (!wClickable(ctx) || ctx.surface !== 'desktop') return;
+    WindowManager.openApp('notes', { view: 'quick' });
+}
+
+function wRenderQuickNotes(body, ctx, size) {
+    const isSmall = size === 's';
+    body.classList.toggle('w-quicknotes-small', isSmall);
+    body.classList.toggle('w-quicknotes-medium', size === 'm');
+    body.classList.toggle('w-quicknotes-tall', size === 'tall');
+    body.classList.toggle('w-quicknotes-large', size === 'l');
+    body.innerHTML = `
+        <div class="w-quicknotes-shell">
+            <div class="w-quicknotes-head">
+                <img src="Theme/Icon/Symbol_icon/stroke/Edit Pen.svg" alt="">
+                <span>${t('widgets.app.quicknotes')}</span>
+            </div>
+            <textarea class="w-quicknotes-text" spellcheck="true" ${ctx.isPreview ? 'readonly' : ''} placeholder="${wEsc(t('notes.placeholder'))}">${wEsc(wQuickNotesText())}</textarea>
+        </div>`;
+
+    const textarea = body.querySelector('.w-quicknotes-text');
+    if (!ctx.isPreview) {
+        textarea.addEventListener('pointerdown', e => e.stopPropagation());
+        textarea.addEventListener('click', e => e.stopPropagation());
+        textarea.addEventListener('input', () => wSetQuickNotesText(textarea.value));
+    }
+
+    wTick(body, 1500, () => {
+        if (!textarea || document.activeElement === textarea) return;
+        const latest = wQuickNotesText();
+        if (textarea.value !== latest) textarea.value = latest;
+    });
+}
+
 function wFavoriteLimit(size) {
     if (size === 's') return 4;
     if (size === 'l') return 16;
@@ -1403,6 +1458,18 @@ const WidgetDefs = {
             ]
         },
         {
+            id: 'quicknotes',
+            nameKey: 'widgets.app.quicknotes',
+            descKey: 'widgets.app.quicknotes.desc',
+            icon: 'Theme/Icon/Symbol_icon/stroke/Edit Pen.svg',
+            variants: [
+                { id: 'quicknotes-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-quicknotes', render(b, c) { wRenderQuickNotes(b, c, 's'); }, onClick: wQuickNotesOpenApp },
+                { id: 'quicknotes-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-quicknotes', render(b, c) { wRenderQuickNotes(b, c, 'm'); }, onClick: wQuickNotesOpenApp },
+                { id: 'quicknotes-tall', w: 2, h: 4, sizeKey: 'widgets.size.tall', theme: 'w-quicknotes', render(b, c) { wRenderQuickNotes(b, c, 'tall'); }, onClick: wQuickNotesOpenApp },
+                { id: 'quicknotes-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-quicknotes', render(b, c) { wRenderQuickNotes(b, c, 'l'); }, onClick: wQuickNotesOpenApp }
+            ]
+        },
+        {
             id: 'search',
             nameKey: 'widgets.app.search',
             descKey: 'widgets.app.search.desc',
@@ -1487,7 +1554,7 @@ const WidgetDefs = {
     /** 首页推荐的小组件形态 */
     recommended: [
         'weather-m', 'clock-analog', 'calendar-s', 'search-capsule',
-        'favorites-m', 'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'
+        'quicknotes-m', 'favorites-m', 'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'
     ],
 
     getApp(appId) {
