@@ -153,6 +153,24 @@ const Taskbar = {
         // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
         this.appsContainer.addEventListener('dragstart', (e) => e.preventDefault());
 
+        this.appsContainer.addEventListener('click', (e) => {
+            if (this._appDragging) return;
+            const btn = e.target.closest('.taskbar-app');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this._handleAppClick(btn.dataset.appId);
+        }, true);
+
+        this.appsContainer.addEventListener('dblclick', (e) => {
+            if (this._appDragging) return;
+            const btn = e.target.closest('.taskbar-app');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            this._handleAppDoubleClick(btn.dataset.appId);
+        }, true);
+
         // 应用图标点击
         this.appsContainer.addEventListener('click', (e) => {
             if (this._appDragging) return; // 拖拽结束后的 click 不触发打开/切换
@@ -306,6 +324,80 @@ const Taskbar = {
      * 任务栏 App 图标的拖拽：超过阈值后出现跟随图标的幽灵，
      * 松手时若落在桌面区域，则在桌面创建该 App 的快捷方式。
      */
+    _getAppWindow(appId) {
+        if (typeof WindowManager === 'undefined') return null;
+        if (typeof WindowManager.getAppWindow === 'function') return WindowManager.getAppWindow(appId);
+        return WindowManager.windows?.find((w) =>
+            w &&
+            w.appId === appId &&
+            w.element &&
+            !w.element.classList.contains('closing')
+        ) || null;
+    },
+
+    _isWindowMinimized(windowData) {
+        return !!windowData && (
+            windowData.isMinimized === true ||
+            windowData.isMinimizing === true ||
+            windowData.element?.style.display === 'none'
+        );
+    },
+
+    _isWindowVisible(windowData) {
+        return !!windowData &&
+            windowData.isMinimized !== true &&
+            windowData.isMinimizing !== true &&
+            windowData.element &&
+            windowData.element.style.display !== 'none' &&
+            !windowData.element.classList.contains('closing');
+    },
+
+    _getVisibleWindowCount() {
+        if (typeof WindowManager === 'undefined' || !Array.isArray(WindowManager.windows)) return 0;
+        return WindowManager.windows.filter((w) => this._isWindowVisible(w)).length;
+    },
+
+    _isWindowActive(windowData) {
+        return !!windowData &&
+            typeof WindowManager !== 'undefined' &&
+            WindowManager.activeWindowId === windowData.id &&
+            !windowData.element?.classList.contains('window-inactive');
+    },
+
+    _runAppSingleClick(appId) {
+        const windowData = this._getAppWindow(appId);
+        if (!windowData) {
+            WindowManager.openApp(appId);
+            WindowManager._syncTaskbarAppState?.(appId);
+            return;
+        }
+
+        if (this._isWindowMinimized(windowData)) {
+            WindowManager.focusWindow(windowData.id);
+            WindowManager._syncTaskbarAppState?.(appId);
+            return;
+        }
+
+        const visibleCount = this._getVisibleWindowCount();
+        const isActive = this._isWindowActive(windowData);
+        if (visibleCount <= 1 || isActive) {
+            WindowManager.minimizeWindow(windowData.id);
+            WindowManager._syncTaskbarAppState?.(appId);
+            return;
+        }
+
+        WindowManager.focusWindow(windowData.id, { forceMotion: true });
+        WindowManager._syncTaskbarAppState?.(appId);
+    },
+
+    _handleAppClick(appId) {
+        this._runAppSingleClick(appId);
+    },
+
+    _handleAppDoubleClick(appId) {
+        void appId;
+    },
+
     _onAppPointerDown(e) {
         if (typeof e.button === 'number' && e.button !== 0) return;
         const btn = e.target.closest('.taskbar-app');

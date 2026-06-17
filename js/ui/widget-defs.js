@@ -1,32 +1,32 @@
-/**
- * 小组件定义（WidgetDefs）
+﻿/**
+ * 鐏忓繒绮嶆禒璺虹暰娑斿绱橶idgetDefs閿?
  *
- * 在这里登记所有真实小组件。每个「小组件应用」包含若干尺寸形态（variants）。
+ * 閸︺劏绻栭柌宀€娅ョ拋鐗堝閺堝婀＄€圭偛鐨紒鍕閵嗗倹鐦℃稉顏傗偓灞界毈缂佸嫪娆㈡惔鏃傛暏閵嗗秴瀵橀崥顐ュ楠炴彃鏄傜€电鑸伴幀渚婄礄variants閿涘鈧?
  *
- * 应用结构：
+ * 鎼存梻鏁ょ紒鎾寸€敍?
  *   { id, nameKey, descKey, icon, recommend: [variantId...], variants: [...] }
  *
- * 形态（variant）结构：
+ * 瑜般垺鈧緤绱檝ariant閿涘绮ㄩ弸鍕剁窗
  *   {
- *     id,                  // 全局唯一，作为实例的 widgetId
- *     w, h,                // 网格单元格数
- *     sizeKey,             // 尺寸名称的 i18n key
- *     theme,               // body 上附加的样式类（w-xxx）
- *     defaultSettings?,    // 实例默认设置
- *     render(body, ctx),   // 渲染内容；ctx: { instance, surface, isPreview, setSettings() }
- *     onClick?(ctx),       // 普通模式下点击整个小组件（仅桌面）
- *     getMenu?(ctx)        // 右键菜单项 [{ label, action }]
+ *     id,                  // 閸忋劌鐪崬顖欑閿涘奔缍旀稉鍝勭杽娓氬娈?widgetId
+ *     w, h,                // 缂冩垶鐗搁崡鏇炲帗閺嶅吋鏆?
+ *     sizeKey,             // 鐏忓搫顕崥宥囆為惃?i18n key
+ *     theme,               // body 娑撳﹪妾崝鐘垫畱閺嶅嘲绱＄猾浼欑礄w-xxx閿?
+ *     defaultSettings?,    // 鐎圭偘绶ユ妯款吇鐠佸墽鐤?
+ *     render(body, ctx),   // 濞撳弶鐓嬮崘鍛啇閿涙矞tx: { instance, surface, isPreview, setSettings() }
+ *     onClick?(ctx),       // 閺咁噣鈧碍膩瀵繋绗呴悙鐟板毊閺佺繝閲滅亸蹇曠矋娴犺绱欐禒鍛攽闂堫澁绱?
+ *     getMenu?(ctx)        // 閸欐娊鏁懣婊冨礋妞?[{ label, action }]
  *   }
  *
- * 数据接口：
- *   - 天气：Open-Meteo（与天气 App 相同）
- *   - Bing 壁纸：bing.biturl.top（与照片 App 相同）
- *   - 热榜 / 农历 / 快递 / 节假日 / 票房 / 每日单词：uapis.cn
+ * 閺佺増宓侀幒銉ュ經閿?
+ *   - 婢垛晜鐨甸敍姝刾en-Meteo閿涘牅绗屾径鈺傜毜 App 閻╃鎮撻敍?
+ *   - Bing 婢逛胶鐒婇敍姝渋ng.biturl.top閿涘牅绗岄悡褏澧?App 閻╃鎮撻敍?
+ *   - 閻戭厽顪?/ 閸愭粌宸?/ 韫囶偊鈧?/ 閼哄倸浜ｉ弮?/ 缁併劍鍩?/ 濮ｅ繑妫╅崡鏇＄槤閿涙apis.cn
  */
 
-/* ==================== 工具 ==================== */
+/* ==================== 瀹搞儱鍙?==================== */
 
-/** 带 TTL 的内存数据缓存，避免重复请求 */
+/** 鐢?TTL 閻ㄥ嫬鍞寸€涙ɑ鏆熼幑顔剧处鐎涙﹫绱濋柆鍨帳闁插秴顦茬拠閿嬬湴 */
 const WidgetData = {
     _cache: {},
 
@@ -131,14 +131,18 @@ async function wFetchUapisJSON(path) {
     throw lastErr || new Error('Uapis request failed');
 }
 
-/** HTML 转义 */
+/** HTML 鏉烆兛绠?*/
 function wEsc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
 }
 
-/** 与元素生命周期绑定的定时器：元素移出 DOM 后自动停止 */
+function wUiText(zh, en) {
+    return (typeof I18n !== 'undefined' && I18n.currentLang === 'en') ? en : zh;
+}
+
+/** 娑撳骸鍘撶槐鐘垫晸閸涜棄鎳嗛張鐔虹拨鐎规氨娈戠€规碍妞傞崳顭掔窗閸忓啰绀岀粔璇插毉 DOM 閸氬氦鍤滈崝銊ヤ粻濮?*/
 function wTick(el, ms, fn) {
     fn();
     const id = setInterval(() => {
@@ -147,7 +151,7 @@ function wTick(el, ms, fn) {
     }, ms);
 }
 
-/** 异步渲染包装：loading → 内容 / 错误 */
+/** 瀵倹顒炲〒鍙夌厠閸栧懓顥婇敍姝璷ading 閳?閸愬懎顔?/ 闁挎瑨顕?*/
 async function wAsync(body, fn) {
     body.innerHTML = `<div class="w-loading">${t('widgets.loading')}</div>`;
     try {
@@ -160,7 +164,7 @@ async function wAsync(body, fn) {
     }
 }
 
-/** 在内置浏览器中打开链接（仅桌面普通模式） */
+/** 閸︺劌鍞寸純顔界セ鐟欏牆娅掓稉顓熷ⅵ瀵偓闁剧偓甯撮敍鍫滅矌濡楀矂娼伴弲顕€鈧碍膩瀵骏绱?*/
 function wOpenInBrowser(input, ctx) {
     if (ctx.isPreview || ctx.surface !== 'desktop') return;
     if (typeof Widgets !== 'undefined' && Widgets.isOpen) return;
@@ -172,14 +176,14 @@ function wOpenInBrowser(input, ctx) {
     }, 450);
 }
 
-/** 普通模式下点击是否应该生效 */
+/** 閺咁噣鈧碍膩瀵繋绗呴悙鐟板毊閺勵垰鎯佹惔鏃囶嚉閻㈢喐鏅?*/
 function wClickable(ctx) {
     if (ctx.isPreview) return false;
     if (typeof Widgets !== 'undefined' && Widgets.isOpen) return false;
     return true;
 }
 
-/** 指定时区的当前时间 */
+/** 閹稿洤鐣鹃弮璺哄隘閻ㄥ嫬缍嬮崜宥嗘闂?*/
 function wTzNow(tz) {
     try {
         return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
@@ -192,7 +196,7 @@ function wPad(n) { return String(n).padStart(2, '0'); }
 
 function wWeekday(d) {
     const keys = ['common.sunday', 'common.monday', 'common.tuesday', 'common.wednesday', 'common.thursday', 'common.friday', 'common.saturday'];
-    const fallbackZh = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+    const fallbackZh = ['\u661f\u671f\u65e5', '\u661f\u671f\u4e00', '\u661f\u671f\u4e8c', '\u661f\u671f\u4e09', '\u661f\u671f\u56db', '\u661f\u671f\u4e94', '\u661f\u671f\u516d'];
     const fallbackEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const v = t(keys[d.getDay()]);
     if (v && v !== keys[d.getDay()]) return v;
@@ -200,9 +204,9 @@ function wWeekday(d) {
     return lang[d.getDay()];
 }
 
-/* ==================== 天气 ==================== */
+/* ==================== 婢垛晜鐨?==================== */
 
-/** WMO 天气码 → 新版天气图标路径（与天气 App 共用同一套映射） */
+/** WMO 婢垛晜鐨甸惍?閳?閺傛壆澧楁径鈺傜毜閸ョ偓鐖ｇ捄顖氱窞閿涘牅绗屾径鈺傜毜 App 閸忚京鏁ら崥灞肩婵傛妲х亸鍕剁礆 */
 function wWeatherIconPath(code) {
     if (window.WeatherApp && typeof WeatherApp.codeToIcon === 'function') {
         return WeatherApp.codeToIcon(code);
@@ -226,18 +230,18 @@ function wWeatherDesc(code) {
     return '';
 }
 
-/** 小组件天气数据有效期：1 小时 */
+/** 鐏忓繒绮嶆禒璺恒亯濮樻梹鏆熼幑顔芥箒閺佸牊婀￠敍? 鐏忓繑妞?*/
 const W_WEATHER_WIDGET_TTL = 60 * 60 * 1000;
 
 async function wFetchWeather(cityKey) {
     const locs = wWeatherLocations();
     const loc = locs[cityKey] || locs.beijing;
-    // 与天气 App 共用同一份缓存：App 内 20 分钟刷新，小组件 1 小时刷新；
-    // App 拿到新数据时小组件会通过 weatherDataUpdate 事件同步。
+    // 娑撳骸銇夊?App 閸忚京鏁ら崥灞肩娴犵晫绱︾€涙﹫绱癆pp 閸?20 閸掑棝鎸撻崚閿嬫煀閿涘苯鐨紒鍕 1 鐏忓繑妞傞崚閿嬫煀閿?
+    // App 閹峰灝鍩岄弬鐗堟殶閹诡喗妞傜亸蹇曠矋娴犳湹绱伴柅姘崇箖 weatherDataUpdate 娴滃娆㈤崥灞绢劄閵?
     if (window.WeatherApp && typeof WeatherApp.getWeather === 'function') {
         return WeatherApp.getWeather(loc.lat, loc.lon, W_WEATHER_WIDGET_TTL);
     }
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current_weather=true&hourly=relativehumidity_2m,windspeed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto`;
     return WidgetData.getJSON(`weather-${cityKey}`, W_WEATHER_WIDGET_TTL, url);
 }
 
@@ -250,67 +254,173 @@ function wWeatherCityName(cityKey) {
     return loc ? t(loc.nameKey) : t('weather.beijing');
 }
 
+function wWeatherNum(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.round(n) : fallback;
+}
+
+function wWeatherIsZh() {
+    return !(typeof I18n !== 'undefined' && I18n.currentLang === 'en');
+}
+
+function wWeatherText(key) {
+    const zh = wWeatherIsZh();
+    const map = {
+        high: zh ? '\u6700\u9ad8' : 'High',
+        low: zh ? '\u6700\u4f4e' : 'Low',
+        windSpeed: zh ? '\u98ce\u901f' : 'Wind Speed'
+    };
+    return map[key] || key;
+}
+
+function wWeatherDayName(dateInput, mode = 'full') {
+    const d = new Date(dateInput);
+    const idx = Number.isNaN(d.getTime()) ? new Date().getDay() : d.getDay();
+    const full = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const localized = String(t('weather.weekdays') || '').split(',');
+    const local = localized[idx] && localized.length >= 7 ? localized[idx] : full[idx];
+    if (wWeatherIsZh()) return local;
+    if (mode === 'compact') return full[idx].slice(0, 3);
+    if (mode === 'short') return full[idx].slice(0, 3).toUpperCase();
+    return full[idx];
+}
+
+function wWeatherPlace(cityKey) {
+    const loc = wWeatherLocations()[cityKey];
+    if (!loc) return wWeatherCityName(cityKey);
+    const name = loc.name || t(loc.nameKey);
+    const country = String(loc.country || '').trim();
+    if (country && name) return `${country},${name}`;
+    return name || wWeatherCityName(cityKey);
+}
+
+function wWeatherMainVisual(code) {
+    return `
+        <div class="w-weather-visual" aria-hidden="true">
+            ${wWeatherIconImg(code, 'w-weather-main-icon')}
+        </div>`;
+}
+
+function wWeatherLocationLine(place) {
+    return `
+        <div class="w-weather-location">
+            <span class="w-weather-pin" aria-hidden="true"></span>
+            <span>${wEsc(place)}</span>
+        </div>`;
+}
+
+function wWeatherMetaBlock(wind, humidity) {
+    return `
+        <div class="w-weather-meta">
+            <div class="w-weather-meta-row">
+                <img class="w-weather-meta-icon w-weather-icon" src="Theme/Icon/Symbol_icon/weather/wind-64px.svg" alt="">
+                <span>${wind} km/h</span>
+            </div>
+            <div class="w-weather-meta-row">
+                <img class="w-weather-meta-icon w-weather-icon" src="Theme/Icon/Symbol_icon/weather/droplets-64px.svg" alt="">
+                <span>${humidity}%</span>
+            </div>
+        </div>`;
+}
+
+function wWeatherHighLow(hi, lo) {
+    return `
+        <div class="w-weather-hi-lo">
+            <div><span>H</span><b>${hi}&deg;</b></div>
+            <div><span>L</span><b>${lo}&deg;</b></div>
+        </div>`;
+}
+
+function wWeatherHumidityGauge(humidity) {
+    const pct = Math.max(8, Math.min(96, wWeatherNum(humidity, 42)));
+    return `
+        <div class="w-weather-humidity">
+            <svg class="w-weather-humidity-ring" viewBox="0 0 92 92" aria-hidden="true" focusable="false">
+                <path class="w-weather-humidity-track" pathLength="100" d="M 21 72 A 38 38 0 1 1 71 72"></path>
+                <path class="w-weather-humidity-progress" pathLength="100" d="M 21 72 A 38 38 0 1 1 71 72" style="stroke-dasharray: ${pct} 100"></path>
+            </svg>
+            <img class="w-weather-humidity-icon w-weather-icon" src="Theme/Icon/Symbol_icon/weather/droplets-64px.svg" alt="">
+            <div class="w-weather-humidity-value">${humidity}%</div>
+        </div>`;
+}
+
 function wRenderWeather(body, ctx, size) {
     const city = wWeatherCity(ctx);
     wAsync(body, async () => {
         const data = await wFetchWeather(city);
         if (!body.isConnected) return;
+
         const cur = data.current_weather || {};
         const daily = data.daily || {};
-        const desc = wWeatherDesc(cur.weathercode);
-        const hi = Math.round(daily.temperature_2m_max?.[0] ?? 0);
-        const lo = Math.round(daily.temperature_2m_min?.[0] ?? 0);
+        const hourly = data.hourly || {};
+        const code = cur.weathercode ?? daily.weathercode?.[0];
+        const temp = wWeatherNum(cur.temperature, 26);
+        const hi = wWeatherNum(daily.temperature_2m_max?.[0], 30);
+        const lo = wWeatherNum(daily.temperature_2m_min?.[0], 20);
+        const wind = wWeatherNum(cur.windspeed ?? hourly.windspeed_10m?.[0], 28);
+        const humidity = wWeatherNum(hourly.relativehumidity_2m?.[0], 42);
+        const currentDate = cur.time || daily.time?.[0] || new Date().toISOString();
+        const place = wWeatherPlace(city);
 
-        const days = (daily.time || []).slice(1, size === 'l' ? 6 : 5).map((dateStr, i) => {
+        const days = (daily.time || []).slice(1, 8).map((dateStr, i) => {
             const idx = i + 1;
-            const d = new Date(dateStr);
             return {
-                label: `${d.getMonth() + 1}/${d.getDate()}`,
+                label: wWeatherDayName(dateStr, 'short'),
                 code: daily.weathercode?.[idx],
-                hi: Math.round(daily.temperature_2m_max?.[idx] ?? 0),
-                lo: Math.round(daily.temperature_2m_min?.[idx] ?? 0)
+                hi: wWeatherNum(daily.temperature_2m_max?.[idx], hi),
+                lo: wWeatherNum(daily.temperature_2m_min?.[idx], lo)
             };
         });
 
-        const head = `
-            <div class="w-weather-head">
-                <div class="w-weather-city">${wEsc(wWeatherCityName(city))}</div>
-                <div class="w-weather-temp-row">
-                    <span class="w-weather-temp">${Math.round(cur.temperature ?? 0)}°</span>
-                    ${wWeatherIconImg(cur.weathercode, 'w-weather-cur-icon')}
-                </div>
-                <div class="w-weather-desc">${wEsc(desc)}</div>
-                <div class="w-weather-range">${hi}° / ${lo}°</div>
-            </div>`;
-
         if (size === 's') {
-            body.innerHTML = head;
-        } else if (size === 'm') {
             body.innerHTML = `
-                <div class="w-weather-row">
-                    ${head}
-                    <div class="w-weather-days">
-                        ${days.slice(0, 4).map(d => `
-                            <div class="w-weather-day">
-                                <div class="w-wd-label">${d.label}</div>
-                                ${wWeatherIconImg(d.code, 'w-wd-icon')}
-                                <div class="w-wd-temp">${d.hi}°</div>
-                                <div class="w-wd-temp lo">${d.lo}°</div>
-                            </div>`).join('')}
-                    </div>
+                <div class="w-weather-card w-weather-card-s">
+                    <div class="w-weather-day-title">${wWeatherDayName(currentDate, 'compact')}</div>
+                    <div class="w-weather-temp">${temp}<span>&deg;</span></div>
+                    <div class="w-weather-range">${lo}&deg;/${hi}&deg;</div>
+                    ${wWeatherMainVisual(code)}
                 </div>`;
-        } else {
-            body.innerHTML = `
-                ${head}
-                <div class="w-weather-list">
-                    ${days.map(d => `
-                        <div class="w-weather-list-row">
-                            <span>${d.label}</span>
-                            ${wWeatherIconImg(d.code, 'w-wl-icon')}
-                            <span class="w-wd-range">${d.lo}° ~ ${d.hi}°</span>
-                        </div>`).join('')}
-                </div>`;
+            return;
         }
+
+        if (size === 'm') {
+            body.innerHTML = `
+                <div class="w-weather-card w-weather-card-m">
+                    <div class="w-weather-day-title">${wWeatherDayName(currentDate)}</div>
+                    <div class="w-weather-temp">${temp}<span>&deg;</span></div>
+                    ${wWeatherMetaBlock(wind, humidity)}
+                    ${wWeatherHighLow(hi, lo)}
+                    ${wWeatherLocationLine(place)}
+                    ${wWeatherMainVisual(code)}
+                </div>`;
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="w-weather-card w-weather-card-l">
+                <div class="w-weather-day-title">${wWeatherDayName(currentDate)}</div>
+                <div class="w-weather-temp">${temp}<span>&deg;</span></div>
+                ${wWeatherMainVisual(code)}
+                <div class="w-weather-extremes">
+                    <div><span>${wWeatherText('high')}</span><b>${hi}&deg;</b></div>
+                    <div><span>${wWeatherText('low')}</span><b>${lo}&deg;</b></div>
+                </div>
+                ${wWeatherHumidityGauge(humidity)}
+                <div class="w-weather-forecast">
+                    ${days.map(d => `
+                        <div class="w-weather-forecast-day">
+                            <div class="w-weather-forecast-label">${d.label}</div>
+                            ${wWeatherIconImg(d.code, 'w-wd-icon')}
+                        </div>`).join('')}
+                </div>
+                <div class="w-weather-footer">
+                    ${wWeatherLocationLine(place)}
+                    <div class="w-weather-wind-footer">
+                        <img class="w-weather-footer-icon w-weather-icon" src="Theme/Icon/Symbol_icon/weather/wind-64px.svg" alt="">
+                        <span>${wWeatherText('windSpeed')}&nbsp; ${wind} km/h</span>
+                    </div>
+                </div>
+            </div>`;
     });
 }
 
@@ -329,7 +439,7 @@ function wWeatherMenu(ctx) {
     }));
 }
 
-/* ==================== 时钟 ==================== */
+/* ==================== 閺冨爼鎸?==================== */
 
 function wRenderWeatherEditor(container, ctx) {
     const cur = wWeatherCity(ctx);
@@ -338,8 +448,8 @@ function wRenderWeatherEditor(container, ctx) {
             <div class="widget-edit-head">
                 <img src="Theme/Icon/Symbol_icon/stroke/Sun.svg" alt="">
                 <div>
-                    <div class="widget-edit-title">天气地点</div>
-                    <div class="widget-edit-subtitle">选择天气小组件显示的城市。</div>
+                    <div class="widget-edit-title">${wUiText('\u5929\u6c14\u5730\u70b9', 'Weather Location')}</div>
+                    <div class="widget-edit-subtitle">${wUiText('\u9009\u62e9\u5929\u6c14\u5c0f\u7ec4\u4ef6\u663e\u793a\u7684\u57ce\u5e02\u3002', 'Choose the city shown in the weather widget.')}</div>
                 </div>
             </div>
             <div class="widget-edit-options">
@@ -440,56 +550,203 @@ function wRenderClockWorld(body) {
     });
 }
 
-/* ==================== 日历 ==================== */
+/* ==================== 閺冦儱宸?==================== */
 
-function wTodayEvents() {
-    const data = Storage.get('clock_data') || {};
-    const events = Array.isArray(data.events) ? data.events : [];
-    const todayStr = new Date().toDateString();
-    return events
-        .filter(e => e && e.date && new Date(e.date).toDateString() === todayStr)
-        .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')));
+const W_CAL_MONTHS_EN = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+const W_CAL_MONTHS_EN_SHORT = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+const W_CAL_WEEK_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const W_CAL_WEEK_ZH = ['\u5468\u65e5', '\u5468\u4e00', '\u5468\u4e8c', '\u5468\u4e09', '\u5468\u56db', '\u5468\u4e94', '\u5468\u516d'];
+
+function wCalendarIsEn() {
+    return typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+}
+
+function wCalendarMonth(date, mode = 'long') {
+    const month = date.getMonth();
+    if (wCalendarIsEn()) {
+        return mode === 'short' ? W_CAL_MONTHS_EN_SHORT[month] : W_CAL_MONTHS_EN[month];
+    }
+    return `${month + 1}\u6708`;
+}
+
+function wCalendarMonthYearCompact(date) {
+    const month = wPad(date.getMonth() + 1);
+    const year = date.getFullYear();
+    return wCalendarIsEn() ? `${month}.${year}` : `${year}.${month}`;
+}
+
+function wCalendarWeekday(date, mode = 'short') {
+    const day = date.getDay();
+    if (wCalendarIsEn()) {
+        const label = W_CAL_WEEK_EN[day];
+        if (mode === 'dot') return `${label}.`;
+        if (mode === 'split') return `${label} Day`;
+        return label;
+    }
+    return W_CAL_WEEK_ZH[day];
+}
+
+function wCalendarDaysInMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function wCalendarNextMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+}
+
+function wCalendarSameMonth(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function wCalendarRange(start, end) {
+    const days = [];
+    for (let day = start; day <= end; day += 1) days.push(day);
+    return days;
+}
+
+function wCalendarNearbyDays(date) {
+    const total = wCalendarDaysInMonth(date);
+    const today = date.getDate();
+    const count = 15;
+    const start = Math.max(1, Math.min(today - 7, Math.max(1, total - count + 1)));
+    return wCalendarRange(start, Math.min(total, start + count - 1));
+}
+
+function wCalendarRingDay(date, size) {
+    const total = wCalendarDaysInMonth(date);
+    const today = date.getDate();
+    const offset = size === 's' ? 6 : 4;
+    if (today + offset <= total) return today + offset;
+    if (today > 1) return Math.max(1, today - offset);
+    return null;
+}
+
+function wCalendarDayCell(day, today, ringDay) {
+    const classes = ['w-calendar-day-cell'];
+    if (day === today) classes.push('is-today');
+    else if (day === ringDay) classes.push('is-ring');
+    return `<div class="${classes.join(' ')}">${day}</div>`;
+}
+
+function wCalendarLocation() {
+    const current = t('weather.current-location');
+    if (current && current !== 'weather.current-location') return current;
+    return wCalendarIsEn() ? 'Current location' : '\u5f53\u524d\u4f4d\u7f6e';
+}
+
+function wCalendarLocationMarkup() {
+    return `
+        <div class="w-calendar-location">
+            <span class="w-calendar-pin" aria-hidden="true"></span>
+            <span>${wEsc(wCalendarLocation())}</span>
+        </div>`;
+}
+
+function wCalendarNavButton(direction) {
+    const label = direction < 0
+        ? (wCalendarIsEn() ? 'Previous month' : '\u4e0a\u4e00\u6708')
+        : (wCalendarIsEn() ? 'Next month' : '\u4e0b\u4e00\u6708');
+    return `<button class="w-calendar-nav-btn" type="button" data-cal-nav="${direction}" aria-label="${wEsc(label)}">${direction < 0 ? '\u2039' : '\u203a'}</button>`;
+}
+
+function wCalendarBindMonthNav(body, onShift) {
+    body.querySelectorAll('[data-cal-nav]').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            onShift(Number(btn.dataset.calNav) || 0);
+        });
+    });
 }
 
 function wRenderCalendar(body, ctx, size) {
+    let viewDate = null;
+    const shiftMonth = (delta) => {
+        if (!delta) return;
+        const base = viewDate || new Date();
+        viewDate = new Date(base.getFullYear(), base.getMonth() + delta, 1);
+        update();
+    };
     const update = () => {
         const now = new Date();
-        const events = wTodayEvents();
-        const dateBlock = `
-            <div class="w-cal-date">
-                <div class="w-cal-week">${wWeekday(now)}</div>
-                <div class="w-cal-day">${now.getDate()}</div>
-                <div class="w-cal-month">${now.getFullYear()}/${wPad(now.getMonth() + 1)}</div>
-            </div>`;
-        const maxItems = size === 'l' ? 7 : 3;
-        const list = events.length === 0
-            ? `<div class="w-cal-empty">${t('widgets.calendar.no-todos')}</div>`
-            : events.slice(0, maxItems).map(e => `
-                <div class="w-cal-item">
-                    <span class="w-cal-item-time">${wEsc(e.time || '')}</span>
-                    <span class="w-cal-item-title">${wEsc(e.title || '')}</span>
-                </div>`).join('') +
-              (events.length > maxItems ? `<div class="w-cal-more">+${events.length - maxItems}</div>` : '');
+        if (!viewDate) viewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        const displayDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+        const isCurrentMonth = wCalendarSameMonth(displayDate, now);
+        const today = isCurrentMonth ? now.getDate() : null;
+        const ringDay = isCurrentMonth ? wCalendarRingDay(now, size) : null;
+        const year = displayDate.getFullYear();
+        const days = wCalendarRange(1, wCalendarDaysInMonth(displayDate));
+        const nextMonth = wCalendarMonth(wCalendarNextMonth(displayDate), 'long');
+        const smallHeader = `${wCalendarWeekday(now, 'dot')} ${wCalendarMonth(now, 'short')} ${now.getFullYear()}`;
 
         if (size === 's') {
             body.innerHTML = `
-                ${dateBlock}
-                <div class="w-cal-count">${events.length > 0 ? t('widgets.calendar.count', { n: events.length }) : t('widgets.calendar.no-todos')}</div>`;
-        } else {
-            body.innerHTML = `
-                <div class="w-cal-split ${size === 'l' ? 'vertical' : ''}">
-                    ${dateBlock}
-                    <div class="w-cal-list">
-                        <div class="w-cal-list-title">${t('widgets.calendar.todos')}</div>
-                        ${list}
+                <div class="w-calendar-card w-calendar-card-s">
+                    <div class="w-calendar-small-nav">
+                        <span aria-hidden="true">\u2039</span>
+                        <strong>${wEsc(smallHeader)}</strong>
+                        <span aria-hidden="true">\u203a</span>
+                    </div>
+                    <div class="w-calendar-small-grid">
+                        ${wCalendarNearbyDays(now).map(day => wCalendarDayCell(day, today, ringDay)).join('')}
                     </div>
                 </div>`;
+            return;
         }
+
+        if (size === 'm') {
+            body.innerHTML = `
+                <div class="w-calendar-card w-calendar-card-m">
+                    <div class="w-calendar-medium-main">
+                        <div class="w-calendar-medium-nav">
+                            ${wCalendarNavButton(-1)}
+                            <strong>${wEsc(wCalendarMonthYearCompact(displayDate))}</strong>
+                            ${wCalendarNavButton(1)}
+                        </div>
+                        <div class="w-calendar-medium-week">${wEsc(wCalendarWeekday(now, 'split'))}</div>
+                        <div class="w-calendar-medium-date">${now.getDate()}</div>
+                    </div>
+                    <div class="w-calendar-medium-month">
+                        <div class="w-calendar-month-grid w-calendar-month-grid-m">
+                            <div class="w-calendar-range-pill" aria-hidden="true"></div>
+                            ${days.map(day => wCalendarDayCell(day, today, ringDay)).join('')}
+                            <div class="w-calendar-next-pill">${wEsc(nextMonth)}</div>
+                        </div>
+                    </div>
+                </div>`;
+            wCalendarBindMonthNav(body, shiftMonth);
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="w-calendar-card w-calendar-card-l">
+                <div class="w-calendar-large-head">
+                    <div class="w-calendar-large-date">${today}</div>
+                    <div class="w-calendar-large-meta">
+                        <strong>${wEsc(wCalendarWeekday(now, 'split'))}</strong>
+                        <span>${wEsc(wCalendarMonth(displayDate, 'long'))}</span>
+                    </div>
+                    <div class="w-calendar-large-year">${year}</div>
+                </div>
+                <div class="w-calendar-large-body">
+                    <div class="w-calendar-month-grid w-calendar-month-grid-l">
+                        <div class="w-calendar-month-chip">${wEsc(wCalendarMonth(displayDate, 'long'))}</div>
+                        ${days.map(day => wCalendarDayCell(day, today, ringDay)).join('')}
+                        <div class="w-calendar-next-pill">${wEsc(nextMonth)}</div>
+                    </div>
+                </div>
+            </div>`;
     };
     wTick(body, 60 * 1000, update);
 }
 
-/* ==================== 照片（Bing 壁纸） ==================== */
+/* ==================== 閻撗呭閿涘湐ing 婢逛胶鐒婇敍?==================== */
 
 async function wFetchBing() {
     return WidgetData.getJSON('bing-today', 60 * 60 * 1000,
@@ -500,7 +757,7 @@ function wRenderPhotos(body, ctx, size) {
     wAsync(body, async () => {
         const data = await wFetchBing();
         if (!body.isConnected) return;
-        const title = (data.copyright || '').split(/[（(]/)[0].trim();
+        const title = (data.copyright || '').split(/[閿?]/)[0].trim();
         body.innerHTML = `
             <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
                 <div class="w-photo-overlay">
@@ -511,7 +768,7 @@ function wRenderPhotos(body, ctx, size) {
     });
 }
 
-/* ==================== 搜索 ==================== */
+/* ==================== 閹兼粎鍌?==================== */
 
 const W_SEARCH_ENGINES = {
     bing: { name: 'Bing', url: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}` },
@@ -536,7 +793,6 @@ function wRenderSearch(body, ctx) {
         <div class="w-search-pill">
             <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="">
             <input type="text" placeholder="${W_SEARCH_ENGINES[engine].name} ${t('widgets.search.placeholder')}" ${ctx.isPreview ? 'disabled' : ''}>
-            <button class="w-search-go">${W_SEARCH_ENGINES[engine].name}</button>
         </div>`;
     if (ctx.isPreview) return;
 
@@ -559,9 +815,9 @@ function wRenderSearch(body, ctx) {
         if (e.key === 'Enter') go();
     });
     input.addEventListener('click', (e) => e.stopPropagation());
-    body.querySelector('.w-search-go').addEventListener('click', (e) => {
+    body.querySelector('.w-search-pill').addEventListener('click', (e) => {
         e.stopPropagation();
-        go();
+        input.focus();
     });
 }
 
@@ -594,56 +850,56 @@ function wRenderSearchEditor(container, ctx) {
     });
 }
 
-/* ==================== 今日新闻（热榜） ==================== */
+/* ==================== 娴犲﹥妫╅弬浼存閿涘牏鍎瑰婊愮礆 ==================== */
 
 const W_HOTBOARD_SOURCES = {
-    bilibili: '哔哩哔哩',
-    acfun: 'A站',
-    weibo: '微博热搜',
-    'zhihu': '知乎热榜',
-    'zhihu-daily': '知乎日报',
-    douyin: '抖音',
-    xiaohongshu: '小红书',
-    kuaishou: '快手',
-    'douban-movie': '豆瓣电影',
-    'douban-group': '豆瓣小组',
-    tieba: '百度贴吧',
-    hupu: '虎扑',
-    ngabbs: 'NGA论坛',
+    bilibili: 'Bilibili',
+    acfun: 'AcFun',
+    weibo: 'Weibo',
+    zhihu: 'Zhihu Hot',
+    'zhihu-daily': 'Zhihu Daily',
+    douyin: 'Douyin',
+    xiaohongshu: 'Xiaohongshu',
+    kuaishou: 'Kuaishou',
+    'douban-movie': 'Douban Movie',
+    'douban-group': 'Douban Group',
+    tieba: 'Baidu Tieba',
+    hupu: 'Hupu',
+    ngabbs: 'NGA',
     v2ex: 'V2EX',
-    '52pojie': '吾爱破解',
-    hostloc: '全球主机交流',
-    coolapk: '酷安',
-    baidu: '百度热搜',
-    thepaper: '澎湃新闻',
-    toutiao: '今日头条',
-    'qq-news': '腾讯新闻',
-    sina: '新浪热搜',
-    'sina-news': '新浪新闻',
-    'netease-news': '网易新闻',
-    huxiu: '虎嗅',
-    ifanr: '爱范儿',
-    sspai: '少数派',
-    ithome: 'IT之家',
-    'ithome-xijiayi': 'IT之家喜加一',
-    juejin: '掘金',
-    jianshu: '简书',
-    guokr: '果壳',
-    '36kr': '36氪',
+    '52pojie': '52pojie',
+    hostloc: 'Hostloc',
+    coolapk: 'Coolapk',
+    baidu: 'Baidu Hot',
+    thepaper: 'The Paper',
+    toutiao: 'Toutiao',
+    'qq-news': 'QQ News',
+    sina: 'Sina Hot',
+    'sina-news': 'Sina News',
+    'netease-news': 'NetEase News',
+    huxiu: 'Huxiu',
+    ifanr: 'ifanr',
+    sspai: 'sspai',
+    ithome: 'IT Home',
+    'ithome-xijiayi': 'IT Home Xijiayi',
+    juejin: 'Juejin',
+    jianshu: 'Jianshu',
+    guokr: 'Guokr',
+    '36kr': '36Kr',
     '51cto': '51CTO',
     csdn: 'CSDN',
     nodeseek: 'NodeSeek',
     hellogithub: 'HelloGitHub',
-    lol: '英雄联盟',
-    genshin: '原神',
-    honkai: '崩坏3',
-    starrail: '星穹铁道',
-    'netease-music': '网易云音乐热歌榜',
-    'qq-music': 'QQ音乐热歌榜',
-    weread: '微信读书',
-    weatheralarm: '天气预警',
-    earthquake: '地震速报',
-    history: '历史上的今天'
+    lol: 'League of Legends',
+    genshin: 'Genshin Impact',
+    honkai: 'Honkai Impact',
+    starrail: 'Honkai Star Rail',
+    'netease-music': 'NetEase Music',
+    'qq-music': 'QQ Music',
+    weread: 'WeRead',
+    weatheralarm: 'Weather Alarm',
+    earthquake: 'Earthquake',
+    history: 'Today in History'
 };
 
 function wHotboardSource(ctx) {
@@ -666,7 +922,7 @@ function wRenderNews(body, ctx, size) {
         const sourceName = W_HOTBOARD_SOURCES[source];
         body.innerHTML = `
             <div class="w-list-head">
-                <span class="w-list-title">📰 ${wEsc(sourceName || t('widgets.news.title'))}</span>
+                <span class="w-list-title">${wUiText('\u70ed\u70b9', 'Hot')} ${wEsc(sourceName || t('widgets.news.title'))}</span>
                 <span class="w-list-sub">${wEsc((data.update_time || '').slice(11, 16))}</span>
             </div>
             <div class="w-list-body">
@@ -695,8 +951,8 @@ function wRenderNewsEditor(container, ctx) {
             <div class="widget-edit-head">
                 <img src="Theme/Icon/Symbol_icon/stroke/Broadcast.svg" alt="">
                 <div>
-                    <div class="widget-edit-title">热榜来源</div>
-                    <div class="widget-edit-subtitle">选择今日热榜小组件展示的数据来源。</div>
+                    <div class="widget-edit-title">${wUiText('\u65b0\u95fb\u6765\u6e90', 'News Source')}</div>
+                    <div class="widget-edit-subtitle">${wUiText('\u9009\u62e9\u65b0\u95fb\u5c0f\u7ec4\u4ef6\u9ed8\u8ba4\u663e\u793a\u7684\u70ed\u70b9\u6765\u6e90\u3002', 'Choose the default hot-news source for this widget.')}</div>
                 </div>
             </div>
             <div class="widget-edit-options widget-edit-hotboard-options">
@@ -720,10 +976,10 @@ function wRenderNewsEditor(container, ctx) {
 function wFormatHot(v) {
     const n = parseInt(v, 10);
     if (!isFinite(n)) return '';
-    return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : String(n);
+    return n >= 10000 ? `${(n / 10000).toFixed(1)}\u4e07` : String(n);
 }
 
-/* ==================== 农历 ==================== */
+/* ==================== 閸愭粌宸?==================== */
 
 async function wFetchLunar() {
     return WidgetData.get('lunartime', 30 * 60 * 1000, () =>
@@ -736,13 +992,13 @@ function wRenderLunar(body, ctx, size) {
         if (!body.isConnected) return;
         const now = new Date();
         const extra = [data.solar_term, data.lunar_festival, data.festival]
-            .filter(Boolean).map(wEsc).join(' · ');
+            .filter(Boolean).map(wEsc).join(' / ');
         body.innerHTML = `
             <div class="w-lunar ${size === 'l' ? 'large' : ''}">
                 <div class="w-lunar-tag">${t('widgets.lunar.title')}</div>
                 <div class="w-lunar-day">${wEsc(data.lunar_day_cn || '--')}</div>
                 <div class="w-lunar-month">${wEsc(data.lunar_month_cn || '')}</div>
-                <div class="w-lunar-ganzhi">${wEsc(data.ganzhi_year || '')}${data.zodiac ? `（${wEsc(data.zodiac)}）` : ''}</div>
+                <div class="w-lunar-ganzhi">${wEsc(data.ganzhi_year || '')}${data.zodiac ? ` ${wEsc(data.zodiac)}` : ''}</div>
                 ${size === 'l' ? `
                     <div class="w-lunar-detail">
                         <span>${t('widgets.lunar.month-gz')} ${wEsc(data.ganzhi_month || '--')}</span>
@@ -754,7 +1010,7 @@ function wRenderLunar(body, ctx, size) {
     });
 }
 
-/* ==================== 快递查询 ==================== */
+/* ==================== 韫囶偊鈧帗鐓＄拠?==================== */
 
 async function wFetchTracking(no) {
     return WidgetData.get(`tracking-${no}`, 5 * 60 * 1000, async () => {
@@ -762,7 +1018,7 @@ async function wFetchTracking(no) {
     });
 }
 
-/** 在未知结构的响应中提取物流轨迹数组 */
+/** 閸︺劍婀惌銉х波閺嬪嫮娈戦崫宥呯安娑擃厽褰侀崣鏍⒖濞翠浇寤烘潻瑙勬殶缂?*/
 function wExtractTraces(json) {
     const candidates = [json.traces, json.data, json.list, json.items, json.tracks,
         json.result && json.result.traces, json.result && json.result.list];
@@ -845,7 +1101,7 @@ function wRenderTracking(body, ctx, size) {
     if (saved) query();
 }
 
-/* ==================== 节假日 ==================== */
+/* ==================== 閼哄倸浜ｉ弮?==================== */
 
 async function wFetchHoliday() {
     const now = new Date();
@@ -909,7 +1165,7 @@ function wRenderHoliday(body, ctx, size) {
     });
 }
 
-/* ==================== 答案之书 ==================== */
+/* ==================== 缁涙梹顢嶆稊瀣╁姛 ==================== */
 
 function wRenderAnswerBook(body, ctx) {
     body.innerHTML = `
@@ -940,7 +1196,7 @@ function wRenderAnswerBook(body, ctx) {
         try {
             const data = await wFetchUapisJSON(`/api/v1/answerbook/ask?question=${encodeURIComponent(q)}`);
             if (!display.isConnected) return;
-            display.textContent = `「${data.answer || t('widgets.error')}」`;
+            display.textContent = '"' + (data.answer || t('widgets.error')) + '"';
             display.classList.add('w-answer-reveal');
         } catch (_) {
             if (display.isConnected) display.textContent = t('widgets.error');
@@ -960,46 +1216,22 @@ function wRenderAnswerBook(body, ctx) {
     });
 }
 
-/* ==================== 每日单词 ==================== */
+/* ==================== 濮ｅ繑妫╅崡鏇＄槤 ==================== */
 
 /**
- * 本地词库兜底：uapis 的 /daily/word 接口禁止浏览器跨域免 key 调用
- * （返回 403 CORS_FORBIDDEN），所以接口失败时按日期从本地词库取词，
- * 保证同一天取到的单词一致。
+ * 閺堫剙婀寸拠宥呯氨閸忔粌绨抽敍姝禷pis 閻?/daily/word 閹恒儱褰涚粋浣诡剾濞村繗顫嶉崳銊ㄦ硶閸╃喎鍘?key 鐠嬪啰鏁?
+ * 閿涘牐绻戦崶?403 CORS_FORBIDDEN閿涘绱濋幍鈧禒銉﹀复閸欙絽銇戠拹銉︽閹稿妫╅張鐔剁矤閺堫剙婀寸拠宥呯氨閸欐牞鐦濋敍?
+ * 娣囨繆鐦夐崥灞肩婢垛晛褰囬崚鎵畱閸楁洝鐦濇稉鈧懛娣偓?
  */
 const W_WORD_BANK = [
-    { word: 'serene', phonetic: '/səˈriːn/', translation: 'adj. 平静的，安详的', examples: [{ text: 'The lake was serene in the morning light.', translation: '晨光中的湖面一片宁静。' }] },
-    { word: 'diligent', phonetic: '/ˈdɪlɪdʒənt/', translation: 'adj. 勤奋的，用功的', examples: [{ text: 'She is a diligent student who never misses a class.', translation: '她是个从不缺课的勤奋学生。' }] },
-    { word: 'abundant', phonetic: '/əˈbʌndənt/', translation: 'adj. 丰富的，充裕的', examples: [{ text: 'The region has abundant natural resources.', translation: '这个地区自然资源丰富。' }] },
-    { word: 'genuine', phonetic: '/ˈdʒenjuɪn/', translation: 'adj. 真正的，真诚的', examples: [{ text: 'Her smile was warm and genuine.', translation: '她的微笑温暖而真诚。' }] },
-    { word: 'persist', phonetic: '/pəˈsɪst/', translation: 'v. 坚持，持续', examples: [{ text: 'If you persist, you will succeed.', translation: '只要坚持，你就会成功。' }] },
-    { word: 'crucial', phonetic: '/ˈkruːʃl/', translation: 'adj. 关键的，至关重要的', examples: [{ text: 'Timing is crucial to the success of the plan.', translation: '时机对计划的成功至关重要。' }] },
-    { word: 'embrace', phonetic: '/ɪmˈbreɪs/', translation: 'v. 拥抱；欣然接受', examples: [{ text: 'We should embrace new technologies.', translation: '我们应该欣然接受新技术。' }] },
-    { word: 'flourish', phonetic: '/ˈflʌrɪʃ/', translation: 'v. 繁荣，茁壮成长', examples: [{ text: 'Plants flourish in this warm climate.', translation: '植物在这种温暖的气候里长势喜人。' }] },
-    { word: 'insight', phonetic: '/ˈɪnsaɪt/', translation: 'n. 洞察力，深刻见解', examples: [{ text: 'The book offers great insight into human nature.', translation: '这本书对人性有深刻的洞察。' }] },
-    { word: 'modest', phonetic: '/ˈmɒdɪst/', translation: 'adj. 谦虚的；适度的', examples: [{ text: 'He remained modest despite his success.', translation: '尽管成功了，他依然保持谦逊。' }] },
-    { word: 'navigate', phonetic: '/ˈnævɪɡeɪt/', translation: 'v. 导航，驾驭；找到方向', examples: [{ text: 'Sailors used the stars to navigate at sea.', translation: '水手们靠星星在海上导航。' }] },
-    { word: 'optimistic', phonetic: '/ˌɒptɪˈmɪstɪk/', translation: 'adj. 乐观的', examples: [{ text: 'She is optimistic about the future.', translation: '她对未来很乐观。' }] },
-    { word: 'profound', phonetic: '/prəˈfaʊnd/', translation: 'adj. 深刻的，深远的', examples: [{ text: 'The discovery had a profound impact on science.', translation: '这一发现对科学产生了深远影响。' }] },
-    { word: 'resilient', phonetic: '/rɪˈzɪliənt/', translation: 'adj. 有韧性的，能快速恢复的', examples: [{ text: 'Children are often remarkably resilient.', translation: '孩子们往往有惊人的恢复力。' }] },
-    { word: 'subtle', phonetic: '/ˈsʌtl/', translation: 'adj. 微妙的，不易察觉的', examples: [{ text: 'There is a subtle difference between the two colors.', translation: '这两种颜色之间有细微的差别。' }] },
-    { word: 'thrive', phonetic: '/θraɪv/', translation: 'v. 茁壮成长，兴旺', examples: [{ text: 'Small businesses thrive in this city.', translation: '小企业在这座城市蓬勃发展。' }] },
-    { word: 'vivid', phonetic: '/ˈvɪvɪd/', translation: 'adj. 生动的，鲜明的', examples: [{ text: 'She gave a vivid description of the trip.', translation: '她对这次旅行做了生动的描述。' }] },
-    { word: 'wisdom', phonetic: '/ˈwɪzdəm/', translation: 'n. 智慧，才智', examples: [{ text: 'Age brings wisdom and experience.', translation: '年龄带来智慧和经验。' }] },
-    { word: 'curious', phonetic: '/ˈkjʊəriəs/', translation: 'adj. 好奇的，求知欲强的', examples: [{ text: 'Cats are naturally curious animals.', translation: '猫天生就是好奇的动物。' }] },
-    { word: 'elegant', phonetic: '/ˈelɪɡənt/', translation: 'adj. 优雅的，简洁巧妙的', examples: [{ text: 'The mathematician found an elegant solution.', translation: '这位数学家找到了一个简洁巧妙的解法。' }] },
-    { word: 'harmony', phonetic: '/ˈhɑːməni/', translation: 'n. 和谐，融洽', examples: [{ text: 'They live in harmony with nature.', translation: '他们与自然和谐相处。' }] },
-    { word: 'inspire', phonetic: '/ɪnˈspaɪə/', translation: 'v. 鼓舞，激励；赋予灵感', examples: [{ text: 'Her courage inspired everyone around her.', translation: '她的勇气鼓舞了身边的每一个人。' }] },
-    { word: 'journey', phonetic: '/ˈdʒɜːni/', translation: 'n. 旅程，历程', examples: [{ text: 'Life is a journey, not a destination.', translation: '人生是一段旅程，而非终点。' }] },
-    { word: 'keen', phonetic: '/kiːn/', translation: 'adj. 热衷的；敏锐的', examples: [{ text: 'She has a keen eye for detail.', translation: '她对细节有敏锐的眼光。' }] },
-    { word: 'luminous', phonetic: '/ˈluːmɪnəs/', translation: 'adj. 发光的，明亮的', examples: [{ text: 'The clock has a luminous dial.', translation: '这只钟有一个夜光表盘。' }] },
-    { word: 'mature', phonetic: '/məˈtʃʊə/', translation: 'adj. 成熟的 v. 成熟', examples: [{ text: 'He is very mature for his age.', translation: '就他的年龄而言，他非常成熟。' }] },
-    { word: 'noble', phonetic: '/ˈnəʊbl/', translation: 'adj. 高尚的，崇高的', examples: [{ text: 'Helping others is a noble cause.', translation: '帮助他人是一项高尚的事业。' }] },
-    { word: 'overcome', phonetic: '/ˌəʊvəˈkʌm/', translation: 'v. 克服，战胜', examples: [{ text: 'She overcame many difficulties to finish school.', translation: '她克服了重重困难完成了学业。' }] },
-    { word: 'patient', phonetic: '/ˈpeɪʃnt/', translation: 'adj. 耐心的 n. 病人', examples: [{ text: 'Be patient; good things take time.', translation: '耐心点，美好的事物需要时间。' }] },
-    { word: 'remarkable', phonetic: '/rɪˈmɑːkəbl/', translation: 'adj. 非凡的，值得注意的', examples: [{ text: 'The team made remarkable progress this year.', translation: '团队今年取得了非凡的进步。' }] },
-    { word: 'sincere', phonetic: '/sɪnˈsɪə/', translation: 'adj. 真诚的，诚挚的', examples: [{ text: 'Please accept my sincere apologies.', translation: '请接受我诚挚的歉意。' }] },
-    { word: 'tranquil', phonetic: '/ˈtræŋkwɪl/', translation: 'adj. 安静的，平静的', examples: [{ text: 'We spent a tranquil evening by the river.', translation: '我们在河边度过了一个宁静的夜晚。' }] }
+    { word: 'serene', phonetic: '/s\u0259\u02c8ri\u02d0n/', translation: 'adj. calm; peaceful', examples: [{ text: 'The lake was serene in the morning light.', translation: 'The scene was calm and peaceful.' }] },
+    { word: 'diligent', phonetic: '/\u02c8d\u026al\u026ad\u0292\u0259nt/', translation: 'adj. hardworking and careful', examples: [{ text: 'She is a diligent student who never misses a class.', translation: 'She studies carefully and consistently.' }] },
+    { word: 'abundant', phonetic: '/\u0259\u02c8b\u028cnd\u0259nt/', translation: 'adj. more than enough', examples: [{ text: 'The region has abundant natural resources.', translation: 'There are many resources in the area.' }] },
+    { word: 'genuine', phonetic: '/\u02c8d\u0292enju\u026an/', translation: 'adj. real; sincere', examples: [{ text: 'Her smile was warm and genuine.', translation: 'Her smile felt sincere.' }] },
+    { word: 'persist', phonetic: '/p\u0259r\u02c8s\u026ast/', translation: 'v. continue firmly', examples: [{ text: 'If you persist, you will succeed.', translation: 'Keep going and you can succeed.' }] },
+    { word: 'crucial', phonetic: '/\u02c8kru\u02d0\u0283l/', translation: 'adj. extremely important', examples: [{ text: 'Timing is crucial to the success of the plan.', translation: 'Timing is very important.' }] },
+    { word: 'embrace', phonetic: '/\u026am\u02c8bre\u026as/', translation: 'v. accept willingly', examples: [{ text: 'We should embrace new technologies.', translation: 'We should welcome new technologies.' }] },
+    { word: 'flourish', phonetic: '/\u02c8fl\u028cr\u026a\u0283/', translation: 'v. grow well', examples: [{ text: 'Plants flourish in this warm climate.', translation: 'Plants grow well here.' }] }
 ];
 
 async function wFetchDailyWord() {
@@ -1007,7 +1239,7 @@ async function wFetchDailyWord() {
         try {
             const data = await wFetchUapisJSON('/api/v1/daily/word');
             if (data && Array.isArray(data.words) && data.words.length) return data;
-        } catch (_) { /* 跨域被拒或网络错误，走本地词库 */ }
+        } catch (_) { /* 鐠恒劌鐓欑悮顐ｅ珕閹存牜缍夌紒婊堟晩鐠囶垽绱濈挧鐗堟拱閸︽媽鐦濇惔?*/ }
         const idx = Math.floor(Date.now() / 86400000) % W_WORD_BANK.length;
         return { words: [W_WORD_BANK[idx]] };
     });
@@ -1039,9 +1271,9 @@ function wRenderWord(body, ctx, size) {
     });
 }
 
-/* ==================== 多媒体 ==================== */
+/* ==================== 婢舵艾鐛熸担?==================== */
 
-/** 无封面时的渐变占位（与多媒体 App 的渐变风格一致） */
+/** 閺冪姴鐨濋棃銏℃閻ㄥ嫭绗庨崣妯哄窗娴ｅ稄绱欐稉搴☆樋婵帊缍?App 閻ㄥ嫭绗庨崣姗€顥撻弽闂寸閼疯揪绱?*/
 const W_MEDIA_GRADIENTS = [
     'linear-gradient(135deg, #ff6b35 0%, #ffb347 52%, #ffe1c2 100%)',
     'linear-gradient(135deg, #ff2d55 0%, #ff7aa2 50%, #ffd1dc 100%)',
@@ -1050,7 +1282,7 @@ const W_MEDIA_GRADIENTS = [
     'linear-gradient(135deg, #34c759 0%, #7be495 55%, #d9f7e2 100%)'
 ];
 
-/** themeColors 缺失时按 gradientIndex 取的兜底主题色 */
+/** themeColors 缂傚搫銇戦弮鑸靛瘻 gradientIndex 閸欐牜娈戦崗婊冪俺娑撳顣介懝?*/
 const W_MEDIA_FALLBACK_COLORS = [
     ['hsl(18, 76%, 56%)', 'hsl(28, 84%, 50%)'],
     ['hsl(350, 80%, 55%)', 'hsl(338, 86%, 48%)'],
@@ -1060,46 +1292,78 @@ const W_MEDIA_FALLBACK_COLORS = [
 ];
 
 /**
- * 取「最近播放」曲目。
- * 优先读运行中的 MediaApp（有封面 blob 与实时播放状态）；
- * App 未打开时退回 localStorage 里的曲库清单（无封面，但有持久化的主题色）。
+ * 閸欐牓鈧本娓舵潻鎴炴尡閺€淇扁偓宥嗘锤閻╊喓鈧?
+ * 娴兼ê鍘涚拠鏄忕箥鐞涘奔鑵戦惃?MediaApp閿涘牊婀佺亸渚€娼?blob 娑撳骸鐤勯弮鑸垫尡閺€鍓уЦ閹緤绱氶敍?
+ * App 閺堫亝澧﹀鈧弮鍫曗偓鈧崶?localStorage 闁插瞼娈戦弴鎻掔氨濞撳懎宕熼敍鍫熸￥鐏忎線娼伴敍灞肩稻閺堝瀵旀稊鍛閻ㄥ嫪瀵屾０妯垮閿涘鈧?
  */
-function wMediaTrack() {
+function wMediaNormalizeTrack(item, index, activeId, playing, progress) {
+    return {
+        id: item.id,
+        title: item.title || item.name || t('widgets.media.unknown'),
+        artist: item.artist || t('widgets.media.unknown'),
+        coverUrl: item.coverUrl || '',
+        themeColors: item.themeColors,
+        gradientIndex: item.gradientIndex || index || 0,
+        playing: item.id === activeId ? playing : false,
+        progress: item.id === activeId ? progress : 0,
+        index
+    };
+}
+
+function wMediaSnapshot() {
     if (window.MediaApp && Array.isArray(MediaApp.library) && MediaApp.library.length) {
         const lib = MediaApp.library;
-        const live = (MediaApp.currentIndex >= 0 && lib[MediaApp.currentIndex])
-            ? lib[MediaApp.currentIndex]
-            : lib.slice().sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0))[0];
+        const fallbackIndex = lib
+            .map((item, index) => ({ item, index }))
+            .sort((a, b) => (b.item.lastPlayed || 0) - (a.item.lastPlayed || 0))[0]?.index ?? 0;
+        const currentIndex = MediaApp.currentIndex >= 0 && lib[MediaApp.currentIndex] ? MediaApp.currentIndex : fallbackIndex;
+        const live = lib[currentIndex] || lib[0];
         const media = MediaApp.mediaElement;
         const playing = !!(media && !media.paused && media.dataset.itemId === live.id);
+        const progress = media && Number.isFinite(media.duration) && media.duration > 0
+            ? Math.max(0, Math.min(100, (media.currentTime / media.duration) * 100))
+            : 68;
         return {
-            id: live.id,
-            title: live.title,
-            artist: live.artist,
-            coverUrl: live.coverUrl || '',
-            themeColors: live.themeColors,
-            gradientIndex: live.gradientIndex || 0,
-            playing
+            tracks: lib.map((item, index) => wMediaNormalizeTrack(item, index, live.id, playing, progress)),
+            currentIndex
         };
     }
+
     let manifest = [];
     try {
         manifest = JSON.parse(localStorage.getItem('fluentos.media.library.v1') || '[]');
     } catch (_) { manifest = []; }
-    if (!Array.isArray(manifest) || !manifest.length) return null;
-    const item = manifest.slice().sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0))[0];
+    if (!Array.isArray(manifest) || !manifest.length) return { tracks: [], currentIndex: -1 };
+    const sorted = manifest
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => (b.item.lastPlayed || 0) - (a.item.lastPlayed || 0));
+    const currentIndex = sorted[0]?.index ?? 0;
+    const activeId = manifest[currentIndex]?.id;
     return {
-        id: item.id,
-        title: item.title,
-        artist: item.artist,
-        coverUrl: '',
-        themeColors: item.themeColors,
-        gradientIndex: item.gradientIndex || 0,
-        playing: false
+        tracks: manifest.map((item, index) => wMediaNormalizeTrack(item, index, activeId, false, 68)),
+        currentIndex
     };
 }
 
-/** 取曲目主题色（两个），用于中尺寸卡片背景 */
+function wMediaState() {
+    const snapshot = wMediaSnapshot();
+    const tracks = snapshot.tracks || [];
+    if (!tracks.length) return { track: null, queue: [] };
+    const currentIndex = snapshot.currentIndex >= 0 ? snapshot.currentIndex : 0;
+    const track = tracks[currentIndex] || tracks[0];
+    const queue = [];
+    for (let step = 1; step < tracks.length && queue.length < 4; step += 1) {
+        queue.push(tracks[(currentIndex + step) % tracks.length]);
+    }
+    if (!queue.length && track) queue.push(track);
+    return { track, queue };
+}
+
+function wMediaTrack() {
+    return wMediaState().track;
+}
+
+/** 閸欐牗娲搁惄顔诲瘜妫版澹婇敍鍫滆⒈娑擃亷绱氶敍宀€鏁ゆ禍搴濊厬鐏忓搫顕崡锛勫閼冲本娅?*/
 function wMediaColors(track) {
     if (track && Array.isArray(track.themeColors) && track.themeColors.length >= 2) {
         return [track.themeColors[0], track.themeColors[1]];
@@ -1119,94 +1383,159 @@ function wMediaCoverHtml(track, cls) {
         </div>`;
 }
 
-/** 播放/暂停：App 已打开则直接切换；未打开则先打开 App，待曲库恢复后自动播放 */
-function wMediaTogglePlay(ctx) {
+/** 閹绢厽鏂?閺嗗倸浠犻敍娆皃p 瀹稿弶澧﹀鈧崚娆戞纯閹恒儱鍨忛幑顫幢閺堫亝澧﹀鈧崚娆忓帥閹垫挸绱?App閿涘苯绶熼弴鎻掔氨閹垹顦查崥搴ゅ殰閸斻劍鎸遍弨?*/
+function wMediaText(key) {
+    const zh = !(typeof I18n !== 'undefined' && I18n.currentLang === 'en');
+    const map = {
+        upNext: zh ? '\u63a5\u4e0b\u6765' : 'Up Next',
+        afternoon: zh ? '\u4f60\u7684\u5348\u540e\u97f3\u4e50' : 'Your afternoon musics',
+        previous: zh ? '\u4e0a\u4e00\u9996' : 'Previous',
+        next: zh ? '\u4e0b\u4e00\u9996' : 'Next'
+    };
+    return map[key] || key;
+}
+
+function wMediaInvoke(action) {
+    if (!(window.MediaApp && MediaApp.container && MediaApp.library.length)) return false;
+    if (action === 'previous') MediaApp.playPrevious();
+    else if (action === 'next') MediaApp.playNext();
+    else MediaApp.togglePlay(action === 'start');
+    return true;
+}
+
+function wMediaControl(ctx, action) {
     if (!wClickable(ctx) || ctx.surface !== 'desktop') return;
-    if (window.MediaApp && MediaApp.container && MediaApp.library.length) {
-        MediaApp.togglePlay();
-        return;
-    }
+    if (wMediaInvoke(action)) return;
     WindowManager.openApp('media');
+    const pendingAction = action === 'play' ? 'start' : action;
     let tries = 0;
     const timer = setInterval(() => {
         tries += 1;
-        if (window.MediaApp && MediaApp.container && MediaApp.library.length) {
+        if (wMediaInvoke(pendingAction)) {
             clearInterval(timer);
-            MediaApp.togglePlay(true);
         } else if (tries > 24) {
             clearInterval(timer);
         }
     }, 250);
 }
 
+function wMediaControlButton(action, track) {
+    const isPlay = action === 'play';
+    const icon = action === 'previous'
+        ? 'Previous.svg'
+        : action === 'next'
+            ? 'Next.svg'
+            : `${track.playing ? 'Pause' : 'Play'}.svg`;
+    const label = action === 'play'
+        ? (track.playing ? t('widgets.media.pause') : t('widgets.media.play'))
+        : wMediaText(action);
+    const progress = Math.max(8, Math.min(100, Math.round(track.progress || 68)));
+    const style = isPlay ? ` style="--w-media-progress:${progress}%;"` : '';
+    return `
+        <button class="w-media-control ${isPlay ? 'w-media-control-play' : ''}" type="button" data-media-action="${action}" aria-label="${wEsc(label)}"${style}>
+            <img src="Theme/Icon/Symbol_icon/stroke/${icon}" alt="">
+        </button>`;
+}
+
+function wMediaControls(track) {
+    return `
+        <div class="w-media-controls">
+            ${wMediaControlButton('previous', track)}
+            ${wMediaControlButton('play', track)}
+            ${wMediaControlButton('next', track)}
+        </div>`;
+}
+
+function wMediaQueueMarkup(queue) {
+    return `
+        <div class="w-media-upnext-title">${wMediaText('upNext')}</div>
+        <div class="w-media-queue">
+            ${queue.slice(0, 4).map(item => `
+                <div class="w-media-queue-item">
+                    ${wMediaCoverHtml(item, 'w-media-queue-art')}
+                    <div class="w-media-queue-title">${wEsc(item.title)}</div>
+                    <div class="w-media-queue-artist">${wEsc(item.artist || t('widgets.media.unknown'))}</div>
+                </div>`).join('')}
+        </div>
+        <div class="w-media-footer-text">${wMediaText('afternoon')}</div>`;
+}
+
 function wRenderMedia(body, ctx, size) {
-    const draw = (track) => {
+    const draw = (state) => {
+        const track = state.track;
         body.classList.toggle('w-media-medium', size === 'm');
+        body.classList.toggle('w-media-large', size === 'l');
         if (!track) {
             body.style.removeProperty('--w-media-c1');
             body.style.removeProperty('--w-media-c2');
             body.innerHTML = `
-                <div class="w-media w-media-empty">
+                <div class="w-media w-media-player-card w-media-empty">
                     <img class="w-media-empty-icon" src="Theme/Icon/Symbol_icon/stroke/Music.svg" alt="">
                     <div class="w-media-empty-text">${t('widgets.media.empty')}</div>
                 </div>`;
             return;
         }
+
         const [c1, c2] = wMediaColors(track);
         body.style.setProperty('--w-media-c1', c1);
         body.style.setProperty('--w-media-c2', c2);
         const artist = track.artist || t('widgets.media.unknown');
-        const playBtn = `
-            <button class="w-media-play" type="button">
-                <img src="Theme/Icon/Symbol_icon/stroke/${track.playing ? 'Pause' : 'Play'}.svg" alt="">
-                <span>${track.playing ? t('widgets.media.pause') : t('widgets.media.play')}</span>
-            </button>`;
+
         if (size === 's') {
-            // 小尺寸：封面铺满整张卡片，底部信息 + 羽化虚化的播放按钮
             body.innerHTML = `
-                <div class="w-media w-media-s">
-                    ${wMediaCoverHtml(track, 'w-media-cover-full')}
-                    <div class="w-media-shade"></div>
-                    <span class="w-media-note"></span>
-                    <div class="w-media-overlay">
+                <div class="w-media w-media-player-card w-media-card-s">
+                    ${wMediaCoverHtml(track, 'w-media-art')}
+                    <div class="w-media-copy">
                         <div class="w-media-title">${wEsc(track.title)}</div>
                         <div class="w-media-artist">${wEsc(artist)}</div>
-                        ${playBtn}
+                    </div>
+                    ${wMediaControls(track)}
+                </div>`;
+        } else if (size === 'm') {
+            body.innerHTML = `
+                <div class="w-media w-media-player-card w-media-card-m">
+                    ${wMediaCoverHtml(track, 'w-media-art')}
+                    <div class="w-media-copy">
+                        <div class="w-media-title">${wEsc(track.title)}</div>
+                        <div class="w-media-artist">${wEsc(artist)}</div>
+                        ${wMediaControls(track)}
                     </div>
                 </div>`;
         } else {
-            // 中尺寸：左侧封面 + 右侧信息，卡片背景使用封面主题色
             body.innerHTML = `
-                <div class="w-media w-media-m">
-                    ${wMediaCoverHtml(track, 'w-media-cover-box')}
-                    <div class="w-media-info">
-                        <div class="w-media-tag">${t('widgets.media.recent')}</div>
-                        <div class="w-media-title">${wEsc(track.title)}</div>
-                        <div class="w-media-artist">${wEsc(artist)}</div>
-                        ${playBtn}
+                <div class="w-media w-media-player-card w-media-card-l">
+                    <div class="w-media-now-row">
+                        ${wMediaCoverHtml(track, 'w-media-art')}
+                        <div class="w-media-copy">
+                            <div class="w-media-title">${wEsc(track.title)}</div>
+                            <div class="w-media-artist">${wEsc(artist)}</div>
+                            ${wMediaControls(track)}
+                        </div>
                     </div>
-                    <span class="w-media-note"></span>
+                    ${wMediaQueueMarkup(state.queue)}
                 </div>`;
         }
-        const btn = body.querySelector('.w-media-play');
-        if (btn) {
+
+        body.querySelectorAll('[data-media-action]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                wMediaTogglePlay(ctx);
-                // 播放状态变化后尽快刷新按钮
+                wMediaControl(ctx, btn.dataset.mediaAction || 'play');
                 setTimeout(refresh, 300);
                 setTimeout(refresh, 800);
             });
-        }
+        });
     };
 
     const refresh = () => {
         if (body.dataset.mediaSig && !body.isConnected) return;
-        const track = wMediaTrack();
-        const sig = track ? `${track.id}|${track.playing}|${track.coverUrl}` : 'empty';
+        const state = wMediaState();
+        const track = state.track;
+        const sig = track
+            ? `${track.id}|${track.playing}|${Math.round(track.progress || 0)}|${track.coverUrl}|${state.queue.map(item => item.id).join(',')}`
+            : 'empty';
         if (body.dataset.mediaSig === sig) return;
         body.dataset.mediaSig = sig;
-        draw(track);
+        draw(state);
     };
 
     body.dataset.mediaSig = '';
@@ -1297,7 +1626,7 @@ function wRenderFavoriteSites(body, ctx, size) {
 
         if (!sites.length) {
             const emptyText = t('widgets.favorites.empty');
-            body.innerHTML = `<div class="w-loading">${emptyText === 'widgets.favorites.empty' ? '暂无收藏网站' : emptyText}</div>`;
+            body.innerHTML = `<div class="w-loading">${emptyText === 'widgets.favorites.empty' ? 'No favorite sites' : emptyText}</div>`;
             return;
         }
 
@@ -1332,12 +1661,12 @@ function wRenderFavoriteSites(body, ctx, size) {
     });
 }
 
-/* ==================== 注册表 ==================== */
+/* ==================== 濞夈劌鍞界悰?==================== */
 
 function wRenderFavoriteSitesEditor(container, ctx) {
     const service = window.FavoriteSites;
     if (!service) {
-        container.innerHTML = `<div class="widget-edit-panel"><div class="w-loading">收藏服务不可用</div></div>`;
+        container.innerHTML = `<div class="widget-edit-panel"><div class="w-loading">${wUiText('\u6536\u85cf\u670d\u52a1\u6682\u4e0d\u53ef\u7528', 'Favorites service is unavailable')}</div></div>`;
         return;
     }
 
@@ -1349,13 +1678,13 @@ function wRenderFavoriteSitesEditor(container, ctx) {
                 <div class="widget-edit-head">
                     <img src="Theme/Icon/Symbol_icon/stroke/Bookmark.svg" alt="">
                     <div>
-                        <div class="widget-edit-title">收藏网站</div>
-                        <div class="widget-edit-subtitle">添加或删除会同步到收藏网站小组件。</div>
+                        <div class="widget-edit-title">${wUiText('\u6536\u85cf\u7f51\u7ad9', 'Favorite Sites')}</div>
+                        <div class="widget-edit-subtitle">${wUiText('\u6dfb\u52a0\u6216\u79fb\u9664\u663e\u793a\u5728\u6536\u85cf\u5c0f\u7ec4\u4ef6\u4e2d\u7684\u5feb\u6377\u7f51\u7ad9\u3002', 'Add or remove quick links shown in the favorites widget.')}</div>
                     </div>
                 </div>
                 <div class="widget-edit-add-row">
-                    <input class="widget-edit-input" type="url" placeholder="输入网站地址，例如 example.com">
-                    <button class="widget-edit-add-btn" type="button">添加</button>
+                    <input class="widget-edit-input" type="url" placeholder="${wUiText('\u8f93\u5165\u7f51\u5740\uff0c\u4f8b\u5982 example.com', 'Enter a URL, for example example.com')}">
+                    <button class="widget-edit-add-btn" type="button">${wUiText('\u6dfb\u52a0', 'Add')}</button>
                 </div>
                 <div class="widget-edit-sites-list">
                     ${sites.map(site => `
@@ -1364,7 +1693,7 @@ function wRenderFavoriteSitesEditor(container, ctx) {
                                 ${site.icon ? `<img src="${wEsc(site.icon)}" alt="">` : ''}
                             </span>
                             <span class="widget-edit-site-name">${wEsc(site.title || site.url)}</span>
-                            <button class="widget-edit-site-remove" type="button" title="删除">
+                            <button class="widget-edit-site-remove" type="button" title="${wUiText('\u5220\u9664', 'Remove')}">
                                 <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
                             </button>
                         </div>
@@ -1454,7 +1783,8 @@ const WidgetDefs = {
             icon: 'Theme/Icon/Symbol_icon/stroke/Music.svg',
             variants: [
                 { id: 'media-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 's'); }, onClick: wMediaOpenApp },
-                { id: 'media-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 'm'); }, onClick: wMediaOpenApp }
+                { id: 'media-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 'm'); }, onClick: wMediaOpenApp },
+                { id: 'media-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-media-theme', render(b, c) { wRenderMedia(b, c, 'l'); }, onClick: wMediaOpenApp }
             ]
         },
         {
@@ -1480,8 +1810,8 @@ const WidgetDefs = {
         },
         {
             id: 'favorites',
-            nameKey: '收藏网站',
-            descKey: '显示常用收藏网站，自动匹配 App Shop 图标',
+            nameKey: 'Favorites',
+            descKey: 'Favorite sites and quick app links',
             icon: 'Theme/Icon/Symbol_icon/stroke/Bookmark.svg',
             variants: [
                 { id: 'favorites-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 's'); }, renderEditor: wRenderFavoriteSitesEditor },
@@ -1551,7 +1881,7 @@ const WidgetDefs = {
         }
     ],
 
-    /** 首页推荐的小组件形态 */
+    /** 妫ｆ牠銆夐幒銊ㄥ礃閻ㄥ嫬鐨紒鍕瑜般垺鈧?*/
     recommended: [
         'weather-m', 'clock-analog', 'calendar-s', 'search-capsule',
         'quicknotes-m', 'favorites-m', 'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'

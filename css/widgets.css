@@ -1,12 +1,12 @@
 /* ==========================================================
-   小组件系统（Widgets）
-   - 桌面 / 锁屏小组件图层
-   - 小组件抽屉（侧边栏 + 推荐页 + 多形态选择页）
-   - 拖拽幽灵、吸附指示器、网格提示
-   - 各小组件内容样式（w-*）
+   灏忕粍浠剁郴缁燂紙Widgets锛?
+   - 妗岄潰 / 閿佸睆灏忕粍浠跺浘灞?
+   - 灏忕粍浠舵娊灞夛紙渚ц竟鏍?+ 鎺ㄨ崘椤?+ 澶氬舰鎬侀€夋嫨椤碉級
+   - 鎷栨嫿骞界伒銆佸惛闄勬寚绀哄櫒銆佺綉鏍兼彁绀?
+   - 鍚勫皬缁勪欢鍐呭鏍峰紡锛坵-*锛?
    ========================================================== */
 
-/* ===== 1. 小组件图层 ===== */
+/* ===== 1. 灏忕粍浠跺浘灞?===== */
 .widgets-layer {
     position: absolute;
     inset: 0;
@@ -18,12 +18,12 @@
     z-index: 5;
 }
 
-/* 编辑模式下桌面图层抬升到窗口之上（任务栏与抽屉之下） */
+/* 缂栬緫妯″紡涓嬫闈㈠浘灞傛姮鍗囧埌绐楀彛涔嬩笂锛堜换鍔℃爮涓庢娊灞変箣涓嬶級 */
 body.widgets-edit-mode #desktop-widgets-layer {
     z-index: 9000;
 }
 
-/* ===== 2. 已放置的小组件 ===== */
+/* ===== 2. 宸叉斁缃殑灏忕粍浠?===== */
 .fluent-widget {
     position: absolute;
     border-radius: 20px;
@@ -47,7 +47,7 @@ body.widgets-edit-mode .fluent-widget:active {
     cursor: grabbing;
 }
 
-/* 编辑模式下内部元素不响应（任意位置可拖动），移除按钮除外 */
+/* 缂栬緫妯″紡涓嬪唴閮ㄥ厓绱犱笉鍝嶅簲锛堜换鎰忎綅缃彲鎷栧姩锛夛紝绉婚櫎鎸夐挳闄ゅ */
 body.widgets-edit-mode .fluent-widget .fluent-widget-body,
 body.widgets-edit-mode .fluent-widget .fluent-widget-body * {
     pointer-events: none;
@@ -74,7 +74,7 @@ body.widgets-edit-mode .fluent-widget .fluent-widget-body * {
     -webkit-backdrop-filter: none;
 }
 
-/* 小组件专用高光反馈：独立于通用按钮高光，开关仍跟随设置里的高光反馈。 */
+/* 灏忕粍浠朵笓鐢ㄩ珮鍏夊弽棣堬細鐙珛浜庨€氱敤鎸夐挳楂樺厜锛屽紑鍏充粛璺熼殢璁剧疆閲岀殑楂樺厜鍙嶉銆?*/
 body.button-glow-enabled .widget-glow-target {
     --widget-glow-x: 50%;
     --widget-glow-y: 50%;
@@ -96,7 +96,7 @@ body.button-glow-enabled .widget-edge-glow {
     z-index: 6;
     opacity: 0;
     transform: translate(-50%, -50%);
-    /* 不用 screen 混合：日历等浅色半透明卡片上白色高光会完全看不见 */
+    /* 涓嶇敤 screen 娣峰悎锛氭棩鍘嗙瓑娴呰壊鍗婇€忔槑鍗＄墖涓婄櫧鑹查珮鍏変細瀹屽叏鐪嬩笉瑙?*/
     background:
         radial-gradient(circle,
             rgba(var(--accent-rgb, 0, 120, 212), 0.34) 0%,
@@ -152,23 +152,23 @@ body.button-glow-enabled.dark-mode .widget-edge-glow {
     }
 }
 
-/* 编辑模式悬停高亮 */
+/* 缂栬緫妯″紡鎮仠楂樹寒 */
 body.widgets-edit-mode .fluent-widget:hover .fluent-widget-body {
     outline: 2px solid rgba(255, 255, 255, 0.7);
     outline-offset: 2px;
 }
 
-/* 编辑模式下已放置的小组件抖动（仿 iOS 编辑 App 图标）
-   抖动只加在内层 body/移除按钮上，外壳 .fluent-widget 保持不动：
-   外壳承载静态模糊贴图（坐标裁切），若在外壳上施加 transform 动画，
-   浏览器会降级为实时 backdrop 采样。 */
+/* 缂栬緫妯″紡涓嬪凡鏀剧疆鐨勫皬缁勪欢鎶栧姩锛堜豢 iOS 缂栬緫 App 鍥炬爣锛?
+   鎶栧姩鍙姞鍦ㄥ唴灞?body/绉婚櫎鎸夐挳涓婏紝澶栧３ .fluent-widget 淇濇寔涓嶅姩锛?
+   澶栧３鎵胯浇闈欐€佹ā绯婅创鍥撅紙鍧愭爣瑁佸垏锛夛紝鑻ュ湪澶栧３涓婃柦鍔?transform 鍔ㄧ敾锛?
+   娴忚鍣ㄤ細闄嶇骇涓哄疄鏃?backdrop 閲囨牱銆?*/
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-body,
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget-remove {
     animation: widgetJiggleA 0.3s ease-in-out infinite;
     transform-origin: 50% 50%;
 }
 
-/* 相邻小组件错相位 + 微调时长，避免整齐划一的机械感 */
+/* 鐩搁偦灏忕粍浠堕敊鐩镐綅 + 寰皟鏃堕暱锛岄伩鍏嶆暣榻愬垝涓€鐨勬満姊版劅 */
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(2n) .fluent-widget-body,
 body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-child(2n) .fluent-widget-remove {
     animation-name: widgetJiggleB;
@@ -181,7 +181,7 @@ body.widgets-edit-mode.animations-enabled .widgets-layer .fluent-widget:nth-chil
     animation-delay: -0.18s;
 }
 
-/* 拖动中（源组件已隐藏）与按下时停止抖动，方便瞄准 */
+/* 鎷栧姩涓紙婧愮粍浠跺凡闅愯棌锛変笌鎸変笅鏃跺仠姝㈡姈鍔紝鏂逛究鐬勫噯 */
 body.widgets-edit-mode .widgets-layer .fluent-widget.dragging-source .fluent-widget-body,
 body.widgets-edit-mode .widgets-layer .fluent-widget.dragging-source .fluent-widget-remove,
 body.widgets-edit-mode .widgets-layer .fluent-widget:active .fluent-widget-body,
@@ -199,12 +199,12 @@ body.widgets-edit-mode .widgets-layer .fluent-widget:active .fluent-widget-remov
     50% { transform: rotate(-0.7deg) translateY(0.5px); }
 }
 
-/* 正在被拖动的源组件隐藏 */
+/* 姝ｅ湪琚嫋鍔ㄧ殑婧愮粍浠堕殣钘?*/
 .fluent-widget.dragging-source {
     visibility: hidden;
 }
 
-/* 普通模式下允许在小组件输入框中输入 / 选中文本（覆盖 body 的 user-select: none） */
+/* 鏅€氭ā寮忎笅鍏佽鍦ㄥ皬缁勪欢杈撳叆妗嗕腑杈撳叆 / 閫変腑鏂囨湰锛堣鐩?body 鐨?user-select: none锛?*/
 .fluent-widget input,
 .fluent-widget textarea {
     user-select: text;
@@ -213,7 +213,7 @@ body.widgets-edit-mode .widgets-layer .fluent-widget:active .fluent-widget-remov
     -ms-user-select: text;
 }
 
-/* 移除按钮（仅编辑模式显示） */
+/* 绉婚櫎鎸夐挳锛堜粎缂栬緫妯″紡鏄剧ず锛?*/
 .fluent-widget-remove,
 .fluent-widget-edit {
     position: absolute;
@@ -267,10 +267,10 @@ body.widgets-edit-mode .fluent-widget-edit {
     opacity: 0.18;
 }
 
-/* ===== 3. 小组件抽屉 ===== */
+/* ===== 3. 灏忕粍浠舵娊灞?===== */
 /*
- * 注意：动画 transform 放在外层 #widgets-drawer（透明包装）上，
- * 打开状态 transform 为 none，避免破坏子元素的 backdrop-filter。
+ * 娉ㄦ剰锛氬姩鐢?transform 鏀惧湪澶栧眰 #widgets-drawer锛堥€忔槑鍖呰锛変笂锛?
+ * 鎵撳紑鐘舵€?transform 涓?none锛岄伩鍏嶇牬鍧忓瓙鍏冪礌鐨?backdrop-filter銆?
  */
 #widgets-drawer {
     position: fixed;
@@ -322,7 +322,7 @@ body:not(.animations-enabled) #widgets-drawer {
     background: rgba(32, 32, 32, 0.92);
 }
 
-/* 顶部内侧高光 */
+/* 椤堕儴鍐呬晶楂樺厜 */
 .widgets-drawer-content::before {
     content: '';
     position: absolute;
@@ -348,7 +348,7 @@ body:not(.animations-enabled) #widgets-drawer {
         transparent);
 }
 
-/* 头部 */
+/* 澶撮儴 */
 .widgets-drawer-header {
     display: flex;
     align-items: center;
@@ -415,7 +415,7 @@ body:not(.animations-enabled) #widgets-drawer {
     transform: scale(0.96);
 }
 
-/* —— 收起后悬浮在任务栏正上方的「展开抽屉 / 完成」按钮组 —— */
+/* 鈥斺€?鏀惰捣鍚庢偓娴湪浠诲姟鏍忔涓婃柟鐨勩€屽睍寮€鎶藉眽 / 瀹屾垚銆嶆寜閽粍 鈥斺€?*/
 #widgets-collapsed-bar {
     position: fixed;
     bottom: 88px;
@@ -456,7 +456,7 @@ body:not(.animations-enabled) #widgets-collapsed-bar {
     background: var(--accent-hover);
 }
 
-/* ===== 4. 抽屉主体：侧边栏 + 页面 ===== */
+/* ===== 4. 鎶藉眽涓讳綋锛氫晶杈规爮 + 椤甸潰 ===== */
 .widgets-drawer-main {
     display: flex;
     gap: 14px;
@@ -497,7 +497,7 @@ body:not(.animations-enabled) #widgets-collapsed-bar {
     background: var(--bg-tertiary);
 }
 
-/* 选中态：文字/图标颜色随主题色明度自适应（浅色主题色→黑，深色主题色→白） */
+/* 閫変腑鎬侊細鏂囧瓧/鍥炬爣棰滆壊闅忎富棰樿壊鏄庡害鑷€傚簲锛堟祬鑹蹭富棰樿壊鈫掗粦锛屾繁鑹蹭富棰樿壊鈫掔櫧锛?*/
 .widgets-sidebar-item.active {
     background: rgba(var(--accent-rgb, 0, 120, 212), 0.4);
     color: var(--accent-contrast, #ffffff);
@@ -520,7 +520,7 @@ body.accent-deep .widgets-sidebar-item.active img {
     flex-direction: column;
 }
 
-/* —— 首页推荐 —— */
+/* 鈥斺€?棣栭〉鎺ㄨ崘 鈥斺€?*/
 .widgets-home {
     flex: 1;
     overflow-y: auto;
@@ -553,7 +553,7 @@ body.accent-deep .widgets-sidebar-item.active img {
     color: var(--text-secondary);
 }
 
-/* —— 应用页 —— */
+/* 鈥斺€?搴旂敤椤?鈥斺€?*/
 .widgets-app-head {
     text-align: center;
     padding: 4px 0 2px;
@@ -664,7 +664,7 @@ body.accent-deep .widgets-sidebar-item.active img {
     transform: scale(1.25);
 }
 
-/* —— 实时预览 —— */
+/* 鈥斺€?瀹炴椂棰勮 鈥斺€?*/
 .widgets-preview-wrap {
     position: relative;
     overflow: visible;
@@ -734,7 +734,7 @@ body:not(.animations-enabled) .widget-preview-inner .fluent-widget-body::after {
     }
 }
 
-/* ===== 5. 拖拽幽灵 ===== */
+/* ===== 5. 鎷栨嫿骞界伒 ===== */
 .widget-ghost {
     position: fixed;
     left: 0;
@@ -763,7 +763,7 @@ body.animations-enabled .widget-ghost.snapping {
     opacity: 0;
 }
 
-/* ===== 6. 吸附指示器与网格提示 ===== */
+/* ===== 6. 鍚搁檮鎸囩ず鍣ㄤ笌缃戞牸鎻愮ず ===== */
 .widget-drop-indicator {
     position: absolute;
     border-radius: 20px;
@@ -800,7 +800,7 @@ body.animations-enabled .widget-drop-indicator {
     background: rgba(128, 128, 128, 0.08);
 }
 
-/* ===== 7. 小组件右键菜单 ===== */
+/* ===== 7. 灏忕粍浠跺彸閿彍鍗?===== */
 #widget-context-menu {
     position: fixed;
     z-index: 10800;
@@ -814,7 +814,7 @@ body.animations-enabled .widget-drop-indicator {
 }
 
 /* ==========================================================
-   8. 小组件内容样式（w-*）
+   8. 灏忕粍浠跺唴瀹规牱寮忥紙w-*锛?
    ========================================================== */
 
 .w-loading {
@@ -826,7 +826,7 @@ body.animations-enabled .widget-drop-indicator {
     opacity: 0.7;
 }
 
-/* —— 主题底色 —— */
+/* 鈥斺€?涓婚搴曡壊 鈥斺€?*/
 .fluent-widget-body.w-weather {
     background: linear-gradient(160deg, rgba(28, 100, 196, 0.92), rgba(82, 168, 255, 0.85));
     color: #fff;
@@ -1374,7 +1374,7 @@ body.animations-enabled .widget-drop-indicator {
     color: #e81123;
 }
 
-/* —— 天气 —— */
+/* 鈥斺€?澶╂皵 鈥斺€?*/
 .w-weather-head {
     display: flex;
     flex-direction: column;
@@ -1410,7 +1410,7 @@ body.animations-enabled .widget-drop-indicator {
     opacity: 0.8;
 }
 
-/* 新版天气图标（黑色描边 SVG，在深色渐变上反白） */
+/* 鏂扮増澶╂皵鍥炬爣锛堥粦鑹叉弿杈?SVG锛屽湪娣辫壊娓愬彉涓婂弽鐧斤級 */
 .w-weather-icon {
     filter: invert(1);
     flex-shrink: 0;
@@ -1478,7 +1478,370 @@ body.animations-enabled .widget-drop-indicator {
     opacity: 0.92;
 }
 
-/* —— 时钟 —— */
+/* Weather widget redesign */
+.fluent-widget-body.w-weather {
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: linear-gradient(180deg, #11a8ef 0%, #1392e5 100%);
+    box-shadow: 0 16px 34px rgba(0, 70, 130, 0.26);
+}
+
+.dark-mode .fluent-widget-body.w-weather {
+    background: linear-gradient(142deg, #075b83 0%, #06101a 100%);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+.w-weather-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    color: #fff;
+    font-family: "Segoe UI", var(--font-family, sans-serif);
+}
+
+.w-weather-card * {
+    box-sizing: border-box;
+}
+
+.w-weather-day-title {
+    position: absolute;
+    left: 17px;
+    top: 16px;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 750;
+    letter-spacing: 0;
+}
+
+.w-weather-temp {
+    position: absolute;
+    left: 17px;
+    top: 41px;
+    font-size: 46px;
+    line-height: 0.86;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.w-weather-temp span {
+    display: inline-block;
+    margin-left: 2px;
+    font-size: 0.52em;
+    line-height: 1;
+    vertical-align: top;
+    transform: translateY(-0.08em);
+}
+
+.w-weather-range {
+    position: absolute;
+    left: 20px;
+    top: 93px;
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 600;
+}
+
+.w-weather-visual {
+    position: absolute;
+    color: #fff;
+}
+
+.w-weather-main-icon {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.w-weather-card-s .w-weather-visual {
+    right: 18px;
+    bottom: 18px;
+    width: 66px;
+    height: 66px;
+}
+
+.dark-mode .w-weather-card-s .w-weather-visual {
+    right: 22px;
+    bottom: 22px;
+    width: 62px;
+    height: 62px;
+}
+
+.w-weather-icon {
+    filter: brightness(0) invert(1);
+    flex-shrink: 0;
+}
+
+.w-weather-meta {
+    position: absolute;
+    left: 128px;
+    top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+    line-height: 1.1;
+    font-weight: 500;
+}
+
+.w-weather-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.w-weather-meta-icon {
+    width: 22px;
+    height: 22px;
+}
+
+.w-weather-hi-lo {
+    position: absolute;
+    left: 126px;
+    top: 108px;
+    display: grid;
+    gap: 4px;
+    font-size: 15px;
+    line-height: 1;
+}
+
+.w-weather-hi-lo div,
+.w-weather-extremes div {
+    display: flex;
+    align-items: baseline;
+    gap: 11px;
+}
+
+.w-weather-hi-lo span,
+.w-weather-extremes span {
+    font-weight: 700;
+}
+
+.w-weather-hi-lo b,
+.w-weather-extremes b {
+    font-weight: 500;
+}
+
+.w-weather-location {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 4px;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.w-weather-location span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.w-weather-pin {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    border: 1.7px solid currentColor;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    flex: 0 0 auto;
+}
+
+.w-weather-pin::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.w-weather-location .w-weather-pin + span {
+    transform: translateY(1px);
+}
+
+.w-weather-card-m .w-weather-location {
+    position: absolute;
+    left: 17px;
+    bottom: 18px;
+    max-width: 120px;
+}
+
+.w-weather-card-m .w-weather-temp {
+    top: 43px;
+    font-size: 64px;
+    line-height: 0.78;
+}
+
+.w-weather-card-m .w-weather-visual {
+    right: 29px;
+    top: 43px;
+    width: 82px;
+    height: 82px;
+}
+
+.dark-mode .w-weather-card-m .w-weather-visual {
+    right: 31px;
+    top: 45px;
+    width: 78px;
+    height: 78px;
+}
+
+.w-weather-card-l .w-weather-day-title {
+    top: 18px;
+    font-size: 15px;
+}
+
+.w-weather-card-l .w-weather-temp {
+    top: 50px;
+    font-size: 66px;
+    line-height: 0.78;
+}
+
+.w-weather-card-l .w-weather-visual {
+    right: 38px;
+    top: 34px;
+    width: 84px;
+    height: 84px;
+}
+
+.dark-mode .w-weather-card-l .w-weather-visual {
+    right: 40px;
+    top: 36px;
+    width: 80px;
+    height: 80px;
+}
+
+.w-weather-extremes {
+    position: absolute;
+    left: 18px;
+    top: 140px;
+    display: grid;
+    gap: 15px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.w-weather-extremes div {
+    gap: 14px;
+}
+
+.w-weather-humidity {
+    position: absolute;
+    right: 42px;
+    top: 137px;
+    width: 76px;
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.w-weather-humidity-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.w-weather-humidity-ring path {
+    fill: none;
+    stroke-width: 6;
+    stroke-linecap: round;
+}
+
+.w-weather-humidity-track {
+    stroke: rgba(255, 255, 255, 0.34);
+}
+
+.w-weather-humidity-progress {
+    stroke: #fff;
+    stroke-dashoffset: 0;
+}
+
+.w-weather-humidity-icon {
+    position: absolute;
+    top: 23px;
+    width: 24px;
+    height: 24px;
+}
+
+.w-weather-humidity-value {
+    position: absolute;
+    top: 51px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.w-weather-forecast {
+    position: absolute;
+    left: 17px;
+    right: 17px;
+    top: 224px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.w-weather-forecast-day {
+    width: 34px;
+    display: grid;
+    justify-items: center;
+    gap: 15px;
+    min-width: 0;
+}
+
+.w-weather-forecast-label {
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+.w-wd-icon {
+    width: 28px;
+    height: 28px;
+}
+
+.w-weather-footer {
+    position: absolute;
+    left: 17px;
+    right: 17px;
+    bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.w-weather-footer .w-weather-location {
+    max-width: 118px;
+    flex: 0 1 auto;
+}
+
+.w-weather-wind-footer {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.w-weather-footer-icon {
+    width: 26px;
+    height: 26px;
+}
+
+/* Clock */
 .w-clock-analog {
     flex: 1;
     display: flex;
@@ -1624,7 +1987,7 @@ body.animations-enabled .widget-drop-indicator {
     font-variant-numeric: tabular-nums;
 }
 
-/* —— 日历 —— */
+/* 鈥斺€?鏃ュ巻 鈥斺€?*/
 .w-cal-date {
     display: flex;
     flex-direction: column;
@@ -1716,7 +2079,440 @@ body.animations-enabled .widget-drop-indicator {
     color: var(--text-tertiary);
 }
 
-/* —— 照片 —— */
+/* 鈥斺€?鐓х墖 鈥斺€?*/
+/* Calendar widget redesign */
+.fluent-widget-body.w-calendar {
+    padding: 0;
+    border: 0;
+    color: #101923;
+    background: #fff;
+    box-shadow: 0 16px 34px rgba(20, 46, 70, 0.18);
+}
+
+.dark-mode .fluent-widget-body.w-calendar {
+    color: #fff;
+    background: #111;
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
+}
+
+.w-calendar-card {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    color: inherit;
+    font-family: "Segoe UI", var(--font-family, sans-serif);
+    letter-spacing: 0;
+}
+
+.w-calendar-card,
+.w-calendar-card * {
+    box-sizing: border-box;
+}
+
+.w-calendar-card-s {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding: 15px 14px 14px;
+    border-radius: inherit;
+    background: #fff;
+}
+
+.dark-mode .w-calendar-card-s {
+    background: #101010;
+}
+
+.w-calendar-small-nav {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 5px;
+    color: currentColor;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 650;
+}
+
+.w-calendar-small-nav span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 21px;
+    line-height: 0.7;
+    font-weight: 300;
+    transform: translateY(-1px);
+}
+
+.w-calendar-small-nav strong {
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.w-calendar-small-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-auto-rows: 1fr;
+    align-items: center;
+    justify-items: center;
+    gap: 6px 5px;
+}
+
+.w-calendar-day-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    color: rgba(16, 25, 35, 0.76);
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.dark-mode .w-calendar-day-cell {
+    color: rgba(255, 255, 255, 0.78);
+}
+
+.w-calendar-day-cell.is-today {
+    color: #fff;
+    background: #18aaf2;
+    font-weight: 750;
+    box-shadow: 0 3px 8px rgba(24, 170, 242, 0.34);
+}
+
+.w-calendar-day-cell.is-ring {
+    color: #18aaf2;
+    border: 1.5px solid #18aaf2;
+    font-weight: 700;
+}
+
+.w-calendar-card-m {
+    display: grid;
+    grid-template-columns: 118px minmax(0, 1fr);
+    border-radius: inherit;
+    background: #fff;
+}
+
+.dark-mode .w-calendar-card-m {
+    background: #111;
+}
+
+.w-calendar-medium-main {
+    position: relative;
+    min-width: 0;
+    padding: 15px 11px 13px;
+    color: #fff;
+    background: #16a8f4;
+}
+
+.dark-mode .w-calendar-medium-main {
+    background: #111;
+}
+
+.w-calendar-medium-nav {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 650;
+}
+
+.w-calendar-nav-btn {
+    width: 18px;
+    height: 18px;
+    border: 0;
+    padding: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+}
+
+.w-calendar-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.w-calendar-nav-btn:active {
+    transform: scale(0.92);
+}
+
+.w-calendar-medium-nav span,
+.w-calendar-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 23px;
+    line-height: 0.65;
+    font-weight: 300;
+    transform: translateY(-1px);
+}
+
+.w-calendar-medium-nav strong {
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.w-calendar-medium-week {
+    position: absolute;
+    left: 13px;
+    top: auto;
+    bottom: 18px;
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.w-calendar-medium-date {
+    position: absolute;
+    left: 13px;
+    top: 59px;
+    font-size: 61px;
+    line-height: 0.82;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.w-calendar-location {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 4px;
+    font-size: 8.5px;
+    line-height: 1;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.w-calendar-location span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.w-calendar-pin {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    border: 1.7px solid currentColor;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    flex: 0 0 auto;
+}
+
+.w-calendar-pin::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.w-calendar-location .w-calendar-pin + span {
+    transform: translateY(1px);
+}
+
+.w-calendar-medium-main .w-calendar-location {
+    position: absolute;
+    left: 12px;
+    right: 8px;
+    bottom: 12px;
+}
+
+.w-calendar-medium-month {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    min-width: 0;
+    padding: 13px 16px 13px 18px;
+    color: #101923;
+    background: #fff;
+}
+
+.dark-mode .w-calendar-medium-month {
+    color: #fff;
+    background: #111;
+}
+
+.w-calendar-month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: center;
+    justify-items: center;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+}
+
+.w-calendar-month-grid-m {
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 2px 6px;
+}
+
+.w-calendar-month-grid-m .w-calendar-day-cell {
+    width: min(22px, 100%);
+    height: min(22px, 100%);
+    font-size: 11.5px;
+}
+
+.w-calendar-range-pill,
+.w-calendar-next-pill,
+.w-calendar-month-chip {
+    border-radius: 999px;
+    background: rgba(16, 25, 35, 0.07);
+    color: rgba(16, 25, 35, 0.68);
+    white-space: nowrap;
+}
+
+.dark-mode .w-calendar-range-pill,
+.dark-mode .w-calendar-next-pill,
+.dark-mode .w-calendar-month-chip {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.w-calendar-month-grid-m .w-calendar-range-pill {
+    grid-column: span 2;
+    width: 50px;
+    height: 12px;
+}
+
+.w-calendar-month-grid-m .w-calendar-next-pill {
+    grid-column: 5 / 8;
+    width: 72px;
+    height: 15px;
+    overflow: hidden;
+    text-align: center;
+    font-size: 8.5px;
+    line-height: 15px;
+    text-overflow: ellipsis;
+}
+
+.w-calendar-card-l {
+    display: flex;
+    flex-direction: column;
+    border-radius: inherit;
+    background: #fff;
+}
+
+.dark-mode .w-calendar-card-l {
+    background: #111;
+}
+
+.w-calendar-large-head {
+    position: relative;
+    height: 82px;
+    flex: 0 0 82px;
+    color: #fff;
+    background: #16a8f4;
+}
+
+.dark-mode .w-calendar-large-head {
+    background: #111;
+}
+
+.w-calendar-large-date {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    font-size: 48px;
+    line-height: 0.86;
+    font-weight: 650;
+    letter-spacing: 0;
+    transform: translateY(-50%);
+}
+
+.w-calendar-large-meta {
+    position: absolute;
+    left: 76px;
+    top: 50%;
+    display: grid;
+    gap: 3px;
+    font-size: 14px;
+    line-height: 1.05;
+    font-weight: 700;
+    transform: translateY(-50%);
+}
+
+.w-calendar-large-meta span {
+    font-weight: 650;
+}
+
+.w-calendar-large-year {
+    position: absolute;
+    right: 17px;
+    top: 50%;
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 700;
+    transform: translateY(-50%);
+}
+
+.w-calendar-large-body {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 18px 19px;
+    color: #101923;
+    background: #fff;
+}
+
+.dark-mode .w-calendar-large-body {
+    color: #fff;
+    background: #111;
+}
+
+.w-calendar-month-grid-l {
+    grid-auto-rows: minmax(0, 1fr);
+    gap: 2px 8px;
+}
+
+.w-calendar-month-grid-l .w-calendar-day-cell {
+    width: min(34px, 100%);
+    height: min(34px, 100%);
+    font-size: 23px;
+}
+
+.w-calendar-month-grid-l .w-calendar-day-cell.is-today {
+    font-size: 22px;
+}
+
+.w-calendar-month-grid-l .w-calendar-month-chip {
+    grid-column: span 2;
+    width: 84px;
+    height: 28px;
+    overflow: hidden;
+    text-align: center;
+    font-size: 13px;
+    line-height: 28px;
+    text-overflow: ellipsis;
+}
+
+.w-calendar-month-grid-l .w-calendar-next-pill {
+    grid-column: 5 / 8;
+    width: 98px;
+    height: 26px;
+    overflow: hidden;
+    text-align: center;
+    font-size: 12px;
+    line-height: 26px;
+    text-overflow: ellipsis;
+}
+
 .w-photo {
     position: absolute;
     inset: 0;
@@ -1752,7 +2548,7 @@ body.animations-enabled .widget-drop-indicator {
     white-space: nowrap;
 }
 
-/* —— 搜索 —— */
+/* 鈥斺€?鎼滅储 鈥斺€?*/
 .fluent-widget-body.w-search {
     padding: 8px 10px;
     justify-content: center;
@@ -1761,14 +2557,15 @@ body.animations-enabled .widget-drop-indicator {
 .w-search-pill {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
+    padding-left: 8px;
 }
 
 .w-search-pill img {
-    width: 18px;
-    height: 18px;
-    margin-left: 6px;
+    width: 20px;
+    height: 20px;
+    margin-left: 8px;
     opacity: 0.7;
 }
 
@@ -1783,29 +2580,15 @@ body.animations-enabled .widget-drop-indicator {
     outline: none;
     background: transparent;
     color: var(--text-primary);
-    font-size: 13px;
+    font-size: 14px;
+    line-height: 20px;
 }
 
 .w-search-pill input::placeholder {
     color: var(--text-tertiary);
 }
 
-.w-search-go {
-    border: none;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 7px 16px;
-    cursor: pointer;
-}
-
-.w-search-go:hover {
-    background: var(--accent-hover);
-}
-
-/* —— 列表类（新闻 / 票房）公共 —— */
+/* 鈥斺€?鍒楄〃绫伙紙鏂伴椈 / 绁ㄦ埧锛夊叕鍏?鈥斺€?*/
 .w-list-head {
     display: flex;
     align-items: center;
@@ -1886,7 +2669,7 @@ body.animations-enabled .widget-drop-indicator {
     font-variant-numeric: tabular-nums;
 }
 
-/* —— 答案之书 —— */
+/* 鈥斺€?绛旀涔嬩功 鈥斺€?*/
 .w-answer {
     flex: 1;
     display: flex;
@@ -1924,7 +2707,7 @@ body.animations-enabled .widget-drop-indicator {
     overflow: hidden;
 }
 
-/* 答案揭晓：丝滑浮现 */
+/* 绛旀鎻檽锛氫笣婊戞诞鐜?*/
 .w-answer-display.w-answer-reveal {
     font-size: 16px;
     font-weight: 600;
@@ -1982,7 +2765,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-answer-bar button:hover { background: rgba(255, 255, 255, 0.34); }
 .w-answer-bar button:active { transform: scale(0.95); }
 
-/* —— 农历 —— */
+/* 鈥斺€?鍐滃巻 鈥斺€?*/
 .w-lunar {
     flex: 1;
     display: flex;
@@ -2048,7 +2831,7 @@ body.animations-enabled .widget-drop-indicator {
     margin-top: 4px;
 }
 
-/* —— 快递 —— */
+/* 鈥斺€?蹇€?鈥斺€?*/
 .w-track {
     flex: 1;
     display: flex;
@@ -2136,7 +2919,7 @@ body.animations-enabled .widget-drop-indicator {
     font-weight: 600;
 }
 
-/* —— 节假日 —— */
+/* 鈥斺€?鑺傚亣鏃?鈥斺€?*/
 .w-holiday {
     flex: 1;
     display: flex;
@@ -2215,7 +2998,7 @@ body.animations-enabled .widget-drop-indicator {
     opacity: 0.9;
 }
 
-/* —— 每日单词 —— */
+/* 鈥斺€?姣忔棩鍗曡瘝 鈥斺€?*/
 .w-word {
     flex: 1;
     display: flex;
@@ -2268,31 +3051,17 @@ body.animations-enabled .widget-drop-indicator {
 }
 
 /* ==========================================================
-   9. 中 / 大尺寸字号增大（w-size-m / w-size-l）
+   9. 涓?/ 澶у昂瀵稿瓧鍙峰澶э紙w-size-m / w-size-l锛?
    ========================================================== */
 
-/* 天气 */
-.w-size-m .w-weather-city,
-.w-size-l .w-weather-city { font-size: 15px; }
-.w-size-m .w-weather-temp { font-size: 44px; }
-.w-size-l .w-weather-temp { font-size: 52px; }
-.w-size-m .w-weather-cur-icon { width: 34px; height: 34px; }
-.w-size-l .w-weather-cur-icon { width: 40px; height: 40px; }
-.w-size-m .w-weather-desc,
-.w-size-l .w-weather-desc { font-size: 13.5px; }
-.w-size-m .w-weather-range,
-.w-size-l .w-weather-range { font-size: 12.5px; }
-.w-size-m .w-weather-day { font-size: 12.5px; }
-.w-size-m .w-wd-icon { width: 24px; height: 24px; }
-.w-size-l .w-weather-list-row { font-size: 13.5px; }
-.w-size-l .w-wl-icon { width: 22px; height: 22px; }
+/* 澶╂皵 */
 
-/* 时钟（世界时钟为中尺寸） */
+/* 鏃堕挓锛堜笘鐣屾椂閽熶负涓昂瀵革級 */
 .w-size-m .w-clock-mini-name { font-size: 12.5px; }
 .w-size-m .w-clock-mini-time { font-size: 15px; }
 .w-size-m .w-clock-face.sm { width: 68px; height: 68px; }
 
-/* 日历 */
+/* 鏃ュ巻 */
 .w-size-m .w-cal-week,
 .w-size-l .w-cal-week { font-size: 14px; }
 .w-size-m .w-cal-day,
@@ -2306,13 +3075,13 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-cal-empty,
 .w-size-l .w-cal-empty { font-size: 13px; }
 
-/* 照片 */
+/* 鐓х墖 */
 .w-size-m .w-photo-title,
 .w-size-l .w-photo-title { font-size: 14px; }
 .w-size-m .w-photo-tag,
 .w-size-l .w-photo-tag { font-size: 11px; }
 
-/* 列表类（新闻 / 票房） */
+/* 鍒楄〃绫伙紙鏂伴椈 / 绁ㄦ埧锛?*/
 .w-size-m .w-list-head,
 .w-size-l .w-list-head { font-size: 13.5px; }
 .w-size-m .w-list-sub,
@@ -2324,7 +3093,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-news-hot,
 .w-size-l .w-news-hot { font-size: 12.5px; }
 
-/* 答案之书（中尺寸） */
+/* 绛旀涔嬩功锛堜腑灏哄锛?*/
 .w-size-m .w-answer-tag { font-size: 12px; }
 .w-size-m .w-answer-display { font-size: 15px; }
 .w-size-m .w-answer-display.w-answer-reveal { font-size: 17px; }
@@ -2333,7 +3102,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-list-body,
 .w-size-l .w-list-body { gap: 4px; }
 
-/* 农历（竖向为 w-size-m，大为 w-size-l） */
+/* 鍐滃巻锛堢珫鍚戜负 w-size-m锛屽ぇ涓?w-size-l锛?*/
 .w-size-m .w-lunar-day { font-size: 46px; }
 .w-size-m .w-lunar-month { font-size: 18px; }
 .w-size-m .w-lunar-ganzhi { font-size: 13.5px; }
@@ -2345,7 +3114,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-l .w-lunar-festival { font-size: 13.5px; }
 .w-size-l .w-lunar-greg { font-size: 12.5px; }
 
-/* 快递 */
+/* 蹇€?*/
 .w-size-m .w-track-bar input,
 .w-size-l .w-track-bar input,
 .w-size-m .w-track-bar button,
@@ -2357,7 +3126,7 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-track-carrier,
 .w-size-l .w-track-carrier { font-size: 12.5px; }
 
-/* 节假日 */
+/* 鑺傚亣鏃?*/
 .w-size-m .w-holiday-name { font-size: 24px; }
 .w-size-l .w-holiday-name { font-size: 28px; }
 .w-size-m .w-holiday-label,
@@ -2373,25 +3142,25 @@ body.animations-enabled .widget-drop-indicator {
 .w-size-m .w-holiday-row-days,
 .w-size-l .w-holiday-row-days { font-size: 12.5px; }
 
-/* 每日单词（中尺寸） */
+/* 姣忔棩鍗曡瘝锛堜腑灏哄锛?*/
 .w-size-m .w-word-tag { font-size: 11px; }
 .w-size-m .w-word-text { font-size: 34px; }
 .w-size-m .w-word-phonetic { font-size: 14px; }
 .w-size-m .w-word-trans { font-size: 13px; }
 .w-size-m .w-word-example { font-size: 12.5px; }
 
-/* 加载 / 空状态 */
+/* 鍔犺浇 / 绌虹姸鎬?*/
 .w-size-m .w-loading,
 .w-size-l .w-loading { font-size: 13.5px; }
 
-/* —— 多媒体 —— */
+/* 鈥斺€?澶氬獟浣?鈥斺€?*/
 .fluent-widget-body.w-media-theme {
     padding: 0;
     color: #fff;
     overflow: hidden;
 }
 
-/* 中尺寸：卡片背景取自封面主题色（浅色模式更亮、深色模式更暗） */
+/* 涓昂瀵革細鍗＄墖鑳屾櫙鍙栬嚜灏侀潰涓婚鑹诧紙娴呰壊妯″紡鏇翠寒銆佹繁鑹叉ā寮忔洿鏆楋級 */
 .fluent-widget-body.w-media-theme.w-media-medium {
     background: linear-gradient(135deg,
         color-mix(in srgb, var(--w-media-c1, #8e8cf0) 58%, #ffffff) 0%,
@@ -2412,7 +3181,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
     height: 100%;
 }
 
-/* 右上角的音乐角标 */
+/* 鍙充笂瑙掔殑闊充箰瑙掓爣 */
 .w-media-note {
     position: absolute;
     top: 12px;
@@ -2425,7 +3194,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
     pointer-events: none;
 }
 
-/* 封面 */
+/* 灏侀潰 */
 .w-media-cover-full {
     position: absolute;
     inset: 0;
@@ -2457,7 +3226,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
     filter: invert(1) !important;
 }
 
-/* 小尺寸：底部信息可读性渐变 */
+/* 灏忓昂瀵革細搴曢儴淇℃伅鍙鎬ф笎鍙?*/
 .w-media-shade {
     position: absolute;
     inset: 0;
@@ -2498,7 +3267,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
 }
 
-/* 播放按钮：胶囊 + 周围羽化虚化（径向蒙版的 backdrop-filter） */
+/* 鎾斁鎸夐挳锛氳兌鍥?+ 鍛ㄥ洿缇藉寲铏氬寲锛堝緞鍚戣挋鐗堢殑 backdrop-filter锛?*/
 .w-media-play {
     position: relative;
     z-index: 0;
@@ -2540,7 +3309,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
     filter: invert(1) !important;
 }
 
-/* 中尺寸布局 */
+/* 涓昂瀵稿竷灞€ */
 .w-media-m {
     display: flex;
     align-items: center;
@@ -2569,7 +3338,7 @@ body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium {
 .w-media-m .w-media-title { font-size: 16px; }
 .w-media-m .w-media-artist { font-size: 12.5px; }
 
-/* 中尺寸按钮：浅色模式下用深色半透明底、黑字黑图标 */
+/* 涓昂瀵告寜閽細娴呰壊妯″紡涓嬬敤娣辫壊鍗婇€忔槑搴曘€侀粦瀛楅粦鍥炬爣 */
 body:not(.dark-mode) .w-media-m .w-media-play {
     background: rgba(0, 0, 0, 0.12);
     color: #1c1c1e;
@@ -2579,7 +3348,7 @@ body:not(.dark-mode) .w-media-m .w-media-play:hover { background: rgba(0, 0, 0, 
 
 body:not(.dark-mode) .w-media-m .w-media-play img { filter: none !important; }
 
-/* 空状态 */
+/* 绌虹姸鎬?*/
 .w-media-empty {
     display: flex;
     flex-direction: column;
@@ -2602,15 +3371,318 @@ body:not(.dark-mode) .w-media-m .w-media-play img { filter: none !important; }
     opacity: 0.88;
 }
 
+/* Media widget player redesign */
+.fluent-widget-body.w-media-theme,
+.fluent-widget-body.w-media-theme.w-media-medium,
+.fluent-widget-body.w-media-theme.w-media-large {
+    padding: 0;
+    border: 0;
+    color: #101010;
+    background: transparent;
+    box-shadow: 0 18px 38px rgba(52, 38, 18, 0.18);
+}
+
+body.dark-mode .fluent-widget-body.w-media-theme,
+body.dark-mode .fluent-widget-body.w-media-theme.w-media-medium,
+body.dark-mode .fluent-widget-body.w-media-theme.w-media-large {
+    color: #fff;
+    background: transparent;
+    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.34);
+}
+
+.w-media-player-card {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: inherit;
+    background: linear-gradient(135deg, #fff9f1 0%, #fff1e0 100%);
+    color: #0b0b0d;
+    font-family: "Segoe UI", var(--font-family, sans-serif);
+    letter-spacing: 0;
+}
+
+body.dark-mode .w-media-player-card {
+    background: #111;
+    color: #fff;
+}
+
+.w-media-player-card,
+.w-media-player-card * {
+    box-sizing: border-box;
+}
+
+.w-media-art,
+.w-media-queue-art {
+    overflow: hidden;
+    border-radius: 10px;
+    background-size: cover;
+    background-position: center;
+    flex: 0 0 auto;
+}
+
+.w-media-art.w-media-cover-fallback,
+.w-media-queue-art.w-media-cover-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.w-media-art.w-media-cover-fallback img,
+.w-media-queue-art.w-media-cover-fallback img {
+    width: 36%;
+    height: 36%;
+    opacity: 0.9;
+    filter: invert(1) !important;
+}
+
+.w-media-copy {
+    min-width: 0;
+}
+
+.w-media-player-card .w-media-title {
+    color: inherit;
+    font-weight: 850;
+    line-height: 1.05;
+    white-space: normal;
+    letter-spacing: 0;
+}
+
+.w-media-player-card .w-media-artist {
+    color: rgba(10, 10, 12, 0.58);
+    font-weight: 650;
+    line-height: 1.15;
+    opacity: 1;
+}
+
+body.dark-mode .w-media-player-card .w-media-artist {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.w-media-controls {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+
+.w-media-control {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    background: #3a3a3c;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.w-media-control:hover {
+    filter: brightness(1.08);
+}
+
+.w-media-control:active {
+    transform: scale(0.93);
+}
+
+.w-media-control img {
+    position: relative;
+    z-index: 1;
+    width: 18px;
+    height: 18px;
+    filter: invert(1) !important;
+}
+
+.w-media-control-play {
+    width: 44px;
+    height: 44px;
+    background: conic-gradient(#ff8500 var(--w-media-progress, 68%), #3a3a3c 0);
+}
+
+.w-media-control-play::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: #202124;
+}
+
+.w-media-card-s {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 13px 7px;
+    padding: 16px 15px 15px;
+}
+
+.w-media-card-s .w-media-art {
+    width: 56px;
+    height: 56px;
+}
+
+.w-media-card-s .w-media-copy {
+    align-self: start;
+    padding-top: 2px;
+}
+
+.w-media-card-s .w-media-title {
+    max-height: 31px;
+    overflow: hidden;
+    font-size: 12px;
+}
+
+.w-media-card-s .w-media-artist {
+    margin-top: 2px;
+    font-size: 10px;
+}
+
+.w-media-card-s .w-media-controls {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    align-self: end;
+}
+
+.w-media-card-s .w-media-control {
+    width: 34px;
+    height: 34px;
+}
+
+.w-media-card-s .w-media-control-play {
+    width: 43px;
+    height: 43px;
+}
+
+.w-media-card-m {
+    display: grid;
+    grid-template-columns: 126px minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+    padding: 16px;
+}
+
+.w-media-card-m .w-media-art {
+    width: 126px;
+    height: 126px;
+    border-radius: 9px;
+}
+
+.w-media-card-m .w-media-title {
+    max-width: 150px;
+    font-size: 25px;
+}
+
+.w-media-card-m .w-media-artist {
+    margin-top: 5px;
+    font-size: 13px;
+}
+
+.w-media-card-m .w-media-controls {
+    margin-top: 17px;
+}
+
+.w-media-card-l {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+}
+
+.w-media-now-row {
+    display: grid;
+    grid-template-columns: 126px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.w-media-card-l .w-media-art {
+    width: 126px;
+    height: 126px;
+    border-radius: 9px;
+}
+
+.w-media-card-l .w-media-title {
+    max-width: 150px;
+    font-size: 23px;
+}
+
+.w-media-card-l .w-media-artist {
+    margin-top: 5px;
+    font-size: 13px;
+}
+
+.w-media-card-l .w-media-controls {
+    margin-top: 18px;
+}
+
+.w-media-upnext-title {
+    margin-top: 24px;
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 850;
+}
+
+.w-media-queue {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 13px;
+}
+
+.w-media-queue-art {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 7px;
+}
+
+.w-media-queue-title {
+    margin-top: 7px;
+    color: inherit;
+    font-size: 10px;
+    line-height: 1.05;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.w-media-queue-artist {
+    margin-top: 3px;
+    color: rgba(10, 10, 12, 0.58);
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.dark-mode .w-media-queue-artist {
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.w-media-footer-text {
+    margin-top: auto;
+    padding-top: 16px;
+    color: rgba(10, 10, 12, 0.28);
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 600;
+}
+
+body.dark-mode .w-media-footer-text {
+    color: rgba(255, 255, 255, 0.25);
+}
+
 /* ==========================================================
-   10. 前台有窗口时，桌面小组件退避（半透明磨砂 + 灰字）
-   body.has-foreground-window 由 WindowManager 维护：
-   存在未最小化窗口时添加，全部关闭/最小化后移除。
+   10. 鍓嶅彴鏈夌獥鍙ｆ椂锛屾闈㈠皬缁勪欢閫€閬匡紙鍗婇€忔槑纾ㄧ爞 + 鐏板瓧锛?
+   body.has-foreground-window 鐢?WindowManager 缁存姢锛?
+   瀛樺湪鏈渶灏忓寲绐楀彛鏃舵坊鍔狅紝鍏ㄩ儴鍏抽棴/鏈€灏忓寲鍚庣Щ闄ゃ€?
    ========================================================== */
 
-/* 平滑过渡：时长与缓动由 WindowManager._syncWidgetDimState 写入
-   CSS 变量，与触发退避的窗口动画（打开 250ms / 关闭 250ms /
-   最小化 460ms / 恢复 520ms）实时同步、同节奏 */
+/* 骞虫粦杩囨浮锛氭椂闀夸笌缂撳姩鐢?WindowManager._syncWidgetDimState 鍐欏叆
+   CSS 鍙橀噺锛屼笌瑙﹀彂閫€閬跨殑绐楀彛鍔ㄧ敾锛堟墦寮€ 250ms / 鍏抽棴 250ms /
+   鏈€灏忓寲 460ms / 鎭㈠ 520ms锛夊疄鏃跺悓姝ャ€佸悓鑺傚 */
 #desktop-widgets-layer .fluent-widget-body,
 #desktop-widgets-layer .fluent-widget-body * {
     transition: color var(--widget-dim-duration, 0.32s) var(--widget-dim-ease, ease),
@@ -2629,26 +3701,49 @@ body.has-foreground-window #desktop-widgets-layer .fluent-widget-body {
     color: var(--text-tertiary) !important;
 }
 
-/* 文字统一变灰 */
+/* 鏂囧瓧缁熶竴鍙樼伆 */
 body.has-foreground-window #desktop-widgets-layer .fluent-widget-body * {
     color: var(--text-tertiary) !important;
     text-shadow: none !important;
 }
 
-/* 退避期间小组件高光同步关闭（已存在的高光/波纹立即隐藏） */
+/* 閫€閬挎湡闂村皬缁勪欢楂樺厜鍚屾鍏抽棴锛堝凡瀛樺湪鐨勯珮鍏?娉㈢汗绔嬪嵆闅愯棌锛?*/
 body.has-foreground-window #desktop-widgets-layer .widget-edge-glow,
 body.has-foreground-window #desktop-widgets-layer .widget-glow-ripple {
     display: none !important;
 }
 
-/* 彩色子元素背景统一中性化 */
+/* 褰╄壊瀛愬厓绱犺儗鏅粺涓€涓€у寲 */
 body.has-foreground-window #desktop-widgets-layer .w-cal-item {
     background: rgba(128, 128, 128, 0.1) !important;
     border-left-color: var(--text-tertiary) !important;
 }
 
+body.has-foreground-window #desktop-widgets-layer .w-calendar-card,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-card-s,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-card-m,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-card-l,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-large-body {
+    background: transparent !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-calendar-medium-main,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-medium-month,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-large-head {
+    background: rgba(128, 128, 128, 0.10) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-calendar-day-cell.is-today,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-day-cell.is-ring,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-nav-btn:hover,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-range-pill,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-next-pill,
+body.has-foreground-window #desktop-widgets-layer .w-calendar-month-chip {
+    background: rgba(128, 128, 128, 0.18) !important;
+    border-color: var(--text-tertiary) !important;
+}
+
 body.has-foreground-window #desktop-widgets-layer .w-news-rank,
-body.has-foreground-window #desktop-widgets-layer .w-search-go,
 body.has-foreground-window #desktop-widgets-layer .w-track-bar button {
     background: rgba(128, 128, 128, 0.22) !important;
 }
@@ -2664,45 +3759,50 @@ body.has-foreground-window #desktop-widgets-layer .w-track-item {
     border-left-color: var(--border-color) !important;
 }
 
-/* 图标变灰 */
+/* 鍥炬爣鍙樼伆 */
 body.has-foreground-window #desktop-widgets-layer .w-weather-icon,
 body.has-foreground-window #desktop-widgets-layer .w-search-pill img {
     filter: brightness(0) invert(0.55) !important;
 }
 
-/* 照片小组件：图片整体变灰淡出，露出磨砂底 */
+/* 鐓х墖灏忕粍浠讹細鍥剧墖鏁翠綋鍙樼伆娣″嚭锛岄湶鍑虹（鐮傚簳 */
 body.has-foreground-window #desktop-widgets-layer .w-photo {
-    filter: grayscale(1) opacity(0.35);
+    filter: saturate(0.72) opacity(0.35);
 }
 
 body.has-foreground-window #desktop-widgets-layer .w-photo-overlay {
     background: none;
 }
 
-/* 多媒体小组件：封面变灰淡出，角标与按钮中性化 */
-body.has-foreground-window #desktop-widgets-layer .w-media-cover-full,
-body.has-foreground-window #desktop-widgets-layer .w-media-cover-box,
-body.has-foreground-window #desktop-widgets-layer .w-media-empty {
-    filter: grayscale(1) opacity(0.35);
+/* 澶氬獟浣撳皬缁勪欢锛氬皝闈㈠彉鐏版贰鍑猴紝瑙掓爣涓庢寜閽腑鎬у寲 */
+body.has-foreground-window #desktop-widgets-layer .w-media-player-card {
+    background: transparent !important;
+    box-shadow: none !important;
 }
 
-body.has-foreground-window #desktop-widgets-layer .w-media-shade {
-    background: none;
+body.has-foreground-window #desktop-widgets-layer .w-media-art,
+body.has-foreground-window #desktop-widgets-layer .w-media-queue-art {
+    filter: saturate(0.72) opacity(0.42);
 }
 
-body.has-foreground-window #desktop-widgets-layer .w-media-note {
-    background: var(--text-tertiary) !important;
-}
-
-body.has-foreground-window #desktop-widgets-layer .w-media-play {
+body.has-foreground-window #desktop-widgets-layer .w-media-control {
     background: rgba(128, 128, 128, 0.22) !important;
+    filter: none !important;
 }
 
-body.has-foreground-window #desktop-widgets-layer .w-media-play img {
+body.has-foreground-window #desktop-widgets-layer .w-media-control-play {
+    background: conic-gradient(var(--text-tertiary) var(--w-media-progress, 68%), rgba(128, 128, 128, 0.22) 0) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-control-play::before {
+    background: rgba(128, 128, 128, 0.18) !important;
+}
+
+body.has-foreground-window #desktop-widgets-layer .w-media-control img {
     filter: brightness(0) invert(0.55) !important;
 }
 
-/* 时钟：表盘与指针变灰 */
+/* 鏃堕挓锛氳〃鐩樹笌鎸囬拡鍙樼伆 */
 body.has-foreground-window #desktop-widgets-layer .w-clock-face {
     background: rgba(128, 128, 128, 0.1);
     border-color: var(--border-color);
@@ -2717,16 +3817,16 @@ body.has-foreground-window #desktop-widgets-layer .w-clock-tick::before {
     background: rgba(128, 128, 128, 0.4);
 }
 
-/* ============ 小组件静态模糊(GPU 减压) ============
-   桌面小组件位于图标/窗口之下,其 backdrop-filter 只能采样到壁纸,
-   因此用 JS 预生成的模糊壁纸贴图(--widgets-static-blur)替代实时模糊:
-   每张卡片按自身坐标裁切视口大小的贴图,避免 background-attachment:fixed
-   在父级 filter/transform 动画下突然失效。
-   贴图仅在更换壁纸/调整窗口尺寸时重新生成;
-   实验室"强制始终实时模糊"开启时 body 不会带 widgets-static-blur 类。 */
-/* 贴图画在外壳 .fluent-widget 上,内层 .fluent-widget-body 保留各自的
-   主题色/半透明底色(w-weather 等渐变),叠加顺序与实时模糊完全一致:
-   壁纸模糊贴图 → 主题/半透明底色 → 内容。 */
+/* ============ 灏忕粍浠堕潤鎬佹ā绯?GPU 鍑忓帇) ============
+   妗岄潰灏忕粍浠朵綅浜庡浘鏍?绐楀彛涔嬩笅,鍏?backdrop-filter 鍙兘閲囨牱鍒板绾?
+   鍥犳鐢?JS 棰勭敓鎴愮殑妯＄硦澹佺焊璐村浘(--widgets-static-blur)鏇夸唬瀹炴椂妯＄硦:
+   姣忓紶鍗＄墖鎸夎嚜韬潗鏍囪鍒囪鍙ｅぇ灏忕殑璐村浘,閬垮厤 background-attachment:fixed
+   鍦ㄧ埗绾?filter/transform 鍔ㄧ敾涓嬬獊鐒跺け鏁堛€?
+   璐村浘浠呭湪鏇存崲澹佺焊/璋冩暣绐楀彛灏哄鏃堕噸鏂扮敓鎴?
+   瀹為獙瀹?寮哄埗濮嬬粓瀹炴椂妯＄硦"寮€鍚椂 body 涓嶄細甯?widgets-static-blur 绫汇€?*/
+/* 璐村浘鐢诲湪澶栧３ .fluent-widget 涓?鍐呭眰 .fluent-widget-body 淇濈暀鍚勮嚜鐨?
+   涓婚鑹?鍗婇€忔槑搴曡壊(w-weather 绛夋笎鍙?,鍙犲姞椤哄簭涓庡疄鏃舵ā绯婂畬鍏ㄤ竴鑷?
+   澹佺焊妯＄硦璐村浘 鈫?涓婚/鍗婇€忔槑搴曡壊 鈫?鍐呭銆?*/
 body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget {
     background-image: var(--widgets-static-blur, none);
     background-size: var(--widget-blur-viewport-w, 100vw) var(--widget-blur-viewport-h, 100vh);
@@ -2739,7 +3839,7 @@ body.widgets-static-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widg
     -webkit-backdrop-filter: none !important;
 }
 
-/* Canvas 无法生成贴图时（如 file:// 跨域限制），桌面改用卡片内壁纸层模糊。 */
+/* Canvas 鏃犳硶鐢熸垚璐村浘鏃讹紙濡?file:// 璺ㄥ煙闄愬埗锛夛紝妗岄潰鏀圭敤鍗＄墖鍐呭绾稿眰妯＄硦銆?*/
 body.widgets-desktop-fallback-blur:not(.blur-disabled) #desktop-widgets-layer .fluent-widget {
     isolation: isolate;
 }
@@ -2782,7 +3882,7 @@ body.widgets-lock-static-blur:not(.blur-disabled) #lock-widgets-layer .fluent-wi
     -webkit-backdrop-filter: none !important;
 }
 
-/* Canvas 无法读取跨域锁屏壁纸时，使用卡片内壁纸层代替实时 backdrop-filter。 */
+/* Canvas 鏃犳硶璇诲彇璺ㄥ煙閿佸睆澹佺焊鏃讹紝浣跨敤鍗＄墖鍐呭绾稿眰浠ｆ浛瀹炴椂 backdrop-filter銆?*/
 body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-widget {
     isolation: isolate;
 }
@@ -2813,7 +3913,7 @@ body.widgets-lock-fallback-blur:not(.blur-disabled) #lock-widgets-layer .fluent-
     -webkit-backdrop-filter: none !important;
 }
 
-/* 快记小组件 */
+/* 蹇灏忕粍浠?*/
 .fluent-widget-body.w-quicknotes {
     background:
         linear-gradient(150deg, rgba(255, 248, 179, 0.78), rgba(231, 244, 255, 0.72)),

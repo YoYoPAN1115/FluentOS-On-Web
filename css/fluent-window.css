@@ -798,30 +798,6 @@ body.dark-mode.blur-disabled .fw-card {
 }
 
 /* ============ 非前置窗口：所有框架/应用 icon 统一变灰 ============ */
-.window.window-inactive .fw-nav-item,
-.window.window-inactive .fw-nav-item.active,
-.window.window-inactive .fw-page,
-.window.window-inactive .window-content {
-    color: rgba(150, 150, 150, 0.78) !important;
-}
-
-.window.window-inactive .fw-nav-item.active {
-    background: rgba(150, 150, 150, 0.16) !important;
-    box-shadow: inset 0 0 0 1px rgba(150, 150, 150, 0.28) !important;
-}
-
-.window.window-inactive .fw-nav-item.active::before,
-.window.window-inactive .fw-nav-icon-symbol {
-    background: rgba(150, 150, 150, 0.86) !important;
-}
-
-.window.window-inactive img[src*="Theme/Icon/"],
-.window.window-inactive img[src*="Symbol_icon/"],
-.window.window-inactive .fw-nav-icon-img,
-.window.window-inactive .window-content img {
-    filter: grayscale(1) saturate(0) opacity(0.62) !important;
-}
-
 /* ============ Fluent 自渲染竖直滚轮（全局接管） ============ */
 * {
     scrollbar-width: none !important;

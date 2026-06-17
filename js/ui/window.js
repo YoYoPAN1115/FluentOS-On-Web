@@ -358,6 +358,15 @@ const WindowManager = {
         ids.forEach((appId) => this._syncTaskbarAppState(appId));
     },
 
+    getAppWindow(appId) {
+        return this.windows.find((w) =>
+            w &&
+            w.appId === appId &&
+            w.element &&
+            !w.element.classList.contains('closing')
+        ) || null;
+    },
+
     _setActiveWindow(windowId = null) {
         this.activeWindowId = windowId;
         this.windows.forEach((w) => {
@@ -367,17 +376,27 @@ const WindowManager = {
         });
     },
 
-    _playForegroundSwitchMotion(windowData) {
+    _playWindowFocusMotion(windowData, motionClass) {
         if (!windowData || !windowData.element || !this._isAnimationEnabled()) return;
         const el = windowData.element;
-        el.classList.remove('window-foreground-switch');
+        el.classList.remove('window-focus-pop', 'window-focus-dip');
         void el.offsetWidth;
-        el.classList.add('window-foreground-switch');
-        clearTimeout(windowData._foregroundSwitchTimer);
-        windowData._foregroundSwitchTimer = setTimeout(() => {
-            el.classList.remove('window-foreground-switch');
-            windowData._foregroundSwitchTimer = null;
-        }, 280);
+        el.classList.add(motionClass);
+        clearTimeout(windowData._focusMotionTimer);
+        windowData._focusMotionTimer = setTimeout(() => {
+            el.classList.remove('window-focus-pop', 'window-focus-dip');
+            windowData._focusMotionTimer = null;
+        }, 340);
+    },
+
+    _playFocusTransitionMotion(nextWindowData, previousWindowData, forceMotion = false) {
+        if (!this._isAnimationEnabled()) return;
+        if (previousWindowData && previousWindowData !== nextWindowData) {
+            this._playWindowFocusMotion(previousWindowData, 'window-focus-dip');
+        }
+        if (forceMotion || (previousWindowData && previousWindowData !== nextWindowData)) {
+            this._playWindowFocusMotion(nextWindowData, 'window-focus-pop');
+        }
     },
 
     _bindDesktopInactivityListener() {
@@ -407,9 +426,16 @@ const WindowManager = {
             clearTimeout(windowData._restoreTimer);
             windowData._restoreTimer = null;
         }
+        if (windowData._focusMotionTimer) {
+            clearTimeout(windowData._focusMotionTimer);
+            windowData._focusMotionTimer = null;
+        }
         if (windowData._dockFeedbackTimer) {
             clearTimeout(windowData._dockFeedbackTimer);
             windowData._dockFeedbackTimer = null;
+        }
+        if (windowData.element) {
+            windowData.element.classList.remove('window-focus-pop', 'window-focus-dip');
         }
         this._clearTaskbarIndicatorMotion(windowData.appId);
     },
@@ -1549,7 +1575,7 @@ const WindowManager = {
         document.addEventListener('pointercancel', finalizeResize);
     },
 
-    focusWindow(windowId) {
+    focusWindow(windowId, options = {}) {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
 
@@ -1566,6 +1592,10 @@ const WindowManager = {
         }
 
         const previousActiveId = this.activeWindowId;
+        const previousWindowData = previousActiveId
+            ? this.windows.find(w => w && w.id === previousActiveId)
+            : null;
+        const forceMotion = options && options.forceMotion === true;
         const alreadyActive = previousActiveId === windowId &&
             windowData.element &&
             !windowData.element.classList.contains('window-inactive');
@@ -1578,8 +1608,8 @@ const WindowManager = {
         this._syncAllTaskbarAppStates();
         this._syncWidgetDimState();
         this._setTaskbarIndicatorForWindow(windowData, true);
-        if (previousActiveId && previousActiveId !== windowId) {
-            this._playForegroundSwitchMotion(windowData);
+        if (forceMotion || (previousActiveId && previousActiveId !== windowId)) {
+            this._playFocusTransitionMotion(windowData, previousWindowData, forceMotion);
         }
 
         if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {

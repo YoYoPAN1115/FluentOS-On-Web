@@ -2007,17 +2007,3 @@ body.fluent-v2.dark-mode .worldclock-card:hover,
 body.fluent-v2.dark-mode .browser-search-card:hover {
     background-color: var(--fluent-card-bg-dark-hover) !important;
 }
-
-/* Keep inactive window navigation and chrome icons neutral across light/dark themes. */
-body.fluent-v2 {
-    --fluent-neutral-icon-filter: brightness(0) saturate(100%) invert(47%) sepia(8%) saturate(442%) hue-rotate(176deg) brightness(91%) contrast(86%);
-    --fluent-neutral-icon-opacity: 0.92;
-}
-
-body.fluent-v2 .window.window-inactive .window-control-btn img,
-body.fluent-v2.dark-mode .window.window-inactive .window-control-btn img,
-body.fluent-v2 .window.window-inactive :is(.fw-nav-item, .media-nav-item) :is(img, svg, .media-symbol),
-body.fluent-v2.dark-mode .window.window-inactive :is(.fw-nav-item, .media-nav-item) :is(img, svg, .media-symbol) {
-    filter: var(--fluent-neutral-icon-filter) !important;
-    opacity: var(--fluent-neutral-icon-opacity) !important;
-}

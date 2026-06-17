@@ -2065,23 +2065,9 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     font-weight: 600;
 }
 
-.window-inactive .window-title-section,
-.window-inactive .window-content,
-.window-inactive .window-titlebar,
-.window-inactive .window-controls {
-    color: rgba(var(--text-primary-rgb, 31, 31, 31), 0.72);
-}
-
-.dark-mode .window-inactive .window-title-section,
-.dark-mode .window-inactive .window-content,
-.dark-mode .window-inactive .window-titlebar,
-.dark-mode .window-inactive .window-controls {
-    color: rgba(255, 255, 255, 0.62);
-}
-
-.window-inactive .window-titlebar img,
-.window-inactive .window-content img {
-    filter: grayscale(0.1) opacity(0.85);
+.window.window-inactive {
+    filter: saturate(0.78);
+    transition: filter 180ms ease;
 }
 
 .window-controls {
