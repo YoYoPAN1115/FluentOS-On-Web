@@ -27,8 +27,7 @@ const Desktop = {
         { id: 'appshop', nameKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png' },
         { id: 'camera', nameKey: 'camera.title', icon: 'Theme/Icon/App_icon/camera.png', isNative: true, isPWA: false },
         { id: 'photos', nameKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png', isNative: true, isPWA: false },
-        { id: 'media', nameKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', isNative: true, isPWA: false },
-        { id: 'settingsnew', nameKey: 'settingsnew.title', icon: 'Theme/Icon/App_icon/app_error.png', isNative: true, isPWA: false }
+        { id: 'media', nameKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', isNative: true, isPWA: false }
     ],
 
     getAppName(app) {

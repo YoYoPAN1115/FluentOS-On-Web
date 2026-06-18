@@ -1,32 +1,32 @@
 ﻿/**
- * 鐏忓繒绮嶆禒璺虹暰娑斿绱橶idgetDefs閿?
+ * Widget definitions (WidgetDefs)
  *
- * 閸︺劏绻栭柌宀€娅ョ拋鐗堝閺堝婀＄€圭偛鐨紒鍕閵嗗倹鐦℃稉顏傗偓灞界毈缂佸嫪娆㈡惔鏃傛暏閵嗗秴瀵橀崥顐ュ楠炴彃鏄傜€电鑸伴幀渚婄礄variants閿涘鈧?
+ * This file centralizes widget apps for desktop, lock screen,
+ * and other widget surfaces, including each app's variants.
  *
- * 鎼存梻鏁ょ紒鎾寸€敍?
- *   { id, nameKey, descKey, icon, recommend: [variantId...], variants: [...] }
+ * Shape: { id, nameKey, descKey, icon, recommend: [variantId...], variants: [...] }
  *
- * 瑜般垺鈧緤绱檝ariant閿涘绮ㄩ弸鍕剁窗
+ * Common variant fields:
  *   {
- *     id,                  // 閸忋劌鐪崬顖欑閿涘奔缍旀稉鍝勭杽娓氬娈?widgetId
- *     w, h,                // 缂冩垶鐗搁崡鏇炲帗閺嶅吋鏆?
- *     sizeKey,             // 鐏忓搫顕崥宥囆為惃?i18n key
- *     theme,               // body 娑撳﹪妾崝鐘垫畱閺嶅嘲绱＄猾浼欑礄w-xxx閿?
- *     defaultSettings?,    // 鐎圭偘绶ユ妯款吇鐠佸墽鐤?
- *     render(body, ctx),   // 濞撳弶鐓嬮崘鍛啇閿涙矞tx: { instance, surface, isPreview, setSettings() }
- *     onClick?(ctx),       // 閺咁噣鈧碍膩瀵繋绗呴悙鐟板毊閺佺繝閲滅亸蹇曠矋娴犺绱欐禒鍛攽闂堫澁绱?
- *     getMenu?(ctx)        // 閸欐娊鏁懣婊冨礋妞?[{ label, action }]
+ *     id,                  // Unique variant ID and base for widgetId
+ *     w, h,                // Grid width and height
+ *     sizeKey,             // i18n key for the size label
+ *     theme,               // Theme class on the widget, for example w-xxx
+ *     defaultSettings?,    // Default settings
+ *     render(body, ctx),   // Render function; ctx: { instance, surface, isPreview, setSettings() }
+ *     onClick?(ctx),       // Click handler
+ *     getMenu?(ctx)        // Context menu items: [{ label, action }]
  *   }
  *
- * 閺佺増宓侀幒銉ュ經閿?
- *   - 婢垛晜鐨甸敍姝刾en-Meteo閿涘牅绗屾径鈺傜毜 App 閻╃鎮撻敍?
- *   - Bing 婢逛胶鐒婇敍姝渋ng.biturl.top閿涘牅绗岄悡褏澧?App 閻╃鎮撻敍?
- *   - 閻戭厽顪?/ 閸愭粌宸?/ 韫囶偊鈧?/ 閼哄倸浜ｉ弮?/ 缁併劍鍩?/ 濮ｅ繑妫╅崡鏇＄槤閿涙apis.cn
+ * Data sources:
+ *   - Weather: Open-Meteo; Weather App provides icon and description mapping
+ *   - Bing daily image: bing.biturl.top; click opens Photos App
+ *   - Lunar, tracking, holidays, answer book, daily word, and more: uapis.cn
  */
 
-/* ==================== 瀹搞儱鍙?==================== */
+/* ==================== Utilities ==================== */
 
-/** 鐢?TTL 閻ㄥ嫬鍞寸€涙ɑ鏆熼幑顔剧处鐎涙﹫绱濋柆鍨帳闁插秴顦茬拠閿嬬湴 */
+/** Cache async widget data with TTL and shared in-flight requests. */
 const WidgetData = {
     _cache: {},
 
@@ -131,7 +131,7 @@ async function wFetchUapisJSON(path) {
     throw lastErr || new Error('Uapis request failed');
 }
 
-/** HTML 鏉烆兛绠?*/
+/** Escape text for HTML output. */
 function wEsc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -142,7 +142,7 @@ function wUiText(zh, en) {
     return (typeof I18n !== 'undefined' && I18n.currentLang === 'en') ? en : zh;
 }
 
-/** 娑撳骸鍘撶槐鐘垫晸閸涜棄鎳嗛張鐔虹拨鐎规氨娈戠€规碍妞傞崳顭掔窗閸忓啰绀岀粔璇插毉 DOM 閸氬氦鍤滈崝銊ヤ粻濮?*/
+/** Run an interval tied to an element lifecycle; stop when the element leaves the DOM. */
 function wTick(el, ms, fn) {
     fn();
     const id = setInterval(() => {
@@ -151,7 +151,7 @@ function wTick(el, ms, fn) {
     }, ms);
 }
 
-/** 瀵倹顒炲〒鍙夌厠閸栧懓顥婇敍姝璷ading 閳?閸愬懎顔?/ 闁挎瑨顕?*/
+/** Async render wrapper: show loading first, then show an error state on failure. */
 async function wAsync(body, fn) {
     body.innerHTML = `<div class="w-loading">${t('widgets.loading')}</div>`;
     try {
@@ -164,7 +164,7 @@ async function wAsync(body, fn) {
     }
 }
 
-/** 閸︺劌鍞寸純顔界セ鐟欏牆娅掓稉顓熷ⅵ瀵偓闁剧偓甯撮敍鍫滅矌濡楀矂娼伴弲顕€鈧碍膩瀵骏绱?*/
+/** Open the browser app on desktop and navigate to the provided input or URL. */
 function wOpenInBrowser(input, ctx) {
     if (ctx.isPreview || ctx.surface !== 'desktop') return;
     if (typeof Widgets !== 'undefined' && Widgets.isOpen) return;
@@ -176,14 +176,14 @@ function wOpenInBrowser(input, ctx) {
     }, 450);
 }
 
-/** 閺咁噣鈧碍膩瀵繋绗呴悙鐟板毊閺勵垰鎯佹惔鏃囶嚉閻㈢喐鏅?*/
+/** Disable widget interaction while previewing or while the widget panel is open. */
 function wClickable(ctx) {
     if (ctx.isPreview) return false;
     if (typeof Widgets !== 'undefined' && Widgets.isOpen) return false;
     return true;
 }
 
-/** 閹稿洤鐣鹃弮璺哄隘閻ㄥ嫬缍嬮崜宥嗘闂?*/
+/** Get the current time for a specific timezone. */
 function wTzNow(tz) {
     try {
         return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
@@ -204,9 +204,9 @@ function wWeekday(d) {
     return lang[d.getDay()];
 }
 
-/* ==================== 婢垛晜鐨?==================== */
+/* ==================== Weather ==================== */
 
-/** WMO 婢垛晜鐨甸惍?閳?閺傛壆澧楁径鈺傜毜閸ョ偓鐖ｇ捄顖氱窞閿涘牅绗屾径鈺傜毜 App 閸忚京鏁ら崥灞肩婵傛妲х亸鍕剁礆 */
+/** Convert WMO weather code to an icon path; prefer Weather App mappings. */
 function wWeatherIconPath(code) {
     if (window.WeatherApp && typeof WeatherApp.codeToIcon === 'function') {
         return WeatherApp.codeToIcon(code);
@@ -230,14 +230,14 @@ function wWeatherDesc(code) {
     return '';
 }
 
-/** 鐏忓繒绮嶆禒璺恒亯濮樻梹鏆熼幑顔芥箒閺佸牊婀￠敍? 鐏忓繑妞?*/
+/** Cache widget weather data for one hour. */
 const W_WEATHER_WIDGET_TTL = 60 * 60 * 1000;
 
 async function wFetchWeather(cityKey) {
     const locs = wWeatherLocations();
     const loc = locs[cityKey] || locs.beijing;
-    // 娑撳骸銇夊?App 閸忚京鏁ら崥灞肩娴犵晫绱︾€涙﹫绱癆pp 閸?20 閸掑棝鎸撻崚閿嬫煀閿涘苯鐨紒鍕 1 鐏忓繑妞傞崚閿嬫煀閿?
-    // App 閹峰灝鍩岄弬鐗堟殶閹诡喗妞傜亸蹇曠矋娴犳湹绱伴柅姘崇箖 weatherDataUpdate 娴滃娆㈤崥灞绢劄閵?
+    // Prefer the Weather App cache so the widget and the app do not fetch duplicate data.
+    // Weather App updates can emit weatherDataUpdate, which Widgets may use to refresh.
     if (window.WeatherApp && typeof WeatherApp.getWeather === 'function') {
         return WeatherApp.getWeather(loc.lat, loc.lon, W_WEATHER_WIDGET_TTL);
     }
@@ -439,7 +439,7 @@ function wWeatherMenu(ctx) {
     }));
 }
 
-/* ==================== 閺冨爼鎸?==================== */
+/* ==================== Clock ==================== */
 
 function wRenderWeatherEditor(container, ctx) {
     const cur = wWeatherCity(ctx);
@@ -550,7 +550,7 @@ function wRenderClockWorld(body) {
     });
 }
 
-/* ==================== 閺冦儱宸?==================== */
+/* ==================== Calendar ==================== */
 
 const W_CAL_MONTHS_EN = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -746,7 +746,7 @@ function wRenderCalendar(body, ctx, size) {
     wTick(body, 60 * 1000, update);
 }
 
-/* ==================== 閻撗呭閿涘湐ing 婢逛胶鐒婇敍?==================== */
+/* ==================== Photos: Bing Daily Image ==================== */
 
 async function wFetchBing() {
     return WidgetData.getJSON('bing-today', 60 * 60 * 1000,
@@ -757,9 +757,9 @@ function wRenderPhotos(body, ctx, size) {
     wAsync(body, async () => {
         const data = await wFetchBing();
         if (!body.isConnected) return;
-        const title = (data.copyright || '').split(/[閿?]/)[0].trim();
+        const title = (data.copyright || '').split(/[\uFF08(]/)[0].trim();
         body.innerHTML = `
-            <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
+            <div class="w-photo" style="background-imag e:url('${wEsc(data.url)}')">
                 <div class="w-photo-overlay">
                     <div class="w-photo-tag">${t('widgets.photos.bing')}</div>
                     ${size !== 's' ? `<div class="w-photo-title">${wEsc(title)}</div>` : ''}
@@ -768,7 +768,7 @@ function wRenderPhotos(body, ctx, size) {
     });
 }
 
-/* ==================== 閹兼粎鍌?==================== */
+/* ==================== Search ==================== */
 
 const W_SEARCH_ENGINES = {
     bing: { name: 'Bing', url: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}` },
@@ -850,7 +850,7 @@ function wRenderSearchEditor(container, ctx) {
     });
 }
 
-/* ==================== 娴犲﹥妫╅弬浼存閿涘牏鍎瑰婊愮礆 ==================== */
+/* ==================== Hot Board / News Sources ==================== */
 
 const W_HOTBOARD_SOURCES = {
     bilibili: 'Bilibili',
@@ -979,7 +979,7 @@ function wFormatHot(v) {
     return n >= 10000 ? `${(n / 10000).toFixed(1)}\u4e07` : String(n);
 }
 
-/* ==================== 閸愭粌宸?==================== */
+/* ==================== Lunar Calendar ==================== */
 
 async function wFetchLunar() {
     return WidgetData.get('lunartime', 30 * 60 * 1000, () =>
@@ -1010,7 +1010,7 @@ function wRenderLunar(body, ctx, size) {
     });
 }
 
-/* ==================== 韫囶偊鈧帗鐓＄拠?==================== */
+/* ==================== Package Tracking ==================== */
 
 async function wFetchTracking(no) {
     return WidgetData.get(`tracking-${no}`, 5 * 60 * 1000, async () => {
@@ -1018,7 +1018,7 @@ async function wFetchTracking(no) {
     });
 }
 
-/** 閸︺劍婀惌銉х波閺嬪嫮娈戦崫宥呯安娑擃厽褰侀崣鏍⒖濞翠浇寤烘潻瑙勬殶缂?*/
+/** Extract tracking traces from the different response shapes returned by APIs. */
 function wExtractTraces(json) {
     const candidates = [json.traces, json.data, json.list, json.items, json.tracks,
         json.result && json.result.traces, json.result && json.result.list];
@@ -1101,7 +1101,7 @@ function wRenderTracking(body, ctx, size) {
     if (saved) query();
 }
 
-/* ==================== 閼哄倸浜ｉ弮?==================== */
+/* ==================== Holidays ==================== */
 
 async function wFetchHoliday() {
     const now = new Date();
@@ -1165,7 +1165,7 @@ function wRenderHoliday(body, ctx, size) {
     });
 }
 
-/* ==================== 缁涙梹顢嶆稊瀣╁姛 ==================== */
+/* ==================== Answer Book ==================== */
 
 function wRenderAnswerBook(body, ctx) {
     body.innerHTML = `
@@ -1216,12 +1216,12 @@ function wRenderAnswerBook(body, ctx) {
     });
 }
 
-/* ==================== 濮ｅ繑妫╅崡鏇＄槤 ==================== */
+/* ==================== Daily Word ==================== */
 
 /**
- * 閺堫剙婀寸拠宥呯氨閸忔粌绨抽敍姝禷pis 閻?/daily/word 閹恒儱褰涚粋浣诡剾濞村繗顫嶉崳銊ㄦ硶閸╃喎鍘?key 鐠嬪啰鏁?
- * 閿涘牐绻戦崶?403 CORS_FORBIDDEN閿涘绱濋幍鈧禒銉﹀复閸欙絽銇戠拹銉︽閹稿妫╅張鐔剁矤閺堫剙婀寸拠宥呯氨閸欐牞鐦濋敍?
- * 娣囨繆鐦夐崥灞肩婢垛晛褰囬崚鎵畱閸楁洝鐦濇稉鈧懛娣偓?
+ * Daily Word uses uapis.cn when available.
+ * Some environments can return 403 CORS_FORBIDDEN, so a local word bank is kept as fallback.
+ * The fallback keeps the widget useful offline or when the remote API fails.
  */
 const W_WORD_BANK = [
     { word: 'serene', phonetic: '/s\u0259\u02c8ri\u02d0n/', translation: 'adj. calm; peaceful', examples: [{ text: 'The lake was serene in the morning light.', translation: 'The scene was calm and peaceful.' }] },
@@ -1239,7 +1239,7 @@ async function wFetchDailyWord() {
         try {
             const data = await wFetchUapisJSON('/api/v1/daily/word');
             if (data && Array.isArray(data.words) && data.words.length) return data;
-        } catch (_) { /* 鐠恒劌鐓欑悮顐ｅ珕閹存牜缍夌紒婊堟晩鐠囶垽绱濈挧鐗堟拱閸︽媽鐦濇惔?*/ }
+        } catch (_) { /* Use the local word bank if the remote API fails. */ }
         const idx = Math.floor(Date.now() / 86400000) % W_WORD_BANK.length;
         return { words: [W_WORD_BANK[idx]] };
     });
@@ -1271,9 +1271,9 @@ function wRenderWord(body, ctx, size) {
     });
 }
 
-/* ==================== 婢舵艾鐛熸担?==================== */
+/* ==================== Media Playback ==================== */
 
-/** 閺冪姴鐨濋棃銏℃閻ㄥ嫭绗庨崣妯哄窗娴ｅ稄绱欐稉搴☆樋婵帊缍?App 閻ㄥ嫭绗庨崣姗€顥撻弽闂寸閼疯揪绱?*/
+/** Fallback cover gradients for the media widget, visually aligned with Media App. */
 const W_MEDIA_GRADIENTS = [
     'linear-gradient(135deg, #ff6b35 0%, #ffb347 52%, #ffe1c2 100%)',
     'linear-gradient(135deg, #ff2d55 0%, #ff7aa2 50%, #ffd1dc 100%)',
@@ -1282,7 +1282,7 @@ const W_MEDIA_GRADIENTS = [
     'linear-gradient(135deg, #34c759 0%, #7be495 55%, #d9f7e2 100%)'
 ];
 
-/** themeColors 缂傚搫銇戦弮鑸靛瘻 gradientIndex 閸欐牜娈戦崗婊冪俺娑撳顣介懝?*/
+/** Fallback colors used when track themeColors are unavailable. */
 const W_MEDIA_FALLBACK_COLORS = [
     ['hsl(18, 76%, 56%)', 'hsl(28, 84%, 50%)'],
     ['hsl(350, 80%, 55%)', 'hsl(338, 86%, 48%)'],
@@ -1292,9 +1292,9 @@ const W_MEDIA_FALLBACK_COLORS = [
 ];
 
 /**
- * 閸欐牓鈧本娓舵潻鎴炴尡閺€淇扁偓宥嗘锤閻╊喓鈧?
- * 娴兼ê鍘涚拠鏄忕箥鐞涘奔鑵戦惃?MediaApp閿涘牊婀佺亸渚€娼?blob 娑撳骸鐤勯弮鑸垫尡閺€鍓уЦ閹緤绱氶敍?
- * App 閺堫亝澧﹀鈧弮鍫曗偓鈧崶?localStorage 闁插瞼娈戦弴鎻掔氨濞撳懎宕熼敍鍫熸￥鐏忎線娼伴敍灞肩稻閺堝瀵旀稊鍛閻ㄥ嫪瀵屾０妯垮閿涘鈧?
+ * Normalize a media playback snapshot.
+ * Prefer the live MediaApp queue, cover blob, and theme colors when available.
+ * If MediaApp is not initialized, restore displayable data from localStorage.
  */
 function wMediaNormalizeTrack(item, index, activeId, playing, progress) {
     return {
@@ -1363,7 +1363,7 @@ function wMediaTrack() {
     return wMediaState().track;
 }
 
-/** 閸欐牗娲搁惄顔诲瘜妫版澹婇敍鍫滆⒈娑擃亷绱氶敍宀€鏁ゆ禍搴濊厬鐏忓搫顕崡锛勫閼冲本娅?*/
+/** Prefer cover theme colors; fall back to the preset gradient palette. */
 function wMediaColors(track) {
     if (track && Array.isArray(track.themeColors) && track.themeColors.length >= 2) {
         return [track.themeColors[0], track.themeColors[1]];
@@ -1383,7 +1383,7 @@ function wMediaCoverHtml(track, cls) {
         </div>`;
 }
 
-/** 閹绢厽鏂?閺嗗倸浠犻敍娆皃p 瀹稿弶澧﹀鈧崚娆戞纯閹恒儱鍨忛幑顫幢閺堫亝澧﹀鈧崚娆忓帥閹垫挸绱?App閿涘苯绶熼弴鎻掔氨閹垹顦查崥搴ゅ殰閸斻劍鎸遍弨?*/
+/** Localized fallback text for the media widget when i18n keys are not available. */
 function wMediaText(key) {
     const zh = !(typeof I18n !== 'undefined' && I18n.currentLang === 'en');
     const map = {
@@ -1661,7 +1661,7 @@ function wRenderFavoriteSites(body, ctx, size) {
     });
 }
 
-/* ==================== 濞夈劌鍞界悰?==================== */
+/* ==================== Favorite Sites ==================== */
 
 function wRenderFavoriteSitesEditor(container, ctx) {
     const service = window.FavoriteSites;
@@ -1881,7 +1881,7 @@ const WidgetDefs = {
         }
     ],
 
-    /** 妫ｆ牠銆夐幒銊ㄥ礃閻ㄥ嫬鐨紒鍕瑜般垺鈧?*/
+    /** Common widgets recommended in the add-widget panel. */
     recommended: [
         'weather-m', 'clock-analog', 'calendar-s', 'search-capsule',
         'quicknotes-m', 'favorites-m', 'media-m', 'photos-m', 'word-s', 'lunar-tall', 'news-m', 'holiday-m', 'answerbook-m'

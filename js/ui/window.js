@@ -44,7 +44,7 @@ const WindowManager = {
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
-        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 400, height: 550, minHeight: 550, component: 'CalculatorApp' },
+        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
         notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 920, height: 640, minWidth: 560, minHeight: 420, component: 'NotesApp' },
         browser: { titleKey: 'browser.title', icon: 'Theme/Icon/App_icon/browser.png', width: 1000, height: 700, component: 'BrowserApp' },
         clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/clock.png', width: 900, height: 650, component: 'ClockApp' },
@@ -52,8 +52,7 @@ const WindowManager = {
         appshop: { titleKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png', width: 1000, height: 700, component: 'AppShop' },
         camera: { titleKey: 'camera.title', icon: 'Theme/Icon/App_icon/camera.png', width: 1100, height: 720, minWidth: 760, minHeight: 520, component: 'CameraApp' },
         photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png', width: 1000, height: 700, component: 'PhotosApp' },
-        media: { titleKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' },
-        settingsnew: { titleKey: 'settingsnew.title', icon: 'Theme/Icon/App_icon/app_error.png', width: 950, height: 650, minWidth: 480, minHeight: 420, component: 'SettingsNewApp' }
+        media: { titleKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' }
     },
 
     // 获取应用配置 - Get application configuration

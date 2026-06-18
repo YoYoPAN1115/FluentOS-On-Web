@@ -13,9 +13,10 @@
     const rand = () => Math.random().toString(36).slice(2, 10);
 
     const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB soft limit to avoid blowing up localStorage
-    const ALLOWED_IMPORT_EXTENSIONS = new Set(['txt', 'doc', 'docx', 'ppt', 'pptx', 'xlsx', 'xls', 'pdf', 'png', 'jpg', 'jpeg']);
+    const ALLOWED_IMPORT_EXTENSIONS = new Set(['txt', 'md', 'doc', 'docx', 'ppt', 'pptx', 'xlsx', 'xls', 'pdf', 'png', 'jpg', 'jpeg']);
     const ALLOWED_IMPORT_MIME_TYPES = new Set([
         'text/plain',
+        'text/markdown',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-powerpoint',
@@ -26,7 +27,7 @@
         'image/png',
         'image/jpeg'
     ]);
-    const ALLOWED_IMPORT_ACCEPT = '.txt,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.pdf,.png,.jpg,.jpeg';
+    const ALLOWED_IMPORT_ACCEPT = '.txt,.md,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.pdf,.png,.jpg,.jpeg';
 
     function isEnabledFlag(value) {
         if (value === true || value === 1) return true;
@@ -101,9 +102,9 @@
     function unsupportedTypeMessage(name) {
         const safeName = String(name || 'file');
         if (isZh()) {
-            return `不支持的文件类型，已跳过：${safeName}（仅支持 txt/doc/docx/ppt/pptx/xlsx/xls/pdf/png/jpg/jpeg）`;
+            return `不支持的文件类型，已跳过：${safeName}（仅支持 txt/md/doc/docx/ppt/pptx/xlsx/xls/pdf/png/jpg/jpeg）`;
         }
-        return `Unsupported file type skipped: ${safeName} (allowed: txt, doc, docx, ppt, pptx, xlsx, xls, pdf, png, jpg, jpeg)`;
+        return `Unsupported file type skipped: ${safeName} (allowed: txt, md, doc, docx, ppt, pptx, xlsx, xls, pdf, png, jpg, jpeg)`;
     }
 
     function uniqueNameIn(folder, desiredName) {

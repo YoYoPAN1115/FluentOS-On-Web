@@ -9,6 +9,7 @@ const NotesApp = {
     widgetRefreshTimer: null,
     quickIntroShownThisSession: false,
     editorState: null,
+    newNoteRevealRunning: false,
     _contextGuardContainer: null,
     _contextGuardHandler: null,
 
@@ -70,7 +71,42 @@ const NotesApp = {
             editorPlaceholder: '开始记录...',
             revealError: '无法定位文件所在位置。',
             copiedSuffix: '副本',
-            folderMissing: '保存位置不可用，已改用文档。'
+            folderMissing: '保存位置不可用，已改用文档。',
+            importMarkdown: '导入文本',
+            exportTxt: '导出 TXT',
+            exportMd: '导出 MD',
+            fontFamily: '字体',
+            fontSize: '字号',
+            paragraphStyle: '段落样式',
+            normalText: '正文',
+            heading1: '标题 1',
+            heading2: '标题 2',
+            heading3: '标题 3',
+            quote: '引用',
+            increaseFont: '增大字号',
+            decreaseFont: '减小字号',
+            textColor: '文字颜色',
+            highlightColor: '高亮颜色',
+            bold: '加粗',
+            italic: '斜体',
+            underline: '下划线',
+            strike: '删除线',
+            subscript: '下标',
+            superscript: '上标',
+            bulletList: '项目符号',
+            numberedList: '编号列表',
+            outdent: '减少缩进',
+            indent: '增加缩进',
+            alignLeft: '左对齐',
+            alignCenter: '居中',
+            alignRight: '右对齐',
+            alignJustify: '两端对齐',
+            lineHeight: '行距',
+            clearFormat: '清除格式',
+            exported: '已导出',
+            importSuccess: '已导入文本文件',
+            importMarkdownError: '只能导入 .txt 或 .md 文件。',
+            characters: '字符'
         },
         en: {
             appTitle: 'Quick Notes',
@@ -129,7 +165,42 @@ const NotesApp = {
             editorPlaceholder: 'Start writing...',
             revealError: 'Unable to locate this file.',
             copiedSuffix: 'copy',
-            folderMissing: 'The save location was unavailable, so Documents was used.'
+            folderMissing: 'The save location was unavailable, so Documents was used.',
+            importMarkdown: 'Import text',
+            exportTxt: 'Export TXT',
+            exportMd: 'Export MD',
+            fontFamily: 'Font',
+            fontSize: 'Size',
+            paragraphStyle: 'Paragraph style',
+            normalText: 'Body',
+            heading1: 'Heading 1',
+            heading2: 'Heading 2',
+            heading3: 'Heading 3',
+            quote: 'Quote',
+            increaseFont: 'Increase font size',
+            decreaseFont: 'Decrease font size',
+            textColor: 'Text color',
+            highlightColor: 'Highlight color',
+            bold: 'Bold',
+            italic: 'Italic',
+            underline: 'Underline',
+            strike: 'Strikethrough',
+            subscript: 'Subscript',
+            superscript: 'Superscript',
+            bulletList: 'Bullets',
+            numberedList: 'Numbered list',
+            outdent: 'Decrease indent',
+            indent: 'Increase indent',
+            alignLeft: 'Align left',
+            alignCenter: 'Center',
+            alignRight: 'Align right',
+            alignJustify: 'Justify',
+            lineHeight: 'Line spacing',
+            clearFormat: 'Clear formatting',
+            exported: 'Exported',
+            importSuccess: 'Text file imported',
+            importMarkdownError: 'Only .txt or .md files can be imported.',
+            characters: 'characters'
         }
     },
 
@@ -235,6 +306,13 @@ const NotesApp = {
                     <h1>${onlyFavorites ? this.tr('favoritesTitle') : this.tr('recentTitle')}</h1>
                     <p>${onlyFavorites ? this.tr('favoritesSubtitle') : this.tr('recentSubtitle')}</p>
                 </div>
+                ${onlyFavorites ? '' : `
+                    <div class="notes-header-actions">
+                        <button class="notes-secondary-button notes-import-text-button" type="button">
+                            <img src="${this.icon('Upload')}" alt="">
+                            <span>${this.tr('importMarkdown')}</span>
+                        </button>
+                    </div>`}
             </div>
             <div class="notes-list" role="list"></div>
             ${onlyFavorites ? '' : `
@@ -265,7 +343,9 @@ const NotesApp = {
         });
 
         const fab = pageEl.querySelector('.notes-fab');
-        if (fab) fab.addEventListener('click', () => this.createNewNote());
+        if (fab) fab.addEventListener('click', () => this.createNewNoteFromButton(fab));
+        const importButton = pageEl.querySelector('.notes-import-text-button');
+        if (importButton) importButton.addEventListener('click', () => this.importTextFile());
     },
 
     renderNoteRow(item) {
@@ -339,38 +419,45 @@ const NotesApp = {
                 </div>
             </div>
             <div class="notes-settings-list">
-                <label class="notes-setting-row">
+                <section class="notes-setting-row">
                     <span class="notes-setting-main">
                         <span>${this.tr('defaultLocation')}</span>
                     </span>
-                    <select class="notes-location-select">
-                        ${folderOptions.map(folder => `
-                            <option value="${this.escape(folder.id)}"${currentLocation === folder.id ? ' selected' : ''}>${this.escape(folder.label)}</option>
-                        `).join('')}
-                    </select>
-                </label>
-                <label class="notes-setting-row">
+                    <span class="notes-setting-control notes-location-select-host"></span>
+                </section>
+                <section class="notes-setting-row">
                     <span class="notes-setting-main">
                         <span>${this.tr('autoSave')}</span>
                         <small>${this.tr('autoSaveHint')}</small>
                     </span>
-                    <span class="notes-switch">
-                        <input class="notes-autosave-toggle" type="checkbox"${autosave ? ' checked' : ''}>
-                        <span></span>
-                    </span>
-                </label>
+                    <span class="notes-setting-control notes-autosave-toggle-host"></span>
+                </section>
             </div>`;
 
-        pageEl.querySelector('.notes-location-select').addEventListener('change', (e) => {
-            State.updateSettings({ notesDefaultSaveLocation: e.target.value });
-        });
-        pageEl.querySelector('.notes-autosave-toggle').addEventListener('change', (e) => {
-            State.updateSettings({ notesAutoSave: e.target.checked });
-            if (e.target.checked && this.editorState && this.editorState.dirty) this.persistEditorDraft();
-        });
+        const locationHost = pageEl.querySelector('.notes-location-select-host');
+        if (locationHost && window.FluentUI && typeof FluentUI.Select === 'function') {
+            locationHost.appendChild(FluentUI.Select({
+                value: currentLocation,
+                className: 'notes-settings-select',
+                options: folderOptions.map(folder => ({ value: folder.id, label: folder.label })),
+                onChange: (value) => State.updateSettings({ notesDefaultSaveLocation: value })
+            }));
+        }
+
+        const autosaveHost = pageEl.querySelector('.notes-autosave-toggle-host');
+        if (autosaveHost && window.FluentUI && typeof FluentUI.Toggle === 'function') {
+            autosaveHost.appendChild(FluentUI.Toggle({
+                checked: autosave,
+                className: 'notes-settings-toggle',
+                onChange: (checked) => {
+                    State.updateSettings({ notesAutoSave: checked });
+                    if (checked && this.editorState && this.editorState.dirty) this.persistEditorDraft();
+                }
+            }));
+        }
     },
 
-    renderEditor(fileId, isNew = false) {
+    renderEditor(fileId, isNew = false, options = {}) {
         const node = State.findNode(fileId);
         if (!node || node.type !== 'file') {
             this.showMessage(this.tr('openError'));
@@ -382,10 +469,15 @@ const NotesApp = {
         State.updateFS(State.fs);
         if (this.frame && this.frame.destroy) this.frame.destroy();
         this.activeView = 'editor';
+        const fileFormat = this.getNodeFormat(node);
+        const editorHtml = this.contentToEditorHtml(node.content || '', fileFormat);
         this.editorState = {
             fileId,
             originalContent: node.content || '',
             draftContent: node.content || '',
+            draftHtml: editorHtml,
+            fileFormat,
+            revealFromNewButton: !!options.revealFromNewButton,
             isNew,
             dirty: false,
             lastSavedAt: node.modified || node.created || new Date().toISOString()
@@ -403,48 +495,102 @@ const NotesApp = {
         const state = this.editorState;
         const node = State.findNode(state.fileId);
         const autosave = State.settings.notesAutoSave !== false;
-        pageEl.className = 'fw-page notes-editor-page';
+        pageEl.className = `fw-page notes-editor-page notes-page-elements-enter${state.revealFromNewButton ? ' notes-editor-page-reveal' : ''}`;
         pageEl.innerHTML = `
             <div class="notes-editor-topbar">
                 <button class="notes-icon-button notes-editor-back" type="button" title="${this.tr('back')}" aria-label="${this.tr('back')}">
                     <img src="${this.icon('Arrow Left')}" alt="">
                 </button>
                 <div class="notes-editor-title" title="${this.escape(node.name || '')}">${this.escape(node.name || this.tr('noteName'))}</div>
-                <button class="notes-primary-button notes-save-button" type="button"${autosave ? ' disabled' : ''}>
-                    <img src="${this.icon('Save Floppy')}" alt="">
-                    <span>${autosave ? this.tr('autosaved') : this.tr('save')}</span>
-                </button>
+                <div class="notes-editor-actions">
+                    <button class="notes-icon-button notes-import-text-button" type="button" title="${this.tr('importMarkdown')}" aria-label="${this.tr('importMarkdown')}">
+                        <img src="${this.icon('Upload')}" alt="">
+                    </button>
+                    <button class="notes-icon-button notes-export-txt-button notes-format-export" type="button" title="${this.tr('exportTxt')}" aria-label="${this.tr('exportTxt')}">TXT</button>
+                    <button class="notes-icon-button notes-export-md-button notes-format-export" type="button" title="${this.tr('exportMd')}" aria-label="${this.tr('exportMd')}">MD</button>
+                    <button class="notes-primary-button notes-save-button" type="button"${autosave ? ' disabled' : ''}>
+                        <img src="${this.icon('Save Floppy')}" alt="">
+                        <span>${autosave ? this.tr('autosaved') : this.tr('save')}</span>
+                    </button>
+                </div>
             </div>
             <div class="notes-editor-toolbar" aria-label="formatting">
-                <button type="button" data-command="bold"><strong>B</strong></button>
-                <button type="button" data-command="italic"><em>I</em></button>
-                <button type="button" data-command="underline"><u>U</u></button>
+                <div class="notes-toolbar-group">
+                    <span class="notes-select-host notes-font-family-host"></span>
+                    <span class="notes-select-host notes-font-size-host"></span>
+                    <button type="button" data-action="decreaseFontSize" title="${this.tr('decreaseFont')}" aria-label="${this.tr('decreaseFont')}">A-</button>
+                    <button type="button" data-action="increaseFontSize" title="${this.tr('increaseFont')}" aria-label="${this.tr('increaseFont')}">A+</button>
+                </div>
                 <span class="notes-toolbar-divider"></span>
-                <button type="button" data-command="insertUnorderedList"><img src="${this.icon('Checklist Note')}" alt=""></button>
-                <button type="button" data-command="justifyLeft"><img src="${this.icon('L Arrow Left Down')}" alt=""></button>
-                <button type="button" data-command="justifyCenter"><img src="${this.icon('Double Arrow Circle')}" alt=""></button>
-                <button type="button" data-command="justifyRight"><img src="${this.icon('L Arrow Right Down')}" alt=""></button>
+                <div class="notes-toolbar-group">
+                    <span class="notes-select-host notes-format-block-host"></span>
+                </div>
+                <span class="notes-toolbar-divider"></span>
+                <div class="notes-toolbar-group">
+                    <button type="button" data-command="bold" title="${this.tr('bold')}" aria-label="${this.tr('bold')}"><strong>B</strong></button>
+                    <button type="button" data-command="italic" title="${this.tr('italic')}" aria-label="${this.tr('italic')}"><em>I</em></button>
+                    <button type="button" data-command="underline" title="${this.tr('underline')}" aria-label="${this.tr('underline')}"><u>U</u></button>
+                    <button type="button" data-command="strikeThrough" title="${this.tr('strike')}" aria-label="${this.tr('strike')}"><s>abc</s></button>
+                    <button type="button" data-command="subscript" title="${this.tr('subscript')}" aria-label="${this.tr('subscript')}">X<sub>2</sub></button>
+                    <button type="button" data-command="superscript" title="${this.tr('superscript')}" aria-label="${this.tr('superscript')}">X<sup>2</sup></button>
+                </div>
+                <span class="notes-toolbar-divider"></span>
+                <div class="notes-toolbar-group">
+                    <label class="notes-color-tool" title="${this.tr('textColor')}" aria-label="${this.tr('textColor')}">
+                        <span class="notes-color-symbol notes-text-color-symbol">A</span>
+                        <input class="notes-color-input notes-text-color-input" type="color" value="#1f1f1f">
+                    </label>
+                    <label class="notes-color-tool" title="${this.tr('highlightColor')}" aria-label="${this.tr('highlightColor')}">
+                        <img src="${this.icon('Color Picker')}" alt="">
+                        <input class="notes-color-input notes-highlight-color-input" type="color" value="#fff2ab">
+                    </label>
+                </div>
+                <span class="notes-toolbar-divider"></span>
+                <div class="notes-toolbar-group">
+                    <button type="button" data-command="insertUnorderedList" title="${this.tr('bulletList')}" aria-label="${this.tr('bulletList')}"><img src="${this.icon('Checklist Note')}" alt=""></button>
+                    <button type="button" data-command="insertOrderedList" title="${this.tr('numberedList')}" aria-label="${this.tr('numberedList')}">1.</button>
+                    <button type="button" data-command="outdent" title="${this.tr('outdent')}" aria-label="${this.tr('outdent')}"><img src="${this.icon('Arrow Left')}" alt=""></button>
+                    <button type="button" data-command="indent" title="${this.tr('indent')}" aria-label="${this.tr('indent')}"><img src="${this.icon('Arrow Right')}" alt=""></button>
+                </div>
+                <span class="notes-toolbar-divider"></span>
+                <div class="notes-toolbar-group">
+                    <button type="button" data-command="justifyLeft" title="${this.tr('alignLeft')}" aria-label="${this.tr('alignLeft')}"><img src="${this.icon('Align Left')}" alt=""></button>
+                    <button type="button" data-command="justifyCenter" title="${this.tr('alignCenter')}" aria-label="${this.tr('alignCenter')}"><img src="${this.icon('Align Center')}" alt=""></button>
+                    <button type="button" data-command="justifyRight" title="${this.tr('alignRight')}" aria-label="${this.tr('alignRight')}"><img src="${this.icon('Align Right')}" alt=""></button>
+                    <button type="button" data-command="justifyFull" title="${this.tr('alignJustify')}" aria-label="${this.tr('alignJustify')}">J</button>
+                    <span class="notes-select-host notes-line-height-host"></span>
+                    <button type="button" data-command="removeFormat" title="${this.tr('clearFormat')}" aria-label="${this.tr('clearFormat')}">Tx</button>
+                </div>
             </div>
             <div class="notes-editor-surface">
                 <div class="notes-rich-editor" contenteditable="true" spellcheck="true" data-placeholder="${this.tr('editorPlaceholder')}"></div>
             </div>
             <div class="notes-editor-status">
                 <span class="notes-status-text">${autosave ? this.tr('autosaved') : this.tr('saved')}</span>
-                <span>${this.escape(this.formatDate(state.lastSavedAt))}</span>
+                <span class="notes-editor-count">0 ${this.tr('characters')}</span>
+                <span class="notes-editor-time">${this.escape(this.formatDate(state.lastSavedAt))}</span>
             </div>`;
 
         const editor = pageEl.querySelector('.notes-rich-editor');
-        editor.innerHTML = state.draftContent || '';
+        editor.innerHTML = state.draftHtml || '';
         const status = pageEl.querySelector('.notes-status-text');
         const saveBtn = pageEl.querySelector('.notes-save-button');
+        const count = pageEl.querySelector('.notes-editor-count');
+        const updateCount = () => {
+            count.textContent = `${this.getEditorPlainText(editor).length} ${this.tr('characters')}`;
+        };
 
         const markDirty = () => {
-            state.draftContent = editor.innerHTML;
+            state.draftHtml = editor.innerHTML;
+            state.draftContent = this.editorHtmlToStoredContent(state.draftHtml, state.fileFormat);
             state.dirty = state.draftContent !== state.originalContent;
             status.textContent = autosave ? this.tr('autosaved') : (state.dirty ? this.tr('unsaved') : this.tr('saved'));
+            updateCount();
             if (State.settings.notesAutoSave !== false) this.scheduleAutoSave();
         };
 
+        updateCount();
+        this.setupEditorToolbar(pageEl, editor, markDirty);
         editor.addEventListener('input', markDirty);
         editor.addEventListener('paste', () => setTimeout(markDirty, 0));
         editor.addEventListener('keydown', (e) => {
@@ -454,14 +600,10 @@ const NotesApp = {
             }
         });
         pageEl.querySelector('.notes-editor-back').addEventListener('click', () => this.returnHomeFromEditor());
+        pageEl.querySelector('.notes-import-text-button').addEventListener('click', () => this.importTextFile());
+        pageEl.querySelector('.notes-export-txt-button').addEventListener('click', () => this.exportCurrentEditor('txt'));
+        pageEl.querySelector('.notes-export-md-button').addEventListener('click', () => this.exportCurrentEditor('md'));
         saveBtn.addEventListener('click', () => this.persistEditorDraft());
-        pageEl.querySelectorAll('.notes-editor-toolbar button[data-command]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                editor.focus();
-                document.execCommand(btn.dataset.command, false, null);
-                markDirty();
-            });
-        });
     },
 
     loadFile(fileId) {
@@ -490,9 +632,9 @@ const NotesApp = {
         this.renderShell('home');
     },
 
-    openEditor(fileId, isNew = false) {
+    openEditor(fileId, isNew = false, options = {}) {
         this.closeContextMenu();
-        this.renderEditor(fileId, isNew);
+        this.renderEditor(fileId, isNew, options);
     },
 
     openWithContent(content = '') {
@@ -506,7 +648,7 @@ const NotesApp = {
         if (this.editorState) {
             const editor = this.container.querySelector('.notes-rich-editor');
             if (editor) {
-                editor.innerHTML = content;
+                editor.innerHTML = this.contentToEditorHtml(content, this.editorState.fileFormat);
                 editor.dispatchEvent(new Event('input', { bubbles: true }));
             }
         } else {
@@ -514,10 +656,300 @@ const NotesApp = {
         }
     },
 
+    setupEditorToolbar(pageEl, editor, markDirty) {
+        const toolbar = pageEl.querySelector('.notes-editor-toolbar');
+        if (!toolbar || !editor) return;
+
+        let lastRange = null;
+        const rememberSelection = () => {
+            const selection = window.getSelection && window.getSelection();
+            if (!selection || !selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            if (this.isRangeInsideEditor(editor, range)) {
+                lastRange = range.cloneRange();
+            }
+        };
+        const restoreSelection = () => {
+            editor.focus({ preventScroll: true });
+            if (!lastRange) return;
+            const selection = window.getSelection && window.getSelection();
+            if (!selection) return;
+            selection.removeAllRanges();
+            selection.addRange(lastRange);
+        };
+        const afterCommand = () => {
+            this.normalizeEditorMarkup(editor);
+            markDirty();
+            rememberSelection();
+            this.updateToolbarButtonStates(pageEl);
+        };
+
+        editor.addEventListener('keyup', () => {
+            rememberSelection();
+            this.updateToolbarButtonStates(pageEl);
+        });
+        editor.addEventListener('mouseup', () => {
+            rememberSelection();
+            this.updateToolbarButtonStates(pageEl);
+        });
+        editor.addEventListener('focus', rememberSelection);
+
+        toolbar.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) e.preventDefault();
+            rememberSelection();
+        });
+
+        toolbar.querySelectorAll('button[data-command]').forEach((button) => {
+            button.addEventListener('click', () => {
+                restoreSelection();
+                document.execCommand(button.dataset.command, false, null);
+                afterCommand();
+            });
+        });
+
+        this.mountToolbarSelect(toolbar.querySelector('.notes-font-family-host'), {
+            options: this.getToolbarFontFamilyOptions(),
+            value: '"Segoe UI", system-ui, sans-serif',
+            className: 'notes-toolbar-select notes-font-family',
+            title: this.tr('fontFamily'),
+            onChange: (value) => {
+                restoreSelection();
+                document.execCommand('fontName', false, value);
+                afterCommand();
+            }
+        });
+
+        const fontSizeOptions = this.getToolbarFontSizeOptions();
+        const fontSizeSelect = this.mountToolbarSelect(toolbar.querySelector('.notes-font-size-host'), {
+            options: fontSizeOptions,
+            value: '16',
+            className: 'notes-toolbar-select notes-font-size',
+            title: this.tr('fontSize'),
+            onChange: (value) => {
+                restoreSelection();
+                this.applyEditorFontSize(editor, Number(value));
+                afterCommand();
+            }
+        });
+
+        this.mountToolbarSelect(toolbar.querySelector('.notes-format-block-host'), {
+            options: this.getToolbarFormatBlockOptions(),
+            value: 'P',
+            className: 'notes-toolbar-select notes-format-block',
+            title: this.tr('paragraphStyle') || this.tr('normalText'),
+            onChange: (value) => {
+                restoreSelection();
+                document.execCommand('formatBlock', false, value);
+                afterCommand();
+            }
+        });
+
+        this.mountToolbarSelect(toolbar.querySelector('.notes-line-height-host'), {
+            options: this.getToolbarLineHeightOptions(),
+            value: '1.5',
+            className: 'notes-toolbar-select notes-line-height',
+            title: this.tr('lineHeight'),
+            onChange: (value) => {
+                restoreSelection();
+                this.applyEditorLineHeight(editor, value);
+                afterCommand();
+            }
+        });
+
+        toolbar.querySelectorAll('button[data-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                restoreSelection();
+                const sizes = fontSizeOptions.map(option => Number(option.value));
+                let index = Math.max(0, sizes.indexOf(Number(fontSizeSelect.getValue())));
+                index += button.dataset.action === 'increaseFontSize' ? 1 : -1;
+                index = Math.max(0, Math.min(sizes.length - 1, index));
+                fontSizeSelect.setValue(String(sizes[index]));
+                this.applyEditorFontSize(editor, sizes[index]);
+                afterCommand();
+            });
+        });
+
+        const textColor = toolbar.querySelector('.notes-text-color-input');
+        const textColorSymbol = toolbar.querySelector('.notes-text-color-symbol');
+        textColor.addEventListener('input', () => {
+            textColorSymbol.style.color = textColor.value;
+            restoreSelection();
+            document.execCommand('foreColor', false, textColor.value);
+            afterCommand();
+        });
+
+        const highlightColor = toolbar.querySelector('.notes-highlight-color-input');
+        highlightColor.addEventListener('input', () => {
+            restoreSelection();
+            const ok = document.execCommand('hiliteColor', false, highlightColor.value);
+            if (!ok) document.execCommand('backColor', false, highlightColor.value);
+            afterCommand();
+        });
+
+        this.updateToolbarButtonStates(pageEl);
+    },
+
+    mountToolbarSelect(host, config = {}) {
+        if (!host || !window.FluentUI || typeof FluentUI.Select !== 'function') return null;
+        const select = FluentUI.Select({
+            options: config.options || [],
+            value: config.value || '',
+            placeholder: config.placeholder || '',
+            className: config.className || '',
+            onChange: config.onChange || null
+        });
+        if (config.title) {
+            select.title = config.title;
+            select.setAttribute('aria-label', config.title);
+            const trigger = select.querySelector('.fluent-select-trigger');
+            if (trigger) {
+                trigger.title = config.title;
+                trigger.setAttribute('aria-label', config.title);
+            }
+        }
+        host.replaceChildren(select);
+        return select;
+    },
+
+    getToolbarFontFamilyOptions() {
+        return [
+            { value: '"Segoe UI", system-ui, sans-serif', label: 'Segoe UI' },
+            { value: 'Arial, sans-serif', label: 'Arial' },
+            { value: '"Times New Roman", serif', label: 'Times New Roman' },
+            { value: '宋体, SimSun, serif', label: '宋体' },
+            { value: '微软雅黑, "Microsoft YaHei", sans-serif', label: '微软雅黑' },
+            { value: '黑体, SimHei, sans-serif', label: '黑体' },
+            { value: '楷体, KaiTi, serif', label: '楷体' }
+        ];
+    },
+
+    getToolbarFontSizeOptions() {
+        return [10, 11, 12, 14, 16, 18, 20, 24, 28, 32]
+            .map(size => ({ value: String(size), label: String(size) }));
+    },
+
+    getToolbarFormatBlockOptions() {
+        return [
+            { value: 'P', label: this.tr('normalText') },
+            { value: 'H1', label: this.tr('heading1') },
+            { value: 'H2', label: this.tr('heading2') },
+            { value: 'H3', label: this.tr('heading3') },
+            { value: 'BLOCKQUOTE', label: this.tr('quote') }
+        ];
+    },
+
+    getToolbarLineHeightOptions() {
+        return ['1', '1.3', '1.5', '1.75', '2']
+            .map(value => ({ value, label: value }));
+    },
+
+    isRangeInsideEditor(editor, range) {
+        if (!editor || !range) return false;
+        const start = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentNode;
+        const end = range.endContainer.nodeType === Node.ELEMENT_NODE ? range.endContainer : range.endContainer.parentNode;
+        return !!(start && end && editor.contains(start) && editor.contains(end));
+    },
+
+    updateToolbarButtonStates(pageEl) {
+        const commands = ['bold', 'italic', 'underline', 'strikeThrough', 'subscript', 'superscript', 'insertUnorderedList', 'insertOrderedList', 'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'];
+        commands.forEach((command) => {
+            const button = pageEl.querySelector(`.notes-editor-toolbar button[data-command="${command}"]`);
+            if (!button) return;
+            let active = false;
+            try {
+                active = document.queryCommandState(command);
+            } catch (_) {
+                active = false;
+            }
+            button.classList.toggle('is-active', active);
+        });
+    },
+
+    applyEditorFontSize(editor, size) {
+        const safeSize = Math.max(8, Math.min(72, Number(size) || 16));
+        document.execCommand('fontSize', false, '7');
+        editor.querySelectorAll('font[size="7"]').forEach((font) => {
+            const span = document.createElement('span');
+            span.style.fontSize = `${safeSize}px`;
+            while (font.firstChild) span.appendChild(font.firstChild);
+            font.replaceWith(span);
+        });
+    },
+
+    applyEditorLineHeight(editor, lineHeight) {
+        const blocks = this.getSelectedEditorBlocks(editor);
+        blocks.forEach((block) => {
+            block.style.lineHeight = lineHeight;
+        });
+    },
+
+    getSelectedEditorBlocks(editor) {
+        const selection = window.getSelection && window.getSelection();
+        const fallback = this.closestEditorBlock(editor, selection && selection.focusNode) || editor;
+        if (!selection || !selection.rangeCount) return [fallback];
+        const range = selection.getRangeAt(0);
+        if (!this.isRangeInsideEditor(editor, range)) return [fallback];
+        const blocks = [];
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT, {
+            acceptNode: (node) => this.isEditorBlock(node) && range.intersectsNode(node)
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_SKIP
+        });
+        let node = walker.nextNode();
+        while (node) {
+            blocks.push(node);
+            node = walker.nextNode();
+        }
+        return blocks.length ? blocks : [fallback];
+    },
+
+    closestEditorBlock(editor, node) {
+        let el = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+        while (el && el !== editor) {
+            if (this.isEditorBlock(el)) return el;
+            el = el.parentElement;
+        }
+        return null;
+    },
+
+    isEditorBlock(node) {
+        return !!node && /^(P|DIV|LI|H1|H2|H3|H4|H5|H6|BLOCKQUOTE|PRE)$/i.test(node.tagName || '');
+    },
+
+    normalizeEditorMarkup(editor) {
+        editor.querySelectorAll('b').forEach((node) => this.renameElement(node, 'strong'));
+        editor.querySelectorAll('i').forEach((node) => this.renameElement(node, 'em'));
+    },
+
+    renameElement(node, tagName) {
+        const replacement = document.createElement(tagName);
+        Array.from(node.attributes || []).forEach(attr => replacement.setAttribute(attr.name, attr.value));
+        while (node.firstChild) replacement.appendChild(node.firstChild);
+        node.replaceWith(replacement);
+    },
+
     async returnHomeFromEditor() {
         const ok = await this.handlePendingEditorChanges();
         if (!ok) return;
         this.renderShell('home');
+        this.playCurrentPageEnterAnimation();
+    },
+
+    playCurrentPageEnterAnimation() {
+        const page = this.frame && this.frame.pageEl;
+        if (!page || !document.body.classList.contains('animations-enabled')) return;
+        const elementEnterMs = 460;
+        page.classList.remove('fw-page-enter');
+        page.classList.remove('notes-page-elements-enter');
+        void page.offsetHeight;
+        page.classList.add('fw-page-enter');
+        page.classList.add('notes-page-elements-enter');
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                page.classList.remove('fw-page-enter');
+                setTimeout(() => page.classList.remove('notes-page-elements-enter'), elementEnterMs);
+            });
+        });
     },
 
     async handlePendingEditorChanges() {
@@ -570,6 +1002,7 @@ const NotesApp = {
         this.windowId = null;
         this.container = null;
         this.editorState = null;
+        this.newNoteRevealRunning = false;
     },
 
     scheduleAutoSave() {
@@ -580,12 +1013,22 @@ const NotesApp = {
     persistEditorDraft(force = false) {
         if (!this.editorState) return;
         const state = this.editorState;
-        if (!force && !state.dirty && State.settings.notesAutoSave === false) return;
+        const editor = this.container && this.container.querySelector('.notes-rich-editor');
+        if (editor && (force || state.dirty)) {
+            state.draftHtml = editor.innerHTML;
+            state.draftContent = this.editorHtmlToStoredContent(state.draftHtml, state.fileFormat);
+            state.dirty = state.draftContent !== state.originalContent;
+        }
+        if (!force && !state.dirty) return;
         const node = State.findNode(state.fileId);
         if (!node) return;
         node.content = state.draftContent || '';
         node.size = this.getByteSize(node.content);
         node.modified = new Date().toISOString();
+        if (state.fileFormat === 'markdown') {
+            node.mime = 'text/markdown';
+            node.encoding = 'text';
+        }
         node._notesAppFile = true;
         node._hiddenFromRecent = false;
         State.updateFS(State.fs);
@@ -596,6 +1039,8 @@ const NotesApp = {
 
         const status = this.container && this.container.querySelector('.notes-status-text');
         if (status) status.textContent = State.settings.notesAutoSave !== false ? this.tr('autosaved') : this.tr('saved');
+        const time = this.container && this.container.querySelector('.notes-editor-time');
+        if (time) time.textContent = this.formatDate(state.lastSavedAt);
     },
 
     revertEditorDraft() {
@@ -638,8 +1083,137 @@ const NotesApp = {
         this.openEditor(file.id, true);
     },
 
-    createFileInDefaultFolder(name, content = '') {
+    createNewNoteFromButton(button) {
+        if (this.newNoteRevealRunning) return;
         const folder = this.getDefaultFolder();
+        const name = this.uniqueFileName(folder, this.tr('newFileBase') + this.tr('txtExt'));
+        const file = this.createFileInDefaultFolder(name, '');
+        const openEditor = () => this.openEditor(file.id, true, { revealFromNewButton: true });
+        if (!this.canPlayNewNoteReveal(button)) {
+            openEditor();
+            return;
+        }
+        this.newNoteRevealRunning = true;
+        this.playNewNoteReveal(button, openEditor);
+    },
+
+    canPlayNewNoteReveal(button) {
+        return !!(
+            button
+            && button.isConnected
+            && this.container
+            && document.body.classList.contains('animations-enabled')
+            && typeof button.getBoundingClientRect === 'function'
+            && typeof document.createElement('div').animate === 'function'
+        );
+    },
+
+    playNewNoteReveal(button, onReady) {
+        const windowHost = (this.container && this.container.closest('.window')) || this.container || document.body;
+        const contentHost = (this.container && this.container.closest('.window-content')) || this.container || windowHost;
+        const buttonStyle = getComputedStyle(button);
+        const accentRgb = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '0, 120, 212';
+        const startColor = buttonStyle.backgroundColor || `rgb(${accentRgb})`;
+        const targetColor = document.body.classList.contains('dark-mode') ? '#202020' : '#ffffff';
+        const buttonRect = button.getBoundingClientRect();
+        const windowRect = windowHost.getBoundingClientRect();
+        const contentRect = contentHost.getBoundingClientRect();
+        const centerX = buttonRect.left + buttonRect.width / 2;
+        const centerY = buttonRect.top + buttonRect.height / 2;
+        const maxX = Math.max(centerX - contentRect.left, contentRect.right - centerX);
+        const maxY = Math.max(centerY - contentRect.top, contentRect.bottom - centerY);
+        const diameter = Math.max(buttonRect.width, buttonRect.height, 1);
+        const targetScale = Math.ceil((Math.hypot(maxX, maxY) * 2.1) / diameter);
+        const localX = centerX - contentRect.left;
+        const localY = centerY - contentRect.top;
+        const clip = document.createElement('div');
+        const reveal = document.createElement('div');
+        clip.className = 'notes-new-note-reveal-clip';
+        reveal.className = 'notes-new-note-reveal';
+        Object.assign(clip.style, {
+            left: `${contentRect.left - windowRect.left}px`,
+            top: `${contentRect.top - windowRect.top}px`,
+            width: `${contentRect.width}px`,
+            height: `${contentRect.height}px`
+        });
+        Object.assign(reveal.style, {
+            left: `${localX}px`,
+            top: `${localY}px`,
+            width: `${diameter}px`,
+            height: `${diameter}px`,
+            backgroundColor: startColor
+        });
+        clip.appendChild(reveal);
+        windowHost.appendChild(clip);
+        button.classList.add('notes-fab-launching');
+
+        let editorShown = false;
+        const showEditor = () => {
+            if (editorShown) return;
+            editorShown = true;
+            onReady();
+        };
+
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            showEditor();
+            requestAnimationFrame(() => {
+                reveal.classList.add('notes-new-note-reveal-hide');
+                button.classList.remove('notes-fab-launching');
+                setTimeout(() => {
+                    clip.remove();
+                    this.newNoteRevealRunning = false;
+                }, 260);
+            });
+        };
+
+        const revealDuration = 430;
+        const animation = reveal.animate([
+            {
+                transform: 'translate(-50%, -50%) scale(1)',
+                borderRadius: '999px',
+                backgroundColor: startColor,
+                opacity: 1
+            },
+            {
+                transform: `translate(-50%, -50%) scale(${targetScale})`,
+                borderRadius: '22px',
+                backgroundColor: targetColor,
+                opacity: 1
+            }
+        ], {
+            duration: revealDuration,
+            easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            fill: 'forwards'
+        });
+
+        setTimeout(showEditor, this.getFluentEasedDelay(revealDuration, 0.6));
+        animation.finished.then(finish).catch(finish);
+    },
+
+    getFluentEasedDelay(duration, progress) {
+        const target = Math.max(0, Math.min(1, progress));
+        const sample = (p1, p2, t) => {
+            const inv = 1 - t;
+            return 3 * inv * inv * t * p1 + 3 * inv * t * t * p2 + t * t * t;
+        };
+        let low = 0;
+        let high = 1;
+        for (let i = 0; i < 18; i += 1) {
+            const mid = (low + high) / 2;
+            if (sample(1, 1, mid) < target) low = mid;
+            else high = mid;
+        }
+        return Math.round(duration * sample(0.16, 0.3, high));
+    },
+
+    createFileInDefaultFolder(name, content = '') {
+        return this.createFileInFolder(this.getDefaultFolder(), name, content);
+    },
+
+    createFileInFolder(folder, name, content = '', extra = {}) {
         const now = new Date().toISOString();
         const file = {
             id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -650,12 +1224,264 @@ const NotesApp = {
             created: now,
             modified: now,
             _notesAppFile: true,
-            _hiddenFromRecent: false
+            _hiddenFromRecent: false,
+            ...extra
         };
         folder.children = folder.children || [];
         folder.children.unshift(file);
         State.updateFS(State.fs);
         return file;
+    },
+
+    importTextFile() {
+        this.navigateAfterPendingChanges(async () => {
+            const file = await this.pickTextFile();
+            if (!file) return;
+            const ext = this.splitFileName(file.name || '').ext.toLowerCase();
+            if (ext !== '.txt' && ext !== '.md') {
+                this.showMessage(this.tr('importMarkdownError'));
+                return;
+            }
+            const content = await this.readExternalTextFile(file);
+            const folder = this.getDefaultFolder();
+            const name = this.uniqueFileName(folder, this.ensureFileExtension(file.name || this.tr('newFileBase'), ext));
+            const note = this.createFileInFolder(folder, name, content, {
+                mime: file.type || (ext === '.md' ? 'text/markdown' : 'text/plain'),
+                encoding: 'text'
+            });
+            this.toast(this.tr('importSuccess'));
+            this.openEditor(note.id, false);
+        });
+    },
+
+    pickTextFile() {
+        return new Promise(resolve => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt,.md,text/plain,text/markdown';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', () => {
+                const file = input.files && input.files[0] ? input.files[0] : null;
+                input.remove();
+                resolve(file);
+            }, { once: true });
+            input.click();
+        });
+    },
+
+    readExternalTextFile(file) {
+        if (file && typeof file.text === 'function') return file.text();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(reader.error || new Error('read_failed'));
+            reader.readAsText(file);
+        });
+    },
+
+    exportCurrentEditor(format) {
+        const state = this.editorState;
+        const editor = this.container && this.container.querySelector('.notes-rich-editor');
+        if (!state || !editor) return;
+        const html = editor.innerHTML || '';
+        const node = State.findNode(state.fileId);
+        const ext = format === 'md' ? 'md' : 'txt';
+        const content = ext === 'md' ? this.htmlToMarkdown(html) : this.htmlToPlainText(html);
+        const name = this.exportFileName(node && node.name, ext);
+        this.downloadTextFile(name, content, ext === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8');
+        this.toast(`${this.tr('exported')}: ${name}`);
+    },
+
+    exportFileName(name, ext) {
+        const split = this.splitFileName(name || this.tr('newFileBase'));
+        const base = (split.base || this.tr('newFileBase')).replace(/[\\/:*?"<>|]/g, '_');
+        return `${base}.${ext}`;
+    },
+
+    downloadTextFile(name, content, type) {
+        const blob = new Blob([String(content || '')], { type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+    },
+
+    ensureFileExtension(name, ext) {
+        const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+        return String(name || this.tr('newFileBase')).toLowerCase().endsWith(cleanExt.toLowerCase())
+            ? String(name || this.tr('newFileBase'))
+            : `${name}${cleanExt}`;
+    },
+
+    getNodeFormat(node) {
+        const ext = this.splitFileName(node && node.name).ext.toLowerCase();
+        if (ext === '.md') return 'markdown';
+        if (ext === '.txt') return 'text';
+        return 'html';
+    },
+
+    contentToEditorHtml(content, format) {
+        const text = String(content || '');
+        if (!text) return '';
+        if (format === 'markdown') return this.markdownToHtml(text);
+        if (this.looksLikeHtml(text)) return text;
+        return this.plainTextToEditorHtml(text);
+    },
+
+    editorHtmlToStoredContent(html, format) {
+        if (format === 'markdown') return this.htmlToMarkdown(html);
+        return String(html || '');
+    },
+
+    looksLikeHtml(text) {
+        return /<\/?[a-z][\s\S]*>/i.test(String(text || ''));
+    },
+
+    plainTextToEditorHtml(text) {
+        return String(text || '')
+            .replace(/\r\n?/g, '\n')
+            .split('\n')
+            .map(line => `<div>${line ? this.escape(line) : '<br>'}</div>`)
+            .join('');
+    },
+
+    markdownToHtml(markdown) {
+        const lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
+        const html = [];
+        let listType = null;
+
+        const closeList = () => {
+            if (!listType) return;
+            html.push(`</${listType}>`);
+            listType = null;
+        };
+        const openList = (type) => {
+            if (listType === type) return;
+            closeList();
+            listType = type;
+            html.push(`<${type}>`);
+        };
+
+        lines.forEach((line) => {
+            if (!line.trim()) {
+                closeList();
+                return;
+            }
+            const heading = line.match(/^(#{1,3})\s+(.+)$/);
+            if (heading) {
+                closeList();
+                html.push(`<h${heading[1].length}>${this.markdownInlineToHtml(heading[2])}</h${heading[1].length}>`);
+                return;
+            }
+            const quote = line.match(/^>\s?(.*)$/);
+            if (quote) {
+                closeList();
+                html.push(`<blockquote>${this.markdownInlineToHtml(quote[1])}</blockquote>`);
+                return;
+            }
+            const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
+            if (unordered) {
+                openList('ul');
+                html.push(`<li>${this.markdownInlineToHtml(unordered[1])}</li>`);
+                return;
+            }
+            const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+            if (ordered) {
+                openList('ol');
+                html.push(`<li>${this.markdownInlineToHtml(ordered[1])}</li>`);
+                return;
+            }
+            closeList();
+            html.push(`<p>${this.markdownInlineToHtml(line)}</p>`);
+        });
+        closeList();
+        return html.join('');
+    },
+
+    markdownInlineToHtml(value) {
+        let text = this.escape(value);
+        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+        text = text.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+        text = text.replace(/(^|[\s(])\*([^*]+)\*/g, '$1<em>$2</em>');
+        text = text.replace(/(^|[\s(])_([^_]+)_/g, '$1<em>$2</em>');
+        text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, label, href) => {
+            return `<a href="${this.escape(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+        });
+        return text;
+    },
+
+    htmlToMarkdown(html) {
+        const container = document.createElement('div');
+        container.innerHTML = html || '';
+        const chunks = Array.from(container.childNodes)
+            .map(node => this.markdownFromBlockNode(node))
+            .filter(Boolean);
+        return chunks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+    },
+
+    markdownFromBlockNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent.trim();
+        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+        const tag = node.tagName.toLowerCase();
+        if (/^h[1-6]$/.test(tag)) {
+            const level = Math.min(6, Number(tag.slice(1)));
+            return `${'#'.repeat(level)} ${this.markdownFromInlineChildren(node).trim()}`;
+        }
+        if (tag === 'blockquote') {
+            const text = this.markdownFromInlineChildren(node).trim();
+            return text.split('\n').map(line => `> ${line}`).join('\n');
+        }
+        if (tag === 'ul' || tag === 'ol') {
+            return Array.from(node.children)
+                .filter(child => child.tagName && child.tagName.toLowerCase() === 'li')
+                .map((child, index) => {
+                    const prefix = tag === 'ol' ? `${index + 1}. ` : '- ';
+                    return `${prefix}${this.markdownFromInlineChildren(child).trim()}`;
+                })
+                .join('\n');
+        }
+        if (tag === 'br') return '';
+        return this.markdownFromInlineChildren(node).trim();
+    },
+
+    markdownFromInlineChildren(node) {
+        return Array.from(node.childNodes).map(child => this.markdownFromInlineNode(child)).join('');
+    },
+
+    markdownFromInlineNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'br') return '\n';
+        const content = this.markdownFromInlineChildren(node);
+        if (tag === 'strong' || tag === 'b') return `**${content}**`;
+        if (tag === 'em' || tag === 'i') return `*${content}*`;
+        if (tag === 's' || tag === 'strike' || tag === 'del') return `~~${content}~~`;
+        if (tag === 'code') return `\`${content.replace(/`/g, '\\`')}\``;
+        if (tag === 'a') {
+            const href = node.getAttribute('href') || '';
+            return href ? `[${content}](${href})` : content;
+        }
+        if (tag === 'sub') return `~${content}~`;
+        if (tag === 'sup') return `^${content}^`;
+        return content;
+    },
+
+    htmlToPlainText(html) {
+        const container = document.createElement('div');
+        container.innerHTML = html || '';
+        return (container.innerText || container.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    },
+
+    getEditorPlainText(editor) {
+        return editor ? (editor.innerText || editor.textContent || '') : '';
     },
 
     getDefaultFolder() {

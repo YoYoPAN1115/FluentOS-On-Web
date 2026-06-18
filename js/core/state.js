@@ -209,7 +209,7 @@ const State = {
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
-            startPinnedApps: ['files', 'settings', 'settingsnew', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
+            startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
             windowBoundsMemory: {}
@@ -221,6 +221,29 @@ const State = {
                 changed = true;
             }
         });
+
+        if (Array.isArray(this.settings.startPinnedApps) && this.settings.startPinnedApps.includes('settingsnew')) {
+            this.settings.startPinnedApps = this.settings.startPinnedApps.filter(appId => appId !== 'settingsnew');
+            changed = true;
+        }
+
+        if (this.settings.windowBoundsMemory && this.settings.windowBoundsMemory.settingsnew) {
+            delete this.settings.windowBoundsMemory.settingsnew;
+            changed = true;
+        }
+
+        if (this.appUsage && this.appUsage.settingsnew) {
+            delete this.appUsage.settingsnew;
+            Storage.set(Storage.keys.APP_USAGE, this.appUsage);
+        }
+
+        if (this.desktopLayout && Array.isArray(this.desktopLayout.icons)) {
+            const beforeCount = this.desktopLayout.icons.length;
+            this.desktopLayout.icons = this.desktopLayout.icons.filter(icon => icon && icon.appId !== 'settingsnew' && icon.id !== 'settingsnew');
+            if (this.desktopLayout.icons.length !== beforeCount) {
+                Storage.set(Storage.keys.DESKTOP_LAYOUT, this.desktopLayout);
+            }
+        }
 
         if (this.settings.enableFluentV2 !== true) {
             this.settings.enableFluentV2 = true;

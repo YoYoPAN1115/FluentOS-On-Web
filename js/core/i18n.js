@@ -238,7 +238,6 @@ const I18n = {
             
             // 设置
             'settings.title': '设置',
-            'settingsnew.title': '新设置 (预览)',
             'settings.overview': '概览',
             'settings.user': '用户',
             'settings.network': '网络',
@@ -1313,7 +1312,6 @@ const I18n = {
             
             // Settings
             'settings.title': 'Settings',
-            'settingsnew.title': 'New Settings (Preview)',
             'settings.overview': 'Overview',
             'settings.user': 'User',
             'settings.network': 'Network',
