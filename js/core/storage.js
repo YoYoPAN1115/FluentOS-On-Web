@@ -96,6 +96,9 @@ const Storage = {
                 fingoApiEncrypted: null,
                 fingoApiStorageType: 'none',
                 fingoApiSaveMode: 'temporary',
+                tombstoneBackgroundEnabled: true,
+                tombstoneFreezeDelayMs: 60 * 1000,
+                tombstoneDimFrozenAppsEnabled: true,
                 windowEdgeSnapEnabled: true,
                 windowHoverSnapEnabled: true,
                 windowBoundsMemory: {}

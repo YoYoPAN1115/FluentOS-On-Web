@@ -55,7 +55,97 @@ const PWALoader = {
             init(windowId) {
                 this.windowId = windowId;
                 this.container = document.getElementById(`${windowId}-content`);
+                this._tombstonePausedMedia = [];
                 this.render();
+            },
+
+            getFrame() {
+                return this.container ? this.container.querySelector('.pwa-iframe') : null;
+            },
+
+            postTombstoneMessage(frame, action) {
+                if (!frame || !frame.contentWindow) return;
+                try {
+                    frame.contentWindow.postMessage({
+                        source: 'FluentOS',
+                        type: 'fluentos:tombstone',
+                        action,
+                        appId: this.config.id,
+                        appName: this.config.name
+                    }, '*');
+                } catch (_) {
+                    // Cross-origin frames may reject access; the iframe remains frozen by the shell.
+                }
+            },
+
+            pauseSameOriginMedia(frame) {
+                this._tombstonePausedMedia = [];
+                try {
+                    const mediaNodes = Array.from(frame.contentDocument?.querySelectorAll('audio, video') || []);
+                    mediaNodes.forEach((node, index) => {
+                        if (!node.paused && !node.ended) {
+                            this._tombstonePausedMedia.push(index);
+                            node.pause();
+                        }
+                    });
+                } catch (_) {
+                    // Third-party PWAs are usually cross-origin; cooperative pages can use postMessage instead.
+                }
+            },
+
+            resumeSameOriginMedia(frame) {
+                if (!Array.isArray(this._tombstonePausedMedia) || this._tombstonePausedMedia.length === 0) return;
+                try {
+                    const mediaNodes = Array.from(frame.contentDocument?.querySelectorAll('audio, video') || []);
+                    this._tombstonePausedMedia.forEach((index) => {
+                        const node = mediaNodes[index];
+                        if (node && typeof node.play === 'function') {
+                            const playResult = node.play();
+                            if (playResult && typeof playResult.catch === 'function') {
+                                playResult.catch(() => {});
+                            }
+                        }
+                    });
+                } catch (_) {
+                    // Ignore cross-origin restore failures; the frame itself was never reloaded.
+                } finally {
+                    this._tombstonePausedMedia = [];
+                }
+            },
+
+            onTombstoneFreeze() {
+                if (!this.container) return;
+                this.container.classList.add('pwa-content-frozen');
+                const frame = this.getFrame();
+                if (frame) {
+                    this.pauseSameOriginMedia(frame);
+                    this.postTombstoneMessage(frame, 'freeze');
+                    frame.dataset.fluentFrozen = 'true';
+                    frame.dataset.fluentDisplayBeforeFreeze = frame.style.display || '';
+                    frame.setAttribute('aria-hidden', 'true');
+                    frame.style.pointerEvents = 'none';
+                    try {
+                        if (frame.contentWindow && typeof frame.contentWindow.stop === 'function') {
+                            frame.contentWindow.stop();
+                        }
+                    } catch (_) {
+                        // stop() is best-effort and not available for every cross-origin frame.
+                    }
+                }
+            },
+
+            onTombstoneRestore() {
+                if (!this.container) return;
+                this.container.classList.remove('pwa-content-frozen');
+                const frame = this.getFrame();
+                if (frame) {
+                    delete frame.dataset.fluentFrozen;
+                    delete frame.dataset.fluentDisplayBeforeFreeze;
+                    frame.removeAttribute('aria-hidden');
+                    frame.style.pointerEvents = '';
+                    this.postTombstoneMessage(frame, 'restore');
+                    this.resumeSameOriginMedia(frame);
+                }
             },
             
             render() {
@@ -73,6 +163,10 @@ const PWALoader = {
 
                 this.container.innerHTML = `
                     <div class="pwa-app">
+                        <div class="pwa-frozen-surface" aria-hidden="true">
+                            <img src="${this.config.icon}" alt="">
+                            <span>${this.config.name}</span>
+                        </div>
                         <iframe 
                             class="pwa-iframe" 
                             src="${this.config.url}"

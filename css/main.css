@@ -2547,6 +2547,27 @@ body.in-taskview .taskbar.hiding {
     will-change: transform;
 }
 
+body.in-taskview .window.taskview-window-active.taskview-window-frozen {
+    filter: grayscale(1) saturate(0.16) brightness(0.78) contrast(0.86) !important;
+    opacity: 0.72 !important;
+}
+
+body.in-taskview .window.taskview-window-active.taskview-window-frozen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    border-radius: inherit;
+    background: rgba(120, 120, 120, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+body.dark-mode.in-taskview .window.taskview-window-active.taskview-window-frozen::after {
+    background: rgba(24, 24, 24, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
 /* ============ 锁屏 → 登录过渡动画 ============ */
 /* 锁屏壁纸放大+模糊（同时进行，双向过渡） */
 body.lock-to-login .lock-wallpaper {
@@ -3239,6 +3260,8 @@ body.fluent-v2 .appshop-category-tab {
     display: flex;
     flex-direction: column;
     height: 100%;
+    position: relative;
+    overflow: hidden;
 }
 
 .pwa-iframe {
@@ -3246,6 +3269,71 @@ body.fluent-v2 .appshop-category-tab {
     width: 100%;
     border: none;
     background: white;
+}
+
+.pwa-frozen-surface {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    background:
+        linear-gradient(135deg, rgba(248, 248, 248, 0.9), rgba(210, 214, 222, 0.9)),
+        var(--bg-secondary);
+    color: var(--text-secondary);
+    z-index: 2;
+    filter: grayscale(1);
+}
+
+.pwa-frozen-surface img {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    opacity: 0.58;
+}
+
+.pwa-frozen-surface span {
+    max-width: min(72%, 260px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.72;
+}
+
+body.dark-mode .pwa-frozen-surface {
+    background:
+        linear-gradient(135deg, rgba(52, 52, 56, 0.94), rgba(26, 28, 34, 0.94)),
+        var(--bg-secondary);
+    color: rgba(255, 255, 255, 0.74);
+}
+
+.pwa-content-frozen .pwa-frozen-surface {
+    display: flex;
+}
+
+.window.window-frozen .window-content,
+.pwa-content-frozen {
+    pointer-events: none;
+    user-select: none;
+}
+
+.window.window-frozen .pwa-iframe,
+.pwa-content-frozen .pwa-iframe {
+    display: none;
+    pointer-events: none;
+}
+
+body.in-taskview .window.taskview-window-active .pwa-content-frozen .pwa-frozen-surface {
+    display: none;
+}
+
+body.in-taskview .window.taskview-window-active .pwa-content-frozen .pwa-iframe {
+    display: block;
+    pointer-events: none;
 }
 
 /* ==================== App Shop 详情弹窗 ==================== */

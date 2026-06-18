@@ -18,6 +18,9 @@ const WindowManager = {
     RESTORE_DURATION_MS: 520,
     MAXIMIZE_TOGGLE_DURATION_MS: 550,
     CLOSE_DURATION_MS: 250,
+    TOMBSTONE_FREEZE_DELAY_MS: 60 * 1000,
+    TOMBSTONE_FREEZE_MIN_MS: 3 * 1000,
+    TOMBSTONE_FREEZE_MAX_MS: 10 * 60 * 1000,
     UNSNAP_RESTORE_BLEND_MS: 240,
     TOP_MAXIMIZE_DWELL_MS: 1500,
     TASKBAR_ICON_FEEDBACK_MS: 280,
@@ -80,6 +83,15 @@ const WindowManager = {
             }
             if (updates.windowEdgeSnapEnabled === false) {
                 this._hideDragSnapHint(true);
+            }
+            if (
+                Object.prototype.hasOwnProperty.call(updates, 'tombstoneBackgroundEnabled') ||
+                Object.prototype.hasOwnProperty.call(updates, 'tombstoneFreezeDelayMs')
+            ) {
+                this._syncTombstoneSetting();
+            }
+            if (Object.prototype.hasOwnProperty.call(updates, 'tombstoneDimFrozenAppsEnabled')) {
+                this._syncTombstoneAppearance();
             }
         });
         this._initTaskbarAutoHide();
@@ -277,6 +289,170 @@ const WindowManager = {
         return State.settings.enableAnimation !== false;
     },
 
+    _isTombstoneBackgroundEnabled() {
+        return !!(typeof State !== 'undefined' && State.settings && State.settings.tombstoneBackgroundEnabled === true);
+    },
+
+    _shouldDimFrozenWindows() {
+        return !(typeof State !== 'undefined' && State.settings && State.settings.tombstoneDimFrozenAppsEnabled === false);
+    },
+
+    _getTombstoneFreezeDelayMs() {
+        const value = (typeof State !== 'undefined' && State.settings)
+            ? Number(State.settings.tombstoneFreezeDelayMs)
+            : this.TOMBSTONE_FREEZE_DELAY_MS;
+        const fallback = this.TOMBSTONE_FREEZE_DELAY_MS;
+        const resolved = Number.isFinite(value) ? value : fallback;
+        return Math.max(this.TOMBSTONE_FREEZE_MIN_MS, Math.min(this.TOMBSTONE_FREEZE_MAX_MS, Math.round(resolved)));
+    },
+
+    _getWindowComponent(windowData) {
+        if (!windowData || !windowData.appId) return null;
+        const config = this.appConfigs[windowData.appId];
+        return config && config.component ? globalThis[config.component] : null;
+    },
+
+    _isPWAWindow(windowData) {
+        if (!windowData || !windowData.appId) return false;
+        if (typeof PWALoader !== 'undefined' && PWALoader.apps && PWALoader.apps[windowData.appId]) return true;
+        const config = this.appConfigs[windowData.appId];
+        return !!(config && /^PWA_/i.test(String(config.component || '')));
+    },
+
+    _clearTombstoneTimer(windowData) {
+        if (!windowData || !windowData._tombstoneTimer) return;
+        clearTimeout(windowData._tombstoneTimer);
+        windowData._tombstoneTimer = null;
+    },
+
+    _setTombstoneClasses(windowData, frozen) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        el.classList.toggle('window-frozen', frozen);
+        el.classList.toggle('window-pwa-frozen', frozen && this._isPWAWindow(windowData));
+        el.classList.toggle(
+            'taskview-window-frozen',
+            frozen && document.body.classList.contains('in-taskview') && this._shouldDimFrozenWindows()
+        );
+        if (frozen) {
+            el.dataset.windowFrozen = 'true';
+        } else {
+            delete el.dataset.windowFrozen;
+            el.classList.remove('taskview-window-frozen');
+        }
+
+        el.querySelectorAll('iframe').forEach((frame) => {
+            if (frozen) {
+                frame.dataset.fluentFrozen = 'true';
+            } else {
+                delete frame.dataset.fluentFrozen;
+            }
+        });
+    },
+
+    _syncTombstoneAppearance() {
+        const inTaskView = document.body && document.body.classList.contains('in-taskview');
+        const shouldDim = this._shouldDimFrozenWindows();
+        this.windows.forEach((windowData) => {
+            if (!windowData || !windowData.element) return;
+            windowData.element.classList.toggle(
+                'taskview-window-frozen',
+                windowData.isFrozen === true && inTaskView && shouldDim
+            );
+        });
+    },
+
+    _freezeWindow(windowData) {
+        if (!windowData || !windowData.element || windowData.isFrozen === true) return;
+        if (!this._isTombstoneBackgroundEnabled()) return;
+        if (windowData.isMinimized !== true || windowData.isRestoring || windowData.element.classList.contains('closing')) return;
+
+        this._clearTombstoneTimer(windowData);
+        windowData.isFrozen = true;
+        windowData.frozenAt = Date.now();
+        this._setTombstoneClasses(windowData, true);
+
+        const component = this._getWindowComponent(windowData);
+        if (component && typeof component.onTombstoneFreeze === 'function') {
+            try {
+                component.onTombstoneFreeze(windowData);
+            } catch (err) {
+                console.warn('[WindowManager] Tombstone freeze hook failed:', err);
+            }
+        }
+
+        try {
+            windowData.element.dispatchEvent(new CustomEvent('fluent-window-freeze', {
+                detail: { appId: windowData.appId, windowId: windowData.id, isPWA: this._isPWAWindow(windowData) }
+            }));
+        } catch (_) {
+            // CustomEvent can fail in unusual embedded contexts; freezing state is already applied.
+        }
+    },
+
+    _restoreWindowFromTombstone(windowData) {
+        if (!windowData) return;
+        this._clearTombstoneTimer(windowData);
+        if (windowData.isFrozen !== true) return;
+
+        windowData.isFrozen = false;
+        windowData.frozenAt = null;
+        this._setTombstoneClasses(windowData, false);
+
+        const component = this._getWindowComponent(windowData);
+        if (component && typeof component.onTombstoneRestore === 'function') {
+            try {
+                component.onTombstoneRestore(windowData);
+            } catch (err) {
+                console.warn('[WindowManager] Tombstone restore hook failed:', err);
+            }
+        }
+
+        if (windowData.element) {
+            try {
+                windowData.element.dispatchEvent(new CustomEvent('fluent-window-restore-from-freeze', {
+                    detail: { appId: windowData.appId, windowId: windowData.id, isPWA: this._isPWAWindow(windowData) }
+                }));
+            } catch (_) {
+                // State restoration has already happened.
+            }
+        }
+    },
+
+    _scheduleTombstoneFreeze(windowData) {
+        if (!windowData || !windowData.element) return;
+        this._clearTombstoneTimer(windowData);
+        if (!this._isTombstoneBackgroundEnabled()) {
+            this._restoreWindowFromTombstone(windowData);
+            return;
+        }
+        if (windowData.isMinimized !== true || windowData.isRestoring || windowData.element.classList.contains('closing')) return;
+
+        const minimizedAt = Number(windowData.minimizedAt || Date.now());
+        const elapsed = Math.max(0, Date.now() - minimizedAt);
+        const delay = Math.max(0, this._getTombstoneFreezeDelayMs() - elapsed);
+        windowData._tombstoneTimer = setTimeout(() => {
+            windowData._tombstoneTimer = null;
+            this._freezeWindow(windowData);
+        }, delay);
+    },
+
+    _syncTombstoneSetting() {
+        if (!this._isTombstoneBackgroundEnabled()) {
+            this.windows.forEach((windowData) => {
+                this._clearTombstoneTimer(windowData);
+                this._restoreWindowFromTombstone(windowData);
+            });
+            return;
+        }
+
+        this.windows.forEach((windowData) => {
+            if (windowData && windowData.isMinimized === true) {
+                this._scheduleTombstoneFreeze(windowData);
+            }
+        });
+    },
+
     _playTaskbarDockFeedback(appId) {
         if (!appId || !this._isAnimationEnabled()) return;
         const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
@@ -434,6 +610,7 @@ const WindowManager = {
             clearTimeout(windowData._dockFeedbackTimer);
             windowData._dockFeedbackTimer = null;
         }
+        this._clearTombstoneTimer(windowData);
         if (windowData.element) {
             windowData.element.classList.remove('window-focus-pop', 'window-focus-dip');
         }
@@ -498,10 +675,12 @@ const WindowManager = {
         windowData.isMinimized = true;
         windowData.isMinimizing = false;
         windowData.isRestoring = false;
+        windowData.minimizedAt = Date.now();
         this.updateMaximizedWallpaperEffect();
         this._syncWidgetDimState();
         this._syncAllTaskbarAppStates();
         this._setTaskbarIndicatorForWindow(windowData, false);
+        this._scheduleTombstoneFreeze(windowData);
     },
 
     _finalizeRestore(windowData) {
@@ -518,6 +697,8 @@ const WindowManager = {
         windowData.isMinimized = false;
         windowData.isRestoring = false;
         windowData.isMinimizing = false;
+        windowData.minimizedAt = null;
+        this._restoreWindowFromTombstone(windowData);
         this._setTaskbarIndicatorForWindow(windowData, true);
         this._syncAllTaskbarAppStates();
         this._syncWidgetDimState();
@@ -527,6 +708,7 @@ const WindowManager = {
         if (!windowData || !windowData.element || windowData.isMinimized) return;
         const el = windowData.element;
         this._clearWindowMotionTimers(windowData);
+        this._restoreWindowFromTombstone(windowData);
         const wasMaximized = windowData.isMaximized === true;
 
         if (fromInterruptedRestore) {
@@ -599,6 +781,7 @@ const WindowManager = {
         if (!windowData || !windowData.element) return;
         const el = windowData.element;
         this._clearWindowMotionTimers(windowData);
+        this._restoreWindowFromTombstone(windowData);
 
         const fromHidden = windowData.isMinimized || el.style.display === 'none';
         if (fromHidden) {
@@ -634,7 +817,7 @@ const WindowManager = {
         const duration = this._effectiveDuration(this.RESTORE_DURATION_MS);
         if (duration <= 0) {
             this._finalizeRestore(windowData);
-            this.focusWindow(windowData.id);
+            this.focusWindow(windowData.id, { suppressMotion: true });
             this.updateMaximizedWallpaperEffect();
             return;
         }
@@ -651,7 +834,7 @@ const WindowManager = {
             el.style.opacity = '1';
         });
 
-        this.focusWindow(windowData.id);
+        this.focusWindow(windowData.id, { suppressMotion: true });
         this.updateMaximizedWallpaperEffect();
 
         windowData._restoreTimer = setTimeout(() => {
@@ -1092,6 +1275,9 @@ const WindowManager = {
             isMinimizing: false,
             isRestoring: false,
             isMaximized: false,
+            isFrozen: false,
+            minimizedAt: null,
+            frozenAt: null,
             snapLayout: initialBounds.snapLayout || null,
             lastNormalBounds: initialLastNormalBounds
         });
@@ -1596,6 +1782,7 @@ const WindowManager = {
             ? this.windows.find(w => w && w.id === previousActiveId)
             : null;
         const forceMotion = options && options.forceMotion === true;
+        const suppressMotion = options && options.suppressMotion === true;
         const alreadyActive = previousActiveId === windowId &&
             windowData.element &&
             !windowData.element.classList.contains('window-inactive');
@@ -1608,7 +1795,7 @@ const WindowManager = {
         this._syncAllTaskbarAppStates();
         this._syncWidgetDimState();
         this._setTaskbarIndicatorForWindow(windowData, true);
-        if (forceMotion || (previousActiveId && previousActiveId !== windowId)) {
+        if (!suppressMotion && (forceMotion || (previousActiveId && previousActiveId !== windowId))) {
             this._playFocusTransitionMotion(windowData, previousWindowData, forceMotion);
         }
 

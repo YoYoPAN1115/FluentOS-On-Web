@@ -2600,7 +2600,28 @@ const SettingsApp = {
 
     renderMultitask(container) {
         container.className = 'settings-content';
-        const section = this.createSection(t('settings.multitask-title'));
+        const performanceSection = this.createSection(t('settings.performance-title'));
+
+        performanceSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-background'),
+            description: t('settings.tombstone-background-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.tombstoneBackgroundEnabled === true,
+                onChange: (v) => {
+                    State.updateSettings({ tombstoneBackgroundEnabled: v });
+                    this.addRecentSetting(t('settings.tombstone-background'), v ? t('settings.on') : t('settings.off'), 'multitask');
+                    State.addNotification({
+                        title: t('settings.performance-title'),
+                        message: v ? t('settings.tombstone-background-on') : t('settings.tombstone-background-off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        container.appendChild(performanceSection);
+
+        const section = this.createSection(t('settings.multitask-window-title'));
 
         section.appendChild(FluentUI.SettingItem({
             label: t('settings.multitask-quick-switch'),
@@ -4346,6 +4367,54 @@ const SettingsApp = {
         this.render();
     },
 
+    formatTombstoneFreezeDelay(ms) {
+        const seconds = Math.max(3, Math.min(600, Math.round(Number(ms || 60000) / 1000)));
+        const isEn = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        if (seconds < 60) return `${seconds}s`;
+        const minutes = Math.floor(seconds / 60);
+        const rest = seconds % 60;
+        if (rest === 0) return isEn ? `${minutes} min` : `${minutes} 分钟`;
+        return isEn ? `${minutes} min ${rest}s` : `${minutes} 分 ${rest} 秒`;
+    },
+
+    getTombstoneFreezeDelayMs() {
+        const raw = State.settings.tombstoneFreezeDelayMs;
+        if (State.normalizeTombstoneFreezeDelay) {
+            return State.normalizeTombstoneFreezeDelay(raw);
+        }
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return 60 * 1000;
+        return Math.max(3 * 1000, Math.min(10 * 60 * 1000, Math.round(numeric)));
+    },
+
+    createTombstoneFreezeDelayControl() {
+        const currentMs = this.getTombstoneFreezeDelayMs();
+        const control = document.createElement('div');
+        control.className = 'settings-slider-control';
+
+        const valueLabel = document.createElement('span');
+        valueLabel.className = 'fluent-slider-value';
+        valueLabel.style.minWidth = '68px';
+        valueLabel.textContent = this.formatTombstoneFreezeDelay(currentMs);
+
+        const slider = FluentUI.Slider({
+            min: 3,
+            max: 600,
+            value: Math.round(currentMs / 1000),
+            step: 1,
+            showValue: false,
+            onChange: (seconds) => {
+                const nextMs = Math.max(3, Math.min(600, Number(seconds))) * 1000;
+                valueLabel.textContent = this.formatTombstoneFreezeDelay(nextMs);
+                State.updateSettings({ tombstoneFreezeDelayMs: nextMs });
+            }
+        });
+
+        control.appendChild(slider);
+        control.appendChild(valueLabel);
+        return control;
+    },
+
     renderDeveloper(container) {
         container.className = 'settings-content';
         const section = this.createSection(t('settings.developer-title'));
@@ -4361,6 +4430,29 @@ const SettingsApp = {
                     State.addNotification({
                         title: t('settings.developer-title'),
                         message: v ? t('settings.debug-mode-on') : t('settings.debug-mode-off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-freeze-delay'),
+            description: t('settings.tombstone-freeze-delay-desc'),
+            control: this.createTombstoneFreezeDelayControl()
+        }));
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-dim-frozen-apps'),
+            description: t('settings.tombstone-dim-frozen-apps-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.tombstoneDimFrozenAppsEnabled !== false,
+                onChange: (v) => {
+                    State.updateSettings({ tombstoneDimFrozenAppsEnabled: v });
+                    this.addRecentSetting(t('settings.tombstone-dim-frozen-apps'), v ? t('settings.on') : t('settings.off'), 'developer');
+                    State.addNotification({
+                        title: t('settings.developer-title'),
+                        message: v ? t('settings.tombstone-dim-frozen-apps-on') : t('settings.tombstone-dim-frozen-apps-off'),
                         type: 'info'
                     });
                 }

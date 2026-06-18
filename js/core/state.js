@@ -203,6 +203,9 @@ const State = {
             userEmail: 'owner@sample.com',
             userAvatar: this.getDefaultUserAvatar(),
             quickWindowSwitchEnabled: true,
+            tombstoneBackgroundEnabled: true,
+            tombstoneFreezeDelayMs: 60 * 1000,
+            tombstoneDimFrozenAppsEnabled: true,
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
@@ -278,9 +281,24 @@ const State = {
             changed = true;
         }
 
+        const normalizedTombstoneFreezeDelay = this.normalizeTombstoneFreezeDelay(this.settings.tombstoneFreezeDelayMs);
+        if (normalizedTombstoneFreezeDelay !== this.settings.tombstoneFreezeDelayMs) {
+            this.settings.tombstoneFreezeDelayMs = normalizedTombstoneFreezeDelay;
+            changed = true;
+        }
+
         if (changed) {
             Storage.set(Storage.keys.SETTINGS, this.settings);
         }
+    },
+
+    normalizeTombstoneFreezeDelay(value) {
+        const fallback = 60 * 1000;
+        const min = 3 * 1000;
+        const max = 10 * 60 * 1000;
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.max(min, Math.min(max, Math.round(numeric)));
     },
 
     restoreStrictCspOnStartup() {
@@ -393,6 +411,9 @@ const State = {
             && this.settings.fingoCustomMode === true;
         if (Object.prototype.hasOwnProperty.call(safeUpdates, 'userAvatar')) {
             safeUpdates.userAvatar = this.normalizeUserAvatar(safeUpdates.userAvatar);
+        }
+        if (Object.prototype.hasOwnProperty.call(safeUpdates, 'tombstoneFreezeDelayMs')) {
+            safeUpdates.tombstoneFreezeDelayMs = this.normalizeTombstoneFreezeDelay(safeUpdates.tombstoneFreezeDelayMs);
         }
         if (Object.prototype.hasOwnProperty.call(safeUpdates, 'accentColor')) {
             safeUpdates.accentColor = this.normalizeAccentColor(safeUpdates.accentColor);
