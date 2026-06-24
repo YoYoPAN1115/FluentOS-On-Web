@@ -62,7 +62,10 @@ const ClockApp = {
     
     loadData() {
         const data = Storage.get('clock_data') || {};
-        this.calendarEvents = data.events || [];
+        this.calendarEvents = (data.events || []).map(event => ({
+            ...event,
+            completed: event.completed === true
+        }));
         this.worldClocks = data.worldClocks || this.worldClocks;
     },
     
@@ -71,6 +74,9 @@ const ClockApp = {
             events: this.calendarEvents,
             worldClocks: this.worldClocks
         });
+        if (typeof State !== 'undefined' && typeof State.emit === 'function') {
+            State.emit('clockEventsUpdate', { events: this.calendarEvents });
+        }
     },
 
     render() {
@@ -168,23 +174,51 @@ const ClockApp = {
             .calendar-day-header { text-align: center; padding: 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
             .calendar-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; background: var(--bg-tertiary); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition-fast); position: relative; }
             .calendar-day:hover { background: rgba(0, 0, 0, 0.05); }
-            .calendar-day.selected { background: var(--accent); color: white; }
+            .calendar-day.selected { background: rgba(var(--accent-rgb, 0, 120, 212), 0.08); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
             .calendar-day.today { border: 2px solid var(--accent); }
             .calendar-day.other-month { opacity: 0.3; }
             .calendar-day.has-event::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
-            .calendar-day.selected.has-event::after { background: white; }
+            .calendar-day.selected.has-event::after { background: var(--accent); }
             .calendar-events { width: 100%; }
             .calendar-events-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
             .calendar-events-title { font-size: 18px; font-weight: 600; }
-            .calendar-add-btn { padding: 8px 16px; background: var(--accent); color: white; border-radius: var(--radius-md); font-size: 13px; cursor: pointer; }
-            .calendar-add-btn:hover { background: var(--accent-hover); }
-            .calendar-event { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); margin-bottom: 8px; }
-            .calendar-event-info { flex: 1; }
+            .calendar-add-btn.fluent-btn { min-height: 36px; padding: 0 18px; border: none; border-radius: 999px; cursor: pointer; font-size: 13px; }
+            .calendar-events-list { display: flex; flex-direction: column; gap: 8px; }
+            .calendar-event { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1), background var(--transition-fast); }
+            .calendar-event-info { flex: 1; min-width: 0; }
             .calendar-event-time { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
-            .calendar-event-title { font-size: 14px; font-weight: 500; }
-            .calendar-event-delete { padding: 6px 12px; font-size: 12px; color: var(--text-secondary); cursor: pointer; border-radius: var(--radius-sm); }
-            .calendar-event-delete:hover { background: rgba(255, 0, 0, 0.1); color: #ff4444; }
+            .calendar-event-title { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+            .calendar-event.completed { opacity: 0.58; }
+            .calendar-event.completed .calendar-event-time,
+            .calendar-event.completed .calendar-event-title { color: var(--text-tertiary); }
+            .calendar-event.completed .calendar-event-title { text-decoration: line-through; }
+            .calendar-event-actions { display: flex; flex: 0 0 auto; gap: 8px; align-items: center; }
+            .calendar-event-action.fluent-btn { min-width: 68px; min-height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+            .calendar-event-action .fluent-btn-text { color: inherit !important; }
+            .calendar-event-complete.fluent-btn { color: var(--accent) !important; }
+            .calendar-event.completed .calendar-event-complete.fluent-btn { color: var(--text-secondary) !important; }
             .calendar-empty { text-align: center; padding: 32px; color: var(--text-tertiary); }
+            .clock-event-modal.fluent-modal-overlay { background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(24px) saturate(125%); -webkit-backdrop-filter: blur(24px) saturate(125%); }
+            .clock-event-modal .fluent-modal { overflow: hidden; }
+            .clock-event-modal .fluent-modal-header,
+            .clock-event-modal .fluent-modal-content { background: var(--bg-primary); }
+            .clock-event-modal .fluent-modal-footer { gap: 10px; padding: 16px 24px 22px; background: var(--bg-secondary); border-top-color: var(--border-color); }
+            .clock-event-modal .fluent-modal-footer .fluent-btn { min-width: 76px; min-height: 34px; padding: 0 18px; border-radius: 999px; font-size: 13px; }
+            body.fluent-v2 .clock-event-modal .fluent-modal-header,
+            body.fluent-v2 .clock-event-modal .fluent-modal-content { background: rgba(255, 255, 255, 0.38); }
+            body.fluent-v2 .clock-event-modal .fluent-modal-footer { background: rgba(255, 255, 255, 0.52); border-top-color: var(--v2-glass-border); }
+            body.dark-mode .clock-event-modal .fluent-modal-header,
+            body.dark-mode .clock-event-modal .fluent-modal-content { background: var(--bg-primary); }
+            body.dark-mode .clock-event-modal .fluent-modal-footer { background: var(--bg-secondary); }
+            body.fluent-v2.dark-mode .clock-event-modal .fluent-modal-header,
+            body.fluent-v2.dark-mode .clock-event-modal .fluent-modal-content { background: rgba(32, 32, 36, 0.58); }
+            body.fluent-v2.dark-mode .clock-event-modal .fluent-modal-footer { background: rgba(24, 24, 28, 0.72); border-top-color: var(--v2-glass-border-dark); }
+            .clock-event-dialog { display: flex; flex-direction: column; gap: 14px; min-width: 320px; }
+            .clock-event-field { display: flex; flex-direction: column; gap: 8px; }
+            .clock-event-field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+            .clock-event-field input { width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-primary); outline: none; font: inherit; }
+            .clock-event-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 0, 120, 212), 0.16); }
+            .clock-event-error { display: none; min-height: 16px; color: #d13438; font-size: 12px; }
             
             /* 暗色模式 */
             .dark-mode .clock-nav-item:hover { background: rgba(255, 255, 255, 0.1); }
@@ -340,6 +374,35 @@ const ClockApp = {
         `;
     },
 
+    escapeHtml(value = '') {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        })[char]);
+    },
+
+    sortCalendarEventsForDisplay(events) {
+        return [...events].sort((a, b) => {
+            const completedOrder = Number(a.completed === true) - Number(b.completed === true);
+            if (completedOrder !== 0) return completedOrder;
+            const timeOrder = String(a.time || '').localeCompare(String(b.time || ''));
+            if (timeOrder !== 0) return timeOrder;
+            return String(a.title || '').localeCompare(String(b.title || ''));
+        });
+    },
+
+    isValidCalendarTime(value) {
+        return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(value || '').trim());
+    },
+
+    normalizeCalendarTime(value) {
+        const [hours, minutes] = String(value || '').trim().split(':');
+        return `${String(parseInt(hours, 10)).padStart(2, '0')}:${minutes}`;
+    },
+
     renderCalendar() {
         const now = new Date();
         const currentYear = this.selectedDate ? this.selectedDate.getFullYear() : now.getFullYear();
@@ -390,6 +453,7 @@ const ClockApp = {
             const eventDate = new Date(e.date);
             return eventDate.toDateString() === selectedDateStr;
         });
+        const sortedDayEvents = this.sortCalendarEventsForDisplay(dayEvents);
 
         return `
             <div class="calendar-container">
@@ -422,17 +486,20 @@ const ClockApp = {
                 <div class="calendar-events">
                     <div class="calendar-events-header">
                         <div class="calendar-events-title">${selectedDateStr ? t('clock.event-title', { month: this.selectedDate.getMonth() + 1, day: this.selectedDate.getDate() }) : t('clock.select-date')}</div>
-                        ${selectedDateStr ? `<div class="calendar-add-btn" id="calendar-add-event">${t('clock.add-event')}</div>` : ''}
+                        ${selectedDateStr ? `<button type="button" class="calendar-add-btn fluent-btn fluent-btn-primary fluent-btn-medium" id="calendar-add-event"><span class="fluent-btn-text">${t('clock.add-event')}</span></button>` : ''}
                     </div>
-                    ${selectedDateStr ? (dayEvents.length > 0 ? dayEvents.map(event => `
-                        <div class="calendar-event">
+                    ${selectedDateStr ? (sortedDayEvents.length > 0 ? `<div class="calendar-events-list">${sortedDayEvents.map(event => `
+                        <div class="calendar-event ${event.completed ? 'completed' : ''}" data-id="${this.escapeHtml(event.id)}">
                             <div class="calendar-event-info">
-                                <div class="calendar-event-time">${event.time}</div>
-                                <div class="calendar-event-title">${event.title}</div>
+                                <div class="calendar-event-time">${this.escapeHtml(event.time)}</div>
+                                <div class="calendar-event-title">${this.escapeHtml(event.title)}</div>
                             </div>
-                            <div class="calendar-event-delete" data-id="${event.id}">${t('clock.delete')}</div>
+                            <div class="calendar-event-actions">
+                                <button type="button" class="calendar-event-action calendar-event-complete fluent-btn fluent-btn-secondary fluent-btn-small" data-id="${this.escapeHtml(event.id)}"><span class="fluent-btn-text">${event.completed ? t('clock.undo-complete') : t('clock.complete')}</span></button>
+                                <button type="button" class="calendar-event-action calendar-event-edit fluent-btn fluent-btn-secondary fluent-btn-small" data-id="${this.escapeHtml(event.id)}"><span class="fluent-btn-text">${t('clock.edit')}</span></button>
+                            </div>
                         </div>
-                    `).join('') : `<div class="calendar-empty">${t('clock.no-events')}</div>`) : `<div class="calendar-empty">${t('clock.select-date')}</div>`}
+                    `).join('')}</div>` : `<div class="calendar-empty">${t('clock.no-events')}</div>`) : `<div class="calendar-empty">${t('clock.select-date')}</div>`}
                 </div>
             </div>
         `;
@@ -480,20 +547,26 @@ const ClockApp = {
             }
             // 日历事件
             else if (e.target.classList.contains('calendar-day')) {
+                const scrollTop = this.captureClockScrollTop();
                 const date = new Date(e.target.dataset.date);
                 this.selectedDate = date;
-                this.render();
+                this.renderKeepingClockScroll(scrollTop);
             } else if (e.target.id === 'calendar-prev') {
                 this.changeMonth(-1);
             } else if (e.target.id === 'calendar-next') {
                 this.changeMonth(1);
             } else if (e.target.id === 'calendar-today') {
+                const scrollTop = this.captureClockScrollTop();
                 this.selectedDate = new Date();
-                this.render();
-            } else if (e.target.id === 'calendar-add-event') {
+                this.renderKeepingClockScroll(scrollTop);
+            } else if (e.target.closest('#calendar-add-event')) {
                 this.addEvent();
-            } else if (e.target.classList.contains('calendar-event-delete')) {
-                this.deleteEvent(e.target.dataset.id);
+            } else if (e.target.closest('.calendar-event-complete')) {
+                const button = e.target.closest('.calendar-event-complete');
+                this.toggleEventComplete(button.dataset.id);
+            } else if (e.target.closest('.calendar-event-edit')) {
+                const button = e.target.closest('.calendar-event-edit');
+                this.editEvent(button.dataset.id);
             }
         });
         
@@ -647,11 +720,12 @@ const ClockApp = {
 
     // 日历方法
     changeMonth(delta) {
+        const scrollTop = this.captureClockScrollTop();
         if (!this.selectedDate) {
             this.selectedDate = new Date();
         }
         this.selectedDate.setMonth(this.selectedDate.getMonth() + delta);
-        this.render();
+        this.renderKeepingClockScroll(scrollTop);
     },
 
     addEvent() {
@@ -700,6 +774,241 @@ const ClockApp = {
     },
 
     // 工具方法
+    addEvent() {
+        this.openEventDialog();
+    },
+
+    getClockScrollElements() {
+        const candidates = [
+            this.frame && this.frame.cardEl,
+            this.container && this.container.querySelector('.fw-card'),
+            this.container && this.container.querySelector('#clock-content'),
+            document.getElementById('clock-content')
+        ].filter(Boolean);
+
+        return [...new Set(candidates)];
+    },
+
+    captureClockScrollTop() {
+        const elements = this.getClockScrollElements();
+        const positions = elements.map((element) => ({
+            role: element.classList.contains('fw-card') ? 'card' : (element.id === 'clock-content' ? 'page' : 'other'),
+            top: element.scrollTop
+        }));
+        const primary = positions.find(item => item.top > 0) || positions[0] || { top: 0 };
+        return { top: primary.top, positions };
+    },
+
+    restoreClockScrollTop(scrollTop) {
+        const fallbackTop = Number.isFinite(scrollTop) ? scrollTop : Number(scrollTop && scrollTop.top);
+        if (!Number.isFinite(fallbackTop)) return;
+
+        const restore = () => {
+            this.getClockScrollElements().forEach((scrollElement) => {
+                const role = scrollElement.classList.contains('fw-card') ? 'card' : (scrollElement.id === 'clock-content' ? 'page' : 'other');
+                const saved = Array.isArray(scrollTop && scrollTop.positions)
+                    ? scrollTop.positions.find(item => item.role === role)
+                    : null;
+                const target = Number.isFinite(saved && saved.top) ? saved.top : fallbackTop;
+                const maxScroll = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+                scrollElement.scrollTop = Math.min(target, maxScroll);
+            });
+        };
+
+        restore();
+        requestAnimationFrame(restore);
+        setTimeout(restore, 80);
+        setTimeout(restore, 180);
+    },
+
+    renderKeepingClockScroll(scrollTop = this.captureClockScrollTop()) {
+        this.render();
+        this.restoreClockScrollTop(scrollTop);
+    },
+
+    editEvent(id) {
+        const event = this.calendarEvents.find(item => String(item.id) === String(id));
+        if (event) {
+            this.openEventDialog(event);
+        }
+    },
+
+    toggleEventComplete(id) {
+        const event = this.calendarEvents.find(item => String(item.id) === String(id));
+        if (!event) return;
+
+        const scrollTop = this.captureClockScrollTop();
+        const previousRects = this.captureCalendarEventRects();
+        event.completed = !event.completed;
+        this.saveData();
+        this.renderKeepingClockScroll(scrollTop);
+        this.animateCalendarEventReorder(previousRects);
+    },
+
+    captureCalendarEventRects() {
+        const content = (this.container && this.container.querySelector('#clock-content')) || document.getElementById('clock-content');
+        if (!content) return new Map();
+
+        return new Map([...content.querySelectorAll('.calendar-event[data-id]')].map(element => [
+            element.dataset.id,
+            element.getBoundingClientRect()
+        ]));
+    },
+
+    animateCalendarEventReorder(previousRects) {
+        if (!previousRects || previousRects.size === 0) return;
+
+        requestAnimationFrame(() => {
+            const content = (this.container && this.container.querySelector('#clock-content')) || document.getElementById('clock-content');
+            if (!content) return;
+
+            content.querySelectorAll('.calendar-event[data-id]').forEach(element => {
+                const previousRect = previousRects.get(element.dataset.id);
+                if (!previousRect || typeof element.animate !== 'function') return;
+
+                const currentRect = element.getBoundingClientRect();
+                const deltaY = previousRect.top - currentRect.top;
+                if (Math.abs(deltaY) < 1) return;
+
+                element.animate([
+                    { transform: `translateY(${deltaY}px)` },
+                    { transform: 'translateY(0)' }
+                ], {
+                    duration: 320,
+                    easing: 'cubic-bezier(0.22, 1, 0.36, 1)'
+                });
+            });
+        });
+    },
+
+    openEventDialog(event = null) {
+        if (!event && !this.selectedDate) return;
+
+        const isEdit = Boolean(event);
+        const dialogScrollTop = this.captureClockScrollTop();
+        const dialogId = `clock-event-dialog-${Date.now()}`;
+        const titleValue = this.escapeHtml(isEdit ? event.title : '');
+        const rawTimeValue = isEdit ? String(event.time || '') : '09:00';
+        const timeValue = this.escapeHtml(this.isValidCalendarTime(rawTimeValue) ? this.normalizeCalendarTime(rawTimeValue) : rawTimeValue);
+        const content = `
+            <div class="clock-event-dialog" data-dialog-id="${dialogId}">
+                <div class="clock-event-field">
+                    <label for="${dialogId}-title">${t('clock.event-task-label')}</label>
+                    <input id="${dialogId}-title" class="clock-event-title-input" type="text" value="${titleValue}" placeholder="${t('clock.event-placeholder')}" maxlength="120">
+                </div>
+                <div class="clock-event-field">
+                    <label for="${dialogId}-time">${t('clock.event-time-label')}</label>
+                    <input id="${dialogId}-time" class="clock-event-time-input" type="time" value="${timeValue}" placeholder="${t('clock.time-placeholder')}">
+                </div>
+                <div class="clock-event-error" role="alert"></div>
+            </div>
+        `;
+
+        let modal = null;
+        const showError = (message) => {
+            const error = modal && modal.querySelector('.clock-event-error');
+            if (error) {
+                error.textContent = message;
+                error.style.display = 'block';
+            }
+        };
+        const clearError = () => {
+            const error = modal && modal.querySelector('.clock-event-error');
+            if (error) {
+                error.textContent = '';
+                error.style.display = 'none';
+            }
+        };
+        const saveEvent = () => {
+            const titleInput = modal.querySelector('.clock-event-title-input');
+            const timeInput = modal.querySelector('.clock-event-time-input');
+            const title = titleInput.value.trim();
+            const time = timeInput.value.trim();
+
+            if (!title) {
+                showError(t('clock.title-required'));
+                titleInput.focus();
+                return;
+            }
+            if (!time) {
+                showError(t('clock.time-required'));
+                timeInput.focus();
+                return;
+            }
+            if (!this.isValidCalendarTime(time)) {
+                showError(t('clock.time-format'));
+                timeInput.focus();
+                return;
+            }
+
+            const normalizedTime = this.normalizeCalendarTime(time);
+            if (isEdit) {
+                event.title = title;
+                event.time = normalizedTime;
+                this.saveData();
+                this.renderKeepingClockScroll(dialogScrollTop);
+                FluentUI.Toast({ title: t('clock.event-updated'), message: `${title} - ${normalizedTime}`, type: 'success' });
+            } else {
+                const newEvent = {
+                    id: `event-${Date.now()}`,
+                    date: this.selectedDate.toISOString(),
+                    time: normalizedTime,
+                    title,
+                    completed: false
+                };
+
+                this.calendarEvents.push(newEvent);
+                this.saveData();
+                this.renderKeepingClockScroll(dialogScrollTop);
+                FluentUI.Toast({ title: t('clock.event-added'), message: `${title} - ${normalizedTime}`, type: 'success' });
+            }
+
+            modal.close();
+        };
+
+        modal = FluentUI.Modal({
+            title: isEdit ? t('clock.edit-event-title') : t('clock.add-event-title'),
+            content,
+            width: '380px',
+            className: 'clock-event-modal',
+            onClose: () => this.restoreClockScrollTop(dialogScrollTop),
+            buttons: isEdit ? [
+                {
+                    text: t('clock.delete'),
+                    variant: 'danger',
+                    closeOnClick: false,
+                    onClick: () => {
+                        this.deleteEvent(event.id, dialogScrollTop);
+                        modal.close();
+                    }
+                },
+                { text: t('cancel'), variant: 'secondary' },
+                { text: t('clock.done'), variant: 'primary', closeOnClick: false, onClick: saveEvent }
+            ] : [
+                { text: t('cancel'), variant: 'secondary' },
+                { text: t('clock.done'), variant: 'primary', closeOnClick: false, onClick: saveEvent }
+            ]
+        });
+
+        modal.show();
+        this.restoreClockScrollTop(dialogScrollTop);
+        requestAnimationFrame(() => {
+            const titleInput = modal.querySelector('.clock-event-title-input');
+            const timeInput = modal.querySelector('.clock-event-time-input');
+            [titleInput, timeInput].forEach(input => input && input.addEventListener('input', clearError));
+            if (titleInput) {
+                titleInput.focus();
+                titleInput.select();
+            }
+        });
+    },
+
+    deleteEvent(id, scrollTop = this.captureClockScrollTop()) {
+        this.calendarEvents = this.calendarEvents.filter(e => String(e.id) !== String(id));
+        this.saveData();
+        this.renderKeepingClockScroll(scrollTop);
+    },
+
     formatTime(hours, minutes, seconds) {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     },
@@ -717,4 +1026,3 @@ const ClockApp = {
 
 // 将应用暴露到全局，供 WindowManager 调用
 window.ClockApp = ClockApp;
-

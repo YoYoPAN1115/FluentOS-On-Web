@@ -910,8 +910,10 @@ const State = {
     applyMaterialSetting() {
         const material = this.settings.materialType === 'mica' ? 'mica' : 'gaussian';
         const blur = Math.max(12, Math.min(70, Number(this.settings.blurIntensity ?? 40)));
-        const micaBlur = 75;
-        const materialBlur = material === 'mica' ? micaBlur : blur;
+        const materialBlur = blur;
+        const micaBlur = Math.max(12, Math.min(90, Math.round(blur * 1.25)));
+        const lightBlur = Math.max(8, Math.round(materialBlur * 0.5));
+        const smallBlur = Math.max(6, Math.round(materialBlur * 0.35));
         const wallpaper = this.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
         const safeWallpaper = String(wallpaper).replace(/\\/g, '/').replace(/"/g, '\\"');
 
@@ -921,9 +923,12 @@ const State = {
         );
         document.body.classList.add(`material-${material}`);
         document.body.style.setProperty('--v2-blur', `${materialBlur}px`);
-        document.body.style.setProperty('--v2-blur-light', `${Math.max(8, Math.round(materialBlur * 0.5))}px`);
+        document.body.style.setProperty('--v2-blur-light', `${lightBlur}px`);
+        document.body.style.setProperty('--blur-lg', `${materialBlur}px`);
+        document.body.style.setProperty('--blur-md', `${lightBlur}px`);
+        document.body.style.setProperty('--blur-sm', `${smallBlur}px`);
         document.body.style.setProperty('--fluent-material-blur', `${materialBlur}px`);
-        document.body.style.setProperty('--fluent-material-blur-light', `${Math.max(8, Math.round(materialBlur * 0.5))}px`);
+        document.body.style.setProperty('--fluent-material-blur-light', `${lightBlur}px`);
         document.body.style.setProperty('--fluent-mica-blur', `${micaBlur}px`);
         document.body.style.setProperty('--fluent-wallpaper-url', `url("${safeWallpaper}")`);
     },

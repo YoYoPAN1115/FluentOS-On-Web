@@ -91,15 +91,16 @@ const Widgets = {
 
         // 天气 App 拿到新数据时，同步刷新所有天气小组件（保持数据一致）
         State.on('weatherDataUpdate', () => this.refreshWeatherWidgets());
+        State.on('clockEventsUpdate', () => this.refreshCalendarEventWidgets());
     },
 
     /** 仅重新渲染天气小组件的内容（不重建其他小组件，避免打断时钟等） */
-    refreshWeatherWidgets() {
+    refreshWidgetsByPrefix(prefix) {
         ['desktop', 'lock'].forEach(surface => {
             const layer = this.layers[surface];
             if (!layer) return;
             this.getLayout()[surface].forEach(inst => {
-                if (!String(inst.widgetId).startsWith('weather-')) return;
+                if (!String(inst.widgetId).startsWith(prefix)) return;
                 const def = this.registry.find(d => d.id === inst.widgetId);
                 const el = layer.querySelector(`.fluent-widget[data-instance-id="${inst.id}"]`);
                 if (!def || !el) return;
@@ -107,6 +108,14 @@ const Widgets = {
                 if (body) this._renderContent(body, def, inst, surface);
             });
         });
+    },
+
+    refreshWeatherWidgets() {
+        this.refreshWidgetsByPrefix('weather-');
+    },
+
+    refreshCalendarEventWidgets() {
+        this.refreshWidgetsByPrefix('calendar-events-');
     },
 
     /* ============ 小组件静态模糊(降低 GPU 实时模糊压力) ============
@@ -127,7 +136,9 @@ const Widgets = {
             if (
                 updates.wallpaperDesktop !== undefined ||
                 updates.wallpaperLock !== undefined ||
-                updates.forceRealtimeBlur !== undefined
+                updates.forceRealtimeBlur !== undefined ||
+                updates.blurIntensity !== undefined ||
+                updates.materialType !== undefined
             ) {
                 this._refreshStaticBlurTexture();
             }
@@ -152,8 +163,10 @@ const Widgets = {
             this._applyStaticBlurMode();
             return;
         }
-        this._refreshStaticBlurTextureFor('desktop', State.settings && State.settings.wallpaperDesktop);
-        this._refreshStaticBlurTextureFor('lock', State.settings && State.settings.wallpaperLock);
+        const desktopWallpaper = (State.settings && State.settings.wallpaperDesktop) || 'Theme/Picture/Fluent-2.png';
+        const lockWallpaper = (State.settings && State.settings.wallpaperLock) || 'Theme/Picture/Fluent-1.png';
+        this._refreshStaticBlurTextureFor('desktop', desktopWallpaper);
+        this._refreshStaticBlurTextureFor('lock', lockWallpaper);
     },
 
     _isCurrentStaticBlurGen(surface, generation) {
@@ -211,7 +224,9 @@ const Widgets = {
                 canvas.height = ch;
                 const ctx = canvas.getContext('2d');
                 // 与 .fluent-widget-body 的 blur(var(--blur-lg)) saturate(150%) 保持观感一致
-                const blurPx = Math.max(6, Math.round(16 * scale));
+                const rawBlur = Number(State.settings && State.settings.blurIntensity);
+                const configuredBlur = Number.isFinite(rawBlur) ? Math.max(12, Math.min(70, rawBlur)) : 40;
+                const blurPx = Math.max(6, Math.round(configuredBlur * scale));
                 ctx.filter = `saturate(150%) blur(${blurPx}px)`;
                 // cover 布局 + 向外扩边,避免画布边缘被模糊出透明黑边
                 const cover = Math.max(cw / img.width, ch / img.height);

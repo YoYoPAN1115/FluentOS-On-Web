@@ -44,8 +44,8 @@ body.window-blur-disabled .window.fw-host,
 .window.fw-host {
     --fw-window-radius: 16px;
     background: rgba(252, 252, 252, 0.72) !important;
-    backdrop-filter: blur(40px) saturate(160%) !important;
-    -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
+    backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(160%) !important;
     border-radius: var(--fw-window-radius) !important;
 }
 
@@ -671,8 +671,8 @@ body.accent-deep .fw-nav-item.active .fw-nav-icon-img {
 body.window-blur-enabled .fw-card {
     background: rgba(255, 255, 255, 0.42) !important;
     background-color: rgba(255, 255, 255, 0.42) !important;
-    backdrop-filter: blur(28px) saturate(150%);
-    -webkit-backdrop-filter: blur(28px) saturate(150%);
+    backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%);
 }
 
 body.dark-mode.window-blur-enabled .fw-card {

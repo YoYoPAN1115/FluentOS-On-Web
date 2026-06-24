@@ -367,11 +367,30 @@ const FluentUI = {
         const wrapper = this._utils.createElement('div', { className: this._utils.classNames('fluent-slider-wrapper', disabled && 'fluent-slider-disabled', className), id });
         const slider = this._utils.createElement('input', { className: 'fluent-slider', attrs: { type: 'range', min, max, value, step } });
         slider.disabled = disabled;
-        slider.addEventListener('input', e => { onChange && onChange(Number(e.target.value)); if (showValue) valueEl.textContent = e.target.value; });
-        wrapper.appendChild(slider);
         let valueEl = null;
-        if (showValue) { valueEl = this._utils.createElement('span', { className: 'fluent-slider-value', text: value }); wrapper.appendChild(valueEl); }
-        wrapper.getValue = () => Number(slider.value); wrapper.setValue = v => { slider.value = v; if (valueEl) valueEl.textContent = v; };
+        if (showValue) valueEl = this._utils.createElement('span', { className: 'fluent-slider-value', text: value });
+        const updateSliderVisual = () => {
+            const minValue = Number(slider.min);
+            const maxValue = Number(slider.max);
+            const currentValue = Number(slider.value);
+            const range = Math.max(1, maxValue - minValue);
+            const progress = Math.max(0, Math.min(100, ((currentValue - minValue) / range) * 100));
+            slider.style.setProperty('--fluent-slider-progress', progress + '%');
+        };
+        slider.addEventListener('input', e => {
+            updateSliderVisual();
+            onChange && onChange(Number(e.target.value));
+            if (showValue) valueEl.textContent = e.target.value;
+        });
+        updateSliderVisual();
+        wrapper.appendChild(slider);
+        if (showValue) wrapper.appendChild(valueEl);
+        wrapper.getValue = () => Number(slider.value);
+        wrapper.setValue = v => {
+            slider.value = v;
+            updateSliderVisual();
+            if (valueEl) valueEl.textContent = v;
+        };
         return wrapper;
     },
 

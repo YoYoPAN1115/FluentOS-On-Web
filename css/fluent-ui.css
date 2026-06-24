@@ -304,9 +304,61 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 .fluent-toggle-label { font-size: 14px; color: var(--text-primary); }
 .fluent-slider-wrapper { display: flex; align-items: center; gap: 12px; }
 .fluent-slider-disabled { opacity: 0.5; pointer-events: none; }
-.fluent-slider { -webkit-appearance: none; appearance: none; flex: 1; height: 4px; background: var(--text-tertiary); border-radius: 2px; outline: none; }
-.fluent-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; box-shadow: var(--shadow-sm); }
-.fluent-slider::-moz-range-thumb { width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: none; box-shadow: var(--shadow-sm); }
+.fluent-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    min-width: 120px;
+    height: 18px;
+    margin: 0;
+    background: transparent;
+    border-radius: 999px;
+    outline: none;
+    cursor: pointer;
+    --fluent-slider-progress: 50%;
+    --fluent-slider-track: rgba(0, 0, 0, 0.16);
+}
+.dark-mode .fluent-slider { --fluent-slider-track: rgba(255, 255, 255, 0.24); }
+.fluent-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(to right,
+        var(--accent) 0%,
+        var(--accent) var(--fluent-slider-progress, 50%),
+        var(--fluent-slider-track) var(--fluent-slider-progress, 50%),
+        var(--fluent-slider-track) 100%);
+}
+.fluent-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+    background: var(--accent);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
+.fluent-slider::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--fluent-slider-track);
+}
+.fluent-slider::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--accent);
+}
+.fluent-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
 .fluent-slider-value { min-width: 32px; text-align: right; font-size: 13px; color: var(--text-secondary); }
 
 /* ============ 右键菜单 ============ */

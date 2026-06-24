@@ -13,6 +13,12 @@ const Taskbar = {
     contextMenu: null,
     taskViewBtn: null,
     _taskViewIgnoreClickUntil: 0,
+    _hoverPreview: null,
+    _hoverPreviewTimer: null,
+    _hoverPreviewHideTimer: null,
+    _hoverPreviewButton: null,
+    _hoverPreviewAppId: null,
+    _hoverPreviewWindowId: null,
 
     init() {
         this.element = document.getElementById('taskbar');
@@ -67,6 +73,7 @@ const Taskbar = {
     },
 
     renderApps() {
+        this.hideHoverPreview(true);
         this.appsContainer.innerHTML = '';
         
         // 获取固定的应用和运行中的应用
@@ -141,6 +148,227 @@ const Taskbar = {
         return btn;
     },
 
+    _escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    _previewWindowZ(windowData) {
+        return Number.parseInt(windowData?.element?.style?.zIndex || windowData?.zIndex || '0', 10) || 0;
+    },
+
+    _getPreviewWindowForApp(appId) {
+        if (typeof WindowManager === 'undefined' || !Array.isArray(WindowManager.windows)) return null;
+        const windows = WindowManager.windows
+            .filter((w) => w && w.appId === appId && w.element && !w.element.classList.contains('closing'))
+            .sort((a, b) => this._previewWindowZ(b) - this._previewWindowZ(a));
+        if (!windows.length) return null;
+        return windows.find((w) => this._isWindowActive(w)) || windows[0];
+    },
+
+    _getPreviewTitle(windowData) {
+        const title = windowData?.element?.querySelector('.window-title')?.textContent?.trim();
+        if (title) return title;
+        const config = (typeof WindowManager !== 'undefined' && WindowManager.getAppConfig) ? WindowManager.getAppConfig(windowData.appId) : null;
+        const app = (typeof Desktop !== 'undefined' && Desktop.apps) ? Desktop.apps.find(a => a.id === windowData.appId) : null;
+        if (app && typeof Desktop.getAppName === 'function') return Desktop.getAppName(app);
+        return config?.title || app?.name || windowData?.appId || 'App';
+    },
+
+    _getPreviewIcon(windowData) {
+        const config = (typeof WindowManager !== 'undefined' && WindowManager.getAppConfig) ? WindowManager.getAppConfig(windowData.appId) : null;
+        const app = (typeof Desktop !== 'undefined' && Desktop.apps) ? Desktop.apps.find(a => a.id === windowData.appId) : null;
+        return config?.icon || app?.icon || windowData?.element?.querySelector('.window-icon')?.getAttribute('src') || '';
+    },
+
+    _readPixel(value, fallback) {
+        if (typeof value === 'string' && value.trim() && !value.trim().endsWith('px')) return fallback;
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) && parsed > 1 ? parsed : fallback;
+    },
+
+    _getPreviewBounds(windowData) {
+        const el = windowData.element;
+        const rect = el.getBoundingClientRect();
+        const config = (typeof WindowManager !== 'undefined' && WindowManager.getAppConfig) ? WindowManager.getAppConfig(windowData.appId) : null;
+        const saved = windowData.savedPosition || windowData.lastNormalBounds || windowData.savedBounds || {};
+        const fallbackWidth = this._readPixel(config?.width, rect.width || 900);
+        const fallbackHeight = this._readPixel(config?.height, rect.height || 600);
+        const width = this._readPixel(el.style.width, this._readPixel(saved.width, fallbackWidth));
+        const height = this._readPixel(el.style.height, this._readPixel(saved.height, fallbackHeight));
+        return {
+            width: Math.max(320, Math.round(width || 900)),
+            height: Math.max(220, Math.round(height || 600))
+        };
+    },
+
+    _stripPreviewCloneIds(root) {
+        if (!root) return;
+        if (root.removeAttribute) root.removeAttribute('id');
+        root.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'));
+    },
+
+    _copyPreviewCanvases(sourceRoot, cloneRoot) {
+        const sourceCanvases = sourceRoot?.querySelectorAll?.('canvas') || [];
+        const cloneCanvases = cloneRoot?.querySelectorAll?.('canvas') || [];
+        sourceCanvases.forEach((source, index) => {
+            const target = cloneCanvases[index];
+            if (!target) return;
+            try {
+                target.width = source.width;
+                target.height = source.height;
+                const ctx = target.getContext('2d');
+                if (ctx) ctx.drawImage(source, 0, 0);
+            } catch (_) {}
+        });
+    },
+
+    _clearHoverPreviewTimers() {
+        clearTimeout(this._hoverPreviewTimer);
+        clearTimeout(this._hoverPreviewHideTimer);
+        this._hoverPreviewTimer = null;
+        this._hoverPreviewHideTimer = null;
+    },
+
+    _scheduleHoverPreview(btn) {
+        if (!btn || this._appDragging) return;
+        clearTimeout(this._hoverPreviewTimer);
+        clearTimeout(this._hoverPreviewHideTimer);
+        this._hoverPreviewButton = btn;
+        this._hoverPreviewTimer = setTimeout(() => {
+            const windowData = this._getPreviewWindowForApp(btn.dataset.appId);
+            if (!windowData) {
+                this.hideHoverPreview(true);
+                return;
+            }
+            this.showHoverPreview(btn, windowData);
+        }, 360);
+    },
+
+    _scheduleHideHoverPreview() {
+        clearTimeout(this._hoverPreviewTimer);
+        clearTimeout(this._hoverPreviewHideTimer);
+        this._hoverPreviewTimer = null;
+        this._hoverPreviewHideTimer = setTimeout(() => this.hideHoverPreview(), 180);
+    },
+
+    _positionHoverPreview(preview = this._hoverPreview, btn = this._hoverPreviewButton) {
+        if (!preview || !btn) return;
+        const rect = btn.getBoundingClientRect();
+        const width = preview.offsetWidth || 260;
+        const height = preview.offsetHeight || 190;
+        const margin = 8;
+        let left = rect.left + rect.width / 2 - width / 2;
+        left = Math.max(margin, Math.min(window.innerWidth - width - margin, left));
+        let top = rect.top - height - 10;
+        if (top < margin) top = rect.bottom + 10;
+        preview.style.left = `${Math.round(left)}px`;
+        preview.style.top = `${Math.round(top)}px`;
+    },
+
+    showHoverPreview(btn, windowData) {
+        if (!btn || !windowData?.element) return;
+        this.hideHoverPreview(true);
+        const title = this._getPreviewTitle(windowData);
+        const icon = this._getPreviewIcon(windowData);
+        const bounds = this._getPreviewBounds(windowData);
+        const preview = document.createElement('div');
+        preview.className = 'taskbar-window-preview';
+        preview.dataset.appId = windowData.appId || '';
+        preview.dataset.windowId = windowData.id || '';
+        preview.innerHTML = `
+            <div class="taskbar-window-preview-titlebar">
+                <div class="taskbar-window-preview-title">
+                    ${icon ? `<img src="${this._escapeHtml(icon)}" alt="">` : ''}
+                    <span>${this._escapeHtml(title)}</span>
+                </div>
+                <button class="taskbar-window-preview-close" type="button" aria-label="${this._escapeHtml(t('close'))}">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="">
+                </button>
+            </div>
+        `;
+
+        const frame = document.createElement('div');
+        frame.className = 'taskbar-window-preview-frame';
+        const clone = windowData.element.cloneNode(true);
+        this._stripPreviewCloneIds(clone);
+        this._copyPreviewCanvases(windowData.element, clone);
+        clone.classList.remove('opening', 'closing', 'minimizing', 'restoring', 'maximizing', 'unmaximizing', 'maximized');
+        clone.classList.add('taskbar-window-preview-clone');
+        clone.style.position = 'absolute';
+        clone.style.left = '0';
+        clone.style.top = '0';
+        clone.style.width = `${bounds.width}px`;
+        clone.style.height = `${bounds.height}px`;
+        clone.style.minWidth = '0';
+        clone.style.minHeight = '0';
+        clone.style.margin = '0';
+        clone.style.display = 'flex';
+        clone.style.transformOrigin = 'top left';
+        clone.style.transition = 'none';
+        clone.style.pointerEvents = 'none';
+        clone.style.zIndex = '1';
+        clone.style.opacity = '1';
+        clone.style.boxShadow = 'none';
+
+        const maxWidth = 280;
+        const maxHeight = 164;
+        const scale = Math.min(maxWidth / bounds.width, maxHeight / bounds.height, 1);
+        clone.style.transform = `scale(${Number(scale.toFixed(4))})`;
+        frame.style.width = `${Math.round(bounds.width * scale)}px`;
+        frame.style.height = `${Math.round(bounds.height * scale)}px`;
+        frame.appendChild(clone);
+        preview.appendChild(frame);
+
+        preview.addEventListener('pointerenter', () => this._clearHoverPreviewTimers());
+        preview.addEventListener('pointerleave', () => this._scheduleHideHoverPreview());
+        preview.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const target = (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows))
+                ? WindowManager.windows.find((w) => w.id === windowData.id)
+                : null;
+            if (event.target.closest('.taskbar-window-preview-close')) {
+                if (target) WindowManager.closeWindow(target.id);
+                this.hideHoverPreview(true);
+                return;
+            }
+            if (target) WindowManager.focusWindow(target.id);
+            this.hideHoverPreview(true);
+        });
+
+        document.body.appendChild(preview);
+        this._hoverPreview = preview;
+        this._hoverPreviewButton = btn;
+        this._hoverPreviewAppId = windowData.appId || null;
+        this._hoverPreviewWindowId = windowData.id || null;
+        this._positionHoverPreview(preview, btn);
+        requestAnimationFrame(() => {
+            this._positionHoverPreview(preview, btn);
+            preview.classList.add('show');
+        });
+    },
+
+    hideHoverPreview(immediate = false) {
+        this._clearHoverPreviewTimers();
+        const preview = this._hoverPreview;
+        if (!preview) return;
+        this._hoverPreview = null;
+        this._hoverPreviewButton = null;
+        this._hoverPreviewAppId = null;
+        this._hoverPreviewWindowId = null;
+        const remove = () => preview.remove();
+        if (immediate) {
+            remove();
+            return;
+        }
+        preview.classList.remove('show');
+        setTimeout(remove, 160);
+    },
     bindEvents() {
         // 开始按钮
         this.startBtn.addEventListener('click', (e) => {
@@ -152,6 +380,22 @@ const Taskbar = {
         this.appsContainer.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
         // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
         this.appsContainer.addEventListener('dragstart', (e) => e.preventDefault());
+
+        this.appsContainer.addEventListener('pointerover', (e) => {
+            const btn = e.target.closest('.taskbar-app');
+            if (!btn || !this.appsContainer.contains(btn)) return;
+            const related = e.relatedTarget;
+            if (related && (btn.contains(related) || this._hoverPreview?.contains(related))) return;
+            this._scheduleHoverPreview(btn);
+        });
+
+        this.appsContainer.addEventListener('pointerout', (e) => {
+            const btn = e.target.closest('.taskbar-app');
+            if (!btn) return;
+            const related = e.relatedTarget;
+            if (related && (btn.contains(related) || this._hoverPreview?.contains(related))) return;
+            this._scheduleHideHoverPreview();
+        });
 
         this.appsContainer.addEventListener('click', (e) => {
             if (this._appDragging) return;
@@ -227,6 +471,8 @@ const Taskbar = {
             if (now < this._taskViewIgnoreClickUntil) return;
             if (typeof TaskView !== 'undefined') TaskView.toggle();
         });
+
+        window.addEventListener('resize', () => this.hideHoverPreview(true));
 
         // 点击外部关闭右键菜单
         document.addEventListener('click', () => {
@@ -403,6 +649,7 @@ const Taskbar = {
         const btn = e.target.closest('.taskbar-app');
         if (!btn) return;
         const appId = btn.dataset.appId;
+        this.hideHoverPreview(true);
         const startX = e.clientX;
         const startY = e.clientY;
         let ghost = null;
@@ -412,6 +659,7 @@ const Taskbar = {
             if (!dragging) {
                 if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 10) return;
                 dragging = true;
+                this.hideHoverPreview(true);
                 this._appDragging = true;
                 const app = Desktop.apps.find(a => a.id === appId);
                 ghost = document.createElement('div');
@@ -499,6 +747,7 @@ const Taskbar = {
     },
 
     onAppStop(appId) {
+        if (this._hoverPreviewAppId === appId) this.hideHoverPreview(true);
         // 应用关闭时，更新状态
         const btn = this.appsContainer.querySelector(`[data-app-id="${appId}"]`);
         if (btn) {

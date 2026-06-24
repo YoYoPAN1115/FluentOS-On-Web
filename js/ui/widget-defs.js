@@ -20,7 +20,7 @@
  *
  * Data sources:
  *   - Weather: Open-Meteo; Weather App provides icon and description mapping
- *   - Bing daily image: bing.biturl.top; click opens Photos App
+ *   - Bing daily image: Bing HPImageArchive with CORS fallbacks; click opens Photos App
  *   - Lunar, tracking, holidays, answer book, daily word, and more: uapis.cn
  */
 
@@ -144,11 +144,17 @@ function wUiText(zh, en) {
 
 /** Run an interval tied to an element lifecycle; stop when the element leaves the DOM. */
 function wTick(el, ms, fn) {
+    if (el._wTickId) clearInterval(el._wTickId);
     fn();
     const id = setInterval(() => {
-        if (!el.isConnected) { clearInterval(id); return; }
+        if (!el.isConnected) {
+            clearInterval(id);
+            if (el._wTickId === id) el._wTickId = null;
+            return;
+        }
         fn();
     }, ms);
+    el._wTickId = id;
 }
 
 /** Async render wrapper: show loading first, then show an error state on failure. */
@@ -561,6 +567,7 @@ const W_CAL_MONTHS_EN_SHORT = [
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 const W_CAL_WEEK_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const W_CAL_WEEK_EN_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const W_CAL_WEEK_ZH = ['\u5468\u65e5', '\u5468\u4e00', '\u5468\u4e8c', '\u5468\u4e09', '\u5468\u56db', '\u5468\u4e94', '\u5468\u516d'];
 
 function wCalendarIsEn() {
@@ -618,19 +625,9 @@ function wCalendarNearbyDays(date) {
     return wCalendarRange(start, Math.min(total, start + count - 1));
 }
 
-function wCalendarRingDay(date, size) {
-    const total = wCalendarDaysInMonth(date);
-    const today = date.getDate();
-    const offset = size === 's' ? 6 : 4;
-    if (today + offset <= total) return today + offset;
-    if (today > 1) return Math.max(1, today - offset);
-    return null;
-}
-
-function wCalendarDayCell(day, today, ringDay) {
+function wCalendarDayCell(day, today) {
     const classes = ['w-calendar-day-cell'];
     if (day === today) classes.push('is-today');
-    else if (day === ringDay) classes.push('is-ring');
     return `<div class="${classes.join(' ')}">${day}</div>`;
 }
 
@@ -665,6 +662,215 @@ function wCalendarBindMonthNav(body, onShift) {
     });
 }
 
+function wCalendarDateKey(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${wPad(date.getMonth() + 1)}-${wPad(date.getDate())}`;
+}
+
+function wCalendarAddDays(date, days) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+function wCalendarClockEvents() {
+    let data = {};
+    try {
+        data = (typeof Storage !== 'undefined')
+            ? Storage.get('clock_data', {})
+            : JSON.parse(localStorage.getItem('clock_data') || '{}');
+    } catch (_) {
+        data = {};
+    }
+    return (Array.isArray(data.events) ? data.events : [])
+        .map(event => ({ ...event, _date: new Date(event.date) }))
+        .filter(event => !Number.isNaN(event._date.getTime()))
+        .sort((a, b) => {
+            const dateDiff = a._date - b._date;
+            if (dateDiff) return dateDiff;
+            return String(a.time || '').localeCompare(String(b.time || ''));
+        });
+}
+
+function wCalendarEventsForDate(date, events = wCalendarClockEvents()) {
+    const key = wCalendarDateKey(date);
+    return events.filter(event => wCalendarDateKey(event._date) === key);
+}
+
+function wCalendarReminderWeekday(date) {
+    return wCalendarIsEn() ? W_CAL_WEEK_EN_FULL[date.getDay()].toUpperCase() : W_CAL_WEEK_ZH[date.getDay()];
+}
+
+function wCalendarReminderDateLabel(date) {
+    if (wCalendarIsEn()) {
+        return `${W_CAL_WEEK_EN_FULL[date.getDay()].toUpperCase()}, ${W_CAL_MONTHS_EN_SHORT[date.getMonth()].toUpperCase()} ${date.getDate()}`;
+    }
+    return `${W_CAL_WEEK_ZH[date.getDay()]} ${date.getMonth() + 1}\u6708${date.getDate()}\u65e5`;
+}
+
+function wCalendarNoEventsText(date, today) {
+    if (wCalendarDateKey(date) === wCalendarDateKey(today)) {
+        return wCalendarIsEn() ? 'No Events Today' : '\u4eca\u5929\u6ca1\u6709\u63d0\u9192\u4e8b\u9879';
+    }
+    return wCalendarIsEn() ? 'No Events' : '\u6682\u65e0\u63d0\u9192\u4e8b\u9879';
+}
+
+function wCalendarEventMarkup(events, limit = 3, compact = false) {
+    return events.slice(0, limit).map(event => `
+        <div class="w-calendar-event-row ${compact ? 'is-compact' : ''}">
+            <span class="w-calendar-event-dot"></span>
+            ${compact
+                ? `<span class="w-calendar-event-title">${wEsc(`${event.time || '--:--'} ${event.title || ''}`)}</span>`
+                : `
+                    <span class="w-calendar-event-time">${wEsc(event.time || '--:--')}</span>
+                    <span class="w-calendar-event-title">${wEsc(event.title || '')}</span>
+                `}
+        </div>
+    `).join('');
+}
+
+function wCalendarEventDensityClass(count) {
+    if (count > 5) return 'is-packed-events';
+    if (count > 2) return 'is-dense-events';
+    return '';
+}
+
+function wCalendarEventsAtHour(events, hour) {
+    return events.filter(event => wCalendarEventHour(event) === hour);
+}
+
+function wCalendarPeriodLabel(period) {
+    if (period === 'am') return wCalendarIsEn() ? 'AM' : '\u4e0a\u5348';
+    return wCalendarIsEn() ? 'PM' : '\u4e0b\u5348';
+}
+
+function wCalendarPeriodEmptyText() {
+    return wCalendarIsEn() ? 'None' : '\u6682\u65e0';
+}
+
+function wCalendarEventsForPeriod(events, period) {
+    return events.filter(event => {
+        const hour = wCalendarEventHour(event);
+        if (hour === null) return period === 'am';
+        return period === 'am' ? hour < 12 : hour >= 12;
+    });
+}
+
+function wCalendarPeriodColumn(events, period) {
+    const periodEvents = wCalendarEventsForPeriod(events, period);
+    return `
+        <div class="w-calendar-event-period">
+            <div class="w-calendar-event-period-title">${wEsc(wCalendarPeriodLabel(period))}</div>
+            <div class="w-calendar-event-period-list ${periodEvents.length ? '' : 'is-empty'}">
+                ${periodEvents.length ? wCalendarEventMarkup(periodEvents, 20, true) : wEsc(wCalendarPeriodEmptyText())}
+            </div>
+        </div>`;
+}
+
+function wCalendarEventHour(event) {
+    const match = String(event?.time || '').match(/^(\d{1,2}):/);
+    if (!match) return null;
+    const hour = Number(match[1]);
+    return Number.isFinite(hour) ? Math.max(0, Math.min(23, hour)) : null;
+}
+
+function wCalendarAgendaHoursForDate(events, now, isToday = false) {
+    const eventHours = events
+        .map(wCalendarEventHour)
+        .filter(hour => hour !== null);
+    const baseHours = isToday
+        ? wCalendarRange(now.getHours(), Math.min(23, now.getHours() + 4))
+        : wCalendarRange(9, 16);
+    return Array.from(new Set([...baseHours, ...eventHours]))
+        .sort((a, b) => a - b);
+}
+
+function wCalendarAgendaColumn(date, events, hours, title, isToday = false) {
+    const now = new Date();
+    return `
+        <div class="w-calendar-agenda-column">
+            <div class="w-calendar-agenda-title">${wEsc(title)}</div>
+            <div class="w-calendar-agenda-rows">
+                ${hours.map(hour => {
+                    const hourEvents = wCalendarEventsAtHour(events, hour);
+                    const showNow = isToday && hour === now.getHours();
+                    const nowOffset = showNow ? Math.max(4, Math.min(96, (now.getMinutes() / 60) * 100)) : 0;
+                    return `
+                        <div class="w-calendar-agenda-row${showNow ? ' is-now' : ''}"${showNow ? ` style="--calendar-now-offset:${nowOffset.toFixed(1)}%;"` : ''}>
+                            <span class="w-calendar-agenda-hour">${wPad(hour)}</span>
+                            <span class="w-calendar-agenda-line"></span>
+                            <div class="w-calendar-agenda-events">
+                                ${hourEvents.map(event => {
+                                    const titleText = event.time ? `${event.time} ${event.title || ''}` : (event.title || '');
+                                    return `<span>${wEsc(titleText)}</span>`;
+                                }).join('')}
+                            </div>
+                        </div>`;
+                }).join('')}
+            </div>
+        </div>`;
+}
+
+function wRenderCalendarEvents(body, ctx, size) {
+    const update = () => {
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const events = wCalendarClockEvents();
+        const todayEvents = wCalendarEventsForDate(todayDate, events);
+
+        if (size === 's') {
+            const density = wCalendarEventDensityClass(todayEvents.length);
+            body.innerHTML = `
+                <div class="w-calendar-event-card w-calendar-event-card-s ${density}">
+                    <div class="w-calendar-event-weekday">${wEsc(wCalendarReminderWeekday(todayDate))}</div>
+                    <div class="w-calendar-event-day">${todayDate.getDate()}</div>
+                    <div class="w-calendar-event-empty ${todayEvents.length ? 'has-events' : ''}">
+                        ${todayEvents.length ? wCalendarEventMarkup(todayEvents, 20, true) : wEsc(wCalendarNoEventsText(todayDate, todayDate))}
+                    </div>
+                </div>`;
+            return;
+        }
+
+        if (size === 'm') {
+            const density = wCalendarEventDensityClass(todayEvents.length);
+            body.innerHTML = `
+                <div class="w-calendar-event-card w-calendar-event-card-m ${density}">
+                    <div class="w-calendar-event-today">
+                        <div class="w-calendar-event-weekday">${wEsc(wCalendarReminderWeekday(todayDate))}</div>
+                        <div class="w-calendar-event-day">${todayDate.getDate()}</div>
+                    </div>
+                    <div class="w-calendar-event-next w-calendar-event-content">
+                        <div class="w-calendar-event-next-title">${wEsc(wCalendarIsEn() ? 'TODAY' : '\u4eca\u5929')}</div>
+                        <div class="w-calendar-event-periods">
+                            ${wCalendarPeriodColumn(todayEvents, 'am')}
+                            ${wCalendarPeriodColumn(todayEvents, 'pm')}
+                        </div>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        const tomorrow = wCalendarAddDays(todayDate, 1);
+        const tomorrowEvents = wCalendarEventsForDate(tomorrow, events);
+        const todayHours = wCalendarAgendaHoursForDate(todayEvents, today, true);
+        const tomorrowHours = wCalendarAgendaHoursForDate(tomorrowEvents, today, false);
+        const density = wCalendarEventDensityClass(todayEvents.length + tomorrowEvents.length + Math.max(0, todayHours.length - 5) + Math.max(0, tomorrowHours.length - 8));
+        body.innerHTML = `
+            <div class="w-calendar-event-card w-calendar-event-card-l ${density}">
+                <div class="w-calendar-event-large-head">
+                    <div>
+                        <div class="w-calendar-event-weekday">${wEsc(wCalendarReminderWeekday(todayDate))}</div>
+                        <div class="w-calendar-event-day">${todayDate.getDate()}</div>
+                    </div>
+                    <div class="w-calendar-event-large-count">${wEsc(todayEvents.length ? t('widgets.calendar.count', { n: todayEvents.length }) : wCalendarNoEventsText(todayDate, todayDate))}</div>
+                </div>
+                <div class="w-calendar-agenda-grid">
+                    ${wCalendarAgendaColumn(todayDate, todayEvents, todayHours, wCalendarIsEn() ? 'TODAY' : '\u4eca\u5929', true)}
+                    ${wCalendarAgendaColumn(tomorrow, tomorrowEvents, tomorrowHours, wCalendarIsEn() ? 'TOMORROW' : '\u660e\u5929')}
+                </div>
+            </div>`;
+    };
+    wTick(body, 60 * 1000, update);
+}
+
 function wRenderCalendar(body, ctx, size) {
     let viewDate = null;
     const shiftMonth = (delta) => {
@@ -679,7 +885,6 @@ function wRenderCalendar(body, ctx, size) {
         const displayDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
         const isCurrentMonth = wCalendarSameMonth(displayDate, now);
         const today = isCurrentMonth ? now.getDate() : null;
-        const ringDay = isCurrentMonth ? wCalendarRingDay(now, size) : null;
         const year = displayDate.getFullYear();
         const days = wCalendarRange(1, wCalendarDaysInMonth(displayDate));
         const nextMonth = wCalendarMonth(wCalendarNextMonth(displayDate), 'long');
@@ -694,7 +899,7 @@ function wRenderCalendar(body, ctx, size) {
                         <span aria-hidden="true">\u203a</span>
                     </div>
                     <div class="w-calendar-small-grid">
-                        ${wCalendarNearbyDays(now).map(day => wCalendarDayCell(day, today, ringDay)).join('')}
+                        ${wCalendarNearbyDays(now).map(day => wCalendarDayCell(day, today)).join('')}
                     </div>
                 </div>`;
             return;
@@ -715,7 +920,7 @@ function wRenderCalendar(body, ctx, size) {
                     <div class="w-calendar-medium-month">
                         <div class="w-calendar-month-grid w-calendar-month-grid-m">
                             <div class="w-calendar-range-pill" aria-hidden="true"></div>
-                            ${days.map(day => wCalendarDayCell(day, today, ringDay)).join('')}
+                            ${days.map(day => wCalendarDayCell(day, today)).join('')}
                             <div class="w-calendar-next-pill">${wEsc(nextMonth)}</div>
                         </div>
                     </div>
@@ -737,7 +942,7 @@ function wRenderCalendar(body, ctx, size) {
                 <div class="w-calendar-large-body">
                     <div class="w-calendar-month-grid w-calendar-month-grid-l">
                         <div class="w-calendar-month-chip">${wEsc(wCalendarMonth(displayDate, 'long'))}</div>
-                        ${days.map(day => wCalendarDayCell(day, today, ringDay)).join('')}
+                        ${days.map(day => wCalendarDayCell(day, today)).join('')}
                         <div class="w-calendar-next-pill">${wEsc(nextMonth)}</div>
                     </div>
                 </div>
@@ -748,9 +953,54 @@ function wRenderCalendar(body, ctx, size) {
 
 /* ==================== Photos: Bing Daily Image ==================== */
 
+function wBingArchiveUrl(idx = 0, count = 1) {
+    return 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=' + idx + '&n=' + count + '&mkt=zh-CN';
+}
+
+function wNormalizeBingImage(data) {
+    const item = data && Array.isArray(data.images) ? data.images[0] : data;
+    if (!item) throw new Error('Missing Bing image');
+    const rawUrl = item.url || item.fullstartdate || item.urlbase;
+    const url = item.url
+        ? (/^https?:\/\//i.test(item.url) ? item.url : `https://www.bing.com${item.url}`)
+        : (item.urlbase ? `https://www.bing.com${item.urlbase}_1920x1080.jpg` : rawUrl);
+    if (!url || !/^https?:\/\//i.test(url)) throw new Error('Missing Bing image URL');
+    const urlHD = item.urlbase ? `https://www.bing.com${item.urlbase}_UHD.jpg` : url.replace(/1920x1080/g, 'UHD');
+    return {
+        ...item,
+        url,
+        urlHD,
+        copyright: item.copyright || item.title || '',
+        copyright_link: item.copyrightlink || item.copyright_link || '',
+        start_date: item.startdate || item.start_date || item.enddate || ''
+    };
+}
+
+async function wFetchBingCandidate(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return wNormalizeBingImage(await res.json());
+}
+
 async function wFetchBing() {
-    return WidgetData.getJSON('bing-today', 60 * 60 * 1000,
-        'https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN');
+    const dateKey = new Date().toISOString().slice(0, 10);
+    return WidgetData.get(`bing-today-${dateKey}`, 30 * 60 * 1000, async () => {
+        const archiveUrl = wBingArchiveUrl(0, 1);
+        const urls = [
+            archiveUrl,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(archiveUrl)}`,
+            'https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN'
+        ];
+        let lastError = null;
+        for (const url of urls) {
+            try {
+                return await wFetchBingCandidate(url);
+            } catch (err) {
+                lastError = err;
+            }
+        }
+        throw lastError || new Error('Bing image unavailable');
+    });
 }
 
 function wRenderPhotos(body, ctx, size) {
@@ -759,7 +1009,7 @@ function wRenderPhotos(body, ctx, size) {
         if (!body.isConnected) return;
         const title = (data.copyright || '').split(/[\uFF08(]/)[0].trim();
         body.innerHTML = `
-            <div class="w-photo" style="background-imag e:url('${wEsc(data.url)}')">
+            <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
                 <div class="w-photo-overlay">
                     <div class="w-photo-tag">${t('widgets.photos.bing')}</div>
                     ${size !== 's' ? `<div class="w-photo-title">${wEsc(title)}</div>` : ''}
@@ -1465,13 +1715,14 @@ function wRenderMedia(body, ctx, size) {
         const track = state.track;
         body.classList.toggle('w-media-medium', size === 'm');
         body.classList.toggle('w-media-large', size === 'l');
+        body.classList.toggle('w-media-empty-state', !track);
         if (!track) {
             body.style.removeProperty('--w-media-c1');
             body.style.removeProperty('--w-media-c2');
             body.innerHTML = `
                 <div class="w-media w-media-player-card w-media-empty">
                     <img class="w-media-empty-icon" src="Theme/Icon/Symbol_icon/stroke/Music.svg" alt="">
-                    <div class="w-media-empty-text">${t('widgets.media.empty')}</div>
+                    <div class="w-media-empty-text">请先导入音乐</div>
                 </div>`;
             return;
         }
@@ -1762,7 +2013,10 @@ const WidgetDefs = {
             variants: [
                 { id: 'calendar-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-calendar', render(b, c) { wRenderCalendar(b, c, 's'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } },
                 { id: 'calendar-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-calendar', render(b, c) { wRenderCalendar(b, c, 'm'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } },
-                { id: 'calendar-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-calendar', render(b, c) { wRenderCalendar(b, c, 'l'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } }
+                { id: 'calendar-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-calendar', render(b, c) { wRenderCalendar(b, c, 'l'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } },
+                { id: 'calendar-events-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-calendar-events', render(b, c) { wRenderCalendarEvents(b, c, 's'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } },
+                { id: 'calendar-events-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-calendar-events', render(b, c) { wRenderCalendarEvents(b, c, 'm'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } },
+                { id: 'calendar-events-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-calendar-events', render(b, c) { wRenderCalendarEvents(b, c, 'l'); }, onClick() { WindowManager.openApp('clock', { tab: 'calendar' }); } }
             ]
         },
         {
@@ -1810,8 +2064,8 @@ const WidgetDefs = {
         },
         {
             id: 'favorites',
-            nameKey: 'Favorites',
-            descKey: 'Favorite sites and quick app links',
+            nameKey: 'widgets.app.favorites',
+            descKey: 'widgets.app.favorites.desc',
             icon: 'Theme/Icon/Symbol_icon/stroke/Bookmark.svg',
             variants: [
                 { id: 'favorites-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-favorites', render(b, c) { wRenderFavoriteSites(b, c, 's'); }, renderEditor: wRenderFavoriteSitesEditor },

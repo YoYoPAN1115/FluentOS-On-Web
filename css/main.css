@@ -1161,6 +1161,129 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     background: var(--accent);
 }
 
+.taskbar-window-preview {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 5000;
+    width: max-content;
+    max-width: calc(100vw - 16px);
+    padding: 6px;
+    border-radius: 14px;
+    background: rgba(248, 248, 248, 0.82);
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+    -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    transform-origin: bottom center;
+    pointer-events: none;
+    transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.taskbar-window-preview.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.dark-mode .taskbar-window-preview {
+    background: rgba(34, 34, 34, 0.84);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.46);
+}
+
+.taskbar-window-preview-titlebar {
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 0 5px 2px;
+    color: var(--text-primary);
+}
+
+.taskbar-window-preview-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.taskbar-window-preview-title img {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+}
+
+.taskbar-window-preview-title span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 228px;
+}
+
+.taskbar-window-preview-close {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.taskbar-window-preview-close img {
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+}
+
+.dark-mode .taskbar-window-preview-close img {
+    filter: invert(1);
+}
+
+.taskbar-window-preview-close:hover {
+    background: rgba(232, 17, 35, 0.88);
+    color: #fff;
+}
+
+.taskbar-window-preview-close:hover img {
+    filter: invert(1);
+}
+
+.taskbar-window-preview-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--bg-primary);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.22);
+}
+
+.dark-mode .taskbar-window-preview-frame {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.taskbar-window-preview-clone,
+.taskbar-window-preview-clone * {
+    pointer-events: none !important;
+}
+
+.taskbar-window-preview-clone {
+    animation: none !important;
+}
+
+.taskbar-window-preview-clone .window-resize-handle,
+.taskbar-window-preview-clone .window-snap-layout-menu {
+    display: none !important;
+}
 .taskbar-notification {
     width: auto !important;
     padding: 0 12px !important;

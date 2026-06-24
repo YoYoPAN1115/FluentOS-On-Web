@@ -101,7 +101,31 @@ const MediaApp = {
     },
 
     get mediaElement() {
-        return this.container?.querySelector('#media-player-element') || null;
+        if (!this.container) return null;
+
+        const current = this.activeItem;
+        if (current?.type === 'audio') {
+            return this.container.querySelector('.media-audio-host audio#media-player-element')
+                || this.container.querySelector('audio#media-player-element')
+                || null;
+        }
+        if (current?.type === 'video') {
+            return this.container.querySelector('video#media-player-element') || null;
+        }
+
+        return this.container.querySelector('#media-player-element') || null;
+    },
+
+    ensureAudioHost() {
+        if (!this.container) return null;
+        let host = this.container.querySelector('.media-audio-host');
+        if (!host) {
+            host = document.createElement('div');
+            host.className = 'media-audio-host';
+            host.setAttribute('aria-hidden', 'true');
+            this.container.appendChild(host);
+        }
+        return host;
     },
 
     isAudioFile(file) {
@@ -275,7 +299,7 @@ const MediaApp = {
     render() {
         const initialPlaybackState = this.capturePlaybackState();
         const initialCurrent = this.activeItem;
-        const initialPreservedAudio = this.detachReusableAudio(initialCurrent);
+        const initialPreservedAudio = this.detachReusableAudio(initialCurrent, true);
         let isInitialFrameRender = true;
         this.container.innerHTML = '';
         if (this.frame && typeof this.frame.destroy === 'function') {
@@ -369,11 +393,17 @@ const MediaApp = {
         });
     },
 
-    detachReusableAudio(current) {
+    detachReusableAudio(current, forceDetach = false) {
         const media = this.mediaElement;
         if (!media || media.tagName !== 'AUDIO' || current?.type !== 'audio' || media.dataset.itemId !== current.id) {
             return null;
         }
+
+        const stableHost = this.container?.querySelector('.media-audio-host');
+        if (!forceDetach && stableHost && stableHost.contains(media)) {
+            return media;
+        }
+
         media.remove();
         return media;
     },
@@ -381,8 +411,11 @@ const MediaApp = {
     attachReusableAudio(media) {
         if (!media || !this.container) return;
         media.className = 'media-audio-hidden';
-        const host = this.container.querySelector('.media-page-shell') || this.container.querySelector('.media-app') || this.container;
-        host.appendChild(media);
+        const host = this.ensureAudioHost();
+        if (host && media.parentElement !== host) {
+            host.appendChild(media);
+        }
+        this.bindMediaElementEvents(media);
     },
 
     capturePlaybackState() {
@@ -1653,7 +1686,8 @@ const MediaApp = {
             media.id = 'media-player-element';
             media.preload = 'metadata';
             media.className = 'media-audio-hidden';
-            (this.container.querySelector('.media-home') || this.container).appendChild(media);
+            const host = this.ensureAudioHost();
+            (host || this.container).appendChild(media);
             this.bindMediaElementEvents(media);
         }
         if (!media) return;
@@ -2354,7 +2388,8 @@ const MediaApp = {
             }
             .media-volume span { grid-column: 1 / 3; }
             .media-hidden-input,
-            .media-audio-hidden { display: none; }
+            .media-audio-hidden,
+            .media-audio-host { display: none; }
             @keyframes mediaArtIn {
                 from { opacity: 0; transform: translateY(18px) scale(0.96); filter: blur(10px); }
                 to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }

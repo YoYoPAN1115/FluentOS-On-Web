@@ -134,38 +134,68 @@ const PhotosApp = {
         return html;
     },
 
+    bingArchiveUrl(idx = 0, count = 10) {
+        return 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=' + idx + '&n=' + count + '&mkt=zh-CN';
+    },
+
+    normalizeBingWallpaper(item, index = 0) {
+        if (!item) return null;
+        const rawUrl = item.url || item.urlbase;
+        const url = item.url
+            ? (/^https?:\/\//i.test(item.url) ? item.url : `https://www.bing.com${item.url}`)
+            : (item.urlbase ? `https://www.bing.com${item.urlbase}_1920x1080.jpg` : rawUrl);
+        if (!url || !/^https?:\/\//i.test(url)) return null;
+        const urlHD = item.urlbase ? `https://www.bing.com${item.urlbase}_UHD.jpg` : url.replace(/1920x1080/g, 'UHD');
+        const title = (item.copyright || item.title || '').split(/[（(]/)[0].trim();
+        return {
+            url,
+            urlHD,
+            title: title || `${t('photos.wallpaper-default')}#${index + 1}`,
+            copyright: item.copyright || item.title || '',
+            date: item.startdate || item.start_date || item.enddate || '',
+            copyrightlink: item.copyrightlink || item.copyright_link || ''
+        };
+    },
+
+    async fetchBingArchive(count = 10, useProxy = false) {
+        const archiveUrl = this.bingArchiveUrl(0, count);
+        const url = useProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(archiveUrl)}` : archiveUrl;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        return (data.images || []).map((item, i) => this.normalizeBingWallpaper(item, i)).filter(Boolean);
+    },
+
+    async fetchBingBiturl(count = 10) {
+        const promises = [];
+        for (let i = 0; i < count; i++) {
+            const url = `https://bing.biturl.top/?resolution=1920&format=json&index=${i}&mkt=zh-CN`;
+            promises.push(fetch(url).then(r => r.ok ? r.json() : null).catch(() => null));
+        }
+        const results = await Promise.all(promises);
+        return results.map((item, i) => this.normalizeBingWallpaper(item, i)).filter(Boolean);
+    },
+
     async fetchBingWallpapers() {
         try {
-            // 使用 bing.biturl.top 第三方 API（无 CORS 限制）
-            // 并发请求最近 10 天的壁纸，index=0 为今天，index=1 为昨天...
             const count = 10;
-            const promises = [];
-            for (let i = 0; i < count; i++) {
-                const url = `https://bing.biturl.top/?resolution=1920&format=json&index=${i}&mkt=zh-CN`;
-                promises.push(
-                    fetch(url)
-                        .then(r => r.ok ? r.json() : null)
-                        .catch(() => null)
-                );
+            let images = [];
+            const loaders = [
+                () => this.fetchBingArchive(count, false),
+                () => this.fetchBingArchive(count, true),
+                () => this.fetchBingBiturl(count)
+            ];
+            let lastError = null;
+            for (const load of loaders) {
+                try {
+                    images = await load();
+                    if (images.length) break;
+                } catch (err) {
+                    lastError = err;
+                }
             }
-            const results = await Promise.all(promises);
-            this.images = results
-                .filter(r => r && r.url)
-                .map((r, i) => {
-                    const hdUrl = r.url.replace(/1920x1080/g, 'UHD');
-                    const dateStr = r.start_date || '';
-                    // 从 copyright 中提取标题（括号前的部分）
-                    const title = (r.copyright || '').split(/[（(]/)[0].trim();
-                    return {
-                        url: r.url,
-                        urlHD: hdUrl,
-                        title: title || `${t('photos.wallpaper-default')}#${i + 1}`,
-                        copyright: r.copyright || '',
-                        date: dateStr,
-                        copyrightlink: r.copyright_link || ''
-                    };
-                });
-            if (this.images.length === 0) throw new Error('No wallpapers');
+            this.images = images;
+            if (this.images.length === 0) throw lastError || new Error('No wallpapers');
             this.renderGallery();
         } catch (e2) {
             console.error('[PhotosApp] Bing wallpaper API failed', e2);
@@ -806,8 +836,10 @@ const PhotosApp = {
             .photos-viewer { display:flex; flex-direction:column; height:100%; position:relative; background:#000 !important; background-color:#000 !important; background-image:none !important; transition:opacity 0.3s ease; }
             .photos-canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:grab; position:relative; background:#000 !important; }
             .photos-main-img { max-width:100%; max-height:100%; object-fit:contain; transition:filter 0.2s, opacity 0.25s ease; user-select:none; -webkit-user-drag:none; }
-            .photos-back-btn { position:absolute; top:12px; left:12px; display:flex; align-items:center; gap:6px; padding:6px 14px; background:rgba(0,0,0,0.5) !important; background-color:rgba(0,0,0,0.5) !important; backdrop-filter:blur(10px); color:#fff !important; border:none; border-radius:20px; cursor:pointer; font-size:13px; z-index:10; transition:background 0.2s; }
-            .photos-back-btn:hover { background:rgba(0,0,0,0.7) !important; background-color:rgba(0,0,0,0.7) !important; }
+            .photos-back-btn { position:absolute; top:12px; left:12px; display:flex; align-items:center; gap:6px; height:32px; min-height:32px; box-sizing:border-box; padding:6px 14px; background:rgba(0,0,0,0.5) !important; background-color:rgba(0,0,0,0.5) !important; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); -webkit-background-clip:unset !important; background-clip:unset !important; color:#fff !important; border:none; border-radius:20px; cursor:pointer; font-size:13px; line-height:1; z-index:10; overflow:hidden; transform:none !important; transition:background-color 0.2s, background 0.2s; }
+            body.button-glow-enabled .photos-back-btn.button-glow-target { position:absolute; top:12px; left:12px; }
+            .photos-back-btn:hover { background:rgba(0,0,0,0.7) !important; background-color:rgba(0,0,0,0.7) !important; transform:none !important; }
+            .photos-back-btn::before, .photos-back-btn::after { display:none !important; }
             .photos-back-btn img { width:16px; height:16px; filter:brightness(0) invert(1); }
             .photos-counter { position:absolute; top:12px; right:12px; padding:4px 12px; background:rgba(0,0,0,0.5) !important; background-color:rgba(0,0,0,0.5) !important; backdrop-filter:blur(10px); color:#fff !important; border-radius:12px; font-size:12px; z-index:10; }
 
