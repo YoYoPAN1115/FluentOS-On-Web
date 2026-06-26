@@ -34,6 +34,10 @@ const StartMenu = {
 
         // 监听文件系统变化，实时刷新推荐
         State.on('fsChange', () => this.renderRecent());
+        window.addEventListener('photos-cache-ready', () => {
+            if (typeof this.renderRecentFiles === 'function') this.renderRecentFiles();
+            else this.renderRecent();
+        });
         // 记事本保存等会更新 modified 时间
         State.on('notificationAdd', () => this.renderRecent());
         
@@ -613,7 +617,7 @@ const StartMenu = {
         }
         this.recentContainer.innerHTML = list.map(f => `
             <div class="recent-item" data-id="${f.id}" title="${f.path}" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;cursor:pointer;">
-                <img src="${f.icon}" alt="" style="width:18px;height:18px;opacity:0.9;">
+                <img src="${f.preview || f.icon}" alt="" class="${f.preview ? 'recent-item-thumb' : ''}" style="width:18px;height:18px;opacity:0.9;">
                 <div style="display:flex;flex-direction:column;gap:2px;">
                     <span style="font-size:13px;">${f.name}</span>
                     <span style="font-size:11px;color:var(--text-tertiary);">${RecentFiles.formatTime(f.modified)}</span>

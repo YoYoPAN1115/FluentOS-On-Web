@@ -1592,6 +1592,11 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     flex-shrink: 0;
 }
 
+.recent-item-thumb {
+    object-fit: cover;
+    border-radius: 6px;
+}
+
 .start-app-group {
     padding: 10px 8px 6px;
     color: var(--text-secondary);

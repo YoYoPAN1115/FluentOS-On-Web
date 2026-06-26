@@ -72,6 +72,17 @@ const FilesApp = {
         };
         State.on('settingsChange', this._settingsHandler);
 
+        this._photosCacheHandler = () => {
+            if (!this.container || this.isSearching) return;
+            clearTimeout(this._photosCacheTimer);
+            this._photosCacheTimer = setTimeout(() => {
+                this._photosCacheTimer = null;
+                if (!this.container || this.isSearching) return;
+                this.renderFileList();
+            }, 80);
+        };
+        window.addEventListener('photos-cache-ready', this._photosCacheHandler);
+
         // 如果有传入文件ID，导航到该位置
         if (data.fileId) {
             setTimeout(() => this.navigateToId(data.fileId), 100);
@@ -87,6 +98,12 @@ const FilesApp = {
         if (ctxMenu && ctxMenu.parentElement === document.body) {
             ctxMenu.remove();
         }
+        if (this._photosCacheHandler) {
+            window.removeEventListener('photos-cache-ready', this._photosCacheHandler);
+            this._photosCacheHandler = null;
+        }
+        clearTimeout(this._photosCacheTimer);
+        this._photosCacheTimer = null;
         this.container = null;
         this.windowId = null;
         return true;
@@ -273,6 +290,8 @@ const FilesApp = {
             .file-item:hover { background: rgba(0, 0, 0, 0.05); }
             .file-item.selected { background: var(--accent); color: white; }
             .file-item img { width: 48px; height: 48px; }
+            .file-item-image-preview { width: 64px !important; height: 64px !important; border-radius: 12px; object-fit: cover; box-shadow: 0 8px 22px rgba(0,0,0,0.14); background: rgba(0,0,0,0.08); }
+            .file-item.selected .file-item-image-preview { box-shadow: 0 8px 22px rgba(0,0,0,0.22); }
             .file-item span { font-size: 13px; text-align: center; word-break: break-word; }
             .files-statusbar { padding: 8px 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); background: var(--bg-tertiary); }
             .dark-mode .toolbar-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
@@ -1134,6 +1153,42 @@ const FilesApp = {
         });
     },
 
+    isImageNode(node) {
+        if (window.PhotosDataStore && typeof PhotosDataStore.isImageNode === 'function') {
+            return PhotosDataStore.isImageNode(node);
+        }
+        if (!node || node.type !== 'file') return false;
+        const mime = String(node.mime || '').toLowerCase();
+        if (mime.startsWith('image/')) return true;
+        return node.encoding === 'dataurl' && /^data:image\//i.test(String(node.content || ''));
+    },
+
+    getImagePreviewSrc(node) {
+        if (window.PhotosDataStore && typeof PhotosDataStore.peekImageSrc === 'function') {
+            return PhotosDataStore.peekImageSrc(node);
+        }
+        if (window.PhotosDataStore && typeof PhotosDataStore.resolveImageSrc === 'function') {
+            return PhotosDataStore.resolveImageSrc(node, new Set(), { load: false });
+        }
+        if (!node || node.type !== 'file') return '';
+        if (/^data:image\//i.test(String(node.content || ''))) return node.content;
+        if (/^https?:\/\//i.test(String(node.url || node.content || ''))) return node.url || node.content;
+        return '';
+    },
+
+    renderFileIconHTML(node) {
+        if (this.isImageNode(node)) {
+            const preview = this.getImagePreviewSrc(node);
+            if (preview) {
+                return `<img class="file-item-image-preview" src="${preview}" alt="${node.name}">`;
+            }
+        }
+        const icon = node.type === 'folder'
+            ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
+            : 'Theme/Icon/Symbol_icon/stroke/File.svg';
+        return `<img src="${icon}" alt="${node.name}">`;
+    },
+
     renderFileList() {
         const filesList = document.getElementById('files-list');
         if (!filesList) {
@@ -1191,12 +1246,8 @@ const FilesApp = {
             item.dataset.id = node.id;
             item.draggable = true;
             
-            const icon = node.type === 'folder' 
-                ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
-                : 'Theme/Icon/Symbol_icon/stroke/File.svg';
-
             item.innerHTML = `
-                <img src="${icon}" alt="${node.name}">
+                ${this.renderFileIconHTML(node)}
                 <span>${node.name}</span>
             `;
             
@@ -1393,6 +1444,11 @@ const FilesApp = {
     
     openNodeWithDefaultApp(node) {
         if (!node || node.type !== 'file' || typeof WindowManager === 'undefined') return false;
+
+        if (this.isImageNode(node)) {
+            WindowManager.openApp('photos', { fileId: node.id });
+            return true;
+        }
 
         // Office 应用已下线，所有文件统一使用记事本打开
         WindowManager.openApp('notes', { fileId: node.id });
@@ -1831,15 +1887,12 @@ const FilesApp = {
             item.className = 'file-item';
             item.dataset.id = nodeId;
             
-            const icon = nodeType === 'folder' 
-                ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
-                : 'Theme/Icon/Symbol_icon/stroke/File.svg';
             const nameNode = State.findNode(nodeId);
             const displayName = nameNode ? nameNode.name : nodeId;
             const location = pathToText(path.slice(0, -1));
 
             item.innerHTML = `
-                <img src="${icon}" alt="${displayName}">
+                ${this.renderFileIconHTML(nameNode || { id: nodeId, name: displayName, type: nodeType })}
                 <span>${displayName}</span>
                 <small style="opacity:.7; font-size:11px; margin-top:-4px;">${location}</small>
             `;

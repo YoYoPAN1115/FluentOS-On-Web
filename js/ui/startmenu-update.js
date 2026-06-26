@@ -12,6 +12,12 @@ Object.assign(StartMenu, {
         this._originalInit.call(this);
         this.recentItemsContainer = document.getElementById('start-recent-items');
         this.bindNewEvents();
+        if (!this._photosCacheReadyHandler) {
+            this._photosCacheReadyHandler = () => {
+                if (this.isOpen) this.renderRecentFiles();
+            };
+            window.addEventListener('photos-cache-ready', this._photosCacheReadyHandler);
+        }
         this.renderRecentFiles();
     },
     
@@ -84,7 +90,7 @@ Object.assign(StartMenu, {
         
         this.recentItemsContainer.innerHTML = recentFiles.map(file => `
             <div class="recent-item" data-file-id="${file.id}" data-file-path="${file.path}">
-                <img src="${file.icon}" alt="" class="recent-item-icon">
+                <img src="${file.preview || file.icon}" alt="" class="recent-item-icon ${file.preview ? 'recent-item-thumb' : ''}">
                 <div class="recent-item-info">
                     <div class="recent-item-name">${file.name}</div>
                     <div class="recent-item-time">${RecentFiles.formatTime(file.modified)}</div>
@@ -118,7 +124,7 @@ Object.assign(StartMenu, {
         
         this.recentItemsContainer.innerHTML = results.map(file => `
             <div class="recent-item" data-file-id="${file.id}" data-file-path="${file.path}">
-                <img src="${file.icon}" alt="" class="recent-item-icon">
+                <img src="${file.preview || file.icon}" alt="" class="recent-item-icon ${file.preview ? 'recent-item-thumb' : ''}">
                 <div class="recent-item-info">
                     <div class="recent-item-name">${file.name}</div>
                     <div class="recent-item-time">${file.path}</div>

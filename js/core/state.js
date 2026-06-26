@@ -86,14 +86,20 @@ const State = {
             this.fs = Storage.get(Storage.keys.FS) || { root: { id: 'root', name: '此电脑', type: 'folder', children: [] } };
         }
         const root = this.fs.root;
-        root.children = root.children || [];
+        let changed = false;
+        if (!Array.isArray(root.children)) {
+            root.children = [];
+            changed = true;
+        }
         const ensureFolder = (id, name) => {
             let node = root.children.find(c => c.id === id);
             if (!node) {
                 node = { id, name, type: 'folder', children: [] };
                 root.children.push(node);
+                changed = true;
             } else if (!Array.isArray(node.children)) {
                 node.children = [];
+                changed = true;
             }
         };
         ensureFolder('desktop', '桌面');
@@ -102,7 +108,7 @@ const State = {
         ensureFolder('downloads', '下载');
         ensureFolder('recycle', '回收站');
         // 保存修复结果
-        Storage.set(Storage.keys.FS, this.fs);
+        if (changed) Storage.set(Storage.keys.FS, this.fs);
     },
 
     getDefaultUserAvatar() {
@@ -1129,8 +1135,9 @@ const State = {
     // 文件系统操作
     updateFS(newFS) {
         this.fs = newFS;
-        Storage.set(Storage.keys.FS, this.fs);
+        const saved = Storage.set(Storage.keys.FS, this.fs);
         this.emit('fsChange', newFS);
+        return saved;
     },
 
     // 查找文件/文件夹

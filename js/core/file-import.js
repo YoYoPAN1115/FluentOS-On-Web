@@ -124,6 +124,12 @@
         return ['txt', 'md', 'json', 'js', 'ts', 'css', 'html', 'htm', 'xml', 'csv', 'log', 'yml', 'yaml'].includes(ext);
     }
 
+    function isImageImportFile(file) {
+        const mime = normalizeMime(file?.type);
+        if (mime.startsWith('image/')) return true;
+        return ['png', 'jpg', 'jpeg'].includes(getFileExt(file?.name || ''));
+    }
+
     function readFile(file, { onProgress, onReader } = {}) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -363,18 +369,43 @@
                         task.progressEl.setValue(0);
                         this._refreshOverall();
 
-                        const result = await readFile(task.file, {
-                            onReader: (reader) => { this._activeReader = reader; },
-                            onProgress: (loaded, total) => {
-                                task.bytesLoaded = loaded;
-                                const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
-                                task.progressEl.setValue(pct);
-                                this._refreshOverall();
-                            }
-                        });
-                        this._activeReader = null;
+                        let result = null;
+                        let cachedImage = null;
+                        const shouldCacheImage = isImageImportFile(task.file)
+                            && window.PhotosDataStore
+                            && typeof PhotosDataStore.storeLocalImage === 'function';
+                        if (shouldCacheImage) {
+                            const nodeId = `file-${Date.now()}-${rand()}`;
+                            const cacheKey = await PhotosDataStore.storeLocalImage(nodeId, task.file, {
+                                mime: task.file.type,
+                                name: task.file.name,
+                                size: task.file.size,
+                                lastModified: task.file.lastModified
+                            });
+                            const thumb = typeof PhotosDataStore.cachedThumbForId === 'function'
+                                ? PhotosDataStore.cachedThumbForId(nodeId)
+                                : '';
+                            cachedImage = { nodeId, cacheKey, thumb };
+                            task.bytesLoaded = task.bytesTotal;
+                            task.progressEl.setValue(100);
+                            this._refreshOverall();
+                        } else {
+                            result = await readFile(task.file, {
+                                onReader: (reader) => { this._activeReader = reader; },
+                                onProgress: (loaded, total) => {
+                                    task.bytesLoaded = loaded;
+                                    const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
+                                    task.progressEl.setValue(pct);
+                                    this._refreshOverall();
+                                }
+                            });
+                            this._activeReader = null;
+                        }
 
                         if (this._cancelled) {
+                            if (cachedImage && window.PhotosDataStore && typeof PhotosDataStore.removeLocalImageCache === 'function') {
+                                PhotosDataStore.removeLocalImageCache(cachedImage.nodeId);
+                            }
                             this._setTaskStatus(task, 'cancelled');
                             this._refreshOverall();
                             continue;
@@ -391,13 +422,16 @@
 
                         const isText = isProbablyText(task.file);
                         const node = {
-                            id: `file-${Date.now()}-${rand()}`,
+                            id: cachedImage ? cachedImage.nodeId : `file-${Date.now()}-${rand()}`,
                             name: finalName,
                             type: 'file',
-                            content: typeof result === 'string' ? result : '',
+                            content: cachedImage ? cachedImage.cacheKey : (typeof result === 'string' ? result : ''),
+                            ...(cachedImage ? { cacheKey: cachedImage.cacheKey, cacheId: cachedImage.nodeId } : {}),
+                            ...(cachedImage && cachedImage.thumb ? { thumb: cachedImage.thumb } : {}),
                             size: Number(task.file.size || 0),
                             mime: String(task.file.type || (isText ? 'text/plain' : 'application/octet-stream')),
-                            encoding: isText ? 'text' : 'dataurl',
+                            encoding: cachedImage ? 'photos-local-cache' : (isText ? 'text' : 'dataurl'),
+                            source: cachedImage ? 'external-import' : undefined,
                             created: nowIso(),
                             modified: nowIso()
                         };

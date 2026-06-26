@@ -11,21 +11,84 @@ const Storage = {
         NOTIFICATIONS: 'fluentos.notifications'
     },
 
+    fsInlinePayloadMarker: '__fluentos_removed_inline_payload__',
+    fsInlineImagePayloadThreshold: 128 * 1024,
+    fsInlineGenericPayloadThreshold: 2 * 1024 * 1024,
+
     // 获取数据
     get(key, defaultValue = null) {
         try {
             const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : defaultValue;
+            if (!data) return defaultValue;
+            if (key === this.keys.FS) return this.parseFS(data, defaultValue);
+            return JSON.parse(data);
         } catch (error) {
             console.error('Storage get error:', error);
             return defaultValue;
         }
     },
 
+    parseFS(data, defaultValue = null) {
+        const cleaned = this.stripLargeInlinePayloads(data);
+        const value = JSON.parse(cleaned.data);
+        if (cleaned.changed) {
+            this.markRemovedInlinePayloads(value);
+            try {
+                localStorage.setItem(this.keys.FS, JSON.stringify(value));
+                console.warn('[Storage] Removed oversized inline file payloads from fluentos.fs to keep startup responsive.');
+            } catch (error) {
+                console.error('Storage FS cleanup error:', error);
+            }
+        }
+        return value || defaultValue;
+    },
+
+    stripLargeInlinePayloads(data) {
+        if (typeof data !== 'string' || data.indexOf('data:') < 0 || data.length < this.fsInlineImagePayloadThreshold) {
+            return { data, changed: false };
+        }
+        let changed = false;
+        const marker = this.fsInlinePayloadMarker;
+        const stripped = data.replace(/("content"\s*:\s*")data:[^"]+(")/g, (match, prefix, suffix) => {
+            const threshold = match.indexOf('data:image/') >= 0
+                ? this.fsInlineImagePayloadThreshold
+                : this.fsInlineGenericPayloadThreshold;
+            if (match.length < threshold) return match;
+            changed = true;
+            return `${prefix}${marker}${suffix}`;
+        });
+        return { data: stripped, changed };
+    },
+
+    markRemovedInlinePayloads(fsData) {
+        const walk = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.type === 'file' && node.content === this.fsInlinePayloadMarker) {
+                node.content = '';
+                node.encoding = 'external-data-removed';
+                node._payloadRemoved = true;
+                node._hiddenFromRecent = true;
+                node.modified = node.modified || new Date().toISOString();
+            }
+            if (Array.isArray(node.children)) node.children.forEach(walk);
+        };
+        walk(fsData && fsData.root);
+    },
+
     // 保存数据
     set(key, value) {
         try {
-            const serialized = JSON.stringify(value);
+            let serialized = JSON.stringify(value);
+            if (key === this.keys.FS) {
+                const cleaned = this.stripLargeInlinePayloads(serialized);
+                if (cleaned.changed) {
+                    const cleanedValue = JSON.parse(cleaned.data);
+                    this.markRemovedInlinePayloads(cleanedValue);
+                    serialized = JSON.stringify(cleanedValue);
+                    value = cleanedValue;
+                    console.warn('[Storage] Prevented oversized inline file payloads from being written to fluentos.fs.');
+                }
+            }
             if (localStorage.getItem(key) === serialized) return true;
             localStorage.setItem(key, serialized);
             return true;

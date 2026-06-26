@@ -92,6 +92,13 @@ const Widgets = {
         // 天气 App 拿到新数据时，同步刷新所有天气小组件（保持数据一致）
         State.on('weatherDataUpdate', () => this.refreshWeatherWidgets());
         State.on('clockEventsUpdate', () => this.refreshCalendarEventWidgets());
+        window.addEventListener('photos-cache-ready', () => {
+            clearTimeout(this._photosCacheRefreshTimer);
+            this._photosCacheRefreshTimer = setTimeout(() => {
+                this._photosCacheRefreshTimer = null;
+                this.refreshWidgetsByPrefix('photos-');
+            }, 80);
+        });
     },
 
     /** 仅重新渲染天气小组件的内容（不重建其他小组件，避免打断时钟等） */

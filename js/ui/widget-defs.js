@@ -1005,6 +1005,31 @@ async function wFetchBing() {
 
 function wRenderPhotos(body, ctx, size) {
     wAsync(body, async () => {
+        const source = wPhotoWidgetSource(ctx);
+        if (source !== 'bing' && window.PhotosDataStore && typeof PhotosDataStore.getWidgetImage === 'function') {
+            const data = PhotosDataStore.getWidgetImage(source);
+            if (!body.isConnected) return;
+            if (data && data.pending) {
+                body.innerHTML = `<div class="w-loading">${t('widgets.loading')}</div>`;
+                return;
+            }
+            if (!data || !data.url) {
+                const empty = source === 'favorites'
+                    ? wUiText('\u6682\u65e0\u6536\u85cf\u7167\u7247', 'No favorite photos')
+                    : wUiText('\u6682\u65e0\u672c\u673a\u7167\u7247', 'No local photos');
+                body.innerHTML = `<div class="w-loading">${empty}</div>`;
+                return;
+            }
+            body.innerHTML = `
+                <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
+                    <div class="w-photo-overlay">
+                        <div class="w-photo-tag">${wEsc(data.tag || wPhotoSourceLabel(source))}</div>
+                        ${size !== 's' ? `<div class="w-photo-title">${wEsc(data.title || '')}</div>` : ''}
+                    </div>
+                </div>`;
+            return;
+        }
+
         const data = await wFetchBing();
         if (!body.isConnected) return;
         const title = (data.copyright || '').split(/[\uFF08(]/)[0].trim();
@@ -1015,6 +1040,60 @@ function wRenderPhotos(body, ctx, size) {
                     ${size !== 's' ? `<div class="w-photo-title">${wEsc(title)}</div>` : ''}
                 </div>
             </div>`;
+    });
+}
+
+function wPhotoWidgetSource(ctx) {
+    const valid = new Set(['bing', 'local', 'favorites']);
+    const inst = ctx.instance?.settings?.source;
+    const globalSource = window.PhotosDataStore && typeof PhotosDataStore.getSettings === 'function'
+        ? PhotosDataStore.getSettings().widgetSource
+        : '';
+    const source = valid.has(globalSource) ? globalSource : (valid.has(inst) ? inst : 'bing');
+    return source;
+}
+
+function wPhotoSourceLabel(source) {
+    if (source === 'local') return wUiText('\u672c\u673a\u7167\u7247', 'Local Photos');
+    if (source === 'favorites') return wUiText('\u6536\u85cf', 'Favorites');
+    return wUiText('Bing \u6bcf\u65e5\u58c1\u7eb8', 'Bing Daily');
+}
+
+function wRenderPhotosEditor(container, ctx) {
+    const current = wPhotoWidgetSource(ctx);
+    const sources = [
+        ['bing', wUiText('Bing \u6bcf\u65e5\u58c1\u7eb8', 'Bing daily wallpaper')],
+        ['local', wUiText('\u968f\u673a\u672c\u673a\u7167\u7247', 'Random local photo')],
+        ['favorites', wUiText('\u6536\u85cf', 'Favorites')]
+    ];
+    container.innerHTML = `
+        <div class="widget-edit-panel">
+            <div class="widget-edit-head">
+                <img src="Theme/Icon/Symbol_icon/stroke/Image.svg" alt="">
+                <div>
+                    <div class="widget-edit-title">${wUiText('\u7167\u7247\u6765\u6e90', 'Photo Source')}</div>
+                    <div class="widget-edit-subtitle">${wUiText('\u9009\u62e9\u7167\u7247\u5c0f\u7ec4\u4ef6\u663e\u793a\u7684\u5185\u5bb9\uff0c\u4f1a\u4e0e\u7167\u7247 App \u8bbe\u7f6e\u540c\u6b65\u3002', 'Choose what the Photos widget displays. This stays synced with Photos settings.')}</div>
+                </div>
+            </div>
+            <div class="widget-edit-options">
+                ${sources.map(([key, label]) => `
+                    <button class="widget-edit-option ${key === current ? 'selected' : ''}" data-photo-source="${key}" type="button">
+                        <span>${wEsc(label)}</span>
+                        <img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="">
+                    </button>
+                `).join('')}
+            </div>
+        </div>`;
+    container.querySelectorAll('[data-photo-source]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const source = btn.dataset.photoSource || 'bing';
+            container.querySelectorAll('.widget-edit-option').forEach(item => item.classList.remove('selected'));
+            btn.classList.add('selected');
+            ctx.setSettings({ source }, { silent: true });
+            if (window.PhotosDataStore && typeof PhotosDataStore.saveSettings === 'function') {
+                PhotosDataStore.saveSettings({ widgetSource: source }, { syncWidgets: true });
+            }
+        });
     });
 }
 
@@ -2025,9 +2104,9 @@ const WidgetDefs = {
             descKey: 'widgets.app.photos.desc',
             icon: 'Theme/Icon/Symbol_icon/stroke/Image.svg',
             variants: [
-                { id: 'photos-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 's'); }, onClick() { WindowManager.openApp('photos'); } },
-                { id: 'photos-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 'm'); }, onClick() { WindowManager.openApp('photos'); } },
-                { id: 'photos-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-photos', render(b, c) { wRenderPhotos(b, c, 'l'); }, onClick() { WindowManager.openApp('photos'); } }
+                { id: 'photos-s', w: 2, h: 2, sizeKey: 'widgets.size.small', theme: 'w-photos', defaultSettings: { source: 'bing' }, render(b, c) { wRenderPhotos(b, c, 's'); }, renderEditor: wRenderPhotosEditor, onClick() { WindowManager.openApp('photos'); } },
+                { id: 'photos-m', w: 4, h: 2, sizeKey: 'widgets.size.medium', theme: 'w-photos', defaultSettings: { source: 'bing' }, render(b, c) { wRenderPhotos(b, c, 'm'); }, renderEditor: wRenderPhotosEditor, onClick() { WindowManager.openApp('photos'); } },
+                { id: 'photos-l', w: 4, h: 4, sizeKey: 'widgets.size.large', theme: 'w-photos', defaultSettings: { source: 'bing' }, render(b, c) { wRenderPhotos(b, c, 'l'); }, renderEditor: wRenderPhotosEditor, onClick() { WindowManager.openApp('photos'); } }
             ]
         },
         {
