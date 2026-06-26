@@ -3483,12 +3483,12 @@ const SettingsApp = {
             })
         }));
 
-        const blur = Math.max(12, Math.min(70, Number(State.settings.blurIntensity ?? 40)));
+        const blur = Math.max(10, Math.min(70, Number(State.settings.blurIntensity ?? 40)));
         blurItem = FluentUI.SettingItem({
             label: t('settings.blur-intensity'),
             description: t('settings.blur-intensity.desc'),
             control: FluentUI.Slider({
-                min: 12,
+                min: 10,
                 max: 70,
                 value: blur,
                 step: 1,

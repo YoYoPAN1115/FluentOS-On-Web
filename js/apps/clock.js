@@ -226,14 +226,16 @@ const ClockApp = {
             .dark-mode .calendar-nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
             
             body.fluent-v2 .clock-app .timer-btn.fluent-btn { min-width: 148px; }
-            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn {
+            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn,
+            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn .fluent-btn-text {
                 color: #111111 !important;
                 -webkit-text-fill-color: #111111;
                 background-clip: border-box;
                 -webkit-background-clip: border-box;
                 background-image: none !important;
             }
-            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn {
+            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn,
+            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn .fluent-btn-text {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff;
                 background-clip: border-box;
@@ -528,21 +530,23 @@ const ClockApp = {
                 }
                 return; // 阻止继续匹配到下面的按钮逻辑
             }
-            if (e.target.id === 'timer-start') {
+            const actionButton = e.target.closest('#timer-start, #timer-pause, #timer-reset, #stopwatch-start, #stopwatch-pause, #stopwatch-reset, #stopwatch-lap');
+            const actionId = actionButton && actionButton.id;
+            if (actionId === 'timer-start') {
                 this.startTimer();
-            } else if (e.target.id === 'timer-pause') {
+            } else if (actionId === 'timer-pause') {
                 this.pauseTimer();
-            } else if (e.target.id === 'timer-reset') {
+            } else if (actionId === 'timer-reset') {
                 this.resetTimer();
             }
             // 秒表事件
-            else if (e.target.id === 'stopwatch-start') {
+            else if (actionId === 'stopwatch-start') {
                 this.startStopwatch();
-            } else if (e.target.id === 'stopwatch-pause') {
+            } else if (actionId === 'stopwatch-pause') {
                 this.pauseStopwatch();
-            } else if (e.target.id === 'stopwatch-reset') {
+            } else if (actionId === 'stopwatch-reset') {
                 this.resetStopwatch();
-            } else if (e.target.id === 'stopwatch-lap') {
+            } else if (actionId === 'stopwatch-lap') {
                 this.addLap();
             }
             // 日历事件
@@ -661,6 +665,7 @@ const ClockApp = {
 
     // 秒表方法
     startStopwatch() {
+        if (this.stopwatchInterval) return;
         this.stopwatchInterval = setInterval(() => {
             this.stopwatchTime += 10;
             this.updateStopwatchDisplay();

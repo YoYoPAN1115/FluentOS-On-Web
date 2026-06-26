@@ -25,13 +25,17 @@ const MediaApp = {
     expandTransitionTimer: null,
     collapseShrinkTimer: null,
     responsiveResizeObserver: null,
-    _rateClickAwayHandler: null,
+    _optionsClickAwayHandler: null,
     _languageListenerBound: false,
     _langHandler: null,
     mediaStorageKey: 'fluentos.media.library.v1',
+    playbackStorageKey: 'fluentos.media.playback.v1',
     mediaDbName: 'FluentOSMediaLibrary',
     mediaDbStore: 'files',
     restoreStarted: false,
+    pendingPlaybackState: null,
+    suppressNextPageAnimation: false,
+    _lastPlaybackSaveAt: 0,
     gradients: [
         'linear-gradient(135deg, #ff6b35 0%, #ffb347 52%, #ffe1c2 100%)',
         'linear-gradient(135deg, #ff2d55 0%, #ff7aa2 50%, #ffd1dc 100%)',
@@ -57,6 +61,7 @@ const MediaApp = {
 
         this.addStyles();
         this.syncVolumeFromState();
+        this.loadPlaybackPreferences();
         this.render();
         this.startProgressLoop();
         this.restoreLibraryFromStorage();
@@ -85,6 +90,7 @@ const MediaApp = {
     },
 
     beforeClose() {
+        this.savePlaybackSnapshot(true);
         this.destroy();
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
@@ -297,7 +303,7 @@ const MediaApp = {
     },
 
     render() {
-        const initialPlaybackState = this.capturePlaybackState();
+        const initialPlaybackState = this.capturePlaybackState() || this.getPendingPlaybackStateForActiveItem();
         const initialCurrent = this.activeItem;
         const initialPreservedAudio = this.detachReusableAudio(initialCurrent, true);
         let isInitialFrameRender = true;
@@ -318,6 +324,8 @@ const MediaApp = {
             const pagePreservedAudio = isInitialFrameRender
                 ? initialPreservedAudio
                 : this.detachReusableAudio(pageCurrentBeforeRender);
+            const suppressPageMotion = Boolean(this.suppressNextPageAnimation);
+            this.suppressNextPageAnimation = false;
 
             if (view && view !== this.getFrameActiveView()) {
                 if (view === 'now') {
@@ -333,7 +341,7 @@ const MediaApp = {
             const filteredItems = this.getFilteredItems();
             pageEl.classList.add('media-fw-page');
             pageEl.innerHTML = `
-                <div class="media-app media-fw-app ${this.playerExpanded ? 'player-expanded' : ''}">
+                <div class="media-app media-fw-app ${this.playerExpanded ? 'player-expanded' : ''} ${suppressPageMotion ? 'media-suppress-page-motion' : ''}">
                     <main class="media-main media-fw-main">
                         <label class="media-search media-fw-search">
                             <input id="media-search-input" type="search" value="${this.escapeAttr(this.searchQuery)}" placeholder="${this.localText('search')}">
@@ -380,6 +388,11 @@ const MediaApp = {
             this.updateProgressUi();
             if (this.playerExpanded) {
                 requestAnimationFrame(() => this.updateExpandedAnimationOrigin());
+            }
+            if (suppressPageMotion) {
+                requestAnimationFrame(() => {
+                    this.container?.querySelector('.media-app')?.classList.remove('media-suppress-page-motion');
+                });
             }
             isInitialFrameRender = false;
         };
@@ -428,6 +441,61 @@ const MediaApp = {
         };
     },
 
+    getStoredPlaybackState() {
+        try {
+            const state = JSON.parse(localStorage.getItem(this.playbackStorageKey) || '{}');
+            return state && typeof state === 'object' ? state : {};
+        } catch (_) {
+            return {};
+        }
+    },
+
+    loadPlaybackPreferences() {
+        const state = this.getStoredPlaybackState();
+        this.pendingPlaybackState = state.currentItemId ? {
+            itemId: state.currentItemId,
+            currentTime: Number(state.currentTime || 0),
+            wasPlaying: Boolean(state.wasPlaying)
+        } : null;
+
+        this.isShuffle = Boolean(state.isShuffle);
+        this.repeatMode = ['none', 'all', 'one'].includes(state.repeatMode) ? state.repeatMode : 'none';
+        const rate = Number(state.playbackRate || 1);
+        this.playbackRate = [0.5, 0.75, 1, 1.25, 1.5, 2].includes(rate) ? rate : 1;
+    },
+
+    getPendingPlaybackStateForActiveItem() {
+        const current = this.activeItem;
+        if (!current || !this.pendingPlaybackState || this.pendingPlaybackState.itemId !== current.id) return null;
+        return this.pendingPlaybackState;
+    },
+
+    savePlaybackSnapshot(force = false) {
+        const now = Date.now();
+        if (!force && now - this._lastPlaybackSaveAt < 1500) return;
+        this._lastPlaybackSaveAt = now;
+
+        const media = this.mediaElement;
+        const current = this.activeItem;
+        const currentTime = media && media.dataset.itemId === current?.id && Number.isFinite(media.currentTime)
+            ? media.currentTime
+            : 0;
+        const wasPlaying = Boolean(media && media.dataset.itemId === current?.id && !media.paused && !media.ended);
+
+        try {
+            localStorage.setItem(this.playbackStorageKey, JSON.stringify({
+                currentItemId: current?.id || null,
+                currentTime,
+                wasPlaying,
+                isShuffle: this.isShuffle,
+                repeatMode: this.repeatMode,
+                playbackRate: this.playbackRate
+            }));
+        } catch (_) {
+            // Storage can be unavailable; keep playback working in memory.
+        }
+    },
+
     restorePlaybackState(state) {
         const media = this.mediaElement;
         const current = this.activeItem;
@@ -439,6 +507,7 @@ const MediaApp = {
             }
             if (state.wasPlaying) this.playMedia(media, false);
             this.updateProgressUi();
+            this.pendingPlaybackState = null;
         };
 
         if (media.readyState >= 1) {
@@ -713,20 +782,45 @@ const MediaApp = {
         return `<input${idAttr} class="media-native-range ${className} ${inputClass}" type="range" min="${this.escapeAttr(String(min))}" max="${this.escapeAttr(String(max))}"${stepAttr} value="${this.escapeAttr(String(value))}"${labelAttr}>`;
     },
 
-    renderRateControl() {
-        const rates = [0.5, 0.75, 1, 1.25, 1.5, 2];
-        const current = Number(this.playbackRate || 1);
-        const options = rates.map((rate) => `
-            <button class="media-rate-option ${rate === current ? 'active' : ''}" type="button" data-rate="${rate}" role="option" aria-selected="${rate === current ? 'true' : 'false'}">${rate}x</button>
+    getPlaybackRates() {
+        return [0.5, 0.75, 1, 1.25, 1.5, 2];
+    },
+
+    getSwitchStateLabel(active) {
+        if (this.getLanguage() === 'en') return active ? 'On' : 'Off';
+        return active ? '开启' : '关闭';
+    },
+
+    renderExpandedOptionsMenu() {
+        const rates = this.getPlaybackRates();
+        const currentRate = Number(this.playbackRate || 1);
+        const rateOptions = rates.map((rate) => `
+            <button class="media-expanded-speed-option ${rate === currentRate ? 'active' : ''}" type="button" data-rate="${rate}" role="menuitemradio" aria-checked="${rate === currentRate ? 'true' : 'false'}">
+                <span>${rate}x</span>
+            </button>
         `).join('');
+
         return `
-            <div class="media-rate-picker">
-                <button class="media-rate-button" type="button" aria-haspopup="listbox" aria-expanded="false">
-                    <span class="media-rate-value">${current}x</span>
-                    <span class="media-rate-chevron" aria-hidden="true">${this.symbolIcon('Chevron Down.svg')}</span>
+            <div class="media-expanded-options">
+                <button class="media-more-button ${this.isShuffle || this.repeatMode !== 'none' ? 'active' : ''}" data-action="expanded-options" type="button" aria-haspopup="menu" aria-expanded="false" title="${this.localText('settings')}">
+                    ${this.symbolIcon('Dots Horizontal.svg')}
                 </button>
-                <div class="media-rate-menu" role="listbox" aria-label="${this.escapeAttr(this.localText('speed'))}">
-                    ${options}
+                <div class="media-expanded-options-menu" role="menu">
+                    <button class="media-expanded-option ${this.isShuffle ? 'active' : ''}" type="button" data-action="shuffle" data-option="shuffle" role="menuitemcheckbox" aria-checked="${this.isShuffle ? 'true' : 'false'}">
+                        <span>${this.localText('shuffle')}</span>
+                        <em>${this.getSwitchStateLabel(this.isShuffle)}</em>
+                    </button>
+                    <button class="media-expanded-option ${this.repeatMode !== 'none' ? 'active' : ''}" type="button" data-action="repeat" data-option="repeat" role="menuitemcheckbox" aria-checked="${this.repeatMode !== 'none' ? 'true' : 'false'}">
+                        <span>${this.localText('repeat')}</span>
+                        <em>${this.getSwitchStateLabel(this.repeatMode !== 'none')}</em>
+                    </button>
+                    <button class="media-expanded-option media-options-speed-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false">
+                        <span>${this.localText('speed')}</span>
+                        <em class="media-expanded-rate-value">${currentRate}x</em>
+                    </button>
+                    <div class="media-expanded-speed-menu" role="menu" aria-label="${this.escapeAttr(this.localText('speed'))}">
+                        ${rateOptions}
+                    </div>
                 </div>
             </div>
         `;
@@ -961,7 +1055,15 @@ const MediaApp = {
             return;
         }
         this.library = restored;
-        this.currentIndex = 0;
+        const storedState = this.getStoredPlaybackState();
+        const storedIndex = storedState.currentItemId
+            ? restored.findIndex((item) => item.id === storedState.currentItemId)
+            : -1;
+        const recentIndex = restored.reduce((best, item, index) => {
+            if (best < 0) return Number(item.lastPlayed || 0) > 0 ? index : best;
+            return Number(item.lastPlayed || 0) > Number(restored[best].lastPlayed || 0) ? index : best;
+        }, -1);
+        this.currentIndex = storedIndex >= 0 ? storedIndex : (recentIndex >= 0 ? recentIndex : 0);
         this.saveLibraryManifest();
         this.render();
     },
@@ -981,15 +1083,13 @@ const MediaApp = {
                         <p>${this.escapeHtml(this.getItemSubtitle(item))}</p>
                     </div>
                     <div class="media-expanded-meta">
-                        <button data-action="shuffle" class="${this.isShuffle ? 'active' : ''}" title="${this.localText('shuffle')}">${this.symbolIcon('Exchange A.svg')}</button>
-                        <button data-action="repeat" class="${this.repeatMode !== 'none' ? 'active' : ''}" title="${this.localText('repeat')}">${this.symbolIcon(this.repeatMode === 'one' ? 'Reload Reverse.svg' : 'Reload.svg')}</button>
-                        <button data-action="fullscreen" title="${this.localText('fullscreen')}">${this.symbolIcon('Maximize.svg')}</button>
+                        ${this.renderExpandedOptionsMenu()}
                     </div>
                 </div>
                 <div class="media-expanded-progress-row">
                     ${this.renderRangeControl({
                         id: 'media-expanded-progress',
-                        className: 'media-expanded-progress',
+                        className: 'media-expanded-progress fluent-slider',
                         inputClass: 'media-seek',
                         min: 0,
                         max: 1000,
@@ -1021,10 +1121,6 @@ const MediaApp = {
                             label: this.localText('volume')
                         })}
                     </label>
-                    <div class="media-rate-control">
-                        <span>${this.localText('speed')}</span>
-                        ${this.renderRateControl()}
-                    </div>
                 </div>
             </section>
         `;
@@ -1134,7 +1230,7 @@ const MediaApp = {
         });
 
         this.container.querySelectorAll('[data-action]').forEach((button) => {
-            button.addEventListener('click', () => this.handleAction(button.dataset.action));
+            button.addEventListener('click', (event) => this.handleAction(button.dataset.action, event));
         });
 
         this.bindTrackListEvents();
@@ -1190,7 +1286,7 @@ const MediaApp = {
             });
         }
 
-        this.bindRateControl();
+        this.bindExpandedOptionsMenu();
 
         const media = this.mediaElement;
         if (media) {
@@ -1198,58 +1294,43 @@ const MediaApp = {
         }
     },
 
-    bindRateControl() {
-        const picker = this.container?.querySelector('.media-rate-picker');
-        if (!picker) return;
+    bindExpandedOptionsMenu() {
+        const menuHost = this.container?.querySelector('.media-expanded-options');
+        if (!menuHost) return;
 
-        const button = picker.querySelector('.media-rate-button');
-        const valueLabel = picker.querySelector('.media-rate-value');
+        const menu = menuHost.querySelector('.media-expanded-options-menu');
+        const button = menuHost.querySelector('.media-more-button');
+        const speedTrigger = menuHost.querySelector('.media-options-speed-trigger');
         const close = () => {
-            picker.classList.remove('is-open');
+            menuHost.classList.remove('is-open', 'speed-open');
             button?.setAttribute('aria-expanded', 'false');
-        };
-        const open = () => {
-            picker.classList.add('is-open');
-            button?.setAttribute('aria-expanded', 'true');
+            speedTrigger?.setAttribute('aria-expanded', 'false');
         };
 
-        button?.addEventListener('click', (event) => {
+        speedTrigger?.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (picker.classList.contains('is-open')) {
-                close();
-            } else {
-                open();
-            }
+            menuHost.classList.toggle('speed-open');
+            speedTrigger.setAttribute('aria-expanded', menuHost.classList.contains('speed-open') ? 'true' : 'false');
         });
 
-        picker.querySelectorAll('.media-rate-option').forEach((option) => {
+        menuHost.querySelectorAll('.media-expanded-speed-option').forEach((option) => {
             option.addEventListener('click', (event) => {
                 event.stopPropagation();
                 const rate = Number(option.dataset.rate || 1);
-                if (!Number.isFinite(rate)) return;
-                this.playbackRate = rate;
-                this.applyMediaSettings();
-                if (valueLabel) valueLabel.textContent = `${rate}x`;
-                picker.querySelectorAll('.media-rate-option').forEach((item) => {
-                    const active = Number(item.dataset.rate || 0) === rate;
-                    item.classList.toggle('active', active);
-                    item.setAttribute('aria-selected', active ? 'true' : 'false');
-                });
+                this.setPlaybackRate(rate);
                 close();
             });
         });
 
-        picker.addEventListener('focusout', (event) => {
-            if (!picker.contains(event.relatedTarget)) close();
-        });
+        menu?.addEventListener('click', (event) => event.stopPropagation());
 
-        if (this._rateClickAwayHandler) {
-            this.container.removeEventListener('click', this._rateClickAwayHandler);
+        if (this._optionsClickAwayHandler) {
+            this.container.removeEventListener('click', this._optionsClickAwayHandler);
         }
-        this._rateClickAwayHandler = (event) => {
-            if (!picker.contains(event.target)) close();
+        this._optionsClickAwayHandler = (event) => {
+            if (!menuHost.contains(event.target)) close();
         };
-        this.container?.addEventListener('click', this._rateClickAwayHandler);
+        this.container?.addEventListener('click', this._optionsClickAwayHandler);
     },
 
     bindMediaElementEvents(media) {
@@ -1263,7 +1344,69 @@ const MediaApp = {
         media.addEventListener('error', () => this.markCurrentError());
     },
 
-    async handleAction(action) {
+    toggleExpandedOptionsMenu() {
+        const menuHost = this.container?.querySelector('.media-expanded-options');
+        const button = menuHost?.querySelector('.media-more-button');
+        if (!menuHost || !button) return;
+        const isOpen = !menuHost.classList.contains('is-open');
+        menuHost.classList.toggle('is-open', isOpen);
+        if (!isOpen) menuHost.classList.remove('speed-open');
+        button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        menuHost.querySelector('.media-options-speed-trigger')?.setAttribute('aria-expanded', 'false');
+    },
+
+    setShuffleEnabled(enabled) {
+        this.isShuffle = Boolean(enabled);
+        this.refreshPlaybackOptionUi();
+        this.savePlaybackSnapshot(true);
+    },
+
+    setRepeatMode(mode) {
+        this.repeatMode = ['none', 'all', 'one'].includes(mode) ? mode : 'none';
+        this.refreshPlaybackOptionUi();
+        this.savePlaybackSnapshot(true);
+    },
+
+    setPlaybackRate(rate) {
+        const nextRate = Number(rate || 1);
+        if (!this.getPlaybackRates().includes(nextRate)) return;
+        this.playbackRate = nextRate;
+        this.applyMediaSettings();
+        this.refreshPlaybackOptionUi();
+        this.savePlaybackSnapshot(true);
+    },
+
+    refreshPlaybackOptionUi() {
+        const shuffleActive = this.isShuffle;
+        const repeatActive = this.repeatMode !== 'none';
+        const moreActive = shuffleActive || repeatActive;
+
+        this.container?.querySelectorAll('[data-action="shuffle"]').forEach((button) => {
+            button.classList.toggle('active', shuffleActive);
+            button.setAttribute('aria-checked', shuffleActive ? 'true' : 'false');
+            const label = button.querySelector('em');
+            if (label) label.textContent = this.getSwitchStateLabel(shuffleActive);
+        });
+        this.container?.querySelectorAll('[data-action="repeat"]').forEach((button) => {
+            button.classList.toggle('active', repeatActive);
+            button.setAttribute('aria-checked', repeatActive ? 'true' : 'false');
+            const label = button.querySelector('em');
+            if (label) label.textContent = this.getSwitchStateLabel(repeatActive);
+        });
+        this.container?.querySelectorAll('.media-more-button').forEach((button) => {
+            button.classList.toggle('active', moreActive);
+        });
+        this.container?.querySelectorAll('.media-expanded-rate-value').forEach((label) => {
+            label.textContent = `${this.playbackRate}x`;
+        });
+        this.container?.querySelectorAll('.media-expanded-speed-option').forEach((option) => {
+            const active = Number(option.dataset.rate || 0) === Number(this.playbackRate || 1);
+            option.classList.toggle('active', active);
+            option.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+    },
+
+    async handleAction(action, event = null) {
         switch (action) {
             case 'open-files':
                 await this.openFiles();
@@ -1290,12 +1433,12 @@ const MediaApp = {
                 this.skipBy(10);
                 break;
             case 'shuffle':
-                this.isShuffle = !this.isShuffle;
-                this.render();
+                event?.stopPropagation();
+                this.setShuffleEnabled(!this.isShuffle);
                 break;
             case 'repeat':
-                this.repeatMode = this.repeatMode === 'none' ? 'all' : this.repeatMode === 'all' ? 'one' : 'none';
-                this.render();
+                event?.stopPropagation();
+                this.setRepeatMode(this.repeatMode === 'none' ? 'all' : 'none');
                 break;
             case 'mute':
                 if (this.muted || Number(State.settings.volume ?? 50) <= 0) {
@@ -1305,8 +1448,9 @@ const MediaApp = {
                 }
                 this.render();
                 break;
-            case 'fullscreen':
-                this.enterFullscreen();
+            case 'expanded-options':
+                event?.stopPropagation();
+                this.toggleExpandedOptionsMenu();
                 break;
             case 'expand-player':
                 this.setExpandedPlayer(true);
@@ -1424,6 +1568,7 @@ const MediaApp = {
         this.currentIndex = -1;
         this.playerExpanded = false;
         try { localStorage.removeItem(this.mediaStorageKey); } catch (_) {}
+        try { localStorage.removeItem(this.playbackStorageKey); } catch (_) {}
         try {
             await this.withMediaStore('readwrite', (store) => {
                 if (typeof store.clear === 'function') store.clear();
@@ -1665,14 +1810,20 @@ const MediaApp = {
         const index = this.library.findIndex((item) => item.id === id);
         if (index < 0) return;
         this.currentIndex = index;
+        this.savePlaybackSnapshot(true);
         this.render();
     },
 
     async playItemById(id) {
         const index = this.library.findIndex((item) => item.id === id);
         if (index < 0) return;
+        const changed = this.currentIndex !== index;
         this.currentIndex = index;
-        this.render();
+        this.savePlaybackSnapshot(true);
+        if (changed) {
+            this.suppressNextPageAnimation = true;
+            this.render();
+        }
         await this.togglePlay(true);
     },
 
@@ -1704,6 +1855,7 @@ const MediaApp = {
     async togglePlay(forcePlay = false) {
         if (!this.activeItem && this.library.length) {
             this.currentIndex = 0;
+            this.savePlaybackSnapshot(true);
             this.render();
         }
         this.loadCurrentMedia(forcePlay);
@@ -1728,6 +1880,7 @@ const MediaApp = {
                 }
                 this.updateMediaSession(current);
                 this.saveLibraryManifest();
+                this.savePlaybackSnapshot(true);
             }
         } catch (_) {
             this.updatePlayButton();
@@ -1760,6 +1913,8 @@ const MediaApp = {
     playPrevious() {
         if (!this.library.length) return;
         this.currentIndex = (this.currentIndex - 1 + this.library.length) % this.library.length;
+        this.suppressNextPageAnimation = true;
+        this.savePlaybackSnapshot(true);
         this.render();
         this.togglePlay(true);
     },
@@ -1773,6 +1928,8 @@ const MediaApp = {
         } else {
             this.currentIndex = (this.currentIndex + 1) % this.library.length;
         }
+        this.suppressNextPageAnimation = true;
+        this.savePlaybackSnapshot(true);
         this.render();
         this.togglePlay(true);
     },
@@ -1811,6 +1968,14 @@ const MediaApp = {
     syncRangeControl(input, value = input?.value) {
         if (!input) return;
         if (value !== undefined && value !== null) input.value = String(value);
+        const min = Number(input.min || 0);
+        const max = Number(input.max || 100);
+        const current = Number(input.value || 0);
+        const range = max - min;
+        const percent = range > 0 && Number.isFinite(current)
+            ? Math.min(100, Math.max(0, ((current - min) / range) * 100))
+            : 0;
+        input.style.setProperty('--fluent-slider-progress', `${percent}%`);
     },
 
     handleLoadedMetadata() {
@@ -1873,6 +2038,7 @@ const MediaApp = {
             duration.textContent = dur ? this.formatTime(dur) : '0:00';
         });
         this.updatePlayButton();
+        this.savePlaybackSnapshot();
     },
 
     updatePlayButton() {
@@ -2950,12 +3116,91 @@ const MediaApp = {
                 background: rgba(255,255,255,0.08);
             }
             .media-expanded-meta button.active { color: var(--media-accent); }
+            .media-expanded-options {
+                position: relative;
+            }
+            .media-expanded-options-menu,
+            .media-expanded-speed-menu {
+                position: absolute;
+                right: 0;
+                top: calc(100% + 8px);
+                z-index: 8;
+                min-width: 180px;
+                display: grid;
+                gap: 4px;
+                padding: 6px;
+                border-radius: 12px;
+                background: rgba(255,255,255,0.94);
+                color: var(--media-fg);
+                box-shadow: 0 18px 44px rgba(18, 32, 48, 0.2);
+                opacity: 0;
+                transform: translateY(-4px) scale(0.98);
+                pointer-events: none;
+                transition: opacity 160ms var(--media-ease), transform 180ms var(--media-ease);
+            }
+            .media-expanded-options.is-open .media-expanded-options-menu,
+            .media-expanded-options.speed-open .media-expanded-speed-menu {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                pointer-events: auto;
+            }
+            .media-expanded-speed-menu {
+                top: calc(100% + 96px);
+            }
+            .media-expanded-option,
+            .media-expanded-speed-option {
+                min-height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 14px;
+                padding: 0 10px;
+                border-radius: 8px;
+                color: inherit;
+                background: transparent;
+                text-align: left;
+            }
+            .media-expanded-option:hover,
+            .media-expanded-speed-option:hover,
+            .media-expanded-option.active,
+            .media-expanded-speed-option.active {
+                background: rgba(0, 120, 212, 0.12);
+                color: var(--media-accent);
+            }
+            .media-expanded-option span,
+            .media-expanded-speed-option span {
+                font-size: 13px;
+            }
+            .media-expanded-option em {
+                color: var(--media-muted);
+                font-style: normal;
+                font-size: 12px;
+            }
+            .media-expanded-option.active em {
+                color: var(--media-accent);
+            }
+            .dark-mode .media-expanded-options-menu,
+            .dark-mode .media-expanded-speed-menu,
+            body.dark-mode .media-expanded-options-menu,
+            body.dark-mode .media-expanded-speed-menu {
+                background: rgba(34, 38, 44, 0.98);
+                color: white;
+                box-shadow: 0 18px 44px rgba(0,0,0,0.38);
+            }
             .media-expanded-progress-row {
                 display: grid;
                 gap: 8px;
             }
             .media-expanded-progress {
                 width: 100%;
+            }
+            .media-expanded-progress.fluent-slider {
+                min-width: 0;
+                height: 20px;
+                --fluent-slider-track: rgba(0, 0, 0, 0.18);
+            }
+            body.dark-mode .media-expanded-progress.fluent-slider {
+                --fluent-slider-track: rgba(255, 255, 255, 0.28);
             }
             .media-expanded .media-time-row {
                 display: flex;
@@ -3590,6 +3835,19 @@ const MediaApp = {
             }
             .media-page-shell {
                 animation: mediaPageBlurIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+            }
+            .media-suppress-page-motion .media-page-shell,
+            .media-suppress-page-motion .media-home,
+            .media-suppress-page-motion .media-large-art {
+                animation: none !important;
+            }
+            .media-suppress-page-motion .media-expanded,
+            .media-suppress-page-motion .media-expanded-art,
+            .media-suppress-page-motion .media-expanded-info,
+            .media-suppress-page-motion .media-expanded-progress-row,
+            .media-suppress-page-motion .media-expanded-controls,
+            .media-suppress-page-motion .media-expanded-aux {
+                transition: none !important;
             }
             @keyframes mediaPageBlurIn {
                 from {
@@ -5711,6 +5969,10 @@ const MediaApp = {
             body.fluent-v2.window-blur-disabled .media-import-empty-card,
             body.fluent-v2.window-blur-disabled .media-rate-button,
             body.fluent-v2.window-blur-disabled .media-rate-menu,
+            body.fluent-v2.window-blur-disabled .media-expanded-options-menu,
+            body.fluent-v2.window-blur-disabled .media-expanded-speed-menu,
+            body.fluent-v2.window-blur-disabled .media-expanded-option,
+            body.fluent-v2.window-blur-disabled .media-expanded-speed-option,
             body.fluent-v2.window-blur-disabled .media-action-secondary,
             body.fluent-v2.window-blur-disabled .media-button-row button,
             body.fluent-v2.window-blur-disabled .media-options button,
@@ -5722,6 +5984,40 @@ const MediaApp = {
                 -webkit-backdrop-filter: none !important;
                 border-color: var(--border-color) !important;
                 box-shadow: none !important;
+            }
+            .media-expanded-meta .media-expanded-options-menu button,
+            .media-expanded-meta .media-expanded-speed-menu button,
+            body.fluent-v2 .media-expanded-meta .media-expanded-options-menu button,
+            body.fluent-v2 .media-expanded-meta .media-expanded-speed-menu button {
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 36px !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                padding: 0 10px !important;
+                line-height: 1.2 !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            .media-expanded-meta .media-expanded-options-menu button:hover,
+            .media-expanded-meta .media-expanded-speed-menu button:hover,
+            body.fluent-v2 .media-expanded-meta .media-expanded-options-menu button:hover,
+            body.fluent-v2 .media-expanded-meta .media-expanded-speed-menu button:hover {
+                transform: none !important;
+                filter: none !important;
+            }
+            .media-expanded-meta .media-more-button,
+            body.fluent-v2 .media-expanded-meta .media-more-button {
+                width: 44px !important;
+                min-width: 44px !important;
+                height: 44px !important;
+                border-radius: 999px !important;
+                display: inline-grid !important;
+                place-items: center !important;
+                padding: 0 !important;
             }
             @keyframes mediaThemeDrift {
                 0% {

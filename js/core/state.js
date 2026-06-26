@@ -915,9 +915,9 @@ const State = {
 
     applyMaterialSetting() {
         const material = this.settings.materialType === 'mica' ? 'mica' : 'gaussian';
-        const blur = Math.max(12, Math.min(70, Number(this.settings.blurIntensity ?? 40)));
+        const blur = Math.max(10, Math.min(70, Number(this.settings.blurIntensity ?? 40)));
         const materialBlur = blur;
-        const micaBlur = Math.max(12, Math.min(90, Math.round(blur * 1.25)));
+        const micaBlur = Math.max(10, Math.min(90, Math.round(blur * 1.25)));
         const lightBlur = Math.max(8, Math.round(materialBlur * 0.5));
         const smallBlur = Math.max(6, Math.round(materialBlur * 0.35));
         const wallpaper = this.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';

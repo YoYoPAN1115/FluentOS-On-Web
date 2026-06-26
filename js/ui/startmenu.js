@@ -415,6 +415,20 @@ const StartMenu = {
         }).join('');
     },
 
+    openAppAndClose(appId, data = null) {
+        if (!appId) return false;
+        if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId)) {
+            FluentUI.Toast({
+                title: t('start.ctx.app-repairing'),
+                message: t('start.ctx.app-repairing-msg'),
+                type: 'warning'
+            });
+            return false;
+        }
+        WindowManager.openApp(appId, data);
+        this.close();
+        return true;
+    },
     bindEvents() {
         // 应用图标拖拽 → 固定到桌面（覆盖固定区与全部应用列表）
         this.element.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
@@ -439,8 +453,7 @@ const StartMenu = {
                 }
                 
                 // 直接打开应用（PWA 应用已注册到 WindowManager）
-                WindowManager.openApp(appId);
-                this.close();
+                this.openAppAndClose(appId);
             }
         });
 
@@ -545,8 +558,7 @@ const StartMenu = {
                 });
                 return;
             }
-            WindowManager.openApp(appId);
-            this.close();
+            this.openAppAndClose(appId);
         });
 
         this.element.addEventListener('contextmenu', (e) => {
@@ -589,9 +601,9 @@ const StartMenu = {
                 if (node.type === 'file') {
                     if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
                         const opened = FilesApp.openNodeWithDefaultApp(node);
-                        if (!opened) WindowManager.openApp('notes', { fileId: id });
+                        if (!opened) this.openAppAndClose('notes', { fileId: id });
                     } else {
-                        WindowManager.openApp('notes', { fileId: id });
+                        this.openAppAndClose('notes', { fileId: id });
                     }
                     this.close();
                 } else if (node.type === 'folder') {
@@ -670,9 +682,9 @@ const StartMenu = {
                     if (node.type === 'file') {
                         if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
                             const opened = FilesApp.openNodeWithDefaultApp(node);
-                            if (!opened) WindowManager.openApp('notes', { fileId: id });
+                            if (!opened) this.openAppAndClose('notes', { fileId: id });
                         } else {
-                            WindowManager.openApp('notes', { fileId: id });
+                            this.openAppAndClose('notes', { fileId: id });
                         }
                         this.close();
                     } else if (node.type === 'folder') {
@@ -1054,14 +1066,7 @@ const StartMenu = {
     handleAppContextMenuAction(action, appId) {
         switch (action) {
             case 'open':
-                // 检查是否是 PWA 应用
-                const appInfo = Desktop.apps.find(a => a.id === appId);
-                if (appInfo && appInfo.isPWA && appInfo.url) {
-                    WindowManager.openApp(appId);
-                } else {
-                    WindowManager.openApp(appId);
-                }
-                this.close();
+                this.openAppAndClose(appId);
                 break;
             case 'pin-start':
                 this.pinToStart(appId);

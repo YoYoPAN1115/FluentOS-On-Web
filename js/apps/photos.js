@@ -1915,8 +1915,6 @@
                 const count = 10;
                 let images = [];
                 const loaders = [
-                    () => this.fetchBingArchive(count, false),
-                    () => this.fetchBingArchive(count, true),
                     () => this.fetchBingBiturl(count)
                 ];
                 let lastError = null;
@@ -1940,10 +1938,6 @@
             }
         },
 
-        bingArchiveUrl(idx = 0, count = 10) {
-            return `https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=${count}&mkt=zh-CN`;
-        },
-
         normalizeBingWallpaper(item, index = 0) {
             if (!item) return null;
             const rawUrl = item.url || item.urlbase;
@@ -1963,15 +1957,6 @@
                 date: item.startdate || item.start_date || item.enddate || '',
                 copyrightlink: item.copyrightlink || item.copyright_link || ''
             };
-        },
-
-        async fetchBingArchive(count = 10, useProxy = false) {
-            const archiveUrl = this.bingArchiveUrl(0, count);
-            const url = useProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(archiveUrl)}` : archiveUrl;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            return (data.images || []).map((item, index) => this.normalizeBingWallpaper(item, index)).filter(Boolean);
         },
 
         async fetchBingBiturl(count = 10) {

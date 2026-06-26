@@ -69,7 +69,7 @@ const CameraApp = {
                         <img src="Theme/Icon/App_icon/camera.png" alt="">
                         <h2>${t('camera.permission-title')}</h2>
                         <p>${t('camera.permission-desc')}</p>
-                        <button class="fluent-btn fluent-btn-primary camera-start" type="button">${t('camera.start')}</button>
+                        <button class="fluent-btn fluent-btn-primary fluent-btn-large camera-start" type="button"><span class="fluent-btn-text">${t('camera.start')}</span></button>
                     </div>
 
                     <div class="camera-record-time">00:00</div>

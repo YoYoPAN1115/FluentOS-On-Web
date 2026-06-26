@@ -20,7 +20,7 @@
  *
  * Data sources:
  *   - Weather: Open-Meteo; Weather App provides icon and description mapping
- *   - Bing daily image: Bing HPImageArchive with CORS fallbacks; click opens Photos App
+ *   - Bing daily image: Photos App cache or local fallback; click opens Photos App
  *   - Lunar, tracking, holidays, answer book, daily word, and more: uapis.cn
  */
 
@@ -65,8 +65,7 @@ function wUapisUrl(path) {
 
 function wProxyUrls(url) {
     return [
-        `https://r.jina.ai/http://${url}`,
-        `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        `https://r.jina.ai/http://${url}`
     ];
 }
 
@@ -119,7 +118,7 @@ async function wFetchText(url) {
 
 async function wFetchUapisJSON(path) {
     const url = wUapisUrl(path);
-    const urls = [...wProxyUrls(url), url];
+    const urls = [url, ...wProxyUrls(url)];
     let lastErr = null;
     for (const candidate of urls) {
         try {
@@ -953,19 +952,21 @@ function wRenderCalendar(body, ctx, size) {
 
 /* ==================== Photos: Bing Daily Image ==================== */
 
-function wBingArchiveUrl(idx = 0, count = 1) {
-    return 'https://www.bing.com/HPImageArchive.aspx?format=js&idx=' + idx + '&n=' + count + '&mkt=zh-CN';
-}
+const W_PHOTO_FALLBACK_IMAGE = 'Theme/Picture/Fluent-2.png';
+const W_BING_CACHE_KEY = 'fluentos.photos.bingCache.v1';
+const W_BING_REFRESH_TTL = 30 * 60 * 1000;
+let wBingRefreshPromise = null;
+let wBingLastRefreshAt = 0;
 
 function wNormalizeBingImage(data) {
     const item = data && Array.isArray(data.images) ? data.images[0] : data;
     if (!item) throw new Error('Missing Bing image');
     const rawUrl = item.url || item.fullstartdate || item.urlbase;
     const url = item.url
-        ? (/^https?:\/\//i.test(item.url) ? item.url : `https://www.bing.com${item.url}`)
+        ? (/^https?:\/\//i.test(item.url) ? item.url : (String(item.url).startsWith('/') ? `https://www.bing.com${item.url}` : item.url))
         : (item.urlbase ? `https://www.bing.com${item.urlbase}_1920x1080.jpg` : rawUrl);
-    if (!url || !/^https?:\/\//i.test(url)) throw new Error('Missing Bing image URL');
-    const urlHD = item.urlbase ? `https://www.bing.com${item.urlbase}_UHD.jpg` : url.replace(/1920x1080/g, 'UHD');
+    if (!url) throw new Error('Missing Bing image URL');
+    const urlHD = item.urlbase ? `https://www.bing.com${item.urlbase}_UHD.jpg` : String(url).replace(/1920x1080/g, 'UHD');
     return {
         ...item,
         url,
@@ -976,36 +977,118 @@ function wNormalizeBingImage(data) {
     };
 }
 
-async function wFetchBingCandidate(url) {
-    const res = await fetch(url);
+function wReadBingCache() {
+    if (window.PhotosDataStore && typeof PhotosDataStore.readBingCache === 'function') {
+        return PhotosDataStore.readBingCache();
+    }
+    try {
+        const data = JSON.parse(localStorage.getItem(W_BING_CACHE_KEY) || '{}');
+        return Array.isArray(data.images) ? data.images : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function wWriteBingCache(images) {
+    if (window.PhotosDataStore && typeof PhotosDataStore.writeBingCache === 'function') {
+        PhotosDataStore.writeBingCache(images);
+        return;
+    }
+    try {
+        localStorage.setItem(W_BING_CACHE_KEY, JSON.stringify({ images, time: Date.now() }));
+    } catch (_) {}
+}
+
+function wBingFallbackImage() {
+    const dateKey = new Date().toISOString().slice(0, 10);
+    return wNormalizeBingImage({
+        url: W_PHOTO_FALLBACK_IMAGE,
+        copyright: wUiText('Fluent OS \u58c1\u7eb8', 'Fluent OS wallpaper'),
+        title: wUiText('Fluent OS \u58c1\u7eb8', 'Fluent OS wallpaper'),
+        startdate: dateKey.replace(/-/g, '')
+    });
+}
+
+function wGetCachedBingImage() {
+    const cached = wReadBingCache();
+    if (!Array.isArray(cached) || !cached.length) return null;
+    try {
+        return wNormalizeBingImage(cached[0]);
+    } catch (_) {
+        return null;
+    }
+}
+
+function wGetBingDisplayImage() {
+    return wGetCachedBingImage() || wBingFallbackImage();
+}
+
+function wSameBingImage(a, b) {
+    if (!a || !b) return false;
+    return Boolean(
+        (a.start_date && b.start_date && a.start_date === b.start_date) ||
+        (a.startdate && b.startdate && a.startdate === b.startdate) ||
+        (a.url && b.url && a.url === b.url) ||
+        (a.urlHD && b.urlHD && a.urlHD === b.urlHD)
+    );
+}
+
+async function wFetchLatestBingImage() {
+    const url = 'https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN';
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return wNormalizeBingImage(await res.json());
 }
 
-async function wFetchBing() {
-    const dateKey = new Date().toISOString().slice(0, 10);
-    return WidgetData.get(`bing-today-${dateKey}`, 30 * 60 * 1000, async () => {
-        const archiveUrl = wBingArchiveUrl(0, 1);
-        const urls = [
-            archiveUrl,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(archiveUrl)}`,
-            'https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN'
-        ];
-        let lastError = null;
-        for (const url of urls) {
-            try {
-                return await wFetchBingCandidate(url);
-            } catch (err) {
-                lastError = err;
-            }
+function wRefreshBingLatestInBackground() {
+    const now = Date.now();
+    if (wBingRefreshPromise || now - wBingLastRefreshAt < W_BING_REFRESH_TTL) return;
+    wBingLastRefreshAt = now;
+    wBingRefreshPromise = (async () => {
+        const previous = wGetCachedBingImage();
+        const latest = await wFetchLatestBingImage();
+        const cached = wReadBingCache();
+        const merged = [
+            latest,
+            ...cached.filter((item) => {
+                try {
+                    return !wSameBingImage(latest, wNormalizeBingImage(item));
+                } catch (_) {
+                    return false;
+                }
+            })
+        ].slice(0, 10);
+        wWriteBingCache(merged);
+        if (!wSameBingImage(previous, latest) && typeof Widgets !== 'undefined' && Widgets.renderAll) {
+            Widgets.renderAll();
         }
-        throw lastError || new Error('Bing image unavailable');
+    })().catch(() => {
+        // Network refresh is optional; keep the cached wallpaper visible.
+    }).finally(() => {
+        wBingRefreshPromise = null;
     });
 }
 
+function wRenderBingPhoto(body, size, data) {
+    const title = (data.copyright || '').split(/[\uFF08(]/)[0].trim();
+    body.innerHTML = `
+        <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
+            <div class="w-photo-overlay">
+                <div class="w-photo-tag">${t('widgets.photos.bing')}</div>
+                ${size !== 's' ? `<div class="w-photo-title">${wEsc(title)}</div>` : ''}
+            </div>
+        </div>`;
+}
+
 function wRenderPhotos(body, ctx, size) {
+    const source = wPhotoWidgetSource(ctx);
+    if (source === 'bing') {
+        wRenderBingPhoto(body, size, wGetBingDisplayImage());
+        if (!ctx.isPreview) wRefreshBingLatestInBackground();
+        return;
+    }
+
     wAsync(body, async () => {
-        const source = wPhotoWidgetSource(ctx);
         if (source !== 'bing' && window.PhotosDataStore && typeof PhotosDataStore.getWidgetImage === 'function') {
             const data = PhotosDataStore.getWidgetImage(source);
             if (!body.isConnected) return;
@@ -1029,17 +1112,6 @@ function wRenderPhotos(body, ctx, size) {
                 </div>`;
             return;
         }
-
-        const data = await wFetchBing();
-        if (!body.isConnected) return;
-        const title = (data.copyright || '').split(/[\uFF08(]/)[0].trim();
-        body.innerHTML = `
-            <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
-                <div class="w-photo-overlay">
-                    <div class="w-photo-tag">${t('widgets.photos.bing')}</div>
-                    ${size !== 's' ? `<div class="w-photo-title">${wEsc(title)}</div>` : ''}
-                </div>
-            </div>`;
     });
 }
 

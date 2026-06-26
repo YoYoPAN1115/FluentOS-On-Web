@@ -191,7 +191,7 @@ const PWALoader = {
             };
         }
         
-        console.log(`[PWA] 已注册应用: ${name}`);
+        console.debug(`[PWA] 已注册应用: ${name}`);
     },
     
     /**
@@ -218,7 +218,7 @@ const PWALoader = {
             if (typeof WindowManager !== 'undefined' && WindowManager.appConfigs) {
                 delete WindowManager.appConfigs[id];
             }
-            console.log(`[PWA] 已注销应用: ${id}`);
+            console.debug(`[PWA] 已注销应用: ${id}`);
         }
     }
 };

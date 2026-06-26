@@ -875,6 +875,52 @@ body.animations-enabled .widget-drop-indicator {
 .dark-mode .fluent-widget-body.w-favorites {
     background: rgba(18, 24, 38, 0.74);
 }
+body.dark-mode .fluent-widget-body.w-lunar {
+    background: linear-gradient(160deg, rgba(86, 23, 23, 0.94), rgba(112, 48, 38, 0.9));
+    color: #fff4f0;
+}
+
+body.dark-mode .fluent-widget-body.w-holiday {
+    background: linear-gradient(160deg, rgba(8, 64, 56, 0.94), rgba(20, 92, 76, 0.9));
+    color: #eefcf7;
+}
+
+body.dark-mode .fluent-widget-body.w-news {
+    background: linear-gradient(160deg, rgba(90, 24, 48, 0.94), rgba(120, 48, 38, 0.9));
+    color: #fff3f5;
+}
+
+body.dark-mode .fluent-widget-body.w-answer-theme {
+    background: linear-gradient(160deg, rgba(18, 14, 42, 0.96), rgba(42, 26, 78, 0.92));
+    color: #f0eaff;
+}
+
+body.dark-mode .fluent-widget-body.w-word-theme {
+    background: linear-gradient(160deg, rgba(32, 24, 82, 0.95), rgba(66, 48, 132, 0.9));
+    color: #f7f3ff;
+}
+
+body.dark-mode .fluent-widget-body.w-search {
+    background: rgba(24, 28, 36, 0.84);
+    color: #f5f7fb;
+}
+
+body.dark-mode .fluent-widget-body.w-search .w-search-pill input {
+    color: #f5f7fb;
+}
+
+body.dark-mode .fluent-widget-body.w-search .w-search-pill input::placeholder {
+    color: rgba(245, 247, 251, 0.5);
+}
+
+body.dark-mode .w-lunar-tag,
+body.dark-mode .w-lunar-festival,
+body.dark-mode .w-holiday-row,
+body.dark-mode .fluent-widget-body.w-news .w-news-row:hover,
+body.dark-mode .fluent-widget-body.w-news .w-news-rank:not(.r1):not(.r2):not(.r3) {
+    background: rgba(0, 0, 0, 0.22);
+    border-color: rgba(255, 255, 255, 0.18);
+}
 
 .w-favorites-grid {
     flex: 1;

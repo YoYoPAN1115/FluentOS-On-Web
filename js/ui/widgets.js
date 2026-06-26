@@ -232,7 +232,7 @@ const Widgets = {
                 const ctx = canvas.getContext('2d');
                 // 与 .fluent-widget-body 的 blur(var(--blur-lg)) saturate(150%) 保持观感一致
                 const rawBlur = Number(State.settings && State.settings.blurIntensity);
-                const configuredBlur = Number.isFinite(rawBlur) ? Math.max(12, Math.min(70, rawBlur)) : 40;
+                const configuredBlur = Number.isFinite(rawBlur) ? Math.max(10, Math.min(70, rawBlur)) : 40;
                 const blurPx = Math.max(6, Math.round(configuredBlur * scale));
                 ctx.filter = `saturate(150%) blur(${blurPx}px)`;
                 // cover 布局 + 向外扩边,避免画布边缘被模糊出透明黑边

@@ -16,6 +16,7 @@ const BootScreen = {
     _backgroundWarmPromise: null,
     _hintRotateTimer: null,
     _hintSwitchTimer: null,
+    _projectRootUrl: null,
 
     init() {
         this.element = document.getElementById('boot-screen');
@@ -232,20 +233,42 @@ const BootScreen = {
 
     _toRelativeAsset(src) {
         if (!src || typeof src !== 'string' || src.startsWith('data:')) return null;
+        const normalize = (value) => {
+            const normalized = String(value || '').replace(/^\.\//, '').replace(/^\//, '');
+            return normalized.startsWith('css/Theme/') ? normalized.slice(4) : normalized;
+        };
         if (/^https?:\/\//i.test(src)) {
             try {
                 const url = new URL(src, window.location.href);
                 if (url.origin !== window.location.origin) return null;
-                return decodeURIComponent(url.pathname.replace(/^\//, ''));
+                return normalize(decodeURIComponent(url.pathname));
             } catch (_) {
                 return null;
             }
         }
-        return src.replace(/^\.\//, '').replace(/^\//, '');
+        return normalize(src);
     },
 
     _uniqAssets(list = []) {
         return [...new Set(list.map((src) => this._toRelativeAsset(src)).filter(Boolean))];
+    },
+
+    _getProjectRootUrl() {
+        if (this._projectRootUrl) return this._projectRootUrl;
+
+        const bootScript = document.querySelector('script[src$="js/ui/boot.js"]');
+        if (bootScript?.src) {
+            this._projectRootUrl = new URL('../../', bootScript.src).href;
+            return this._projectRootUrl;
+        }
+
+        this._projectRootUrl = new URL('./', window.location.href).href;
+        return this._projectRootUrl;
+    },
+
+    _assetUrl(src) {
+        const normalized = this._toRelativeAsset(src);
+        return normalized ? new URL(normalized, this._getProjectRootUrl()).href : null;
     },
 
     _buildPriorityAssets() {
@@ -281,45 +304,6 @@ const BootScreen = {
             ...profileAvatarDefaults
         ]);
 
-        const staticIcons = [
-            'Theme/Icon/Symbol_icon/stroke/Search.svg',
-            'Theme/Icon/Symbol_icon/stroke/Settings.svg',
-            'Theme/Icon/Symbol_icon/stroke/Home.svg',
-            'Theme/Icon/Symbol_icon/stroke/User Circle.svg',
-            'Theme/Icon/Symbol_icon/stroke/Globe.svg',
-            'Theme/Icon/Symbol_icon/stroke/Color Picker.svg',
-            'Theme/Icon/Symbol_icon/stroke/Inbox Download.svg',
-            'Theme/Icon/Symbol_icon/stroke/Dashboard Check.svg',
-            'Theme/Icon/Symbol_icon/stroke/Clock.svg',
-            'Theme/Icon/Symbol_icon/stroke/Shut Down.svg',
-            'Theme/Icon/Symbol_icon/stroke/Lock.svg',
-            'Theme/Icon/Symbol_icon/stroke/Logout.svg',
-            'Theme/Icon/Symbol_icon/stroke/Robot Happy.svg',
-            'Theme/Icon/Symbol_icon/stroke/Tube.svg',
-            'Theme/Icon/Symbol_icon/stroke/Information Circle.svg',
-            'Theme/Icon/Symbol_icon/stroke/Moon.svg',
-            'Theme/Icon/Symbol_icon/stroke/Sun.svg',
-            'Theme/Icon/Symbol_icon/stroke/Volume Up.svg',
-            'Theme/Icon/Symbol_icon/stroke/Notification Bell.svg',
-            'Theme/Icon/Symbol_icon/stroke/Bluetooth_close.svg',
-            'Theme/Icon/Symbol_icon/stroke/Bluetooth_open.svg',
-            'Theme/Icon/Symbol_icon/stroke/Broadcast.svg',
-            'Theme/Icon/Symbol_icon/stroke/Arrow Right.svg',
-            'Theme/Icon/Symbol_icon/stroke/Arrow Left.svg',
-            'Theme/Icon/Symbol_icon/stroke/Arrow Down.svg',
-            'Theme/Icon/Symbol_icon/stroke/Cancel.svg',
-            'Theme/Icon/Symbol_icon/stroke/Exclamation Triangle.svg',
-            'Theme/Icon/Symbol_icon/stroke/Document.svg',
-            'Theme/Icon/Symbol_icon/stroke/Database 2.svg',
-            'Theme/Icon/Symbol_icon/stroke/Refresh.svg',
-            'Theme/Icon/Symbol_icon/fill/Moon.svg',
-            'Theme/Icon/Symbol_icon/fill/Settings.svg',
-            'Theme/Icon/Symbol_icon/fill/Shut Down.svg',
-            'Theme/Icon/Symbol_icon/fill/Broadcast.svg',
-            'Theme/Icon/Symbol_icon/fill/Stars A.svg',
-            'Theme/Icon/Symbol_icon/colour/Folder.svg'
-        ];
-
         const appIcons = Array.isArray(window.Desktop?.apps)
             ? Desktop.apps.map(app => app.icon).filter(Boolean)
             : [];
@@ -327,7 +311,6 @@ const BootScreen = {
         const iconCandidates = [
             'Theme/Icon/Fluent_logo.png',
             'Theme/Icon/Fluent_logo_dark.png',
-            ...staticIcons,
             ...appIcons,
             ...Array.from(document.querySelectorAll('img[src]'))
                 .map(img => img.getAttribute('src'))
@@ -380,14 +363,16 @@ const BootScreen = {
 
     async _fetchAndCacheAsset(src) {
         try {
+            const assetUrl = this._assetUrl(src);
+            if (!assetUrl) return false;
             const cache = await this._getResourceCache();
-            const request = new Request(src, { cache: 'reload' });
+            const request = new Request(assetUrl, { cache: 'reload' });
             let response = await fetch(request);
             if (!response || !response.ok) {
-                response = await fetch(src, { cache: 'force-cache' });
+                response = await fetch(assetUrl, { cache: 'force-cache' });
             }
             if (response && response.ok && cache) {
-                await cache.put(src, response.clone());
+                await cache.put(assetUrl, response.clone());
             }
             return true;
         } catch (_) {
@@ -397,6 +382,11 @@ const BootScreen = {
 
     async _decodeImageAsset(src) {
         return new Promise((resolve) => {
+            const assetUrl = this._assetUrl(src);
+            if (!assetUrl) {
+                resolve(false);
+                return;
+            }
             let settled = false;
             const finish = (ok) => {
                 if (settled) return;
@@ -408,7 +398,7 @@ const BootScreen = {
             img.decoding = 'async';
             img.onload = () => finish(true);
             img.onerror = () => finish(false);
-            img.src = src;
+            img.src = assetUrl;
 
             if (typeof img.decode === 'function') {
                 img.decode().then(() => finish(true)).catch(() => {

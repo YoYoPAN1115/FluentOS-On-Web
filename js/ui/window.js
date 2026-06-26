@@ -1242,7 +1242,7 @@ const WindowManager = {
         }
 
         // 检查是否已经打开该应用窗口 - Check if app window already exists
-        const existingWindow = this.windows.find(w => w.appId === appId);
+        const existingWindow = this.getAppWindow(appId);
         if (existingWindow) {
             this.focusWindow(existingWindow.id);
             this._syncTaskbarAppState(appId);
@@ -1811,8 +1811,11 @@ const WindowManager = {
     },
 
     toggleWindow(appId) {
-        const windowData = this.windows.find(w => w.appId === appId);
-        if (!windowData) return;
+        const windowData = this.getAppWindow(appId);
+        if (!windowData) {
+            this.openApp(appId);
+            return;
+        }
 
         if (windowData.isMinimizing) {
             this._startRestoreAnimation(windowData, true);
