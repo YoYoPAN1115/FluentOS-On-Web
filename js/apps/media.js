@@ -343,10 +343,6 @@ const MediaApp = {
             pageEl.innerHTML = `
                 <div class="media-app media-fw-app ${this.playerExpanded ? 'player-expanded' : ''} ${suppressPageMotion ? 'media-suppress-page-motion' : ''}">
                     <main class="media-main media-fw-main">
-                        <label class="media-search media-fw-search">
-                            <input id="media-search-input" type="search" value="${this.escapeAttr(this.searchQuery)}" placeholder="${this.localText('search')}">
-                            <span>${this.symbolIcon('Search.svg')}</span>
-                        </label>
                         ${this.renderMainContent(filteredItems, current)}
                     </main>
 
@@ -402,8 +398,36 @@ const MediaApp = {
             items: this.getFrameNavItems(),
             footerItems: this.getFrameFooterItems(),
             activeId: this.getFrameActiveView(),
+            sidebarSearch: this.getSidebarSearchOptions(),
             onNavigate: renderMediaPage
         });
+    },
+
+    getSidebarSearchOptions() {
+        return {
+            placeholder: this.localText('search'),
+            emptyText: this.localText('noMatch'),
+            debounceMs: 80,
+            search: (query) => {
+                const normalizedQuery = String(query || '').trim().toLowerCase();
+                if (!normalizedQuery) return [];
+                return this.library
+                    .filter((item) => [item.title, item.artist, item.album, item.name]
+                        .some((value) => String(value || '').toLowerCase().includes(normalizedQuery)))
+                    .slice(0, 12)
+                    .map((item) => ({
+                        id: item.id,
+                        title: item.title,
+                        subtitle: this.getItemSubtitle(item, true),
+                        icon: item.type === 'video' ? 'Media Reel V' : 'Music',
+                        iconSrc: item.coverUrl || '',
+                        data: item
+                    }));
+            },
+            onResultClick: (result) => {
+                if (result?.id) this.playItemById(result.id);
+            }
+        };
     },
 
     detachReusableAudio(current, forceDetach = false) {
@@ -814,12 +838,14 @@ const MediaApp = {
                         <span>${this.localText('repeat')}</span>
                         <em>${this.getSwitchStateLabel(this.repeatMode !== 'none')}</em>
                     </button>
-                    <button class="media-expanded-option media-options-speed-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false">
-                        <span>${this.localText('speed')}</span>
-                        <em class="media-expanded-rate-value">${currentRate}x</em>
-                    </button>
-                    <div class="media-expanded-speed-menu" role="menu" aria-label="${this.escapeAttr(this.localText('speed'))}">
-                        ${rateOptions}
+                    <div class="media-expanded-speed-entry">
+                        <button class="media-expanded-option media-options-speed-trigger" type="button" role="menuitem" aria-haspopup="menu" aria-expanded="false">
+                            <span>${this.localText('speed')}</span>
+                            <em class="media-expanded-rate-value">${currentRate}x</em>
+                        </button>
+                        <div class="media-expanded-speed-menu" role="menu" aria-label="${this.escapeAttr(this.localText('speed'))}">
+                            ${rateOptions}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1113,7 +1139,7 @@ const MediaApp = {
                         <button data-action="mute" title="${this.localText('volume')}">${this.symbolIcon(this.muted ? 'Volume Mute.svg' : 'Volume Up.svg')}</button>
                         ${this.renderRangeControl({
                             id: 'media-volume',
-                            className: 'media-volume-slider',
+                            className: 'media-volume-slider fluent-slider',
                             min: 0,
                             max: 1,
                             step: 0.01,
@@ -1234,14 +1260,6 @@ const MediaApp = {
         });
 
         this.bindTrackListEvents();
-
-        const searchInput = this.container.querySelector('#media-search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                this.searchQuery = searchInput.value || '';
-                this.refreshTrackListOnly();
-            });
-        }
 
         const fileInput = this.container.querySelector('#media-file-input');
         if (fileInput) {
@@ -6018,6 +6036,159 @@ const MediaApp = {
                 display: inline-grid !important;
                 place-items: center !important;
                 padding: 0 !important;
+            }
+
+            /* FluentWindow owns the sidebar and card geometry. Do not reserve the
+               legacy in-app sidebar column after the frame collapses. */
+            .media-fw-app,
+            .media-fw-app.sidebar-collapsed,
+            .media-fw-app.media-compact-width,
+            body.fluent-v2 .media-fw-app,
+            body.fluent-v2 .media-fw-app.sidebar-collapsed,
+            body.fluent-v2 .media-fw-app.media-compact-width {
+                grid-template-columns: minmax(0, 1fr) !important;
+                grid-template-rows: minmax(0, 1fr) 0 !important;
+                background: transparent !important;
+                background-image: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            .media-fw-app .media-fw-main,
+            .media-fw-app.sidebar-collapsed .media-fw-main,
+            .media-fw-app.media-compact-width .media-fw-main {
+                grid-column: 1 / -1 !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                padding-left: clamp(18px, 3.2vw, 34px) !important;
+                padding-right: clamp(18px, 3vw, 30px) !important;
+            }
+            .media-fw-app .media-player-bar,
+            .media-fw-app.sidebar-collapsed .media-player-bar,
+            .media-fw-app.media-compact-width .media-player-bar,
+            body.fluent-v2 .media-fw-app .media-player-bar {
+                grid-column: 1 / -1 !important;
+                grid-row: 1 !important;
+                left: 50% !important;
+                right: auto !important;
+                width: min(760px, calc(100% - 36px)) !important;
+                transform: translateX(-50%) !important;
+            }
+
+            /* The compact player is a floating Fluent material surface, so it
+               keeps the framework's Gaussian treatment even when page cards are opaque. */
+            body.fluent-v2.window-blur-disabled .media-fw-app .media-player-bar,
+            body.window-blur-disabled .media-fw-app .media-player-bar {
+                background: rgba(252, 252, 252, 0.76) !important;
+                background-image: none !important;
+                border-color: rgba(255, 255, 255, 0.48) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+            }
+            body.fluent-v2.dark-mode.window-blur-disabled .media-fw-app .media-player-bar,
+            body.dark-mode.window-blur-disabled .media-fw-app .media-player-bar {
+                background: rgba(32, 32, 32, 0.76) !important;
+                border-color: rgba(255, 255, 255, 0.12) !important;
+            }
+
+            /* Expanded-player menus must stay above transport controls. The speed
+               flyout is a sibling surface visually positioned to the menu's right. */
+            .media-expanded-info,
+            .media-expanded-meta,
+            .media-expanded-options {
+                position: relative;
+                z-index: 120 !important;
+                overflow: visible !important;
+            }
+            .media-expanded-options-menu,
+            .media-expanded-speed-menu {
+                z-index: 140 !important;
+                background: rgba(252, 252, 252, 0.72) !important;
+                background-image: linear-gradient(135deg, rgba(255,255,255,0.34), rgba(255,255,255,0.08)) !important;
+                border: 1px solid rgba(255, 255, 255, 0.48) !important;
+                box-shadow: 0 18px 44px rgba(18, 32, 48, 0.2) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
+            }
+            body.dark-mode .media-expanded-options-menu,
+            body.dark-mode .media-expanded-speed-menu {
+                background: rgba(32, 32, 32, 0.72) !important;
+                background-image: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02)) !important;
+                border-color: rgba(255, 255, 255, 0.12) !important;
+                box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38) !important;
+            }
+            .media-expanded-options-menu {
+                top: 50% !important;
+                right: calc(100% + 10px) !important;
+                left: auto !important;
+                transform: translate(4px, -50%) scale(0.98) !important;
+                transform-origin: right center !important;
+            }
+            .media-expanded-options.is-open .media-expanded-options-menu {
+                transform: translate(0, -50%) scale(1) !important;
+            }
+            .media-expanded-options.speed-open .media-expanded-options-menu {
+                right: calc(100% + 66px) !important;
+            }
+            .media-expanded-speed-entry {
+                position: relative !important;
+                min-width: 0 !important;
+            }
+            .media-expanded-speed-entry .media-options-speed-trigger {
+                width: 100% !important;
+            }
+            .media-expanded-speed-menu {
+                top: 0 !important;
+                right: auto !important;
+                left: calc(100% + 8px) !important;
+                width: max-content !important;
+                min-width: 0 !important;
+                padding: 4px !important;
+                transform: translateX(-4px) scale(0.98) !important;
+                transform-origin: left top !important;
+            }
+            .media-expanded-options.speed-open .media-expanded-speed-menu {
+                transform: translateX(0) scale(1) !important;
+            }
+            .media-expanded-meta .media-expanded-speed-menu .media-expanded-speed-option,
+            body.fluent-v2 .media-expanded-meta .media-expanded-speed-menu .media-expanded-speed-option {
+                width: max-content !important;
+                min-width: 0 !important;
+                padding-left: 8px !important;
+                padding-right: 8px !important;
+            }
+            .media-expanded-meta .media-expanded-options-menu button,
+            .media-expanded-meta .media-expanded-speed-menu button,
+            body.fluent-v2 .media-expanded-meta .media-expanded-options-menu button,
+            body.fluent-v2 .media-expanded-meta .media-expanded-speed-menu button,
+            body.fluent-v2.window-blur-disabled .media-expanded-meta .media-expanded-options-menu button,
+            body.fluent-v2.window-blur-disabled .media-expanded-meta .media-expanded-speed-menu button {
+                background: transparent !important;
+                background-image: none !important;
+                border: 0 !important;
+                box-shadow: none !important;
+            }
+            .media-expanded-meta .media-expanded-options-menu button:hover,
+            .media-expanded-meta .media-expanded-speed-menu button:hover,
+            .media-expanded-meta .media-expanded-options-menu button.active,
+            .media-expanded-meta .media-expanded-speed-menu button.active {
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.12) !important;
+            }
+            .media-expanded-aux .media-volume-slider.fluent-slider {
+                display: block !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 18px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: 0 !important;
+                border-radius: 999px !important;
+                background: transparent !important;
+                box-shadow: none !important;
+                accent-color: var(--accent, #0078d4) !important;
+                --fluent-slider-track: rgba(0, 0, 0, 0.18);
+            }
+            body.dark-mode .media-expanded-aux .media-volume-slider.fluent-slider {
+                --fluent-slider-track: rgba(255, 255, 255, 0.28);
             }
             @keyframes mediaThemeDrift {
                 0% {

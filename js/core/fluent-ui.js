@@ -785,8 +785,8 @@ const FluentUI = {
         // 类型对应的图标和标题
         const typeConfig = {
             info: { icon: 'Information Circle', defaultTitle: '提示' },
-            warning: { icon: 'Exclamation Triangle', defaultTitle: '警告' },
-            error: { icon: 'Cancel Circle', defaultTitle: '错误' }
+            warning: { icon: 'Question Mark Circle', defaultTitle: '警告' },
+            error: { icon: 'Question Mark Circle', defaultTitle: '错误' }
         };
         const config = typeConfig[type] || typeConfig.info;
         const dialogTitle = title || config.defaultTitle;
@@ -1015,8 +1015,8 @@ const FluentUI = {
         const typeIcons = {
             info: 'Information Circle',
             success: 'Checkmark Circle',
-            warning: 'Exclamation Triangle',
-            error: 'Cancel Circle'
+            warning: 'Question Mark Circle',
+            error: 'Question Mark Circle'
         };
         const toastIcon = icon || typeIcons[type] || typeIcons.info;
         

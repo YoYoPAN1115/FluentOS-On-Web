@@ -758,6 +758,28 @@ const CameraApp = {
                 color: var(--text-primary);
             }
 
+            .camera-app,
+            .camera-viewer {
+                --camera-glass-bg: rgba(252, 252, 252, 0.72);
+                --camera-glass-bg-hover: rgba(255, 255, 255, 0.88);
+                --camera-glass-border: rgba(255, 255, 255, 0.58);
+                --camera-glass-fg: var(--text-primary, #202020);
+                --camera-glass-muted: var(--text-secondary, #5f5f5f);
+                --camera-glass-icon-filter: none;
+                --camera-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+            }
+
+            body.dark-mode .camera-app,
+            body.dark-mode .camera-viewer {
+                --camera-glass-bg: rgba(30, 30, 30, 0.72);
+                --camera-glass-bg-hover: rgba(52, 52, 52, 0.86);
+                --camera-glass-border: rgba(255, 255, 255, 0.14);
+                --camera-glass-fg: var(--text-primary, #f5f5f5);
+                --camera-glass-muted: rgba(255, 255, 255, 0.72);
+                --camera-glass-icon-filter: brightness(0) invert(1);
+                --camera-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
+            }
+
             .camera-stage {
                 position: relative;
                 width: 100%;
@@ -878,14 +900,14 @@ const CameraApp = {
 
             .camera-round-btn,
             .camera-shutter {
-                border: 0;
+                border: 1px solid var(--camera-glass-border);
                 padding: 0;
                 cursor: pointer;
-                color: #fff;
-                background: rgba(30, 30, 30, 0.78);
-                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
-                backdrop-filter: blur(18px);
-                -webkit-backdrop-filter: blur(18px);
+                color: var(--camera-glass-fg);
+                background: var(--camera-glass-bg);
+                box-shadow: var(--camera-glass-shadow);
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
             }
 
             .camera-round-btn {
@@ -900,7 +922,7 @@ const CameraApp = {
 
             .camera-round-btn:hover {
                 transform: scale(1.04);
-                background: rgba(255, 255, 255, 0.16);
+                background: var(--camera-glass-bg-hover);
             }
 
             .camera-round-btn:disabled,
@@ -912,12 +934,15 @@ const CameraApp = {
             .camera-round-btn img {
                 width: 23px;
                 height: 23px;
-                filter: invert(1);
+                filter: var(--camera-glass-icon-filter);
                 opacity: 0.92;
             }
 
-            .camera-grid-toggle.active img {
-                filter: invert(83%) sepia(92%) saturate(603%) hue-rotate(8deg) brightness(105%) contrast(104%);
+            .camera-grid-toggle.active {
+                color: var(--accent, #0078d4);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.18);
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.42);
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.12) inset, var(--camera-glass-shadow);
             }
 
             .camera-shutter {
@@ -926,12 +951,13 @@ const CameraApp = {
                 border-radius: 50%;
                 display: grid;
                 place-items: center;
-                background: rgba(31, 38, 47, 0.74);
+                background: var(--camera-glass-bg);
                 transition: transform 140ms ease, background 160ms ease;
             }
 
             .camera-shutter:hover {
                 transform: scale(1.03);
+                background: var(--camera-glass-bg-hover);
             }
 
             .camera-shutter span {
@@ -965,9 +991,12 @@ const CameraApp = {
                 gap: 6px;
                 padding: 5px;
                 border-radius: 999px;
-                background: rgba(30, 30, 30, 0.62);
-                backdrop-filter: blur(18px);
-                -webkit-backdrop-filter: blur(18px);
+                color: var(--camera-glass-fg);
+                background: var(--camera-glass-bg);
+                border: 1px solid var(--camera-glass-border);
+                box-shadow: var(--camera-glass-shadow);
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
             }
 
             .camera-mode-btn {
@@ -976,7 +1005,7 @@ const CameraApp = {
                 min-height: 34px;
                 border-radius: 18px;
                 padding: 0 16px;
-                color: rgba(255, 255, 255, 0.82);
+                color: var(--camera-glass-muted);
                 background: transparent;
                 cursor: pointer;
                 font-size: 13px;
@@ -985,8 +1014,9 @@ const CameraApp = {
             }
 
             .camera-mode-btn.active {
-                color: #111;
-                background: #ffff53;
+                color: var(--accent, #0078d4);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.16);
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.22) inset;
             }
 
             .camera-page-header {
@@ -1162,12 +1192,12 @@ const CameraApp = {
                 min-height: 32px;
                 box-sizing: border-box;
                 padding: 6px 14px;
-                background: rgba(0, 0, 0, 0.5) !important;
-                background-color: rgba(0, 0, 0, 0.5) !important;
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                color: #fff !important;
-                border: none;
+                background: var(--camera-glass-bg) !important;
+                background-color: var(--camera-glass-bg) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                color: var(--camera-glass-fg) !important;
+                border: 1px solid var(--camera-glass-border);
                 border-radius: 20px;
                 cursor: pointer;
                 font-size: 13px;
@@ -1185,8 +1215,8 @@ const CameraApp = {
             }
 
             .camera-back-btn:hover {
-                background: rgba(0, 0, 0, 0.7) !important;
-                background-color: rgba(0, 0, 0, 0.7) !important;
+                background: var(--camera-glass-bg-hover) !important;
+                background-color: var(--camera-glass-bg-hover) !important;
                 transform: none !important;
             }
 
@@ -1198,7 +1228,7 @@ const CameraApp = {
             .camera-back-btn img {
                 width: 16px;
                 height: 16px;
-                filter: brightness(0) invert(1);
+                filter: var(--camera-glass-icon-filter);
             }
 
             .camera-counter {
@@ -1207,10 +1237,11 @@ const CameraApp = {
                 right: 12px;
                 z-index: 35;
                 padding: 4px 12px;
-                background: rgba(0, 0, 0, 0.5);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                color: #fff;
+                background: var(--camera-glass-bg);
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                color: var(--camera-glass-fg);
+                border: 1px solid var(--camera-glass-border);
                 border-radius: 12px;
                 font-size: 12px;
             }
@@ -1224,10 +1255,11 @@ const CameraApp = {
                 align-items: center;
                 gap: 4px;
                 padding: 8px 16px;
-                background: rgba(30, 30, 30, 0.78) !important;
-                background-color: rgba(30, 30, 30, 0.78) !important;
-                backdrop-filter: blur(20px) saturate(150%);
-                -webkit-backdrop-filter: blur(20px) saturate(150%);
+                background: var(--camera-glass-bg) !important;
+                background-color: var(--camera-glass-bg) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%);
+                border: 1px solid var(--camera-glass-border);
                 border-radius: 28px;
                 box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
                 z-index: 36;
@@ -1249,7 +1281,7 @@ const CameraApp = {
             }
 
             .camera-tool-btn:hover {
-                background: rgba(255, 255, 255, 0.12) !important;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.14) !important;
                 transform: scale(1.1);
             }
 
@@ -1269,7 +1301,7 @@ const CameraApp = {
                 width: 20px;
                 height: 20px;
                 opacity: 0.9;
-                filter: brightness(0) invert(1) !important;
+                filter: var(--camera-glass-icon-filter) !important;
             }
 
             .camera-tool-danger img {
