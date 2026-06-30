@@ -16,6 +16,8 @@ const AppShop = {
     activePage: 'featured',
     isSearchActive: false,
     _contentScrollRestoreRaf: null,
+    _searchInputTimer: null,
+    _searchComposing: false,
     _iconColorCache: new Map(),
     _iconColorPending: new Map(),
     
@@ -597,6 +599,9 @@ const AppShop = {
                 letter-spacing: 0;
                 font-weight: 800;
             }
+            .appshop-fw-app {
+                container-type: inline-size !important;
+            }
             .appshop-page-subtitle {
                 margin: -12px 0 24px;
                 color: rgba(255,255,255,0.58);
@@ -800,8 +805,9 @@ const AppShop = {
             }
             .appshop-editorial-grid {
                 display: grid;
-                grid-template-columns: repeat(3, minmax(220px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
                 gap: 24px;
+                align-items: start;
             }
             .appshop-editorial-panel {
                 min-width: 0;
@@ -939,119 +945,243 @@ const AppShop = {
                 inset: 0;
                 z-index: 40;
                 display: grid;
-                place-items: start center;
-                padding: 34px;
-                background-color: rgba(0,0,0,0.66) !important;
+                place-items: center;
+                padding: 28px;
+                box-sizing: border-box;
+                background: rgba(15, 18, 24, 0.38) !important;
+                backdrop-filter: blur(18px) saturate(120%);
+                -webkit-backdrop-filter: blur(18px) saturate(120%);
                 opacity: 0;
-                transition: opacity 180ms ease;
-                overflow: auto;
+                transition: opacity 280ms ease;
+                overflow: hidden;
             }
             .appshop-story-overlay.show { opacity: 1; }
+            .appshop-story-overlay.closing { pointer-events: none; }
             .appshop-story-modal {
                 position: relative;
-                width: min(820px, 100%);
-                max-height: calc(100vh - 92px);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 18px;
-                background-color: #1d1d1f !important;
-                color: #f7f7f7 !important;
-                overflow: auto;
-                box-shadow: 0 30px 90px rgba(0,0,0,0.58);
+                width: min(900px, 100%);
+                max-height: 100%;
+                border: 1px solid rgba(255,255,255,0.2);
+                border-radius: 22px;
+                background: var(--bg-primary, #f6f6f6) !important;
+                color: var(--text-primary, #1d1d1f) !important;
+                overflow: hidden;
+                box-shadow: 0 34px 100px rgba(0,0,0,0.34);
                 isolation: isolate;
-                transform: translateZ(0);
+                transform-origin: top left;
+                will-change: transform, border-radius, filter;
             }
             body:not(.dark-mode) .appshop-story-overlay {
-                background-color: rgba(30,30,32,0.48) !important;
+                background: rgba(228, 236, 246, 0.42) !important;
             }
-            body:not(.dark-mode) .appshop-story-modal {
-                background-color: #f8f8f9 !important;
-                color: #1d1d1f !important;
-                border-color: rgba(0,0,0,0.08) !important;
-                box-shadow: 0 30px 90px rgba(20,30,45,0.28);
+            body.dark-mode .appshop-story-modal {
+                background: #1d1d1f !important;
+                color: #f7f7f7 !important;
+                border-color: rgba(255,255,255,0.12) !important;
+                box-shadow: 0 34px 100px rgba(0,0,0,0.58);
             }
             .appshop-story-detail-hero {
-                height: 330px;
+                height: clamp(330px, 47vh, 420px);
                 position: relative;
-                display: grid;
-                place-items: center;
                 background: linear-gradient(140deg, var(--story-a), var(--story-b)) !important;
                 overflow: hidden;
             }
-            .appshop-story-detail-hero img {
-                width: 170px;
-                height: 170px;
+            .appshop-story-icon-scene {
+                position: absolute;
+                inset: 0;
+                z-index: 2;
+                display: grid;
+                place-items: center;
+                pointer-events: none;
+            }
+            .appshop-story-detail-icon-wrap {
+                width: 190px;
+                height: 190px;
+                padding: 16px;
+                box-sizing: border-box;
+                display: grid;
+                place-items: center;
+                border-radius: 42px;
+                background: rgba(255,255,255,0.14);
+                border: 1px solid rgba(255,255,255,0.28);
+                box-shadow: 0 30px 70px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.32);
+                backdrop-filter: blur(18px) saturate(130%);
+                -webkit-backdrop-filter: blur(18px) saturate(130%);
+                animation: appshop-detail-icon-breathe 5.8s cubic-bezier(0.45,0,0.2,1) infinite alternate;
+            }
+            .appshop-story-detail-icon-wrap img {
+                width: 100%;
+                height: 100%;
                 object-fit: contain;
                 filter: drop-shadow(0 24px 56px rgba(0,0,0,0.45));
-                position: relative;
-                z-index: 2;
+            }
+            .appshop-story-orbit {
+                position: absolute;
+                width: 270px;
+                height: 270px;
+                border: 1px solid rgba(255,255,255,0.3);
+                border-radius: 50%;
+                animation: appshop-detail-orbit 16s linear infinite;
+            }
+            .appshop-story-orbit::after {
+                content: '';
+                position: absolute;
+                top: 22px;
+                left: 25px;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.82);
+                box-shadow: 0 0 24px rgba(255,255,255,0.72);
+            }
+            .appshop-story-orbit.orbit-two {
+                width: 330px;
+                height: 210px;
+                transform: rotate(-24deg);
+                opacity: 0.58;
+                animation-duration: 23s;
+                animation-direction: reverse;
+            }
+            .appshop-story-spark {
+                position: absolute;
+                width: 22px;
+                height: 22px;
+                border-radius: 7px;
+                background: rgba(255,255,255,0.4);
+                backdrop-filter: blur(8px);
+                animation: appshop-detail-spark 6s ease-in-out infinite alternate;
+            }
+            .appshop-story-spark.spark-one { translate: -178px -96px; rotate: 18deg; }
+            .appshop-story-spark.spark-two { translate: 186px 72px; rotate: 42deg; animation-delay: -2s; }
+            .appshop-story-spark.spark-three { translate: -148px 118px; width: 14px; height: 14px; animation-delay: -4s; }
+            @keyframes appshop-detail-orbit { to { rotate: 360deg; } }
+            @keyframes appshop-detail-icon-breathe {
+                from { transform: translateY(4px) scale(0.98); }
+                to { transform: translateY(-7px) scale(1.025); }
+            }
+            @keyframes appshop-detail-spark {
+                from { margin-top: 10px; opacity: 0.5; }
+                to { margin-top: -12px; opacity: 0.9; }
             }
             .appshop-story-detail-copy {
                 position: absolute;
-                left: 24px;
-                right: 24px;
-                bottom: 22px;
+                left: 30px;
+                right: 30px;
+                bottom: 26px;
                 background: transparent !important;
                 z-index: 3;
+                color: #fff;
+                text-shadow: 0 2px 18px rgba(0,0,0,0.24);
             }
             .appshop-story-detail-copy h2 {
                 margin: 6px 0 0;
-                font-size: 34px;
+                font-size: clamp(30px, 4vw, 42px);
                 line-height: 1.05;
                 color: #fff !important;
+            }
+            .appshop-story-detail-copy p {
+                max-width: 620px;
+                margin: 9px 0 0;
+                color: rgba(255,255,255,0.78) !important;
+                font-size: 14px;
             }
             .appshop-story-detail-hero .appshop-story-kicker {
                 color: rgba(255,255,255,0.72) !important;
             }
-            .appshop-story-detail-modal h4,
-            .appshop-story-detail-appbar h4,
-            .appshop-story-detail-body p,
-            .appshop-story-detail-body strong {
-                background: transparent !important;
+            .appshop-story-detail-surface {
+                max-height: min(330px, 38vh);
+                overflow: auto;
+                background: var(--bg-primary, #f8f8f9);
+            }
+            body.dark-mode .appshop-story-detail-surface {
+                background: #1d1d1f;
             }
             .appshop-story-detail-appbar {
-                min-height: 92px;
-                padding: 14px 24px;
+                min-height: 96px;
+                padding: 15px 30px;
                 display: grid;
-                grid-template-columns: 58px minmax(0, 1fr) auto;
-                gap: 14px;
+                grid-template-columns: 62px minmax(0, 1fr) auto;
+                gap: 16px;
                 align-items: center;
-                background-color: rgba(11,31,58,0.82) !important;
-                border-bottom: 1px solid rgba(255,255,255,0.08);
+                background: rgba(255,255,255,0.54) !important;
+                border-bottom: 1px solid rgba(0,0,0,0.08);
+                backdrop-filter: blur(22px) saturate(140%);
+                -webkit-backdrop-filter: blur(22px) saturate(140%);
             }
-            body:not(.dark-mode) .appshop-story-detail-appbar {
-                background-color: rgba(255,255,255,0.88) !important;
-                border-bottom-color: rgba(0,0,0,0.08);
+            body.dark-mode .appshop-story-detail-appbar {
+                background: rgba(255,255,255,0.06) !important;
+                border-bottom-color: rgba(255,255,255,0.1);
             }
-            body:not(.dark-mode) .appshop-story-detail-appbar h4 {
-                color: #1d1d1f !important;
+            .appshop-story-detail-appbar .appshop-list-icon {
+                width: 62px;
+                height: 62px;
+                border-radius: 15px;
             }
-            body:not(.dark-mode) .appshop-story-detail-appbar p {
-                color: rgba(29,29,31,0.62) !important;
+            .appshop-story-detail-appbar h4 {
+                margin: 0;
+                color: var(--text-primary, #1d1d1f) !important;
+                font-size: 17px;
+            }
+            .appshop-story-detail-appbar p {
+                margin: 4px 0 0;
+                color: var(--text-secondary, rgba(29,29,31,0.62)) !important;
+                font-size: 13px;
             }
             .appshop-story-detail-body {
-                padding: 26px 42px 56px;
-                background-color: #1d1d1f !important;
-                color: #fff !important;
-                font-size: 20px;
-                line-height: 1.45;
-            }
-            body:not(.dark-mode) .appshop-story-detail-body {
-                background-color: #f8f8f9 !important;
-                color: #1d1d1f !important;
+                padding: 28px 34px 34px;
+                color: var(--text-primary, #1d1d1f) !important;
+                font-size: 16px;
+                line-height: 1.68;
             }
             .appshop-story-detail-body p {
-                margin: 0;
-                color: #fff !important;
+                margin: 8px 0 0;
+                color: var(--text-primary, #1d1d1f) !important;
             }
-            body:not(.dark-mode) .appshop-story-detail-body p {
-                color: #1d1d1f !important;
+            .appshop-story-about-label {
+                color: var(--accent, #0078d4) !important;
+                font-size: 12px;
+                font-weight: 800;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
             }
-            .appshop-story-detail-body strong {
-                color: #fff;
-                font-weight: 760;
+            .appshop-story-detail-stats {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px;
+                margin-top: 24px;
+                padding-top: 20px;
+                border-top: 1px solid var(--border-color, rgba(0,0,0,0.1));
             }
-            body:not(.dark-mode) .appshop-story-detail-body strong {
-                color: #1d1d1f !important;
+            .appshop-story-detail-stats div { display: grid; gap: 2px; }
+            .appshop-story-detail-stats strong {
+                overflow: hidden;
+                color: var(--text-primary, #1d1d1f) !important;
+                font-size: 14px;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .appshop-story-detail-stats span {
+                color: var(--text-secondary, #666) !important;
+                font-size: 11px;
+            }
+            .appshop-story-detail-reveal {
+                opacity: 0;
+                filter: blur(16px);
+                transform: translateY(10px);
+                transition:
+                    opacity 340ms ease,
+                    filter 500ms cubic-bezier(0.16,1,0.3,1),
+                    transform 500ms cubic-bezier(0.16,1,0.3,1);
+            }
+            .appshop-story-overlay.content-ready .appshop-story-detail-reveal {
+                opacity: 1;
+                filter: blur(0);
+                transform: translateY(0);
+            }
+            .appshop-story-overlay.content-ready .appshop-story-detail-appbar { transition-delay: 50ms; }
+            .appshop-story-overlay.content-ready .appshop-story-detail-body { transition-delay: 110ms; }
+            .appshop-story-overlay.closing .appshop-story-detail-reveal {
+                transition-delay: 0ms !important;
             }
             .appshop-story-close,
             .appshop-story-detail-close {
@@ -1072,11 +1202,12 @@ const AppShop = {
                 box-sizing: border-box !important;
                 border: 1px solid rgba(255,255,255,0.15);
                 border-radius: 50%;
-                background: rgba(30,30,32,0.54);
+                background: rgba(30,30,32,0.42);
                 display: grid;
                 place-items: center;
                 cursor: pointer;
-                backdrop-filter: blur(16px);
+                backdrop-filter: blur(18px) saturate(140%);
+                -webkit-backdrop-filter: blur(18px) saturate(140%);
                 transition: background 160ms ease, border-color 160ms ease !important;
             }
             .appshop-story-close img,
@@ -1105,12 +1236,26 @@ const AppShop = {
                 background: rgba(255,255,255,0.88);
                 border-color: rgba(0,0,0,0.2);
             }
+            @media (prefers-reduced-motion: reduce) {
+                .appshop-story-detail-icon-wrap,
+                .appshop-story-orbit,
+                .appshop-story-spark { animation: none !important; }
+                .appshop-story-detail-reveal { transition: none !important; }
+            }
             @container (max-width: 760px) {
                 .appshop-today-grid,
-                .appshop-editorial-grid,
                 .appshop-category-strip,
                 .appshop-discover-grid { grid-template-columns: 1fr; }
                 .appshop-main { padding: 20px; min-width: 0; }
+                .appshop-story-overlay { padding: 16px; }
+                .appshop-story-detail-hero { height: 310px; }
+                .appshop-story-detail-icon-wrap { width: 150px; height: 150px; border-radius: 34px; }
+                .appshop-story-orbit { width: 220px; height: 220px; }
+                .appshop-story-orbit.orbit-two { width: 270px; height: 170px; }
+                .appshop-story-detail-copy { left: 22px; right: 22px; bottom: 20px; }
+                .appshop-story-detail-copy p { display: none; }
+                .appshop-story-detail-appbar { padding: 13px 20px; }
+                .appshop-story-detail-body { padding: 24px; }
             }
         `;
         document.head.appendChild(style);
@@ -1880,6 +2025,11 @@ const AppShop = {
     },
 
     beforeClose() {
+        if (this._searchInputTimer) {
+            clearTimeout(this._searchInputTimer);
+            this._searchInputTimer = null;
+        }
+        this._searchComposing = false;
         if (this._contentScrollRestoreRaf) {
             cancelAnimationFrame(this._contentScrollRestoreRaf);
             this._contentScrollRestoreRaf = null;
@@ -1976,19 +2126,37 @@ const AppShop = {
     bindEvents() {
         const searchInput = this.container.querySelector('.appshop-search-input');
         if (searchInput) {
-            let debounceTimer;
+            const scheduleSearchRender = (delay = 280) => {
+                if (this._searchInputTimer) clearTimeout(this._searchInputTimer);
+                this._searchInputTimer = setTimeout(() => {
+                    this._searchInputTimer = null;
+                    if (this._searchComposing || !this.container?.isConnected) return;
+                    this.render({ preserveScroll: true, focusSearch: true });
+                }, delay);
+            };
             searchInput.addEventListener('focus', () => {
                 if (this.isSearchActive) return;
                 this.isSearchActive = true;
                 this.render({ preserveScroll: true, focusSearch: true });
             });
+            searchInput.addEventListener('compositionstart', () => {
+                this._searchComposing = true;
+                if (this._searchInputTimer) {
+                    clearTimeout(this._searchInputTimer);
+                    this._searchInputTimer = null;
+                }
+            });
+            searchInput.addEventListener('compositionend', (e) => {
+                this._searchComposing = false;
+                this.searchQuery = e.target.value;
+                this.isSearchActive = true;
+                scheduleSearchRender(80);
+            });
             searchInput.addEventListener('input', (e) => {
                 this.searchQuery = e.target.value;
                 this.isSearchActive = true;
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    this.render({ preserveScroll: true, focusSearch: true });
-                }, 120);
+                if (e.isComposing || this._searchComposing) return;
+                scheduleSearchRender();
             });
         }
 
@@ -2040,7 +2208,7 @@ const AppShop = {
 
         this.container.querySelectorAll('[data-story-index]').forEach(card => {
             card.addEventListener('click', () => {
-                this.showFeaturedStory(Number(card.dataset.storyIndex || 0));
+                this.showFeaturedStory(Number(card.dataset.storyIndex || 0), card);
             });
         });
 
@@ -2254,13 +2422,17 @@ const AppShop = {
         WindowManager.openApp(app.id);
     },
 
-    showFeaturedStory(storyIndex = 0) {
+    showFeaturedStory(storyIndex = 0, sourceCard = null) {
         const feature = this.getTodayFeature();
         const app = feature.heroApps[storyIndex] || feature.heroApps[0];
         if (!app) return;
         const colors = this.getStoryColors(feature, app, storyIndex);
         const title = storyIndex === 0 ? feature.title : t('appshop.special-feature-title', { name: app.name });
         const intro = this.getStoryDetailIntro(feature, app, storyIndex);
+        const category = this.getCategories().find(item => item.id === app.category)?.name || app.category;
+        const aboutLabel = this.getCurrentLanguage() === 'en' ? 'About this app' : '关于此 App';
+        const sourceRect = sourceCard?.isConnected ? sourceCard.getBoundingClientRect() : null;
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
         const overlay = document.createElement('div');
         overlay.className = 'appshop-story-overlay';
@@ -2271,36 +2443,118 @@ const AppShop = {
                 </button>
                 <header class="appshop-story-detail-hero">
                     ${this.renderStoryShapes(storyIndex)}
-                    <img src="${this.getIconPath(app.icon)}" alt="">
-                    <div class="appshop-story-detail-copy">
+                    <div class="appshop-story-icon-scene" aria-hidden="true">
+                        <span class="appshop-story-orbit orbit-one"></span>
+                        <span class="appshop-story-orbit orbit-two"></span>
+                        <span class="appshop-story-spark spark-one"></span>
+                        <span class="appshop-story-spark spark-two"></span>
+                        <span class="appshop-story-spark spark-three"></span>
+                        <div class="appshop-story-detail-icon-wrap">
+                            <img src="${this.getIconPath(app.icon)}" alt="">
+                        </div>
+                    </div>
+                    <div class="appshop-story-detail-copy appshop-story-detail-reveal">
                         <span class="appshop-story-kicker">${storyIndex === 0 ? t('appshop.today-best') : t('appshop.special-feature')}</span>
                         <h2>${title}</h2>
+                        <p>${feature.subtitle}</p>
                     </div>
                 </header>
-                <div class="appshop-story-detail-appbar">
-                    <img class="appshop-list-icon" src="${this.getIconPath(app.icon)}" alt="">
-                    <div>
-                        <h4>${app.name}</h4>
-                        <p>${app.developer}</p>
+                <div class="appshop-story-detail-surface">
+                    <div class="appshop-story-detail-appbar appshop-story-detail-reveal">
+                        <img class="appshop-list-icon" src="${this.getIconPath(app.icon)}" alt="">
+                        <div>
+                            <h4>${app.name}</h4>
+                            <p>${app.developer}</p>
+                        </div>
+                        ${this.renderActionButton(app)}
                     </div>
-                    ${this.renderActionButton(app)}
-                </div>
-                <div class="appshop-story-detail-body">
-                    <p><strong>${intro}</strong></p>
+                    <div class="appshop-story-detail-body appshop-story-detail-reveal">
+                        <span class="appshop-story-about-label">${aboutLabel}</span>
+                        <p>${intro}</p>
+                        <div class="appshop-story-detail-stats">
+                            <div><strong>★ ${app.rating}</strong><span>${t('appshop.rating')}</span></div>
+                            <div><strong>${app.downloads}</strong><span>${t('appshop.downloads')}</span></div>
+                            <div><strong>${category}</strong><span>${t('appshop.category')}</span></div>
+                        </div>
+                    </div>
                 </div>
             </article>
         `;
         this.container.appendChild(overlay);
         this.ensureIconColors(app, colors);
-        requestAnimationFrame(() => overlay.classList.add('show'));
+
+        const modal = overlay.querySelector('.appshop-story-modal');
+        const restoreSource = () => {
+            if (sourceCard?.isConnected) sourceCard.style.removeProperty('visibility');
+        };
+        const getFlipTransform = (fromRect, toRect) => {
+            if (!fromRect || !toRect || !toRect.width || !toRect.height) return 'none';
+            const x = fromRect.left - toRect.left;
+            const y = fromRect.top - toRect.top;
+            const scaleX = Math.max(0.08, fromRect.width / toRect.width);
+            const scaleY = Math.max(0.08, fromRect.height / toRect.height);
+            return `translate3d(${x}px, ${y}px, 0) scale(${scaleX}, ${scaleY})`;
+        };
+
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+            const modalRect = modal.getBoundingClientRect();
+            if (sourceRect && !reducedMotion) {
+                sourceCard.style.visibility = 'hidden';
+                modal.animate([
+                    { transform: getFlipTransform(sourceRect, modalRect), borderRadius: '16px', filter: 'blur(0px)' },
+                    { transform: 'translate3d(0,0,0) scale(1)', borderRadius: '22px', filter: 'blur(0px)' }
+                ], {
+                    duration: 620,
+                    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                    fill: 'both'
+                });
+            }
+            setTimeout(() => overlay.classList.add('content-ready'), reducedMotion ? 0 : 150);
+        });
+
+        let closing = false;
         const close = () => {
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 180);
+            if (closing) return;
+            closing = true;
+            overlay.classList.remove('content-ready', 'show');
+            overlay.classList.add('closing');
+            const currentRect = modal.getBoundingClientRect();
+            const targetRect = sourceCard?.isConnected ? sourceCard.getBoundingClientRect() : null;
+            if (!targetRect || reducedMotion) {
+                setTimeout(() => {
+                    restoreSource();
+                    overlay.remove();
+                }, reducedMotion ? 0 : 260);
+                return;
+            }
+            const animation = modal.animate([
+                { transform: 'translate3d(0,0,0) scale(1)', borderRadius: '22px', filter: 'blur(0px)' },
+                { transform: getFlipTransform(targetRect, currentRect), borderRadius: '16px', filter: 'blur(1px)' }
+            ], {
+                duration: 520,
+                easing: 'cubic-bezier(0.7, 0, 0.84, 0)',
+                fill: 'both'
+            });
+            animation.finished.catch(() => {}).then(() => {
+                restoreSource();
+                overlay.remove();
+            });
+        };
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return;
+            document.removeEventListener('keydown', onKeyDown);
+            close();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        const closeAndCleanup = () => {
+            document.removeEventListener('keydown', onKeyDown);
+            close();
         };
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
+            if (e.target === overlay) closeAndCleanup();
         });
-        overlay.querySelector('.appshop-story-detail-close')?.addEventListener('click', close);
+        overlay.querySelector('.appshop-story-detail-close')?.addEventListener('click', closeAndCleanup);
         overlay.querySelector('[data-install-app-id]')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.installApp(app.id);

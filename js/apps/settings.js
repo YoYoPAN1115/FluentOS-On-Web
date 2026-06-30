@@ -8,6 +8,61 @@ const SettingsApp = {
     currentPage: 'overview',
     _aboutDevTapCount: 0,
     _developerModeVisible: false,
+    // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
+    aboutChangelog: [
+        { date: '2026-06-27', version: '2.0.260627', commits: [
+            { hash: 'fcb7056', title: '修复已知视觉BUG，进一步优化了多媒体App' }
+        ] },
+        { date: '2026-06-26', version: '2.0.260626', commits: [
+            { hash: '20833ed', title: '彻底修复大量已知BUG，大幅度提高系统稳定性' },
+            { hash: 'd140b7b', title: '照片App大升级，采用新一代App框架，统一设计语言，并支持导入本地照片功能，和文件App完成联动，修复大量已知BUG，并调整了部分场景下的动画' }
+        ] },
+        { date: '2026-06-24', version: '2.0.260624', commits: [
+            { hash: '110ff49', title: '完成对时钟App的日历方面重构，但仍需优化，新增提醒事项小组件，修复大量已知BUG，新增任务栏App窗口预览功能，彻底重构了相机App' }
+        ] },
+        { date: '2026-06-18', version: '2.0.260618', commits: [
+            { hash: '72f21fa', title: '全新计算器App已上线，快记App新增大量编辑功能，进一步优化了快记App，修复大量已知BUG' },
+            { hash: '16edb5e', title: '新增全新的性能工具开关，进一步优化了窗口逻辑' }
+        ] },
+        { date: '2026-06-17', version: '2.0.260617', commits: [
+            { hash: '86fbd64', title: '进一步优化了小组件的设计，调整了天气、音乐卡片，新增日历小组件，优化了窗口逻辑，修复大量已知BUG' }
+        ] },
+        { date: '2026-06-14', version: '2.0.260614', commits: [
+            { hash: 'e1d97c5', title: '基本完成对新一代Notes的开发工作80%' }
+        ] },
+        { date: '2026-06-13', version: '2.0.260613', commits: [
+            { hash: '02916ed', title: '进一步完善了小组件编辑界面以及相关动画优化' }
+        ] },
+        { date: '2026-06-12', version: '2.0.260612', commits: [
+            { hash: '62f2e02', title: '新增统一的小组件编辑功能，优化了窗口切换动画' }
+        ] },
+        { date: '2026-06-11', version: '2.0.260611', commits: [
+            { hash: '5f85669', title: '修复大量已知BUG，天气App新增搜索和当前位置天气的功能，优化了小组件' },
+            { hash: '5a6987c', title: '完善小组件交互细节，修复大量小组间产生的BUG' }
+        ] },
+        { date: '2026-06-10', version: '2.0.260610', commits: [
+            { hash: '1ced11a', title: '解决实时模糊层可能会导致的意外白线/黑线出现过于频繁的问题，采用实时+静态模糊动态调整，大幅降低GPU渲染压力，大幅减少意外线条出现' },
+            { hash: '695e4c8', title: '进一步完善小组件开发工作90%' },
+            { hash: 'd49a310', title: '优化了侧边栏的UI，修复侧边栏不能滚动的BUG' },
+            { hash: 'b5450d2', title: '基本完成全新小组件的功能开发80%' },
+            { hash: '8c84760', title: '完成FluentOS全新UI开发，精简并统一了原生级App的窗口代码模块' }
+        ] },
+        { date: '2026-06-09', version: '2.0.260609', commits: [
+            { hash: '845f78f', title: '完成一些小BUG的修补工作' }
+        ] },
+        { date: '2026-06-08', version: '2.0.260608', commits: [
+            { hash: '5b1d15d', title: '完善窗口逻辑，新增全新自定义主题色' },
+            { hash: '239c50e', title: 'App Shop全新版本基本完成开发' },
+            { hash: 'c1a8214', title: 'App Shop新版开发工作60%' },
+            { hash: '70ddb46', title: '完成App Shop应用扩充' }
+        ] },
+        { date: '2026-06-07', version: '2.0.260607', commits: [
+            { hash: '45428a5', title: '完成全新高光效果开发' },
+            { hash: 'fd9d197', title: '基本完成模糊程度+云母材质效果切换' },
+            { hash: '544ea15', title: '更换图标+Liquid Glass效果引入' }
+        ] },
+        { date: '2026-06-06', version: '2.0.260606', baseline: true, commits: [] }
+    ],
 
     _isMounted() {
         return !!(this.container && this.container.isConnected);
@@ -99,7 +154,7 @@ const SettingsApp = {
         if (!data || !data.page) return;
         if (data.page !== 'app-detail') {
             const hasPage = this.getPages().some(page => page.id === data.page);
-            if (hasPage || data.page === 'personalization-advanced') {
+            if (hasPage || data.page === 'personalization-advanced' || data.page === 'about-changelog') {
                 this.currentAppDetail = null;
                 this.navigateToPage(data.page);
             }
@@ -1330,54 +1385,231 @@ const SettingsApp = {
             }
 
             .settings-about-hero-card {
+                min-height: 146px;
                 display: flex;
                 align-items: center;
-                gap: 18px;
+                gap: 28px;
+                overflow: hidden;
+                position: relative;
+                padding: 24px 28px;
+                box-sizing: border-box;
+                isolation: isolate;
+                animation: aboutCardEnter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
-            .settings-about-logo-wrap {
-                width: 84px;
-                height: 84px;
-                flex-shrink: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+            .settings-about-landscape {
+                position: absolute;
+                inset: -1px;
+                z-index: 0;
+                overflow: hidden;
+                border-radius: inherit;
+                background: #d5d9dc;
+                pointer-events: none;
             }
 
-            .settings-about-logo-wrap img {
-                width: 84px;
-                height: 84px;
-                object-fit: contain;
+            .settings-about-landscape::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: 9;
+                background:
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18) 44%, rgba(255, 255, 255, 0.02)),
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 64%);
+            }
+
+            .dark-mode .settings-about-landscape {
+                background: #1f2630;
+            }
+
+            .dark-mode .settings-about-landscape::after {
+                background:
+                    linear-gradient(90deg, rgba(12, 16, 24, 0.36), rgba(12, 16, 24, 0.24) 46%, rgba(12, 16, 24, 0.08)),
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01) 64%);
+            }
+
+            .settings-about-landscape-layer {
+                position: absolute;
+                left: 0;
                 display: block;
+                pointer-events: none;
+                user-select: none;
+                object-fit: fill;
+                transform-origin: center bottom;
+            }
+
+            .settings-about-landscape-sky {
+                z-index: 1;
+                inset: -1px;
+                width: calc(100% + 2px);
+                height: calc(100% + 2px);
+                animation: aboutLandscapeSkyEnter 920ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-water-base {
+                z-index: 2;
+                left: -1px;
+                bottom: -1px;
+                width: calc(100% + 2px);
+                height: 30%;
+                animation: aboutLandscapeWaterEnter 760ms 110ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-reflection {
+                z-index: 3;
+                left: -1px;
+                bottom: -1px;
+                width: 100%;
+                height: 30%;
+                transform-origin: left center;
+                animation: aboutLandscapeReflectionEnter 820ms 190ms cubic-bezier(0.2, 0.82, 0.22, 1) both;
+            }
+
+            .settings-about-landscape-mountain-middle {
+                z-index: 4;
+                left: -1px;
+                bottom: 29.4%;
+                width: 98.5%;
+                height: 32.21%;
+                animation: aboutLandscapeMiddleEnter 880ms 230ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-mountain-dark {
+                z-index: 5;
+                left: 4.5%;
+                bottom: 29.4%;
+                width: 102%;
+                height: 32.21%;
+                animation: aboutLandscapePeaksEnter 920ms 310ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-land {
+                z-index: 6;
+                left: 5%;
+                bottom: -1px;
+                width: 100%;
+                height: 30%;
+                animation: aboutLandscapeLandEnter 820ms 390ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-trees {
+                z-index: 7;
+                left: 23.56%;
+                bottom: 28.64%;
+                width: 76.44%;
+                height: 11.76%;
+                animation: aboutLandscapeTreesEnter 760ms 470ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-brand {
+                position: relative;
+                z-index: 2;
+                display: flex;
+                align-items: center;
+                gap: 28px;
+                min-width: 0;
+                color: #1d1d1f;
+            }
+
+            .dark-mode .settings-about-brand {
+                color: rgba(255, 255, 255, 0.94);
+            }
+
+            .settings-about-brand-logo {
+                width: clamp(96px, 11.5vw, 118px);
+                height: clamp(96px, 11.5vw, 118px);
+                flex: 0 0 auto;
+                display: grid;
+                place-items: center;
+                background: transparent;
                 box-shadow: none;
+                animation: aboutBrandLogoEnter 760ms 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-brand-logo img {
+                width: 100%;
+                height: 100%;
+                display: block;
+                object-fit: contain;
+                filter: drop-shadow(0 10px 22px rgba(17, 31, 52, 0.18));
+            }
+
+            .settings-about-logo-dark { display: none !important; }
+            .dark-mode .settings-about-logo-light { display: none !important; }
+            .dark-mode .settings-about-logo-dark { display: block !important; }
+
+            .settings-about-brand-name {
+                font-size: clamp(38px, 6vw, 54px);
+                font-weight: 760;
+                line-height: 1;
+                letter-spacing: -0.045em;
+                text-shadow: 0 10px 28px rgba(255, 255, 255, 0.4);
+                animation: aboutBrandNameEnter 760ms 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .dark-mode .settings-about-brand-name {
+                text-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+            }
+
+            .settings-about-card-codename {
+                position: absolute;
+                right: 24px;
+                bottom: 18px;
+                z-index: 2;
+                max-width: min(320px, calc(100% - 48px));
+                overflow: hidden;
+                color: rgba(255, 255, 255, 0.88);
+                font-size: 13px;
+                font-weight: 650;
+                text-align: right;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-shadow: 0 2px 10px rgba(0, 0, 0, 0.36);
+                animation: aboutCodenameEnter 620ms 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
             .settings-about-hero-text {
                 min-width: 0;
-                flex: 1;
                 text-align: left;
-                min-height: 84px;
-                display: flex;
-                align-items: center;
+                animation: aboutTextEnter 640ms 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-hero-kicker {
+                color: var(--accent);
+                font-size: 12px;
+                font-weight: 760;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
             }
 
             .settings-about-hero-name {
                 font-size: 40px;
-                font-weight: 700;
+                font-weight: 750;
                 line-height: 1;
                 margin: 0;
             }
 
             .settings-about-hero-meta {
-                font-size: 14px;
                 color: var(--text-secondary);
-                word-break: break-word;
+                font-size: 14px;
+            }
+
+            .settings-about-version-pill {
+                justify-self: start;
+                margin-top: 6px;
+                padding: 6px 11px;
+                border-radius: 999px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
+                color: var(--accent);
+                font-size: 12px;
+                font-weight: 650;
+                font-variant-numeric: tabular-nums;
             }
 
             .settings-about-meta-card {
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                animation: aboutCardEnter 560ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
             .settings-about-meta-row {
@@ -1409,9 +1641,296 @@ const SettingsApp = {
                 text-decoration: underline;
             }
 
+            .settings-about-list {
+                animation: aboutCardEnter 560ms 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-list .fluent-list-item[data-id="changelog"] {
+                cursor: pointer;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.075);
+            }
+
+            .settings-about-list .fluent-list-item[data-id="changelog"]:hover {
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.14);
+            }
+
+            .settings-about-list .fluent-list-item-extra {
+                font-size: 20px;
+                color: var(--accent);
+            }
+
+            .settings-changelog-page {
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-changelog-page.slide-out {
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
+            }
+
+            .settings-changelog-header {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 18px;
+                margin-bottom: 18px;
+            }
+
+            .settings-changelog-title {
+                margin: 0;
+                font-size: 28px;
+                line-height: 1.15;
+            }
+
+            .settings-changelog-subtitle {
+                margin: 6px 0 0;
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+
+            .settings-changelog-count {
+                flex-shrink: 0;
+                padding: 6px 11px;
+                border-radius: 999px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
+                color: var(--accent);
+                font-size: 12px;
+            }
+
+            .settings-changelog-timeline {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding-left: 18px;
+            }
+
+            .settings-changelog-timeline::before {
+                content: '';
+                position: absolute;
+                left: 5px;
+                top: 18px;
+                bottom: 18px;
+                width: 2px;
+                border-radius: 2px;
+                background: linear-gradient(180deg, var(--accent), rgba(var(--accent-rgb, 0, 120, 212), 0.12));
+            }
+
+            .settings-changelog-entry {
+                position: relative;
+                margin-bottom: 0;
+                animation: aboutLogItemEnter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: min(calc(var(--log-index) * 42ms), 420ms);
+            }
+
+            .settings-changelog-entry::before {
+                content: '';
+                position: absolute;
+                left: -20px;
+                top: 23px;
+                width: 10px;
+                height: 10px;
+                box-sizing: border-box;
+                border-radius: 50%;
+                background: var(--bg-primary);
+                border: 3px solid var(--accent);
+                z-index: 2;
+            }
+
+            .settings-changelog-entry.is-baseline::before {
+                border-color: var(--text-tertiary);
+            }
+
+            .settings-changelog-entry-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 11px;
+            }
+
+            .settings-changelog-version {
+                font-size: 16px;
+                font-weight: 650;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .settings-changelog-date {
+                color: var(--text-secondary);
+                font-size: 12px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .settings-changelog-commits {
+                display: flex;
+                flex-direction: column;
+                gap: 9px;
+            }
+
+            .settings-changelog-commit {
+                display: grid;
+                grid-template-columns: 58px minmax(0, 1fr);
+                align-items: start;
+                gap: 10px;
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+            .settings-changelog-hash {
+                margin-top: 1px;
+                padding: 2px 5px;
+                border-radius: 5px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.09);
+                color: var(--accent);
+                font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+                text-align: center;
+            }
+
+            .settings-changelog-baseline {
+                color: var(--text-secondary);
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+            @keyframes aboutCardEnter {
+                from { opacity: 0; transform: translateY(18px) scale(0.985); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+
+            @keyframes aboutTextEnter {
+                from { opacity: 0; transform: translateX(22px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes aboutLandscapeSkyEnter {
+                from { opacity: 0; transform: scale(1.035); filter: saturate(0.82); }
+                to { opacity: 1; transform: scale(1); filter: saturate(1); }
+            }
+
+            @keyframes aboutLandscapeWaterEnter {
+                from { opacity: 0; transform: translateY(22px) scaleY(0.78); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapeReflectionEnter {
+                from { opacity: 0; transform: translateY(16px) scaleX(0.88); }
+                to { opacity: 1; transform: translateY(0) scaleX(1); }
+            }
+
+            @keyframes aboutLandscapeMiddleEnter {
+                from { opacity: 0; transform: translateY(30px) scaleY(0.76); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapePeaksEnter {
+                from { opacity: 0; transform: translateY(34px) scaleY(0.72); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapeLandEnter {
+                from { opacity: 0; transform: translateY(24px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @keyframes aboutLandscapeTreesEnter {
+                from { opacity: 0; transform: translateY(16px) scaleY(0.45); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutBrandLogoEnter {
+                from { opacity: 0; transform: translateX(-22px) scale(0.86); filter: blur(4px); }
+                70% { opacity: 1; transform: translateX(2px) scale(1.035); filter: blur(0); }
+                to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+            }
+
+            @keyframes aboutBrandNameEnter {
+                from { opacity: 0; transform: translateX(28px); filter: blur(5px); }
+                to { opacity: 1; transform: translateX(0); filter: blur(0); }
+            }
+
+            @keyframes aboutCodenameEnter {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @keyframes aboutChangelogEnter {
+                from { opacity: 0; transform: translateX(34px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes aboutChangelogExit {
+                from { opacity: 1; transform: translateX(0); }
+                to { opacity: 0; transform: translateX(34px); }
+            }
+
+            @keyframes aboutLogItemEnter {
+                from { opacity: 0; transform: translateY(14px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
             @media (max-width: 900px) {
-                .settings-about-hero-name {
-                    font-size: 30px;
+                .settings-about-hero-card {
+                    min-height: 140px;
+                    padding: 22px 24px;
+                }
+
+                .settings-about-brand {
+                    gap: 24px;
+                }
+            }
+
+            @media (max-width: 620px) {
+                .settings-about-hero-card {
+                    min-height: 128px;
+                    padding: 20px;
+                }
+
+                .settings-about-brand {
+                    gap: 16px;
+                }
+
+                .settings-about-brand-logo {
+                    width: 78px;
+                    height: 78px;
+                }
+
+                .settings-about-brand-name {
+                    font-size: 34px;
+                }
+
+                .settings-about-card-codename {
+                    right: 18px;
+                    bottom: 14px;
+                    font-size: 12px;
+                }
+
+                .settings-changelog-header {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+
+                .settings-changelog-commit {
+                    grid-template-columns: 1fr;
+                    gap: 5px;
+                }
+
+                .settings-changelog-hash {
+                    width: max-content;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .settings-about-hero-card,
+                .settings-about-meta-card,
+                .settings-about-list,
+                .settings-about-hero-text,
+                .settings-about-landscape-layer,
+                .settings-about-brand-logo,
+                .settings-about-brand-name,
+                .settings-about-card-codename,
+                .settings-changelog-page,
+                .settings-changelog-entry {
+                    animation: none !important;
                 }
             }
 
@@ -1776,6 +2295,9 @@ const SettingsApp = {
                 break;
             case 'about':
                 this.renderAbout(container);
+                break;
+            case 'about-changelog':
+                this.renderAboutChangelog(container);
                 break;
             case 'developer':
                 this.renderDeveloper(container);
@@ -4289,19 +4811,32 @@ const SettingsApp = {
         container.className = 'settings-content settings-about';
 
         const section = this.createSection(t('settings.about-title'));
-        const aboutLogo = (State?.settings?.theme === 'dark')
-            ? 'Theme/Icon/Fluent_logo_dark.png'
-            : 'Theme/Icon/Fluent_logo.png';
+        const currentVersion = this.aboutChangelog[0].version;
+        const qingshanLakeName = t('settings.about.qingshan-lake');
+        const qingshanLakeCodename = qingshanLakeName && qingshanLakeName !== 'Qingshan Lake'
+            ? `${t('settings.about.codename')}：${qingshanLakeName}`
+            : 'Qingshan Lake';
 
         const heroCard = document.createElement('div');
         heroCard.className = 'fluent-setting-item settings-about-hero-card';
         heroCard.innerHTML = `
-            <div class="settings-about-logo-wrap">
-                <img src="${aboutLogo}" alt="FluentOS">
+            <div class="settings-about-landscape" aria-hidden="true">
+                <img class="settings-about-landscape-layer settings-about-landscape-sky" src="Theme/Qingshan_lake/03_sky_far_background_mountains.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-water-base" src="Theme/Qingshan_lake/04_water_base_gradient_bands.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-reflection" src="Theme/Qingshan_lake/05_water_reflection_bands.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-mountain-middle" src="Theme/Qingshan_lake/06_middle_colored_mountain_slopes.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-mountain-dark" src="Theme/Qingshan_lake/07_dark_mountain_peaks.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-land" src="Theme/Qingshan_lake/09_foreground_dark_land.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-trees" src="Theme/Qingshan_lake/10_tree_silhouettes.png" alt="">
             </div>
-            <div class="settings-about-hero-text">
-                <div class="settings-about-hero-name">FluentOS</div>
+            <div class="settings-about-brand">
+                <div class="settings-about-brand-logo">
+                    <img class="settings-about-logo-light" src="Theme/Icon/Fluent_logo.png" alt="">
+                    <img class="settings-about-logo-dark" src="Theme/Icon/Fluent_logo_dark.png" alt="">
+                </div>
+                <div class="settings-about-brand-name">FluentOS</div>
             </div>
+            <div class="settings-about-card-codename">${qingshanLakeCodename}</div>
         `;
         section.appendChild(heroCard);
         const aboutTitleEl = section.querySelector('.settings-section-title');
@@ -4325,14 +4860,107 @@ const SettingsApp = {
         section.appendChild(metaCard);
 
         const list = FluentUI.List({
+            className: 'settings-about-list',
             items: [
-                { id: 'version', title: t('settings.version'), description: '2.0.0.2 BETA', icon: 'Information Circle' },
-                { id: 'Insider Preview', title: t('Insider Preview'), description: 'Build 20260613', icon: 'Information Circle' },
+                { id: 'changelog', title: t('settings.about.changelog'), description: t('settings.about.changelog-desc'), icon: 'Document', extra: '›' },
+                { id: 'version', title: t('settings.version'), description: currentVersion, icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
-            ]
+            ],
+            onItemClick: (id) => {
+                if (id === 'changelog') this.navigateToPage('about-changelog');
+            }
         });
+        const changelogItem = list.querySelector('[data-id="changelog"]');
+        if (changelogItem) {
+            changelogItem.setAttribute('role', 'button');
+            changelogItem.tabIndex = 0;
+            changelogItem.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                this.navigateToPage('about-changelog');
+            });
+        }
         section.appendChild(list);
+        container.appendChild(section);
+    },
+
+    renderAboutChangelog(container) {
+        container.className = 'settings-content settings-about-changelog';
+
+        const section = document.createElement('section');
+        section.className = 'settings-section settings-changelog-page';
+
+        const backBtn = document.createElement('div');
+        backBtn.className = 'app-detail-back settings-changelog-back';
+        backBtn.innerHTML = `
+            <img src="Theme/Icon/Symbol_icon/stroke/Chevron Left.svg" alt="">
+            <span>${t('settings.about-title')}</span>
+        `;
+        backBtn.addEventListener('click', () => {
+            section.classList.add('slide-out');
+            setTimeout(() => this.navigateToPage('about'), 240);
+        });
+        section.appendChild(backBtn);
+
+        const commitCount = this.aboutChangelog.reduce((total, release) => total + release.commits.length, 0);
+        const header = document.createElement('header');
+        header.className = 'settings-changelog-header';
+        header.innerHTML = `
+            <div>
+                <h1 class="settings-changelog-title">${t('settings.about.changelog')}</h1>
+                <p class="settings-changelog-subtitle">${t('settings.about.changelog-subtitle')}</p>
+            </div>
+            <div class="settings-changelog-count">${t('settings.about.commit-count', { count: commitCount })}</div>
+        `;
+        section.appendChild(header);
+
+        const timeline = document.createElement('div');
+        timeline.className = 'settings-changelog-timeline';
+
+        this.aboutChangelog.forEach((release, index) => {
+            const entry = document.createElement('article');
+            entry.className = `fluent-setting-item settings-changelog-entry${release.baseline ? ' is-baseline' : ''}`;
+            entry.style.setProperty('--log-index', index);
+
+            const entryHead = document.createElement('div');
+            entryHead.className = 'settings-changelog-entry-head';
+            entryHead.innerHTML = `
+                <div class="settings-changelog-version">${release.version}</div>
+                <time class="settings-changelog-date" datetime="${release.date}">${release.date}</time>
+            `;
+            entry.appendChild(entryHead);
+
+            if (release.baseline) {
+                const baseline = document.createElement('div');
+                baseline.className = 'settings-changelog-baseline';
+                baseline.textContent = t('settings.about.baseline');
+                entry.appendChild(baseline);
+            } else {
+                const commits = document.createElement('div');
+                commits.className = 'settings-changelog-commits';
+                release.commits.forEach(commit => {
+                    const commitRow = document.createElement('div');
+                    commitRow.className = 'settings-changelog-commit';
+
+                    const hash = document.createElement('span');
+                    hash.className = 'settings-changelog-hash';
+                    hash.textContent = commit.hash;
+
+                    const title = document.createElement('span');
+                    title.className = 'settings-changelog-commit-title';
+                    title.textContent = commit.title;
+
+                    commitRow.append(hash, title);
+                    commits.appendChild(commitRow);
+                });
+                entry.appendChild(commits);
+            }
+
+            timeline.appendChild(entry);
+        });
+
+        section.appendChild(timeline);
         container.appendChild(section);
     },
 
