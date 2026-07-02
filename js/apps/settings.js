@@ -59,7 +59,7 @@ const SettingsApp = {
         { date: '2026-06-07', version: '2.0.260607', commits: [
             { hash: '45428a5', title: '完成全新高光效果开发' },
             { hash: 'fd9d197', title: '基本完成模糊程度+云母材质效果切换' },
-            { hash: '544ea15', title: '更换图标+Liquid Glass效果引入' }
+            { hash: '544ea15', title: '更换图标并优化UI界面' }
         ] },
         { date: '2026-06-06', version: '2.0.260606', baseline: true, commits: [] }
     ],

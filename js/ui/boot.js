@@ -330,11 +330,17 @@ const BootScreen = {
                 .map((img) => img.getAttribute('src'))
                 .filter((src) => src && src.startsWith('Theme/Icon/'))
         ]);
+        const illustrations = this._uniqAssets([
+            'Theme/illustrations/language-and-region.svg',
+            'Theme/illustrations/profile-data.svg',
+            'Theme/illustrations/password.svg'
+        ]);
 
         return {
             lockWallpapers: pack.lockWallpapers,
             avatars: pack.avatars,
-            icons: oobeIcons
+            icons: oobeIcons,
+            illustrations
         };
     },
 
@@ -504,7 +510,8 @@ const BootScreen = {
         const lockOk = await this._preloadGroupWithResult(pack.lockWallpapers, 4); // 必要：锁屏壁纸
         const avatarOk = await this._preloadGroupWithResult(pack.avatars, 2);       // 必要：用户头像
         const iconOk = await this._preloadGroupWithResult(pack.icons, 8);           // 必要：OOBE 图标 + Logo
-        return lockOk && avatarOk && iconOk;
+        const illustrationOk = await this._preloadGroupWithResult(pack.illustrations, 3);
+        return lockOk && avatarOk && iconOk && illustrationOk;
     },
 
     async _warmRenderOobeEssentialResources() {
@@ -512,8 +519,9 @@ const BootScreen = {
         const lockOk = await this._warmRenderGroupWithResult(pack.lockWallpapers, 2);
         const avatarOk = await this._warmRenderGroupWithResult(pack.avatars, 2);
         const iconOk = await this._warmRenderGroupWithResult(pack.icons, 6);
+        const illustrationOk = await this._warmRenderGroupWithResult(pack.illustrations, 3);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        return lockOk && avatarOk && iconOk;
+        return lockOk && avatarOk && iconOk && illustrationOk;
     },
 
     async _preloadOobeDeferredResources() {

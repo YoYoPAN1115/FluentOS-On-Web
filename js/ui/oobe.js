@@ -1,23 +1,18 @@
 /**
  * OOBE first-launch onboarding flow.
- * Standalone module: 6 steps (0-5) with live preview.
+ * Standalone module: 7 steps (0-6) with staged settings and live preview.
  */
 const OOBE = {
     STORAGE_KEY: 'fluentos.oobe_completed',
 
     element: null,
     backgroundElement: null,
-    lockPreviewElements: [],
-
     steps: [],
-    progressDots: [],
-    previewDesktopElements: [],
-    previewTextNodes: [],
-    previewTimeNodes: [],
-    previewDateNodes: [],
-    previewSearchInputNodes: [],
-    lockPreviewTimeNodes: [],
-    lockPreviewDateNodes: [],
+    systemPreviewHosts: [],
+    systemPreviewFrames: [],
+    themeControlEl: null,
+    windowBlurToggleEl: null,
+    autoFullscreenToggleEl: null,
 
     userNameInputEl: null,
     userEmailInputEl: null,
@@ -33,6 +28,9 @@ const OOBE = {
 
     selectedLang: null,
     selectedTheme: 'light',
+    selectedWallpaper: 'Theme/Picture/Fluent-2.png',
+    selectedWindowBlur: false,
+    selectedAccentColor: '#0078d4',
     selectedAutoFullscreen: true,
     selectedFingoMode: 'local',
     selectedUserName: '',
@@ -68,44 +66,60 @@ const OOBE = {
 
     /* Welcome animation state */
     welcomeLogoEl: null,
+    welcomeBrandEl: null,
+    welcomeBrandTextEl: null,
+    welcomeCopyEl: null,
     welcomeTextEl: null,
     welcomeNextEl: null,
     welcomeAnimTimer: null,
     welcomePhaseTimer: null,
     welcomeLogoTextTimer: null,
+    welcomeBrandTimer: null,
+    welcomeTransformTimer: null,
+    welcomeSwapTimer: null,
     welcomeTextIndex: 0,
-    welcomeTexts: ['欢迎', 'Welcome'],
     welcomeAnimStarted: false,
     logoBridgeEl: null,
     logoBridgeTimer: null,
     bridgeBootLogoEl: null,
-
-    /* Language preview */
-    langPreviewTextEl: null,
+    tiltRaf: null,
+    tiltPointerX: 0,
+    tiltPointerY: 0,
+    tiltCurrentX: 0,
+    tiltCurrentY: 0,
 
     i18n: {
         zh: {
-            welcomeNext: '下一步',
-
-            languageTitle: '欢迎使用 FluentOS',
-            languageSubtitle: '选择系统语言后再继续。',
+            languageTitle: '语言 & Language',
+            languageSubtitle: '选择 Fluent OS 的显示语言。',
             langZhTitle: '简体中文',
             langZhDesc: '推荐中文用户',
             langEnTitle: 'English',
             langEnDesc: 'For English users',
 
-            themePageTitle: '主题设置',
-            themePageSubtitle: '实时预览浅色和深色模式的任务栏与开始菜单。',
-            themeTitle: '主题',
+            themePageTitle: '系统主题',
+            themePageSubtitle: '让 Fluent OS 看起来更像你。',
+            themeTitle: '颜色模式',
             themeLight: '浅色',
             themeDark: '深色',
-            autoFullscreenTitle: '\u5f00\u673a\u81ea\u52a8\u7f51\u9875\u5168\u5c4f',
-            autoFullscreenDesc: '\u5f00\u673a\u7b2c2\u79d2\u81ea\u52a8\u8fdb\u5165\u7f51\u9875\u5168\u5c4f\uff0c\u5e26\u6765\u66f4\u4e3a\u6c89\u6d78\u7684\u4f53\u9a8c\u3002',
-            autoFullscreenOn: '\u5f00\u542f',
-            autoFullscreenOff: '\u5173\u95ed',
+            wallpaperTitle: '桌面壁纸',
+            wallpaperUpload: '上传',
+            wallpaperLoading: '正在获取 Bing 壁纸...',
+            wallpaperReady: 'Bing 壁纸已准备完成。',
+            wallpaperError: '暂时无法获取 Bing 壁纸，可以重试或继续设置。',
+            windowBlurTitle: '全局窗口模糊',
+            windowBlurDesc: '让壁纸透过 Fluent 窗口。',
+            autoFullscreenTitle: '开机自动网页全屏',
+            autoFullscreenDesc: '启动后自动进入沉浸全屏。',
 
-            fingoPageTitle: 'Fingo AI 模式',
-            fingoPageSubtitle: '你可以在上方临时对话，退出 OOBE 后不会保存记录。',
+            accentPageTitle: '主题颜色',
+            accentPageSubtitle: '选择用于按钮、焦点和高亮的颜色。',
+            accentCurrentTitle: '当前颜色',
+            customColorTitle: '自定义颜色',
+            customColorDesc: '从调色板中选择任意颜色。',
+
+            fingoPageTitle: 'Fingo AI',
+            fingoPageSubtitle: '选择 Fingo 的工作方式，也可以在左侧临时对话。',
             fingoModeTitle: '对话模式',
             fingoModeLocal: '默认本地模式',
             fingoModeCustom: '自定义 API 模式',
@@ -118,7 +132,7 @@ const OOBE = {
 
             next: '下一步',
             back: '返回',
-            finish: '完成并进入锁屏',
+            finish: '完成并进入桌面',
 
             preloadRunning: '正在后台准备离线资源包...',
             preloadDone: '离线资源包已准备完成。',
@@ -144,27 +158,36 @@ const OOBE = {
             fingoOobeBlocked: '这个功能需要进入系统才可以使用哦~'
         },
         en: {
-            welcomeNext: 'Next',
-
-            languageTitle: 'Welcome to FluentOS',
-            languageSubtitle: 'Choose your language first.',
+            languageTitle: 'Language',
+            languageSubtitle: 'Choose the display language for Fluent OS.',
             langZhTitle: 'Chinese',
             langZhDesc: 'Simplified Chinese UI',
             langEnTitle: 'English',
             langEnDesc: 'Recommended for English users',
 
             themePageTitle: 'Theme',
-            themePageSubtitle: 'Preview taskbar and Start menu in real time.',
-            themeTitle: 'Theme',
+            themePageSubtitle: 'Make Fluent OS feel like yours.',
+            themeTitle: 'Color mode',
             themeLight: 'Light',
             themeDark: 'Dark',
+            wallpaperTitle: 'Desktop wallpaper',
+            wallpaperUpload: 'Upload',
+            wallpaperLoading: 'Fetching a Bing wallpaper...',
+            wallpaperReady: 'The Bing wallpaper is ready.',
+            wallpaperError: 'Bing wallpaper is unavailable. Retry or continue setup.',
+            windowBlurTitle: 'Global window blur',
+            windowBlurDesc: 'Let the wallpaper show through Fluent windows.',
             autoFullscreenTitle: 'Auto Web Fullscreen On Boot',
-            autoFullscreenDesc: 'Automatically enter web fullscreen at second 2 after boot for a more immersive experience.',
-            autoFullscreenOn: 'On',
-            autoFullscreenOff: 'Off',
+            autoFullscreenDesc: 'Enter immersive fullscreen automatically after startup.',
+
+            accentPageTitle: 'Accent color',
+            accentPageSubtitle: 'Choose the color used for buttons, focus and highlights.',
+            accentCurrentTitle: 'Current color',
+            customColorTitle: 'Custom color',
+            customColorDesc: 'Choose any color from the color picker.',
 
             fingoPageTitle: 'Fingo AI Mode',
-            fingoPageSubtitle: 'Chat above in temporary mode. Nothing is saved after OOBE.',
+            fingoPageSubtitle: 'Choose how Fingo works, or try a temporary chat on the left.',
             fingoModeTitle: 'Conversation Mode',
             fingoModeLocal: 'Default local mode',
             fingoModeCustom: 'Custom API mode',
@@ -177,7 +200,7 @@ const OOBE = {
 
             next: 'Next',
             back: 'Back',
-            finish: 'Finish and enter lock screen',
+            finish: 'Finish and enter desktop',
 
             preloadRunning: 'Preparing offline resource pack in background...',
             preloadDone: 'Offline resource pack is ready.',
@@ -209,17 +232,15 @@ const OOBE = {
         if (!this.element) return;
 
         this.backgroundElement = document.getElementById('oobe-background');
-        this.lockPreviewElements = Array.from(this.element.querySelectorAll('.oobe-live-lock-preview'));
 
         this.steps = Array.from(this.element.querySelectorAll('.oobe-step'));
-        this.progressDots = Array.from(this.element.querySelectorAll('.oobe-progress-dot'));
-        this.previewDesktopElements = Array.from(this.element.querySelectorAll('.oobe-live-desktop'));
-        this.previewTextNodes = Array.from(this.element.querySelectorAll('[data-preview-text]'));
-        this.previewTimeNodes = Array.from(this.element.querySelectorAll('.oobe-preview-time'));
-        this.previewDateNodes = Array.from(this.element.querySelectorAll('.oobe-preview-date'));
-        this.previewSearchInputNodes = Array.from(this.element.querySelectorAll('[data-preview-placeholder="search"]'));
-        this.lockPreviewTimeNodes = Array.from(this.element.querySelectorAll('.oobe-lock-preview-time'));
-        this.lockPreviewDateNodes = Array.from(this.element.querySelectorAll('.oobe-lock-preview-date'));
+        this.systemPreviewHosts = [
+            document.getElementById('oobe-theme-preview-host'),
+            document.getElementById('oobe-accent-preview-host')
+        ].filter(Boolean);
+        this.themeControlEl = document.getElementById('oobe-theme-control');
+        this.windowBlurToggleEl = document.getElementById('oobe-window-blur-toggle');
+        this.autoFullscreenToggleEl = document.getElementById('oobe-auto-fullscreen-toggle');
 
         this.fingoMessagesEl = document.getElementById('oobe-fingo-messages');
         this.fingoInputEl = document.getElementById('oobe-fingo-input');
@@ -239,12 +260,14 @@ const OOBE = {
 
         /* Welcome elements */
         this.welcomeLogoEl = document.getElementById('oobe-welcome-logo');
+        this.welcomeBrandEl = document.getElementById('oobe-welcome-brand');
+        this.welcomeBrandTextEl = document.getElementById('oobe-welcome-brand-text');
         this.welcomeTextEl = document.getElementById('oobe-welcome-text');
-        this.welcomeNextEl = document.getElementById('oobe-next-0');
+        this.welcomeCopyEl = this.welcomeTextEl?.closest('.oobe-welcome-copy') || null;
+        this.welcomeNextEl = document.getElementById('oobe-welcome-continue');
 
-        /* Language preview text */
-        this.langPreviewTextEl = document.getElementById('oobe-lang-preview-text');
-
+        this._initThemeControls();
+        this._initAccentPalette();
         this._initFingoSettingsPanel();
         if (!this.oobeFingoApiListenerBound && State && typeof State.on === 'function') {
             this.oobeFingoApiListenerBound = true;
@@ -252,6 +275,7 @@ const OOBE = {
         }
 
         this._bindEvents();
+        this._bindTiltEffect();
         this._refreshTexts();
         this._setStep(0, true);
         this.hide();
@@ -274,12 +298,14 @@ const OOBE = {
         this._resetFlow();
         this._syncBackgroundWithLockWallpaper();
         this._syncDesktopPreviewState();
-        this._tickPreviewClock();
-        this._startPreviewClockTimer();
         this._startPreloadInBackground();
 
         this._refreshTexts();
         this._setStep(0, true);
+        requestAnimationFrame(() => {
+            this._initSystemPreviews();
+            this._syncDesktopPreviewState();
+        });
         if (options && options.bootLogoEl) {
             this._startWelcomeAnimationFromBootLogo(options.bootLogoEl);
         } else {
@@ -292,24 +318,46 @@ const OOBE = {
 
         this._stopPreviewClockTimer();
         this._stopWelcomeAnimation();
+        this._resetTiltEffect();
         if (this.welcomeLogoEl) {
             this.welcomeLogoEl.classList.remove('oobe-logo-bridged');
         }
         this.element.classList.add('hidden');
+        document.body.classList.remove('oobe-dark-dialog-mode');
     },
 
     completeAndEnterLock() {
+        this.completeAndEnterDesktop();
+    },
+
+    _detectBrowserLanguage() {
+        const browserLanguage = String(
+            (Array.isArray(navigator.languages) && navigator.languages[0])
+            || navigator.language
+            || ''
+        ).toLowerCase();
+        return browserLanguage === 'zh' || browserLanguage.startsWith('zh-') ? 'zh' : 'en';
+    },
+
+    completeAndEnterDesktop() {
         if (this.finishing || !this.element) return;
         this.finishing = true;
 
-        const continueToLock = () => {
+        const continueToDesktop = () => {
             this._applySelections();
             this._markCompleted();
-            this._enterLockTransition();
+            if (State && typeof State.updateSession === 'function') {
+                State.updateSession({
+                    isLoggedIn: true,
+                    lastLogin: new Date().toISOString(),
+                    loginAttempts: 0
+                });
+            }
+            this._enterDesktopTransition();
         };
 
         if (!this._shouldWarnDefaultPinBeforeFinish()) {
-            continueToLock();
+            continueToDesktop();
             return;
         }
 
@@ -318,7 +366,7 @@ const OOBE = {
                 this.finishing = false;
                 return;
             }
-            continueToLock();
+            continueToDesktop();
         }).catch(() => {
             this.finishing = false;
         });
@@ -394,32 +442,35 @@ const OOBE = {
         });
     },
 
-    _enterLockTransition() {
-        const lockEl = document.getElementById('lock-screen');
-        if (lockEl) {
-            LockScreen.show();
-            lockEl.style.opacity = '0';
-            lockEl.style.transition = 'opacity 0.6s ease';
-            lockEl.classList.remove('hidden');
+    _enterDesktopTransition() {
+        const desktopEl = document.getElementById('desktop-screen');
+        if (desktopEl) {
+            Desktop.show();
+            desktopEl.style.opacity = '0';
+            desktopEl.style.transition = 'opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1)';
+            desktopEl.classList.remove('hidden');
         }
 
-        this.element.style.transition = 'opacity 0.6s ease';
+        this.element.style.transition = 'opacity 0.52s ease';
         requestAnimationFrame(() => {
             this.element.style.opacity = '0';
-            if (lockEl) lockEl.style.opacity = '1';
+            if (desktopEl) desktopEl.style.opacity = '1';
         });
 
         setTimeout(() => {
-            this.hide();
             this.element.style.transition = '';
             this.element.style.opacity = '';
-            if (lockEl) {
-                lockEl.style.transition = '';
-                lockEl.style.opacity = '';
+            if (desktopEl) {
+                desktopEl.style.transition = '';
+                desktopEl.style.opacity = '';
             }
-            State.view = 'lock';
+            if (State && typeof State.setView === 'function') {
+                State.setView('desktop');
+            } else {
+                this.hide();
+            }
             this.finishing = false;
-        }, 620);
+        }, 660);
     },
 
     _getUserAvatarOptions() {
@@ -622,7 +673,7 @@ const OOBE = {
 
     _syncUserStepState() {
         const d = this._dict();
-        const next4 = document.getElementById('oobe-next-4');
+        const next4 = document.getElementById('oobe-next-5');
 
         const name = String(this.selectedUserName || '').trim();
         const email = String(this.selectedUserEmail || '').trim();
@@ -724,40 +775,271 @@ const OOBE = {
         this.userSettingsHostEl.appendChild(body);
     },
 
+    _initThemeControls() {
+        if (typeof FluentUI === 'undefined' || !FluentUI) return;
+
+        if (this.themeControlEl) {
+            this.themeControlEl.innerHTML = '';
+            this.themeControlEl.appendChild(FluentUI.SegmentedControl({
+                segments: [
+                    { id: 'light', label: this._dict().themeLight },
+                    { id: 'dark', label: this._dict().themeDark }
+                ],
+                activeSegment: this.selectedTheme,
+                onChange: (theme) => {
+                    this.selectedTheme = theme === 'dark' ? 'dark' : 'light';
+                    this._syncDesktopPreviewState();
+                },
+                className: 'oobe-theme-segmented'
+            }));
+        }
+
+        if (this.windowBlurToggleEl) {
+            this.windowBlurToggleEl.innerHTML = '';
+            this.windowBlurToggleEl.appendChild(FluentUI.Toggle({
+                checked: this.selectedWindowBlur,
+                onChange: (value) => {
+                    this.selectedWindowBlur = value === true;
+                    this._syncDesktopPreviewState();
+                }
+            }));
+        }
+
+        if (this.autoFullscreenToggleEl) {
+            this.autoFullscreenToggleEl.innerHTML = '';
+            this.autoFullscreenToggleEl.appendChild(FluentUI.Toggle({
+                checked: this.selectedAutoFullscreen,
+                onChange: (value) => {
+                    this.selectedAutoFullscreen = value === true;
+                }
+            }));
+        }
+    },
+
+    _initAccentPalette() {
+        const colors = [
+            '#ffb900', '#f7630c', '#d13438', '#e81123',
+            '#e3008c', '#b146c2', '#0078d4', '#6b69d6',
+            '#0099bc', '#00b7c3', '#00a98f', '#107c10',
+            '#7a7574', '#68768a', '#567c73', '#4c4a48'
+        ];
+        const grid = document.getElementById('oobe-accent-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        colors.forEach((color) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'oobe-accent-swatch';
+            button.dataset.color = color;
+            button.style.setProperty('--swatch-color', color);
+            button.title = color.toUpperCase();
+            button.setAttribute('aria-label', color.toUpperCase());
+            button.innerHTML = '<img src="Theme/Icon/Symbol_icon/stroke/Check.svg" alt="">';
+            button.addEventListener('click', () => this._selectAccentColor(color));
+            grid.appendChild(button);
+        });
+        this._syncAccentSelection();
+    },
+
+    _selectAccentColor(color) {
+        this.selectedAccentColor = State && typeof State.normalizeAccentColor === 'function'
+            ? State.normalizeAccentColor(color)
+            : String(color || '#0078d4').toLowerCase();
+        this._syncAccentSelection();
+        this._syncDesktopPreviewState();
+    },
+
+    _syncAccentSelection() {
+        const normalized = String(this.selectedAccentColor || '#0078d4').toLowerCase();
+        this.element?.querySelectorAll('.oobe-accent-swatch').forEach((button) => {
+            const selected = String(button.dataset.color || '').toLowerCase() === normalized;
+            button.classList.toggle('selected', selected);
+            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+        const current = document.getElementById('oobe-accent-current-swatch');
+        const value = document.getElementById('oobe-accent-current-value');
+        const input = document.getElementById('oobe-custom-color-input');
+        if (current) current.style.backgroundColor = normalized;
+        if (value) value.textContent = normalized.toUpperCase();
+        if (input) input.value = normalized;
+    },
+
+    _initSystemPreviews() {
+        if (this.systemPreviewFrames.length) return;
+        this.systemPreviewHosts.forEach((host) => {
+            host.innerHTML = `
+                <div class="oobe-preview-wallpaper"></div>
+                <div class="oobe-preview-app-window">
+                    <div class="oobe-preview-titlebar">
+                        <div class="oobe-preview-app-title">
+                            <img src="Theme/Icon/App_icon/settings.png" alt="">
+                            <span class="oobe-preview-title-placeholder"></span>
+                        </div>
+                        <div class="oobe-preview-window-controls" aria-hidden="true">
+                            <i class="oobe-preview-window-control"></i>
+                            <i class="oobe-preview-window-control"></i>
+                            <i class="oobe-preview-window-control"></i>
+                        </div>
+                    </div>
+                    <div class="oobe-preview-window-content">
+                        <aside class="oobe-preview-sidebar">
+                            ${Array.from({ length: 6 }, (_, index) => `
+                                <div class="oobe-preview-nav-row ${index === 0 ? 'active' : ''}">
+                                    <i></i><span style="--placeholder-width:${52 + ((index % 4) * 10)}%"></span>
+                                </div>
+                            `).join('')}
+                        </aside>
+                        <main class="oobe-preview-main">
+                            <div class="oobe-preview-device">
+                                <div class="oobe-preview-device-image"></div>
+                                <div class="oobe-preview-device-copy"><b></b><span></span><small></small></div>
+                            </div>
+                            <div class="oobe-preview-section-heading"></div>
+                            <div class="oobe-preview-recommendations">
+                                ${Array.from({ length: 3 }, () => `
+                                    <div class="oobe-preview-recommendation"><i></i><div><b></b><span></span></div><em></em></div>
+                                `).join('')}
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            `;
+            this.systemPreviewFrames.push({
+                host,
+                wallpaperEl: host.querySelector('.oobe-preview-wallpaper'),
+                windowEl: host.querySelector('.oobe-preview-app-window')
+            });
+        });
+    },
+
+    _bindTiltEffect() {
+        if (this._tiltBound || !this.element) return;
+        this._tiltBound = true;
+        const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        if (reduceMotion || coarsePointer) return;
+
+        window.addEventListener('pointermove', (event) => {
+            this.tiltPointerX = ((event.clientX / Math.max(1, window.innerWidth)) - 0.5) * 2;
+            this.tiltPointerY = ((event.clientY / Math.max(1, window.innerHeight)) - 0.5) * 2;
+            this.element?.classList.add('oobe-tilt-active');
+            this._scheduleTiltFrame();
+        }, { passive: true });
+        document.documentElement.addEventListener('mouseleave', () => this._resetTiltEffect());
+    },
+
+    _scheduleTiltFrame() {
+        if (this.tiltRaf) return;
+        const tick = () => {
+            this.tiltRaf = null;
+            this.tiltCurrentX += (this.tiltPointerX - this.tiltCurrentX) * 0.12;
+            this.tiltCurrentY += (this.tiltPointerY - this.tiltCurrentY) * 0.12;
+            this.element?.style.setProperty('--oobe-tilt-x', `${(-this.tiltCurrentY * 3).toFixed(3)}deg`);
+            this.element?.style.setProperty('--oobe-tilt-y', `${(this.tiltCurrentX * 4).toFixed(3)}deg`);
+            this.element?.style.setProperty('--oobe-tilt-shift-x', `${(this.tiltCurrentX * 4).toFixed(2)}px`);
+            this.element?.style.setProperty('--oobe-tilt-shift-y', `${(this.tiltCurrentY * 3).toFixed(2)}px`);
+            if (Math.abs(this.tiltPointerX - this.tiltCurrentX) > 0.003 || Math.abs(this.tiltPointerY - this.tiltCurrentY) > 0.003) {
+                this._scheduleTiltFrame();
+            } else if (this.tiltPointerX === 0 && this.tiltPointerY === 0) {
+                this.element?.classList.remove('oobe-tilt-active');
+            }
+        };
+        this.tiltRaf = requestAnimationFrame(tick);
+    },
+
+    _resetTiltEffect() {
+        this.tiltPointerX = 0;
+        this.tiltPointerY = 0;
+        this._scheduleTiltFrame();
+    },
+
+    _selectWallpaper(wallpaper) {
+        if (!wallpaper) return;
+        this.selectedWallpaper = wallpaper;
+        this._syncWallpaperSelection();
+        this._syncDesktopPreviewState();
+    },
+
+    _syncWallpaperSelection() {
+        this.element?.querySelectorAll('#oobe-wallpaper-grid [data-wallpaper]').forEach((button) => {
+            const selected = button.dataset.wallpaper === this.selectedWallpaper;
+            button.classList.toggle('selected', selected);
+            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+    },
+
+    async _fetchBingWallpaper() {
+        const button = document.getElementById('oobe-bing-wallpaper');
+        const status = document.getElementById('oobe-wallpaper-status');
+        const dict = this._dict();
+        if (button?.disabled) return;
+        if (button) button.disabled = true;
+        if (status) {
+            status.textContent = dict.wallpaperLoading;
+            status.classList.remove('error', 'success');
+        }
+        try {
+            const market = this._langCode() === 'en' ? 'en-US' : 'zh-CN';
+            const response = await fetch(`https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=${market}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            if (!data?.url) throw new Error('Invalid Bing wallpaper response');
+            this._selectWallpaper(data.url);
+            if (status) {
+                status.textContent = dict.wallpaperReady;
+                status.classList.add('success');
+            }
+        } catch (error) {
+            console.warn('OOBE Bing wallpaper fetch failed', error);
+            if (status) {
+                status.textContent = dict.wallpaperError;
+                status.classList.add('error');
+            }
+        } finally {
+            if (button) button.disabled = false;
+        }
+    },
+
     _bindEvents() {
+        window.addEventListener('resize', () => {
+            if (this.currentStep === 0 && !this.element?.classList.contains('hidden')) {
+                this._syncWelcomeLogoPositions();
+            }
+        }, { passive: true });
+
         const languageButtons = Array.from(this.element.querySelectorAll('.oobe-option-btn[data-lang]'));
         languageButtons.forEach((btn) => {
             btn.addEventListener('click', () => {
                 this.selectedLang = btn.dataset.lang || 'zh';
                 languageButtons.forEach(item => item.classList.toggle('active', item === btn));
                 this._syncNextStep1State();
-                this._syncDesktopPreviewState();
-                this._syncLangPreviewText();
                 this._refreshTexts();
             });
         });
 
-        const themeButtons = Array.from(this.element.querySelectorAll('#oobe-theme-group .oobe-chip'));
-        themeButtons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                this.selectedTheme = btn.dataset.theme || 'light';
-                themeButtons.forEach(item => item.classList.toggle('active', item === btn));
-                this._syncDesktopPreviewState();
-            });
+        this.element.querySelectorAll('#oobe-wallpaper-grid [data-wallpaper]').forEach((button) => {
+            button.addEventListener('click', () => this._selectWallpaper(button.dataset.wallpaper));
         });
-
-        const autoFullscreenButtons = Array.from(this.element.querySelectorAll('#oobe-auto-fullscreen-group .oobe-chip'));
-        autoFullscreenButtons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                this.selectedAutoFullscreen = btn.dataset.autoFullscreen !== 'false';
-                autoFullscreenButtons.forEach(item => item.classList.toggle('active', item === btn));
-            });
+        document.getElementById('oobe-bing-wallpaper')?.addEventListener('click', () => this._fetchBingWallpaper());
+        const wallpaperFile = document.getElementById('oobe-wallpaper-file');
+        document.getElementById('oobe-upload-wallpaper')?.addEventListener('click', () => wallpaperFile?.click());
+        wallpaperFile?.addEventListener('change', (event) => {
+            const file = event.target?.files?.[0];
+            if (!file || !file.type?.startsWith('image/')) return;
+            const reader = new FileReader();
+            reader.onload = () => this._selectWallpaper(String(reader.result || ''));
+            reader.readAsDataURL(file);
+            event.target.value = '';
         });
+        const customColorInput = document.getElementById('oobe-custom-color-input');
+        document.getElementById('oobe-custom-color-button')?.addEventListener('click', () => customColorInput?.click());
+        customColorInput?.addEventListener('input', (event) => this._selectAccentColor(event.target.value));
 
-        /* Welcome step 0 next */
-        const next0 = document.getElementById('oobe-next-0');
-        if (next0) {
-            next0.addEventListener('click', () => {
+        /* The welcome card itself is the forward action. */
+        const welcomeCard = document.getElementById('oobe-card');
+        if (welcomeCard) {
+            welcomeCard.addEventListener('click', () => {
+                if (this.currentStep !== 0 || !this.welcomeNextEl?.classList.contains('is-visible')) return;
                 this._stopWelcomeAnimation();
                 this._setStep(1);
             });
@@ -768,10 +1050,12 @@ const OOBE = {
         const next2 = document.getElementById('oobe-next-2');
         const next3 = document.getElementById('oobe-next-3');
         const next4 = document.getElementById('oobe-next-4');
+        const next5 = document.getElementById('oobe-next-5');
         const back2 = document.getElementById('oobe-back-2');
         const back3 = document.getElementById('oobe-back-3');
         const back4 = document.getElementById('oobe-back-4');
         const back5 = document.getElementById('oobe-back-5');
+        const back6 = document.getElementById('oobe-back-6');
         const finish = document.getElementById('oobe-finish');
 
         if (next1) {
@@ -783,15 +1067,17 @@ const OOBE = {
         if (back1) back1.addEventListener('click', () => { this._setStep(0); this._startWelcomeAnimation(); });
         if (next2) next2.addEventListener('click', () => this._setStep(3));
         if (next3) next3.addEventListener('click', () => this._setStep(4));
-        if (next4) next4.addEventListener('click', () => {
+        if (next4) next4.addEventListener('click', () => this._setStep(5));
+        if (next5) next5.addEventListener('click', () => {
             if (!this._syncUserStepState()) return;
-            this._setStep(5);
+            this._setStep(6);
         });
         if (back2) back2.addEventListener('click', () => this._setStep(1));
         if (back3) back3.addEventListener('click', () => this._setStep(2));
         if (back4) back4.addEventListener('click', () => this._setStep(3));
         if (back5) back5.addEventListener('click', () => this._setStep(4));
-        if (finish) finish.addEventListener('click', () => this.completeAndEnterLock());
+        if (back6) back6.addEventListener('click', () => this._setStep(5));
+        if (finish) finish.addEventListener('click', () => this.completeAndEnterDesktop());
 
         if (this.userNameInputEl) {
             this.userNameInputEl.addEventListener('input', () => {
@@ -873,18 +1159,7 @@ const OOBE = {
             }
         });
 
-        /* Progress dots map to steps 1-5 */
-        this.progressDots.forEach((dot, idx) => {
-            dot.classList.toggle('active', idx === step - 1);
-        });
-
-        /* Hide progress on step 0 */
-        const progressEl = document.getElementById('oobe-progress');
-        if (progressEl) {
-            progressEl.classList.toggle('oobe-progress-hidden', step === 0);
-        }
-
-        if (step === 3) {
+        if (step === 4) {
             if (this.fingoInputEl) {
                 setTimeout(() => this.fingoInputEl.focus(), 120);
             }
@@ -894,10 +1169,9 @@ const OOBE = {
             }
         }
 
-        if (step === 4) {
+        if (step === 5) {
             this._syncUserProfileDraftToInputs();
             this._renderUserAvatarGrid();
-            this._syncLockPreviewProfile();
             this._syncUserStepState();
             if (this.userSettingsScrollArea && typeof this.userSettingsScrollArea.refresh === 'function') {
                 requestAnimationFrame(() => this.userSettingsScrollArea.refresh());
@@ -907,20 +1181,21 @@ const OOBE = {
             }
         }
 
-        if (step === 5) {
-            this._syncLockPreviewProfile();
-        }
-
-        /* Sync language preview text when entering step 1 */
-        if (step === 1) {
-            this._syncLangPreviewText();
+        if (step === 2 || step === 3) {
+            this._initSystemPreviews();
+            this._syncDesktopPreviewState();
         }
     },
 
     _resetFlow() {
         this.finishing = false;
-        this.selectedLang = null;
+        this.selectedLang = this._detectBrowserLanguage();
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
+        this.selectedWallpaper = State?.settings?.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
+        this.selectedWindowBlur = State?.settings?.enableWindowBlur === true;
+        this.selectedAccentColor = State?.normalizeAccentColor
+            ? State.normalizeAccentColor(State?.settings?.accentColor)
+            : (State?.settings?.accentColor || '#0078d4');
         this.selectedAutoFullscreen = State?.settings?.autoEnterFullscreen !== false;
         this.selectedFingoMode = State?.settings?.fingoCustomMode ? 'custom' : 'local';
         const draft = this._getInitialUserProfileDraft();
@@ -934,15 +1209,16 @@ const OOBE = {
         if (pinInput) pinInput.value = '';
 
         const languageButtons = Array.from(this.element.querySelectorAll('.oobe-option-btn[data-lang]'));
-        languageButtons.forEach(btn => btn.classList.remove('active'));
+        languageButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.lang === this.selectedLang));
 
-        this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === this.selectedTheme);
-        this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+        this._initThemeControls();
+        this._syncWallpaperSelection();
+        this._syncAccentSelection();
         this._renderFingoSettingsPanel();
         this._syncUserProfileDraftToInputs();
         this._renderUserAvatarGrid();
         this._syncUserStepState();
-        this._syncLockPreviewProfile();
+        this._syncDesktopPreviewState();
 
         this._syncNextStep1State();
         this._resetTempFingoChat();
@@ -966,94 +1242,42 @@ const OOBE = {
 
     _syncBackgroundWithLockWallpaper() {
         const lockWallpaper = State?.settings?.wallpaperLock || 'Theme/Picture/Fluent-1.png';
-        const desktopWallpaper = State?.settings?.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
 
         if (this.backgroundElement) {
             this.backgroundElement.style.backgroundImage = `url('${lockWallpaper}')`;
         }
+    },
 
-        /* Lock preview wallpaper elements */
-        this.lockPreviewElements.forEach((preview) => {
-            const lockWpEl = preview.querySelector('.oobe-live-lock-wallpaper');
-            if (lockWpEl) {
-                lockWpEl.style.backgroundImage = `url('${lockWallpaper}')`;
-            }
-        });
+    _syncDesktopPreviewState() {
+        const isDark = this.selectedTheme === 'dark';
+        this.element.classList.toggle('dark-mode', isDark);
+        this.element.classList.toggle('oobe-theme-light', !isDark);
+        document.body.classList.toggle('oobe-dark-dialog-mode', isDark && !this.element.classList.contains('hidden'));
+        const accent = String(this.selectedAccentColor || '#0078d4');
+        const rgb = State && typeof State.hexToRgb === 'function'
+            ? State.hexToRgb(accent)
+            : { r: 0, g: 120, b: 212 };
+        this.element.style.setProperty('--accent', accent);
+        this.element.style.setProperty('--accent-rgb', `${rgb.r}, ${rgb.g}, ${rgb.b}`);
 
-        this.previewDesktopElements.forEach((preview) => {
-            const wallpaper = preview.querySelector('.oobe-live-wallpaper');
-            if (wallpaper) {
-                wallpaper.style.backgroundImage = `url('${desktopWallpaper}')`;
-            }
+        this.systemPreviewFrames.forEach(({ host, wallpaperEl, windowEl }) => {
+            host.classList.toggle('is-dark', isDark);
+            host.classList.toggle('window-blur-on', this.selectedWindowBlur);
+            host.classList.toggle('window-blur-off', !this.selectedWindowBlur);
+            host.style.setProperty('--oobe-preview-accent', accent);
+            if (wallpaperEl) wallpaperEl.style.backgroundImage = `url('${this.selectedWallpaper}')`;
+            if (windowEl) windowEl.setAttribute('data-material', this.selectedWindowBlur ? 'glass' : 'solid');
         });
 
         const fingoPreview = this.element.querySelector('.oobe-live-fingo');
         if (fingoPreview) {
-            fingoPreview.style.setProperty('--oobe-preview-bg', `url('${desktopWallpaper}')`);
-            const fingoWallpaper = fingoPreview.querySelector('.oobe-live-wallpaper');
-            if (fingoWallpaper) {
-                fingoWallpaper.style.backgroundImage = `url('${desktopWallpaper}')`;
-            }
+            fingoPreview.style.setProperty('--oobe-preview-bg', `url('${this.selectedWallpaper}')`);
+            fingoPreview.querySelector('.oobe-live-wallpaper')?.style.setProperty('background-image', `url('${this.selectedWallpaper}')`);
         }
     },
 
-    _syncDesktopPreviewState() {
-        const dict = this._dict();
-        const isDark = this.selectedTheme === 'dark';
-        this.element.classList.toggle('dark-mode', isDark);
-        this.element.classList.toggle('oobe-theme-light', !isDark);
-
-        this.previewTextNodes.forEach((node) => {
-            const key = node.getAttribute('data-preview-text');
-            if (!key) return;
-            const value = {
-                pinned: dict.previewPinned,
-                allApps: dict.previewAllApps,
-                appFiles: dict.previewAppFiles,
-                appSettings: dict.previewAppSettings,
-                appCalc: dict.previewAppCalc,
-                appNotes: dict.previewAppNotes,
-                appBrowser: dict.previewAppBrowser,
-                appClock: dict.previewAppClock,
-                recommended: dict.previewRecommended,
-                more: dict.previewMore,
-                pictures: dict.previewPictures,
-                downloads: dict.previewDownloads
-            }[key];
-            if (typeof value === 'string') {
-                node.textContent = value;
-            }
-        });
-
-        this.previewSearchInputNodes.forEach((node) => {
-            node.placeholder = dict.previewSearch;
-        });
-    },
-
     _tickPreviewClock() {
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-
-        const timeText = `${hh}:${mm}`;
-        const dateText = `${month}/${day}`;
-
-        this.previewTimeNodes.forEach(node => {
-            node.textContent = timeText;
-        });
-
-        this.previewDateNodes.forEach(node => {
-            node.textContent = dateText;
-        });
-
-        this.lockPreviewTimeNodes.forEach((node) => {
-            node.textContent = timeText;
-        });
-        this.lockPreviewDateNodes.forEach((node) => {
-            node.textContent = dateText;
-        });
+        // Kept for compatibility with older integrations; previews no longer show a clock.
     },
 
     _startPreviewClockTimer() {
@@ -1610,6 +1834,10 @@ const OOBE = {
 
         const updates = {
             theme: this.selectedTheme,
+            wallpaperDesktop: this.selectedWallpaper,
+            enableWindowBlur: this.selectedWindowBlur,
+            accentColor: this.selectedAccentColor,
+            accentColorAuto: false,
             autoEnterFullscreen: this.selectedAutoFullscreen,
             fingoCustomMode: this.selectedFingoMode === 'custom',
             userName: name || fallbackName,
@@ -1871,7 +2099,7 @@ const OOBE = {
 
         if (pa.type === 'disableAutoFullscreen') {
             this.selectedAutoFullscreen = false;
-            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            this._initThemeControls();
             return this._langCode() === 'zh'
                 ? '已关闭开机自动网页全屏。'
                 : 'Auto web fullscreen on boot is now disabled.';
@@ -1935,14 +2163,14 @@ const OOBE = {
 
         if (action === 'setTheme:dark') {
             this.selectedTheme = 'dark';
-            this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === 'dark');
+            this._initThemeControls();
             this._syncDesktopPreviewState();
             return;
         }
 
         if (action === 'setTheme:light') {
             this.selectedTheme = 'light';
-            this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === 'light');
+            this._initThemeControls();
             this._syncDesktopPreviewState();
             return;
         }
@@ -1950,7 +2178,7 @@ const OOBE = {
         if (action === 'setTheme:auto') {
             const hour = new Date().getHours();
             this.selectedTheme = (hour >= 18 || hour < 6) ? 'dark' : 'light';
-            this._setChipGroupActive('#oobe-theme-group .oobe-chip', (btn) => (btn.dataset.theme || 'light') === this.selectedTheme);
+            this._initThemeControls();
             this._syncDesktopPreviewState();
             return;
         }
@@ -1962,13 +2190,13 @@ const OOBE = {
 
         if (action === 'setAutoFullscreen:false') {
             this.selectedAutoFullscreen = false;
-            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            this._initThemeControls();
             return;
         }
 
         if (action === 'setAutoFullscreen:true') {
             this.selectedAutoFullscreen = true;
-            this._setChipGroupActive('#oobe-auto-fullscreen-group .oobe-chip', (btn) => (btn.dataset.autoFullscreen !== 'false') === this.selectedAutoFullscreen);
+            this._initThemeControls();
             return;
         }
 
@@ -1978,12 +2206,12 @@ const OOBE = {
         }
 
         if (action === 'openSettings:fingo') {
-            this._setStep(3);
+            this._setStep(4);
             return;
         }
 
         if (action === 'openSettings:privacy') {
-            this._setStep(4);
+            this._setStep(5);
         }
     },
 
@@ -2087,8 +2315,16 @@ const OOBE = {
         setText('oobe-title-theme', d.themePageTitle);
         setText('oobe-subtitle-theme', d.themePageSubtitle);
         setText('oobe-theme-title', d.themeTitle);
+        setText('oobe-wallpaper-title', d.wallpaperTitle);
+        setText('oobe-window-blur-title', d.windowBlurTitle);
+        setText('oobe-window-blur-desc', d.windowBlurDesc);
         setText('oobe-auto-fullscreen-title', d.autoFullscreenTitle);
         setText('oobe-auto-fullscreen-desc', d.autoFullscreenDesc);
+        setText('oobe-title-accent', d.accentPageTitle);
+        setText('oobe-subtitle-accent', d.accentPageSubtitle);
+        setText('oobe-accent-current-title', d.accentCurrentTitle);
+        setText('oobe-custom-color-title', d.customColorTitle);
+        setText('oobe-custom-color-desc', d.customColorDesc);
         setText('oobe-title-fingo', d.fingoPageTitle);
         setText('oobe-subtitle-fingo', d.fingoPageSubtitle);
         setText('oobe-fingo-title', this._fingoText('settings.fingo-title', 'Fingo AI', 'Fingo AI'));
@@ -2107,6 +2343,8 @@ const OOBE = {
         if (this.userEmailInputEl) this.userEmailInputEl.placeholder = d.userEmailPlaceholder;
         if (this.userAvatarUploadBtnEl) this.userAvatarUploadBtnEl.textContent = d.userUploadAvatar;
         if (this.userAvatarResetBtnEl) this.userAvatarResetBtnEl.textContent = d.userResetAvatar;
+        const uploadWallpaperText = document.querySelector('#oobe-upload-wallpaper .fluent-btn-text');
+        if (uploadWallpaperText) uploadWallpaperText.textContent = d.wallpaperUpload;
 
         const langZhTitle = this.element.querySelector('[data-lang="zh"] .oobe-option-title');
         const langZhDesc = this.element.querySelector('[data-lang="zh"] .oobe-option-desc');
@@ -2117,38 +2355,34 @@ const OOBE = {
         if (langEnTitle) langEnTitle.textContent = d.langEnTitle;
         if (langEnDesc) langEnDesc.textContent = d.langEnDesc;
 
-        const themeLight = this.element.querySelector('#oobe-theme-group [data-theme="light"]');
-        const themeDark = this.element.querySelector('#oobe-theme-group [data-theme="dark"]');
-        if (themeLight) themeLight.textContent = d.themeLight;
-        if (themeDark) themeDark.textContent = d.themeDark;
-        const autoFullscreenOn = this.element.querySelector('#oobe-auto-fullscreen-group [data-auto-fullscreen="true"]');
-        const autoFullscreenOff = this.element.querySelector('#oobe-auto-fullscreen-group [data-auto-fullscreen="false"]');
-        if (autoFullscreenOn) autoFullscreenOn.textContent = d.autoFullscreenOn;
-        if (autoFullscreenOff) autoFullscreenOff.textContent = d.autoFullscreenOff;
+        this._initThemeControls();
+        ['oobe-next-1', 'oobe-next-2', 'oobe-next-3', 'oobe-next-4', 'oobe-next-5'].forEach((id) => {
+            const button = document.getElementById(id);
+            if (!button) return;
+            button.title = d.next;
+            button.setAttribute('aria-label', d.next);
+        });
+        ['oobe-back-1', 'oobe-back-2', 'oobe-back-3', 'oobe-back-4', 'oobe-back-5', 'oobe-back-6'].forEach((id) => {
+            const button = document.getElementById(id);
+            if (button) button.title = d.back;
+        });
+        const finishButton = document.getElementById('oobe-finish');
+        if (finishButton) {
+            finishButton.title = d.finish;
+            finishButton.setAttribute('aria-label', d.finish);
+        }
 
-        const next0 = document.getElementById('oobe-next-0');
-        const next1 = document.getElementById('oobe-next-1');
-        const back1 = document.getElementById('oobe-back-1');
-        const next2 = document.getElementById('oobe-next-2');
-        const next3 = document.getElementById('oobe-next-3');
-        const next4 = document.getElementById('oobe-next-4');
-        const back2 = document.getElementById('oobe-back-2');
-        const back3 = document.getElementById('oobe-back-3');
-        const back4 = document.getElementById('oobe-back-4');
-        const back5 = document.getElementById('oobe-back-5');
-        const finish = document.getElementById('oobe-finish');
-
-        if (next0) next0.textContent = d.welcomeNext;
-        if (next1) next1.textContent = d.next;
-        if (back1) back1.textContent = d.back;
-        if (next2) next2.textContent = d.next;
-        if (next3) next3.textContent = d.next;
-        if (next4) next4.textContent = d.next;
-        if (back2) back2.textContent = d.back;
-        if (back3) back3.textContent = d.back;
-        if (back4) back4.textContent = d.back;
-        if (back5) back5.textContent = d.back;
-        if (finish) finish.textContent = d.finish;
+        if (this.welcomeBrandTextEl) {
+            this.welcomeBrandTextEl.textContent = this._langCode() === 'zh'
+                ? 'Fluent OS 青山湖'
+                : 'Fluent OS Qingshan Lake';
+        }
+        this.welcomeCopyEl?.classList.toggle('is-english', this._langCode() !== 'zh');
+        if (this.welcomeNextEl) {
+            this.welcomeNextEl.textContent = this._langCode() === 'zh'
+                ? '单击任意位置以继续'
+                : 'Click anywhere to continue';
+        }
 
         if (this.fingoInputEl) {
             this.fingoInputEl.placeholder = d.fingoInputPlaceholder;
@@ -2160,7 +2394,6 @@ const OOBE = {
 
         this._renderFingoSettingsPanel();
         this._syncUserStepState();
-        this._syncLockPreviewProfile();
         this._syncDesktopPreviewState();
         this._updatePreloadStatusText();
     },
@@ -2182,7 +2415,7 @@ const OOBE = {
         const base = lang === 'en'
             ? {
                 userPageTitle: 'User',
-                userPageSubtitle: 'Set avatar, user name and email. The lock preview above updates in real time.',
+                userPageSubtitle: 'Set your avatar, user name and email.',
                 userAvatarTitle: 'Avatar',
                 userUploadAvatar: 'Upload Custom Avatar',
                 userResetAvatar: 'Restore Default Avatar',
@@ -2195,7 +2428,7 @@ const OOBE = {
             }
             : {
                 userPageTitle: '\u7528\u6237',
-                userPageSubtitle: '\u8bbe\u7f6e\u5934\u50cf\u3001\u7528\u6237\u540d\u548c\u90ae\u7bb1\uff0c\u4e0a\u65b9\u9501\u5c4f\u9884\u89c8\u4f1a\u5b9e\u65f6\u540c\u6b65\u3002',
+                userPageSubtitle: '\u8bbe\u7f6e\u5934\u50cf\u3001\u7528\u6237\u540d\u548c\u90ae\u7bb1\u3002',
                 userAvatarTitle: '\u5934\u50cf',
                 userUploadAvatar: '\u4e0a\u4f20\u81ea\u5b9a\u4e49\u5934\u50cf',
                 userResetAvatar: '\u6062\u590d\u9ed8\u8ba4\u5934\u50cf',
@@ -2223,16 +2456,19 @@ const OOBE = {
             return;
         }
 
+        this._stopWelcomeAnimation();
+        this.welcomeAnimStarted = false;
+        this.welcomeTextIndex = 0;
         this.bridgeBootLogoEl = bootLogoEl;
         this.bridgeBootLogoEl.style.opacity = '0';
         this.bridgeBootLogoEl.style.visibility = 'hidden';
 
-        this._clearWelcomeLogoBridge();
-        this.welcomeLogoEl.classList.remove('oobe-logo-bridged', 'oobe-welcome-logo-up');
+        this.welcomeLogoEl.classList.remove('oobe-logo-bridged');
+        this.welcomeLogoEl.classList.remove('oobe-logo-shift-left', 'oobe-logo-welcome-position');
         this.welcomeLogoEl.classList.add('oobe-logo-bridging');
-        this.welcomeLogoEl.classList.add('oobe-logo-bridge-target', 'oobe-welcome-logo-up');
+        this.welcomeLogoEl.classList.add('oobe-logo-bridge-target');
         const targetRect = this.welcomeLogoEl.getBoundingClientRect();
-        this.welcomeLogoEl.classList.remove('oobe-logo-bridge-target', 'oobe-welcome-logo-up');
+        this.welcomeLogoEl.classList.remove('oobe-logo-bridge-target');
 
         if (!targetRect.width || !targetRect.height) {
             this._startWelcomeAnimation();
@@ -2250,6 +2486,12 @@ const OOBE = {
         document.body.appendChild(bridge);
         this.logoBridgeEl = bridge;
 
+        if (this.welcomeTextEl) {
+            this.welcomeTextEl.innerHTML = '';
+            this.welcomeTextEl.classList.remove('oobe-welcome-text-show');
+        }
+        this.welcomeNextEl?.classList.remove('is-visible');
+
         const animation = bridge.animate([
             {
                 left: `${startRect.left}px`,
@@ -2259,6 +2501,14 @@ const OOBE = {
                 opacity: 1
             },
             {
+                left: `${startRect.left + ((targetRect.left - startRect.left) * 0.62)}px`,
+                top: `${startRect.top + ((targetRect.top - startRect.top) * 0.38) - 18}px`,
+                width: `${startRect.width + ((targetRect.width - startRect.width) * 0.58)}px`,
+                height: `${startRect.height + ((targetRect.height - startRect.height) * 0.58)}px`,
+                opacity: 1,
+                offset: 0.56
+            },
+            {
                 left: `${targetRect.left}px`,
                 top: `${targetRect.top}px`,
                 width: `${targetRect.width}px`,
@@ -2266,9 +2516,8 @@ const OOBE = {
                 opacity: 1
             }
         ], {
-            delay: 1100,
-            duration: 780,
-            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            duration: 900,
+            easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
             fill: 'forwards'
         });
 
@@ -2277,15 +2526,15 @@ const OOBE = {
             if (this.currentStep !== 0) return;
             if (this.welcomeLogoEl) {
                 this.welcomeLogoEl.classList.remove('oobe-logo-bridging');
-                this.welcomeLogoEl.classList.add('oobe-logo-bridged', 'oobe-welcome-logo-up');
+                this.welcomeLogoEl.classList.add('oobe-logo-bridged');
             }
-            this._startWelcomeAnimation(true);
+            this._startWelcomeBrandSequence(160);
         };
 
         if (animation && animation.finished && typeof animation.finished.then === 'function') {
             animation.finished.then(onDone).catch(onDone);
         } else {
-            this.logoBridgeTimer = setTimeout(onDone, 1910);
+            this.logoBridgeTimer = setTimeout(onDone, 920);
         }
     },
 
@@ -2309,45 +2558,112 @@ const OOBE = {
         this.welcomeAnimStarted = false;
         this.welcomeTextIndex = 0;
 
-        /* Hide next button initially */
+        /* Keep the continuation hint hidden until the first welcome word. */
         if (this.welcomeNextEl) {
-            this.welcomeNextEl.classList.add('hidden');
+            this.welcomeNextEl.classList.remove('is-visible');
         }
 
         /* Phase 1: logo animates in (CSS handles initial positioning) */
         if (this.welcomeLogoEl) {
             this.welcomeLogoEl.classList.remove('oobe-logo-bridging');
-            if (!fromBridge) {
-                this.welcomeLogoEl.classList.remove('oobe-welcome-logo-up');
-            }
+            this.welcomeLogoEl.classList.remove('oobe-logo-shift-left', 'oobe-logo-welcome-position');
             this.welcomeLogoEl.classList.toggle('oobe-logo-bridged', fromBridge);
+            void this.welcomeLogoEl.offsetWidth;
         }
         if (this.welcomeTextEl) {
             this.welcomeTextEl.innerHTML = '';
             this.welcomeTextEl.classList.remove('oobe-welcome-text-show');
         }
-
-        const logoDelay = fromBridge ? 0 : 800;
-        const textDelay = fromBridge ? 260 : 500;
-
-        /* After logo settle, move logo up and start text cycle */
         this.welcomePhaseTimer = setTimeout(() => {
+            if (this.currentStep === 0) this._startWelcomeBrandSequence(160);
+        }, fromBridge ? 120 : 900);
+    },
+
+    _syncWelcomeLogoPositions() {
+        if (!this.welcomeLogoEl || !this.welcomeCopyEl || !this.welcomeBrandEl || !this.welcomeBrandTextEl || !this.element) return;
+        const stage = this.element.querySelector('.oobe-welcome-layout');
+        if (!stage) return;
+
+        const stageRect = stage.getBoundingClientRect();
+        const logoRect = this.welcomeLogoEl.getBoundingClientRect();
+        if (!stageRect.width || !logoRect.width) return;
+
+        this.welcomeBrandEl.style.width = 'max-content';
+        const brandWidth = Math.ceil(this.welcomeBrandTextEl.getBoundingClientRect().width);
+        this.welcomeBrandEl.style.width = '100%';
+        if (!brandWidth) return;
+
+        const brandGap = Math.max(48, Math.min(78, stageRect.width * 0.045));
+        const welcomeGap = Math.max(32, Math.min(42, stageRect.width * 0.028));
+        const groupWidth = logoRect.width + brandGap + brandWidth;
+        const groupLeft = stageRect.left + ((stageRect.width - groupWidth) / 2);
+        const copyLeft = groupLeft + logoRect.width + brandGap;
+        const centeredLogoLeft = stageRect.left + ((stageRect.width - logoRect.width) / 2);
+        const brandShift = groupLeft - centeredLogoLeft;
+
+        const welcomeStyle = getComputedStyle(this.welcomeTextEl);
+        const canvas = this._welcomeMeasureCanvas || (this._welcomeMeasureCanvas = document.createElement('canvas'));
+        const context = canvas.getContext('2d');
+        let welcomeWidth = Math.min(brandWidth, 430);
+        if (context) {
+            context.font = `${welcomeStyle.fontWeight} ${welcomeStyle.fontSize} ${welcomeStyle.fontFamily}`;
+            welcomeWidth = Math.max(
+                context.measureText('Welcome').width,
+                context.measureText('欢\u00a0迎').width
+            );
+        }
+        const welcomeLeft = copyLeft + ((brandWidth - welcomeWidth) / 2);
+        const centeredLogoRight = centeredLogoLeft + logoRect.width;
+        const welcomeShift = welcomeLeft - welcomeGap - centeredLogoRight;
+
+        this.welcomeCopyEl.style.left = `${(copyLeft - stageRect.left).toFixed(2)}px`;
+        this.welcomeCopyEl.style.width = `${brandWidth}px`;
+
+        this.welcomeLogoEl.style.setProperty('--oobe-logo-brand-shift', `${brandShift.toFixed(2)}px`);
+        this.welcomeLogoEl.style.setProperty('--oobe-logo-welcome-shift', `${welcomeShift.toFixed(2)}px`);
+    },
+
+    _startWelcomeBrandSequence(delay = 320) {
+        if (this.welcomeBrandTextEl) {
+            this.welcomeBrandTextEl.textContent = this._langCode() === 'zh'
+                ? 'Fluent OS 青山湖'
+                : 'Fluent OS Qingshan Lake';
+        }
+        this.welcomeCopyEl?.classList.toggle('is-english', this._langCode() !== 'zh');
+        if (this.welcomeBrandEl) {
+            this.welcomeBrandEl.classList.remove('is-revealing', 'is-transforming', 'is-finished');
+            this.welcomeBrandEl.classList.toggle('is-english', this._langCode() !== 'zh');
+            void this.welcomeBrandEl.offsetWidth;
+        }
+
+        this._syncWelcomeLogoPositions();
+        this.welcomeLogoEl?.classList.remove('oobe-logo-welcome-position');
+        this.welcomeLogoEl?.classList.add('oobe-logo-shift-left');
+
+        this.welcomeBrandTimer = setTimeout(() => {
             if (this.currentStep !== 0) return;
-            if (this.welcomeLogoEl && !fromBridge) {
-                this.welcomeLogoEl.classList.add('oobe-welcome-logo-up');
-            }
-            /* After logo transition, show first text */
+            this.welcomeBrandEl?.classList.add('is-revealing');
+        }, delay);
+
+        this.welcomeTransformTimer = setTimeout(() => {
+            if (this.currentStep !== 0) return;
+            this.welcomeBrandEl?.classList.add('is-transforming');
+            this._syncWelcomeLogoPositions();
+            this.welcomeLogoEl?.classList.add('oobe-logo-welcome-position');
             this.welcomeLogoTextTimer = setTimeout(() => {
-                if (this.currentStep !== 0) return;
-                this._cycleWelcomeText();
-            }, textDelay);
-        }, logoDelay);
+                if (this.currentStep === 0) this._cycleWelcomeText();
+            }, 240);
+        }, delay + 1420);
     },
 
     _cycleWelcomeText() {
         if (!this.welcomeTextEl || this.currentStep !== 0) return;
 
-        const text = this.welcomeTexts[this.welcomeTextIndex % this.welcomeTexts.length];
+        const texts = this._langCode() === 'zh'
+            ? ['欢\u00a0迎', 'Welcome']
+            : ['Welcome', '欢\u00a0迎'];
+        const text = texts[this.welcomeTextIndex % texts.length];
+        this.welcomeBrandEl?.classList.add('is-finished');
 
         /* Build letter spans for Q-bounce animation */
         this.welcomeTextEl.innerHTML = '';
@@ -2362,30 +2678,25 @@ const OOBE = {
             this.welcomeTextEl.appendChild(span);
         });
 
-        /* Show next button on first text */
+        /* Reveal the card-wide continuation hint with the first welcome word. */
         if (!this.welcomeAnimStarted && this.welcomeNextEl) {
             this.welcomeAnimStarted = true;
-            setTimeout(() => {
-                if (this.welcomeNextEl) this.welcomeNextEl.classList.remove('hidden');
-            }, 600);
+            this.welcomeNextEl.classList.add('is-visible');
         }
 
-        /* After 4s, bounce out current text then show next */
         this.welcomeAnimTimer = setTimeout(() => {
-            if (this.currentStep !== 0) return;
-            /* Bounce out */
+            if (this.currentStep !== 0 || !this.welcomeTextEl) return;
             const letters = this.welcomeTextEl.querySelectorAll('.oobe-welcome-letter');
-            letters.forEach((l, i) => {
-                l.classList.add('oobe-welcome-letter-out');
-                l.style.animationDelay = `${i * 40}ms`;
+            letters.forEach((letter, index) => {
+                letter.classList.add('oobe-welcome-letter-out');
+                letter.style.animationDelay = `${index * 40}ms`;
             });
-
-            /* After out animation, cycle to next */
-            setTimeout(() => {
-                this.welcomeTextIndex++;
+            this.welcomeSwapTimer = setTimeout(() => {
+                if (this.currentStep !== 0) return;
+                this.welcomeTextIndex = (this.welcomeTextIndex + 1) % texts.length;
                 this._cycleWelcomeText();
-            }, chars.length * 40 + 300);
-        }, 4000);
+            }, (letters.length * 40) + 320);
+        }, 2500);
     },
 
     _stopWelcomeAnimation() {
@@ -2400,6 +2711,21 @@ const OOBE = {
         if (this.welcomeLogoTextTimer) {
             clearTimeout(this.welcomeLogoTextTimer);
             this.welcomeLogoTextTimer = null;
+        }
+        if (this.welcomeBrandTimer) {
+            clearTimeout(this.welcomeBrandTimer);
+            this.welcomeBrandTimer = null;
+        }
+        if (this.welcomeTransformTimer) {
+            clearTimeout(this.welcomeTransformTimer);
+            this.welcomeTransformTimer = null;
+        }
+        if (this.welcomeSwapTimer) {
+            clearTimeout(this.welcomeSwapTimer);
+            this.welcomeSwapTimer = null;
+        }
+        if (this.welcomeBrandEl) {
+            this.welcomeBrandEl.classList.remove('is-revealing', 'is-transforming', 'is-finished');
         }
         this._clearWelcomeLogoBridge();
     },

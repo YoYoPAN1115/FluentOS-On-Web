@@ -1366,7 +1366,7 @@ const I18n = {
             'settings.accent-auto': 'Automatically pick an accent color from my background',
             'settings.accent-readability': 'Readability optimization',
             'settings.accent-recent': 'Recently used colors',
-            'settings.accent-windows': 'Windows colors',
+            'settings.accent-windows': 'Colors',
             'settings.accent-custom': 'Custom color',
             'settings.blur': 'Blur Effect',
             'settings.blur.desc': 'Enable Gaussian blur background',

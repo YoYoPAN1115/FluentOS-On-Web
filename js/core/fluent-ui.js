@@ -354,10 +354,31 @@ const FluentUI = {
         const wrapper = this._utils.createElement('label', { className: this._utils.classNames('fluent-toggle-wrapper', disabled && 'fluent-toggle-disabled', className), id });
         const toggle = this._utils.createElement('div', { className: this._utils.classNames('fluent-toggle', checked && 'active') });
         toggle.innerHTML = '<div class="fluent-toggle-track"><div class="fluent-toggle-thumb"></div></div>';
-        if (!disabled) toggle.addEventListener('click', () => { toggle.classList.toggle('active'); onChange && onChange(toggle.classList.contains('active')); });
+        toggle.setAttribute('role', 'switch');
+        toggle.setAttribute('aria-checked', checked ? 'true' : 'false');
+        toggle.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        toggle.tabIndex = disabled ? -1 : 0;
+
+        const setChecked = (value, notify = false) => {
+            const next = value === true;
+            toggle.classList.toggle('active', next);
+            toggle.setAttribute('aria-checked', next ? 'true' : 'false');
+            if (notify && onChange) onChange(next);
+        };
+        const toggleChecked = () => setChecked(!toggle.classList.contains('active'), true);
+
+        if (!disabled) {
+            toggle.addEventListener('click', toggleChecked);
+            toggle.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                toggleChecked();
+            });
+        }
         wrapper.appendChild(toggle);
         if (label) wrapper.appendChild(this._utils.createElement('span', { className: 'fluent-toggle-label', text: label }));
-        wrapper.isChecked = () => toggle.classList.contains('active'); wrapper.setChecked = v => toggle.classList.toggle('active', v);
+        wrapper.isChecked = () => toggle.classList.contains('active');
+        wrapper.setChecked = value => setChecked(value, false);
         return wrapper;
     },
 

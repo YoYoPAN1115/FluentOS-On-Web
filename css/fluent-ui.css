@@ -296,11 +296,56 @@ body:not(.fluent-v2) .fluent-btn-primary .fluent-btn-text { color: #ffffff !impo
 /* ============ 开关/滑块 ============ */
 .fluent-toggle-wrapper { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
 .fluent-toggle-disabled { opacity: 0.5; pointer-events: none; }
-.fluent-toggle { width: 44px; height: 24px; }
-.fluent-toggle-track { width: 100%; height: 100%; background: var(--text-tertiary); border-radius: 12px; position: relative; transition: background var(--transition-fast); }
-.fluent-toggle.active .fluent-toggle-track { background: var(--accent); }
-.fluent-toggle-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; box-shadow: var(--shadow-sm); transition: transform var(--transition-fast); }
-.fluent-toggle.active .fluent-toggle-thumb { transform: translateX(20px); }
+.fluent-toggle {
+    width: 44px;
+    height: 24px;
+    flex: 0 0 44px;
+    overflow: visible;
+    outline: none;
+}
+.fluent-toggle-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(180, 180, 180, 0.4), rgba(160, 160, 160, 0.3));
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(var(--v2-blur, 40px)) saturate(150%);
+    -webkit-backdrop-filter: blur(var(--v2-blur, 40px)) saturate(150%);
+    transition: background 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
+}
+.fluent-toggle-thumb {
+    position: absolute;
+    top: -3px;
+    left: -1px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: none !important;
+    transition: left 400ms cubic-bezier(0.4, 0, 0.2, 1), background 300ms ease, border-color 300ms ease;
+}
+.fluent-toggle-thumb::before { display: none; }
+.fluent-toggle.active .fluent-toggle-track {
+    border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.5);
+    background: linear-gradient(180deg, rgba(var(--accent-rgb, 0, 120, 212), 0.62), rgba(var(--accent-rgb, 0, 120, 212), 0.46));
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 16px rgba(var(--accent-rgb, 0, 120, 212), 0.3);
+}
+.fluent-toggle.active .fluent-toggle-thumb {
+    left: 17px;
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.8);
+}
+.fluent-toggle:focus-visible .fluent-toggle-track {
+    outline: 2px solid rgba(var(--accent-rgb, 0, 120, 212), 0.65);
+    outline-offset: 3px;
+}
 .fluent-toggle-label { font-size: 14px; color: var(--text-primary); }
 .fluent-slider-wrapper { display: flex; align-items: center; gap: 12px; }
 .fluent-slider-disabled { opacity: 0.5; pointer-events: none; }
@@ -878,104 +923,6 @@ body.fluent-v2 .fluent-select-option.selected {
     backdrop-filter: blur(10px);
 }
 
-/* V2 毛玻璃开关 - 大圆球通透质感 */
-body.fluent-v2 .fluent-toggle {
-    width: 44px;
-    height: 24px;
-}
-
-body.fluent-v2 .fluent-toggle-track {
-    width: 44px;
-    height: 24px;
-    background: linear-gradient(180deg, 
-        rgba(180, 180, 180, 0.4) 0%, 
-        rgba(160, 160, 160, 0.3) 100%);
-    backdrop-filter: blur(var(--v2-blur)) saturate(150%);
-    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 50px;
-    box-shadow: 
-        inset 0 2px 4px rgba(0, 0, 0, 0.1),
-        0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-body.fluent-v2 .fluent-toggle-thumb {
-    position: absolute;
-    left: -1px;
-    top: -3px;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    transform: none !important;
-}
-
-/* 圆球顶部高光 - 扁平化设计不需要 */
-body.fluent-v2 .fluent-toggle-thumb::before {
-    display: none;
-}
-
-body.fluent-v2 .fluent-toggle.active .fluent-toggle-track {
-    background: linear-gradient(180deg, 
-        rgba(var(--accent-rgb, 0, 120, 212), 0.62) 0%,
-        rgba(var(--accent-rgb, 0, 120, 212), 0.46) 100%);
-    border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.5);
-    box-shadow: 
-        inset 0 2px 4px rgba(0, 0, 0, 0.1),
-        0 0 16px rgba(var(--accent-rgb, 0, 120, 212), 0.3);
-}
-
-body.fluent-v2 .fluent-toggle.active .fluent-toggle-thumb {
-    left: 17px;
-    transform: none !important;
-    background: rgba(255, 255, 255, 0.8);
-    border-color: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* V2 深色模式开关 */
-body.fluent-v2.dark-mode .fluent-toggle-track {
-    background: linear-gradient(180deg, 
-        rgba(180, 180, 180, 0.4) 0%,
-        rgba(160, 160, 160, 0.3) 100%);
-    border-color: rgba(255, 255, 255, 0.4);
-    box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.1),
-        0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-body.fluent-v2.dark-mode .fluent-toggle-thumb {
-    left: -1px;
-    top: -3px;
-    transform: none !important;
-    background: rgba(255, 255, 255, 0.75);
-    border-color: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-track {
-    background: linear-gradient(180deg, 
-        rgba(var(--accent-rgb, 0, 120, 212), 0.62) 0%,
-        rgba(var(--accent-rgb, 0, 120, 212), 0.46) 100%);
-    border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.5);
-    box-shadow: 
-        inset 0 2px 4px rgba(0, 0, 0, 0.1),
-        0 0 16px rgba(var(--accent-rgb, 0, 120, 212), 0.3);
-}
-
-body.fluent-v2.dark-mode .fluent-toggle.active .fluent-toggle-thumb {
-    left: 17px;
-    transform: none !important;
-    background: rgba(255, 255, 255, 0.8);
-    border-color: rgba(255, 255, 255, 0.5);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
 /* V2 毛玻璃标签栏 */
 body.fluent-v2 .fluent-tabbar {
     background: var(--v2-glass-bg);
@@ -1397,7 +1344,7 @@ body.fluent-v2 .settings-section {
     background: transparent !important;
 }
 
-body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
+body.fluent-v2 .settings-content *:not(.fluent-setting-item):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(.fluent-toggle-track):not(.fluent-toggle-thumb):not(.button-toggle-glow-surface):not(.button-edge-glow):not(.button-glow-ripple):not(img):not(span):not(h2):not(h3):not(h4):not(p):not(button):not(input):not(select) {
     background-color: transparent;
 }
 
@@ -1407,7 +1354,7 @@ body.fluent-v2 .settings-content > div:not(.settings-section):not(.settings-over
 }
 
 /* 修复V2模式下窗口重叠时的白条问题 */
-body.fluent-v2 .window *:not(.fluent-setting-item):not(.fw-nav-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
+body.fluent-v2 .window *:not(.fluent-setting-item):not(.fw-nav-item):not(.fluent-button):not(.fluent-toggle):not(.fluent-toggle-track):not(.fluent-toggle-thumb):not(.button-toggle-glow-surface):not(.button-edge-glow):not(.button-glow-ripple):not(.fluent-select):not(.settings-recommend-item):not(.settings-recent-item):not(.network-hero-card):not(.network-option-item):not(.network-expand-panel):not(.wallpaper-item):not(.settings-overview-wallpaper):not(.settings-accent-swatch):not(.settings-accent-entry-swatch):not(.storage-bar-wrapper):not(.storage-bar-fill):not(.legend-dot):not(.photos-toolbar-classic):not(.photos-toolbar-v2):not(.photos-tool-btn):not(.photos-adjust-panel):not(.photos-info-panel):not(.photos-viewer):not(.photos-back-btn):not(.photos-counter):not(.photos-card):not(.photos-card-inner):not(.photos-card-caption):not(.photos-card-meta):not(.photos-search-bar):not(.photos-search-input):not(.photos-retry-btn):not(.photos-wallpaper-menu):not(.photos-wpmenu-item):not(.photos-no-result) {
     background-color: transparent;
 }
 
