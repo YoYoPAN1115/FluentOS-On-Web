@@ -47,13 +47,19 @@ const Widgets = {
     /* ==================== 初始化 ==================== */
 
     init() {
-        this.registry = (typeof WidgetDefs !== 'undefined') ? WidgetDefs.getAllVariants() : [];
+        this._refreshAvailableRegistry();
         this._createLayers();
         this._createDrawer();
         this._createMenu();
+        this.syncAppWidgetAvailability({ render: false });
         this.renderAll();
         this._initStaticBlur();
         this._initWidgetGlow();
+
+        State.on('settingsChange', (updates) => {
+            if (!updates || updates.installedApps === undefined) return;
+            this.syncAppWidgetAvailability();
+        }, { key: 'Widgets.appAvailability' });
 
         State.on('languageChange', () => {
             this.updateTexts();
@@ -99,6 +105,54 @@ const Widgets = {
                 this.refreshWidgetsByPrefix('photos-');
             }, 80);
         });
+    },
+
+    /** Photos and Media widgets exist only while their owning system App is installed. */
+    _widgetOwnerApp(widgetOrAppId) {
+        const id = String(widgetOrAppId || '');
+        if (id === 'photos' || id.startsWith('photos-')) return 'photos';
+        if (id === 'media' || id.startsWith('media-')) return 'media';
+        return null;
+    },
+
+    _isWidgetAppAvailable(widgetOrAppId) {
+        const ownerApp = this._widgetOwnerApp(widgetOrAppId);
+        if (!ownerApp) return true;
+        const appShop = typeof globalThis !== 'undefined' ? globalThis.AppShop : null;
+        if (appShop && typeof appShop.isInstalled === 'function') {
+            return appShop.isInstalled(ownerApp);
+        }
+        const installedApps = State.settings && State.settings.installedApps;
+        return !Array.isArray(installedApps) || installedApps.includes(ownerApp);
+    },
+
+    _refreshAvailableRegistry() {
+        const variants = (typeof WidgetDefs !== 'undefined') ? WidgetDefs.getAllVariants() : [];
+        this.registry = variants.filter(variant => this._isWidgetAppAvailable(variant.appId || variant.id));
+    },
+
+    syncAppWidgetAvailability(options = {}) {
+        this._refreshAvailableRegistry();
+        const current = this.getLayout();
+        if (this._editingWidget) {
+            const editingInstance = current[this._editingWidget.surface]?.find(
+                inst => inst.id === this._editingWidget.instanceId
+            );
+            if (editingInstance && !this._isWidgetAppAvailable(editingInstance.widgetId)) {
+                this.closeWidgetEditor({ resumeDrawer: false });
+            }
+        }
+        const layout = {
+            desktop: current.desktop.filter(inst => this._isWidgetAppAvailable(inst.widgetId)),
+            lock: current.lock.filter(inst => this._isWidgetAppAvailable(inst.widgetId))
+        };
+        const changed = layout.desktop.length !== current.desktop.length || layout.lock.length !== current.lock.length;
+        if (changed) this.saveLayout(layout);
+
+        if (!this._isWidgetAppAvailable(this.drawerPage)) this.drawerPage = 'home';
+        this._renderSidebar();
+        if (this.isOpen) this._renderPage();
+        if (options.render !== false) this.renderAll();
     },
 
     /** 仅重新渲染天气小组件的内容（不重建其他小组件，避免打断时钟等） */
@@ -376,7 +430,9 @@ const Widgets = {
         };
 
         makeItem('home', 'Theme/Icon/Symbol_icon/stroke/Stars B.svg', t('widgets.drawer.recommended'));
-        WidgetDefs.apps.forEach(app => makeItem(app.id, app.icon, t(app.nameKey)));
+        WidgetDefs.apps
+            .filter(app => this._isWidgetAppAvailable(app.id))
+            .forEach(app => makeItem(app.id, app.icon, t(app.nameKey)));
         this._syncSidebarActive();
     },
 
@@ -403,7 +459,14 @@ const Widgets = {
         if (this.drawerPage === 'home') {
             this._renderHomePage(page);
         } else {
-            this._renderAppPage(page, WidgetDefs.getApp(this.drawerPage));
+            const app = WidgetDefs.getApp(this.drawerPage);
+            if (!app || !this._isWidgetAppAvailable(app.id)) {
+                this.drawerPage = 'home';
+                this._syncSidebarActive();
+                this._renderHomePage(page);
+                return;
+            }
+            this._renderAppPage(page, app);
         }
     },
 
@@ -413,7 +476,7 @@ const Widgets = {
         grid.className = 'widgets-home';
         WidgetDefs.recommended.forEach(variantId => {
             const variant = WidgetDefs.getVariant(variantId);
-            if (!variant) return;
+            if (!variant || !this._isWidgetAppAvailable(variant.appId || variant.id)) return;
             const card = document.createElement('div');
             card.className = 'widgets-home-card';
             card.appendChild(this._buildPreview(variant, 0.56));
@@ -917,6 +980,7 @@ const Widgets = {
 
     addWidget(surface, widgetId, col, row) {
         const def = this.registry.find(d => d.id === widgetId);
+        if (!def || !this._isWidgetAppAvailable(def.appId || widgetId)) return;
         const layout = this.getLayout();
         layout[surface] = layout[surface].concat([{
             id: `wi-${Date.now()}-${Math.floor(Math.random() * 1000)}`,

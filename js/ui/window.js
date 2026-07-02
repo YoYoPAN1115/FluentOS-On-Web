@@ -1221,6 +1221,15 @@ const WindowManager = {
 
     openApp(appId, data = null) {
 
+        if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId)) {
+            FluentUI.Toast({
+                title: t('start.ctx.app-repairing'),
+                message: t('start.ctx.app-repairing-msg'),
+                type: 'warning'
+            });
+            return false;
+        }
+
         const config = this.getAppConfig(appId);
         if (!config) {
             console.warn(`App ${appId} not configured`);

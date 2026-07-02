@@ -50,17 +50,9 @@ const Taskbar = {
     updateAppRepairState(appId, isRepairing) {
         const btn = this.appsContainer.querySelector(`[data-app-id="${appId}"]`);
         if (btn) {
-            if (isRepairing) {
-                btn.classList.add('repairing');
-                btn.style.opacity = '0.4';
-                btn.style.filter = 'grayscale(100%)';
-                btn.style.pointerEvents = 'none';
-            } else {
-                btn.classList.remove('repairing');
-                btn.style.opacity = '';
-                btn.style.filter = '';
-                btn.style.pointerEvents = '';
-            }
+            btn.classList.toggle('repairing', isRepairing);
+            btn.disabled = isRepairing;
+            btn.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
         }
     },
 
@@ -130,6 +122,10 @@ const Taskbar = {
         const name = Desktop.getAppName(app);
         btn.innerHTML = `<img src="${app.icon}" alt="${name}">`;
         btn.title = name;
+        const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId);
+        btn.classList.toggle('repairing', repairing);
+        btn.disabled = repairing;
+        btn.setAttribute('aria-disabled', repairing ? 'true' : 'false');
         
         // 检查是否运行中
         if (State.runningApps.has(appId)) {

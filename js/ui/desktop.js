@@ -45,6 +45,17 @@ const Desktop = {
         this.bindEvents();
         this.bindKeyboardEvents();
         this.bindDragDropEvents();
+
+        State.on('appRepairStart', (appId) => this.updateAppRepairState(appId, true));
+        State.on('appRepairEnd', (appId) => this.updateAppRepairState(appId, false));
+    },
+
+    updateAppRepairState(appId, isRepairing) {
+        if (!this.iconsContainer) return;
+        this.iconsContainer.querySelectorAll(`.desktop-icon[data-app-id="${appId}"]`).forEach(icon => {
+            icon.classList.toggle('repairing', isRepairing);
+            icon.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
+        });
     },
     
     bindDragDropEvents() {
@@ -503,6 +514,12 @@ const Desktop = {
             const el = document.createElement('div');
             el.className = 'desktop-icon';
             el.dataset.nodeId = node.id;
+            if (node.type === 'app') {
+                el.dataset.appId = node.appId;
+                const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(node.appId);
+                el.classList.toggle('repairing', repairing);
+                el.setAttribute('aria-disabled', repairing ? 'true' : 'false');
+            }
             el.draggable = true;
             const icon = this.getDesktopIcon(node);
             el.innerHTML = `<img src="${icon}" alt="${node.name}"><span>${node.name}</span>`;

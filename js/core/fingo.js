@@ -1227,6 +1227,15 @@ const Fingo = {
         const installed = this._findApp(lower);
         if (installed) {
             const name = Desktop.getAppName(installed);
+            if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(installed.id)) {
+                setTimeout(() => this.addMessage(
+                    lang === 'zh'
+                        ? `${name} 正在修复中，请等待修复完成后再打开。`
+                        : `${name} is being repaired. Please wait until the repair is complete.`,
+                    'bot'
+                ), 300);
+                return;
+            }
             setTimeout(() => {
                 WindowManager.openApp(installed.id);
                 this._ensurePanelForeground();

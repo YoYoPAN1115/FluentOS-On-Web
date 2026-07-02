@@ -828,6 +828,17 @@ body.button-glow-enabled .pin-toggle.button-glow-target {
     filter: none;
 }
 
+/* 修复中的 App 在所有启动入口保持统一的禁用视觉。 */
+.desktop-icon.repairing,
+.taskbar-app.repairing,
+.start-app.repairing,
+.start-all-app-row.repairing {
+    opacity: 0.4 !important;
+    filter: grayscale(100%) !important;
+    pointer-events: none !important;
+    cursor: default !important;
+}
+
 /* 禁用图标的浏览器原生拖拽，避免与指针拖拽（固定到桌面）冲突 */
 .taskbar-app img,
 .start-app img,
@@ -1484,10 +1495,14 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     position: absolute;
     left: 24px;
     right: 24px;
-    top: 114px;
+    top: 94px;
     margin-bottom: 0;
     opacity: 1;
     transform: translateX(0);
+}
+
+.start-menu.start-search-mode .start-search-results-view {
+    top: 114px;
 }
 
 .start-menu.start-all-apps-mode .start-section,
@@ -1502,7 +1517,7 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     position: absolute;
     left: 24px;
     right: 24px;
-    top: 114px;
+    top: 94px;
     margin-bottom: 0;
     pointer-events: none;
 }
@@ -1515,13 +1530,15 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    min-height: 24px;
+    margin-bottom: 4px;
     padding: 0 4px;
 }
 
 .start-all-apps-header > span {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
+    line-height: 24px;
     color: var(--text-primary);
 }
 
@@ -1529,10 +1546,15 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
+    height: 24px;
+    padding: 4px 8px;
+    border: none;
     border-radius: var(--radius-sm);
+    background: transparent;
     color: var(--text-primary);
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
     transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -1591,6 +1613,10 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     width: 22px !important;
     height: 22px !important;
     flex-shrink: 0;
+}
+
+.start-all-apps-list > .start-app-group:first-child {
+    padding-top: 4px;
 }
 
 .recent-item-thumb {
@@ -3454,6 +3480,10 @@ body.dark-mode .pwa-frozen-surface {
 .pwa-content-frozen .pwa-iframe {
     display: none;
     pointer-events: none;
+}
+
+.start-menu.start-returning-home .start-search-results-view {
+    top: 114px;
 }
 
 body.in-taskview .window.taskview-window-active .pwa-content-frozen .pwa-frozen-surface {

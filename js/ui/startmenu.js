@@ -52,20 +52,10 @@ const StartMenu = {
     
     // 更新应用修复状态
     updateAppRepairState(appId, isRepairing) {
-        const appEl = this.element.querySelector(`.start-app[data-app-id="${appId}"]`);
-        if (appEl) {
-            if (isRepairing) {
-                appEl.classList.add('repairing');
-                appEl.style.opacity = '0.4';
-                appEl.style.filter = 'grayscale(100%)';
-                appEl.style.pointerEvents = 'none';
-            } else {
-                appEl.classList.remove('repairing');
-                appEl.style.opacity = '';
-                appEl.style.filter = '';
-                appEl.style.pointerEvents = '';
-            }
-        }
+        this.element.querySelectorAll(`.start-app[data-app-id="${appId}"], .start-all-app-row[data-app-id="${appId}"]`).forEach(appEl => {
+            appEl.classList.toggle('repairing', isRepairing);
+            appEl.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
+        });
     },
     
     updateLanguage() {
@@ -130,6 +120,9 @@ const StartMenu = {
             const appElement = document.createElement('div');
             appElement.className = 'start-app';
             appElement.dataset.appId = app.id;
+            const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
+            appElement.classList.toggle('repairing', repairing);
+            appElement.setAttribute('aria-disabled', repairing ? 'true' : 'false');
             const name = Desktop.getAppName(app);
             appElement.innerHTML = `
                 <img src="${app.icon}" alt="${name}">
@@ -401,13 +394,14 @@ const StartMenu = {
         return apps.map(app => {
             const name = Desktop.getAppName(app);
             const group = this.getAppGroupKey(app);
+            const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
             const header = grouped && group !== lastGroup
                 ? `<div class="start-app-group">${group}</div>`
                 : '';
             lastGroup = group;
             return `
                 ${header}
-                <div class="start-all-app-row start-app" data-app-id="${app.id}">
+                <div class="start-all-app-row start-app${repairing ? ' repairing' : ''}" data-app-id="${app.id}" aria-disabled="${repairing ? 'true' : 'false'}">
                     <img src="${app.icon}" alt="${name}">
                     <span>${name}</span>
                 </div>
