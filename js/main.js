@@ -1106,6 +1106,19 @@ window.addEventListener('error', (e) => {
 /**
  * 全局禁用右键菜单和文字复制（记事本除外）
  */
+window.closeAllContextMenus = (except = null) => {
+    document.querySelectorAll('.context-menu, .fluent-context-menu').forEach((menu) => {
+        if (menu === except || (except && menu.contains(except))) return;
+        if (typeof menu.hide === 'function') menu.hide();
+        else menu.classList.add('hidden');
+    });
+};
+
+// 捕获阶段先收起旧菜单；目标区域随后可在冒泡阶段打开自己的菜单。
+document.addEventListener('contextmenu', () => {
+    window.closeAllContextMenus();
+}, true);
+
 document.addEventListener('contextmenu', (e) => {
     // 检查是否在记事本应用内
     const notesApp = e.target.closest('.notes-app');

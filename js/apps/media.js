@@ -6190,6 +6190,46 @@ const MediaApp = {
             body.dark-mode .media-expanded-aux .media-volume-slider.fluent-slider {
                 --fluent-slider-track: rgba(255, 255, 255, 0.28);
             }
+
+            /* Keep FluentWindow's diagonal .fw-card intact. Only the empty-state
+               content card below the titlebar is removed visually. */
+            .media-import-empty-card,
+            body.fluent-v2 .media-import-empty-card,
+            body.fluent-v2.window-blur-disabled .media-import-empty-card {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+
+            /* FluentWindow hosts remain Gaussian even when full-window blur is
+               disabled. Media's older solid fallback must not override that. */
+            body.window-blur-disabled .window[data-app-id="media"].fw-host,
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"].fw-host {
+                background: rgba(252, 252, 252, 0.72) !important;
+                background-color: rgba(252, 252, 252, 0.72) !important;
+                background-image: none !important;
+                backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(160%) !important;
+            }
+            body.dark-mode.window-blur-disabled .window[data-app-id="media"].fw-host,
+            body.fluent-v2.dark-mode.window-blur-disabled .window[data-app-id="media"].fw-host {
+                background: rgba(34, 34, 34, 0.72) !important;
+                background-color: rgba(34, 34, 34, 0.72) !important;
+            }
+            body.window-blur-disabled .window[data-app-id="media"].fw-host .window-titlebar,
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"].fw-host .window-titlebar,
+            body.window-blur-disabled .window[data-app-id="media"].fw-host .window-content,
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"].fw-host .window-content,
+            body.window-blur-disabled .window[data-app-id="media"].fw-host .media-fw-app,
+            body.fluent-v2.window-blur-disabled .window[data-app-id="media"].fw-host .media-fw-app {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+            }
             @keyframes mediaThemeDrift {
                 0% {
                     transform: translate3d(-9%, -6%, 0) scale(1.12) rotate(-2deg);

@@ -1198,9 +1198,10 @@ function wRenderSearch(body, ctx) {
     if (ctx.isPreview) return;
 
     const input = body.querySelector('input');
-    const go = () => {
-        const q = input.value.trim();
+    const go = (query = input.value) => {
+        const q = String(query || '').trim();
         if (!q) return;
+        if (window.SearchHistory) SearchHistory.add(q);
         const searchUrl = wSearchUrl(q, ctx);
         if (ctx.surface === 'lock') {
             window.open(searchUrl, '_blank');
@@ -1220,6 +1221,15 @@ function wRenderSearch(body, ctx) {
         e.stopPropagation();
         input.focus();
     });
+    if (window.SearchHistory) {
+        SearchHistory.bindPopover(input, {
+            anchor: body,
+            className: 'widget-search-history',
+            minWidth: 300,
+            gap: 16,
+            onSelect: query => go(query)
+        });
+    }
 }
 
 function wRenderSearchEditor(container, ctx) {
@@ -2023,7 +2033,7 @@ function wRenderFavoriteSites(body, ctx, size) {
     wAsync(body, async () => {
         const service = window.FavoriteSites;
         const limit = wFavoriteLimit(size);
-        const sites = service ? await service.getDisplaySites(limit) : [];
+        const sites = service ? await service.getWidgetDisplaySites(limit) : [];
         if (!body.isConnected) return;
 
         if (!sites.length) {
@@ -2101,6 +2111,10 @@ function wRenderFavoriteSitesEditor(container, ctx) {
                         </div>
                     `).join('')}
                 </div>
+                <button class="widget-edit-import-button" type="button">
+                    <img src="Theme/Icon/Symbol_icon/stroke/Bookmark Download.svg" alt="">
+                    <span>${wUiText('\u4ece\u5f53\u524d\u6d4f\u89c8\u5668\u5bfc\u5165\u6536\u85cf', 'Import favorites...')}</span>
+                </button>
             </div>`;
 
         const input = container.querySelector('.widget-edit-input');
@@ -2117,6 +2131,9 @@ function wRenderFavoriteSitesEditor(container, ctx) {
         addBtn.addEventListener('click', addSite);
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') addSite();
+        });
+        container.querySelector('.widget-edit-import-button')?.addEventListener('click', () => {
+            service.selectBookmarksFile({ onComplete: () => draw() });
         });
         container.querySelectorAll('.widget-edit-site-remove').forEach(btn => {
             btn.addEventListener('click', async () => {

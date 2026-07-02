@@ -11,6 +11,7 @@ const SettingsApp = {
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
         { date: '2026-07-02', version: '2.0.260702', commits: [
+            { hash: '0a5b367', title: '修复已知 BUG，提升系统稳定性' },
             { hash: '6c5173f', title: '修复大量已知 BUG，提升系统稳定性，并优化 App Shop 交互动画' },
             { hash: '3c3c65b', title: '修复按钮图标错误请求导致的后台大量报错问题' },
             { hash: '6fd0587', title: '完成全新 FluentOS 青山湖 OOBE 界面开发工作，并统一 Fluent UI 组件库的开关控件设计语言' }

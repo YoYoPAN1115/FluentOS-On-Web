@@ -23,6 +23,14 @@ const BrowserApp = {
 
         this.render();
         this.createNewTab();
+
+        if (!this._favoriteSitesChangeHandler) {
+            this._favoriteSitesChangeHandler = () => {
+                if (this.getActiveTab()?.url === 'about:blank') this.renderStartPageFavorites();
+                this.updateBookmarkButton();
+            };
+            window.addEventListener('fluent-favorite-sites-change', this._favoriteSitesChangeHandler);
+        }
     },
 
     render() {
@@ -51,14 +59,8 @@ const BrowserApp = {
                         </div>
 
                         <div class="browser-tools">
-                            <button class="browser-tool-btn" id="browser-bookmark" title="${t('browser.bookmark')}">
+                            <button class="browser-tool-btn" id="browser-bookmark" title="${t('browser.bookmark')}" aria-pressed="false">
                                 <img src="Theme/Icon/Symbol_icon/stroke/Star.svg" alt="${t('browser.bookmark')}">
-                            </button>
-                            <button class="browser-tool-btn" id="browser-settings" title="${t('browser.settings')}">
-                                <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="${t('browser.settings')}">
-                            </button>
-                            <button class="browser-tool-btn" id="browser-profile" title="${t('browser.profile')}">
-                                <img src="Theme/Icon/Symbol_icon/stroke/User Circle.svg" alt="${t('browser.profile')}">
                             </button>
                         </div>
                     </div>
@@ -105,18 +107,27 @@ const BrowserApp = {
 
             try {
                 if (!window.FavoriteSites) throw new Error('FavoriteSites unavailable');
-                await FavoriteSites.addFromUrl(tab.url, tab.title);
+                bookmarkBtn.disabled = true;
+                const existing = this.getFavoriteForUrl(tab.url);
+                if (existing) {
+                    FavoriteSites.removeSite(existing.id);
+                } else {
+                    await FavoriteSites.addFromUrl(tab.url, tab.title);
+                }
                 if (typeof Widgets !== 'undefined' && Widgets.renderAll) Widgets.renderAll();
+                const message = existing
+                    ? `已取消收藏 ${tab.title || tab.url}`
+                    : `已收藏 ${tab.title || tab.url}`;
                 if (window.FluentUI && FluentUI.Toast) {
                     FluentUI.Toast({
                         title: t('browser.title'),
-                        message: `已收藏 ${tab.title || tab.url}`,
+                        message,
                         type: 'success'
                     });
                 } else {
                     State.addNotification({
                         title: t('browser.title'),
-                        message: `已收藏 ${tab.title || tab.url}`,
+                        message,
                         type: 'success'
                     });
                 }
@@ -126,8 +137,20 @@ const BrowserApp = {
                     message: '收藏失败，请稍后重试',
                     type: 'error'
                 });
+            } finally {
+                bookmarkBtn.disabled = false;
+                this.updateBookmarkButton();
             }
         });
+
+        if (window.SearchHistory && addressBar) {
+            SearchHistory.bindPopover(addressBar, {
+                anchor: addressBar.closest('.browser-address-bar'),
+                className: 'browser-search-history',
+                minWidth: 360,
+                onSelect: query => this.navigate(query)
+            });
+        }
     },
 
     getWindowElement() {
@@ -251,6 +274,30 @@ const BrowserApp = {
         return this.tabs.find((tab) => tab.id === this.activeTabId) || null;
     },
 
+    getFavoriteForUrl(url) {
+        if (!window.FavoriteSites || !url || url === 'about:blank') return null;
+        const urlKey = FavoriteSites.getUrlKey(url);
+        if (!urlKey) return null;
+        return FavoriteSites.getSites().find(site => FavoriteSites.getUrlKey(site.url) === urlKey) || null;
+    },
+
+    updateBookmarkButton() {
+        const button = this.container?.querySelector('#browser-bookmark');
+        const image = button?.querySelector('img');
+        if (!button || !image) return;
+
+        const tab = this.getActiveTab();
+        const canBookmark = Boolean(tab?.url && tab.url !== 'about:blank');
+        const isBookmarked = canBookmark && Boolean(this.getFavoriteForUrl(tab.url));
+        const label = isBookmarked ? '取消收藏' : t('browser.bookmark');
+
+        button.classList.toggle('bookmarked', isBookmarked);
+        button.setAttribute('aria-pressed', String(isBookmarked));
+        button.title = label;
+        image.src = `Theme/Icon/Symbol_icon/${isBookmarked ? 'fill' : 'stroke'}/Star.svg`;
+        image.alt = label;
+    },
+
     navigate(input) {
         const tab = this.getActiveTab();
         if (!tab) return;
@@ -272,6 +319,7 @@ const BrowserApp = {
                 url = `https://${url}`;
             }
         } else {
+            if (window.SearchHistory) SearchHistory.add(url);
             url = this.buildSearchResultsUrl(url);
         }
 
@@ -307,44 +355,23 @@ const BrowserApp = {
         const contentContainer = this.container.querySelector('#browser-content');
         contentContainer.innerHTML = `
             <div class="browser-start-page">
-                <div class="start-page-logo">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Globe.svg" alt="" style="width: 60px; height: 60px; opacity: 0.6;">
-                    <h1>Fluent Browser</h1>
-                </div>
+                <time class="start-page-time" aria-label="当前时间"></time>
 
                 <div class="start-page-search">
                     <img src="Theme/Icon/Symbol_icon/stroke/Search.svg" alt="" class="search-icon">
                     <input type="text" placeholder="${t('browser.search.placeholder')}" id="start-page-search" spellcheck="false">
                 </div>
 
-                <div class="start-page-shortcuts">
-                    <div class="shortcut-item" data-url="https://www.bilibili.com">
-                        <div class="shortcut-icon" style="background: #fb7299;">
-                            <img src="Theme/Icon/Symbol_icon/stroke/Video.svg" alt="">
-                        </div>
-                        <span>${t('browser.shortcut-bilibili')}</span>
-                    </div>
-                    <div class="shortcut-item" data-url="https://www.cnblogs.com/">
-                        <div class="shortcut-icon" style="background: #e5e5e5; color: #333; font-weight: 600; font-size: 20px; display: flex; align-items: center; justify-content: center;">
-                            博
-                        </div>
-                        <span>${t('browser.shortcut-cnblogs')}</span>
-                    </div>
-                    <div class="shortcut-item" data-url="https://baike.baidu.com/">
-                        <div class="shortcut-icon" style="background: #4e9ff5; color: #fff; font-weight: 600; font-size: 20px; display: flex; align-items: center; justify-content: center;">
-                            百
-                        </div>
-                        <span>${t('browser.shortcut-baike')}</span>
-                    </div>
-                    <div class="shortcut-item add-shortcut">
-                        <div class="shortcut-icon">
-                            <img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="">
-                        </div>
-                        <span>${t('browser.add-shortcut')}</span>
+                <div class="start-page-favorites" aria-live="polite">
+                    <div class="start-page-section-title">收藏网站</div>
+                    <div class="start-page-shortcuts">
+                        <div class="start-page-favorites-loading">正在加载收藏…</div>
                     </div>
                 </div>
             </div>
         `;
+
+        this.startStartPageClock();
 
         const startSearch = contentContainer.querySelector('#start-page-search');
         startSearch?.addEventListener('keydown', (event) => {
@@ -352,25 +379,114 @@ const BrowserApp = {
                 this.navigate(startSearch.value);
             }
         });
-        startSearch?.focus();
-
-        contentContainer.querySelectorAll('.shortcut-item[data-url]').forEach((shortcut) => {
-            shortcut.addEventListener('click', () => {
-                this.navigate(shortcut.dataset.url);
+        if (window.SearchHistory && startSearch) {
+            SearchHistory.bindPopover(startSearch, {
+                anchor: startSearch.closest('.start-page-search'),
+                className: 'browser-search-history start-page-search-history',
+                minWidth: 360,
+                onSelect: query => this.navigate(query)
             });
-        });
-
-        const addShortcut = contentContainer.querySelector('.add-shortcut');
-        addShortcut?.addEventListener('click', () => {
-            State.addNotification({
-                title: t('browser.title'),
-                message: t('browser.shortcut-coming'),
-                type: 'info'
-            });
-        });
+        }
+        this.renderStartPageFavorites();
 
         this.renderTabs();
         this.updateAddressBar();
+    },
+
+    startStartPageClock() {
+        clearTimeout(this._startPageClockTimer);
+
+        const update = () => {
+            const clock = this.container?.querySelector('.start-page-time');
+            if (!clock) {
+                this._startPageClockTimer = null;
+                return;
+            }
+
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            clock.textContent = `${hours}:${minutes}`;
+            clock.dateTime = `${hours}:${minutes}`;
+
+            const delayToNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+            this._startPageClockTimer = setTimeout(update, delayToNextMinute + 20);
+        };
+
+        update();
+    },
+
+    stopStartPageClock() {
+        clearTimeout(this._startPageClockTimer);
+        this._startPageClockTimer = null;
+    },
+
+    async renderStartPageFavorites() {
+        const contentContainer = this.container?.querySelector('#browser-content');
+        const grid = contentContainer?.querySelector('.start-page-shortcuts');
+        if (!grid || !window.FavoriteSites) return;
+        const renderSeq = (this._favoritesRenderSeq || 0) + 1;
+        this._favoritesRenderSeq = renderSeq;
+        const sites = await FavoriteSites.getDisplaySites(FavoriteSites.getSites().length);
+        if (renderSeq !== this._favoritesRenderSeq || !grid.isConnected || !grid.closest('.browser-start-page')) return;
+
+        grid.innerHTML = sites.map((site, index) => `
+            <button class="shortcut-item" type="button" data-site-index="${index}" title="${this.escapeHtml(site.title || site.url)}">
+                <span class="shortcut-icon">
+                    <span class="shortcut-letter">${this.escapeHtml((site.title || site.url || '?').trim().slice(0, 1).toUpperCase())}</span>
+                    ${site.icon ? `<img src="${this.escapeHtml(site.icon)}" alt="">` : ''}
+                </span>
+                <span class="shortcut-name">${this.escapeHtml(site.title || site.url)}</span>
+            </button>
+        `).join('') + `
+            <button class="shortcut-item add-favorite-site" type="button" title="添加收藏网站">
+                <span class="shortcut-icon"><img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt=""></span>
+                <span class="shortcut-name">添加收藏网站</span>
+            </button>`;
+
+        grid.querySelectorAll('.shortcut-icon img').forEach(image => {
+            image.addEventListener('error', () => image.remove(), { once: true });
+        });
+        grid.querySelectorAll('.shortcut-item[data-site-index]').forEach(button => {
+            const site = sites[Number(button.dataset.siteIndex)];
+            button.addEventListener('click', () => site && this.navigate(site.url));
+            button.addEventListener('contextmenu', event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (site) this.showFavoriteContextMenu(site, event.clientX, event.clientY);
+            });
+        });
+        grid.querySelector('.add-favorite-site')?.addEventListener('click', () => {
+            FavoriteSites.openAddDialog({ onAdded: () => this.renderStartPageFavorites() });
+        });
+    },
+
+    showFavoriteContextMenu(site, x, y) {
+        this._favoriteContextMenu?.remove();
+        if (!window.FluentUI?.ContextMenu) return;
+        const menu = FluentUI.ContextMenu({
+            className: 'browser-favorite-context-menu',
+            items: [{
+                label: '删除收藏',
+                icon: 'Trash',
+                action: 'remove',
+                onClick: () => {
+                    FavoriteSites.removeSite(site.id);
+                    menu.remove();
+                    if (this._favoriteContextMenu === menu) this._favoriteContextMenu = null;
+                }
+            }]
+        });
+        document.body.appendChild(menu);
+        menu.show(x, y);
+        this._favoriteContextMenu = menu;
+        const dismiss = event => {
+            if (!menu.contains(event.target)) {
+                menu.remove();
+                if (this._favoriteContextMenu === menu) this._favoriteContextMenu = null;
+            }
+        };
+        setTimeout(() => document.addEventListener('pointerdown', dismiss, { once: true }), 0);
     },
 
     renderSearchResultsPage(query) {
@@ -463,6 +579,8 @@ const BrowserApp = {
             return;
         }
 
+        this.stopStartPageClock();
+
         if (this.isSearchResultsUrl(tab.url)) {
             this.renderSearchResultsPage(this.getSearchQueryFromUrl(tab.url));
             return;
@@ -554,6 +672,7 @@ const BrowserApp = {
     updateAddressBar() {
         const tab = this.getActiveTab();
         const addressBar = this.container.querySelector('#browser-address');
+        this.updateBookmarkButton();
         if (!addressBar) return;
 
         if (!tab || tab.url === 'about:blank') {
@@ -766,9 +885,16 @@ const BrowserApp = {
             }
 
             body.fluent-v2 .window[data-app-id="browser"] {
-                --browser-float-radius: var(--radius-xl);
+                --browser-float-radius: var(--radius-lg, 16px);
                 border-radius: var(--browser-float-radius);
                 overflow: hidden;
+            }
+
+            body.fluent-v2 .window[data-app-id="browser"].maximized,
+            body.fluent-v2 .window[data-app-id="browser"].maximized .window-titlebar,
+            body.fluent-v2 .window[data-app-id="browser"].maximized .browser-app,
+            body.fluent-v2 .window[data-app-id="browser"].maximized .browser-content {
+                border-radius: 0 !important;
             }
 
             body.fluent-v2 .window[data-app-id="browser"] .browser-app {
@@ -940,21 +1066,24 @@ const BrowserApp = {
                 overflow-y: auto;
             }
 
-            .start-page-logo {
-                text-align: center;
+            .start-page-time {
+                display: block;
                 margin-bottom: 40px;
-            }
-
-            .start-page-logo h1 {
-                font-size: 28px;
-                font-weight: 600;
-                margin-top: 16px;
                 color: var(--text-primary);
+                font-size: 48px;
+                font-weight: 600;
+                line-height: 1;
+                letter-spacing: -1px;
+                font-variant-numeric: tabular-nums;
             }
 
             .start-page-search {
+                box-sizing: border-box;
+                flex: 0 0 48px;
                 width: 100%;
                 max-width: 600px;
+                min-height: 48px;
+                max-height: 48px;
                 display: flex;
                 align-items: center;
                 gap: 12px;
@@ -962,7 +1091,7 @@ const BrowserApp = {
                 border-radius: 24px;
                 padding: 0 24px;
                 height: 48px;
-                margin-bottom: 60px;
+                margin-bottom: 34px;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             }
 
@@ -974,6 +1103,9 @@ const BrowserApp = {
 
             #start-page-search {
                 flex: 1;
+                min-width: 0;
+                height: 100%;
+                padding: 0;
                 background: transparent;
                 border: none;
                 outline: none;
@@ -987,10 +1119,31 @@ const BrowserApp = {
 
             .start-page-shortcuts {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                gap: 24px;
+                grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+                gap: 14px;
                 max-width: 800px;
                 width: 100%;
+            }
+
+            .start-page-favorites {
+                width: 100%;
+                max-width: 800px;
+            }
+
+            .start-page-section-title {
+                margin: 0 4px 12px;
+                color: var(--text-secondary);
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            .start-page-favorites-loading,
+            .start-page-favorites-empty {
+                grid-column: 1 / -1;
+                padding: 24px;
+                color: var(--text-secondary);
+                text-align: center;
+                font-size: 13px;
             }
 
             .shortcut-item {
@@ -999,8 +1152,10 @@ const BrowserApp = {
                 align-items: center;
                 gap: 12px;
                 cursor: pointer;
-                padding: 16px;
+                padding: 12px 8px;
                 border-radius: 12px;
+                border: 0;
+                background: transparent;
                 transition: background var(--transition-fast);
             }
 
@@ -1008,11 +1163,23 @@ const BrowserApp = {
                 background: rgba(0, 0, 0, 0.03);
             }
 
+            .add-favorite-site .shortcut-icon {
+                border: 1px dashed rgba(var(--accent-rgb, 0, 120, 212), 0.46);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.08);
+            }
+
+            .add-favorite-site .shortcut-icon img {
+                width: 24px;
+                height: 24px;
+                opacity: 0.72;
+            }
+
             .dark-mode .shortcut-item:hover {
                 background: rgba(255, 255, 255, 0.05);
             }
 
             .shortcut-icon {
+                position: relative;
                 width: 60px;
                 height: 60px;
                 border-radius: 12px;
@@ -1020,22 +1187,36 @@ const BrowserApp = {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                overflow: hidden;
             }
 
             .shortcut-icon img {
-                width: 28px;
-                height: 28px;
+                position: relative;
+                z-index: 1;
+                width: 38px;
+                height: 38px;
+                object-fit: contain;
             }
 
-            .shortcut-item span {
+            .shortcut-letter {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--accent);
+                font-size: 22px;
+                font-weight: 700;
+            }
+
+            .shortcut-name {
+                width: 100%;
                 font-size: 13px;
                 color: var(--text-primary);
                 text-align: center;
-            }
-
-            .add-shortcut .shortcut-icon {
-                background: transparent;
-                border: 2px dashed var(--border-color);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .browser-app *::-webkit-scrollbar {

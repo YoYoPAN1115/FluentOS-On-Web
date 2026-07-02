@@ -68,6 +68,10 @@ const Widgets = {
             this.renderAll();
         });
 
+        window.addEventListener('fluent-favorite-sites-change', () => {
+            this.refreshWidgetsByPrefix('favorites-');
+        });
+
         window.addEventListener('resize', () => {
             clearTimeout(this._resizeTimer);
             this._resizeTimer = setTimeout(() => {
@@ -886,20 +890,23 @@ const Widgets = {
 
     _makeWidgetEl(inst, def, m, surface) {
         const px = this._cellToPx(m, inst.col, inst.row, def.w, def.h);
+        const verticalInset = def.id === 'search-capsule' ? 6 : 0;
+        const visualTop = px.y + verticalInset;
+        const visualHeight = px.h - verticalInset * 2;
         const el = document.createElement('div');
         el.className = 'fluent-widget';
         el.classList.add(this._sizeClass(def));
         if (def.h === 1) el.classList.add('capsule');
         el.dataset.instanceId = inst.id;
         el.style.left = `${px.x}px`;
-        el.style.top = `${px.y}px`;
+        el.style.top = `${visualTop}px`;
         el.style.width = `${px.w}px`;
-        el.style.height = `${px.h}px`;
+        el.style.height = `${visualHeight}px`;
         if (surface === 'desktop' || surface === 'lock') {
             el.style.setProperty('--widget-blur-left', `${px.x}px`);
-            el.style.setProperty('--widget-blur-top', `${px.y}px`);
+            el.style.setProperty('--widget-blur-top', `${visualTop}px`);
             el.style.setProperty('--widget-blur-offset-x', `${-px.x}px`);
-            el.style.setProperty('--widget-blur-offset-y', `${-px.y}px`);
+            el.style.setProperty('--widget-blur-offset-y', `${-visualTop}px`);
             el.style.setProperty('--widget-blur-viewport-w', `${window.innerWidth}px`);
             el.style.setProperty('--widget-blur-viewport-h', `${window.innerHeight}px`);
         }
@@ -921,7 +928,7 @@ const Widgets = {
         if (typeof def.renderEditor === 'function') {
             const editBtn = document.createElement('button');
             editBtn.className = 'fluent-widget-edit button-glow-disabled';
-            editBtn.title = '编辑小组件';
+            editBtn.title = t('widgets.edit');
             editBtn.innerHTML = `<img src="Theme/Icon/Symbol_icon/stroke/Dots Horizontal.svg" alt="...">`;
             editBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1012,13 +1019,13 @@ const Widgets = {
         const items = [];
         if (typeof def.renderEditor === 'function') {
             items.push({
-                label: '编辑小组件',
+                label: t('widgets.edit'),
                 icon: 'Theme/Icon/Symbol_icon/stroke/Edit.svg',
                 action: () => this.openWidgetEditor(surface, inst.id)
             });
         }
         items.push({
-            label: '删除',
+            label: t('widgets.remove'),
             icon: 'Theme/Icon/Symbol_icon/stroke/Trash.svg',
             danger: true,
             action: () => this.removeWidget(surface, inst.id)
