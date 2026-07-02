@@ -262,7 +262,50 @@ const Desktop = {
 
     updateWallpaper() {
         const wallpaper = State.settings.wallpaperDesktop;
-        this.wallpaperElement.style.backgroundImage = `url('${wallpaper}')`;
+        const applyWallpaper = () => {
+            if (State.settings.wallpaperDesktop !== wallpaper) return;
+            if (this._currentWallpaper === wallpaper && !this._wallpaperTransitionLayer) return;
+            const currentImage = this.wallpaperElement.style.backgroundImage;
+            const nextImage = `url("${String(wallpaper).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
+            const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+            if (!currentImage || currentImage === 'none' || reducedMotion) {
+                this.wallpaperElement.style.backgroundImage = nextImage;
+                this._currentWallpaper = wallpaper;
+                return;
+            }
+
+            const previousLayer = this._wallpaperTransitionLayer;
+            if (previousLayer) {
+                this.wallpaperElement.style.backgroundImage = previousLayer.style.backgroundImage;
+                previousLayer.remove();
+            }
+
+            const layer = document.createElement('div');
+            layer.className = 'desktop-wallpaper desktop-wallpaper-fade-layer';
+            layer.style.backgroundImage = nextImage;
+            this._wallpaperTransitionLayer = layer;
+            this.wallpaperElement.insertAdjacentElement('afterend', layer);
+
+            const finish = () => {
+                if (this._wallpaperTransitionLayer !== layer) return;
+                this.wallpaperElement.style.backgroundImage = nextImage;
+                this._currentWallpaper = wallpaper;
+                this._wallpaperTransitionLayer = null;
+                layer.remove();
+            };
+            const fade = layer.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 460, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'forwards' }
+            );
+            fade.finished.catch(() => {}).then(finish);
+            setTimeout(finish, 560);
+        };
+
+        const image = new Image();
+        image.onload = applyWallpaper;
+        image.onerror = applyWallpaper;
+        image.src = wallpaper;
         if (document.body && State.applyMaterialSetting) {
             State.applyMaterialSetting();
         }

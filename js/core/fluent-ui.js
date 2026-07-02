@@ -1035,7 +1035,7 @@ const FluentUI = {
         // 类型对应的图标
         const typeIcons = {
             info: 'Information Circle',
-            success: 'Checkmark Circle',
+            success: 'Check Circle',
             warning: 'Question Mark Circle',
             error: 'Question Mark Circle'
         };

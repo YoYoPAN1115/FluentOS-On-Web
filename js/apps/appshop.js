@@ -948,7 +948,7 @@ const AppShop = {
                 place-items: center;
                 padding: 28px;
                 box-sizing: border-box;
-                background: rgba(15, 18, 24, 0.38) !important;
+                background: rgba(15, 18, 24, 0.38);
                 backdrop-filter: blur(18px) saturate(120%);
                 -webkit-backdrop-filter: blur(18px) saturate(120%);
                 opacity: 0;
@@ -960,7 +960,10 @@ const AppShop = {
             .appshop-story-modal {
                 position: relative;
                 width: min(900px, 100%);
+                height: min(750px, 100%);
                 max-height: 100%;
+                display: flex;
+                flex-direction: column;
                 border: 1px solid rgba(255,255,255,0.2);
                 border-radius: 22px;
                 background: var(--bg-primary, #f6f6f6) !important;
@@ -972,7 +975,7 @@ const AppShop = {
                 will-change: transform, border-radius, filter;
             }
             body:not(.dark-mode) .appshop-story-overlay {
-                background: rgba(228, 236, 246, 0.42) !important;
+                background: rgba(228, 236, 246, 0.42);
             }
             body.dark-mode .appshop-story-modal {
                 background: #1d1d1f !important;
@@ -980,11 +983,26 @@ const AppShop = {
                 border-color: rgba(255,255,255,0.12) !important;
                 box-shadow: 0 34px 100px rgba(0,0,0,0.58);
             }
+            .appshop-story-morph-card {
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 30;
+                min-height: 0 !important;
+                box-sizing: border-box;
+                border-radius: inherit !important;
+                pointer-events: none;
+                cursor: default;
+                transform-origin: top left;
+                will-change: opacity, filter;
+            }
             .appshop-story-detail-hero {
-                height: clamp(330px, 47vh, 420px);
+                height: var(--story-hero-height, clamp(330px, 47vh, 420px));
+                flex: 0 0 var(--story-hero-height, clamp(330px, 47vh, 420px));
                 position: relative;
                 background: linear-gradient(140deg, var(--story-a), var(--story-b)) !important;
                 overflow: hidden;
+                transition: height 100ms linear, flex-basis 100ms linear;
             }
             .appshop-story-icon-scene {
                 position: absolute;
@@ -993,6 +1011,11 @@ const AppShop = {
                 display: grid;
                 place-items: center;
                 pointer-events: none;
+                transform: scale(var(--story-hero-scale, 1));
+                opacity: var(--story-hero-opacity, 1);
+                transform-origin: center center;
+                will-change: transform, opacity;
+                transition: transform 120ms linear, opacity 120ms linear;
             }
             .appshop-story-detail-icon-wrap {
                 width: 190px;
@@ -1072,6 +1095,8 @@ const AppShop = {
                 z-index: 3;
                 color: #fff;
                 text-shadow: 0 2px 18px rgba(0,0,0,0.24);
+                transform-origin: left bottom;
+                will-change: transform, opacity;
             }
             .appshop-story-detail-copy h2 {
                 margin: 6px 0 0;
@@ -1089,33 +1114,37 @@ const AppShop = {
                 color: rgba(255,255,255,0.72) !important;
             }
             .appshop-story-detail-surface {
-                max-height: min(330px, 38vh);
+                flex: 1 1 auto;
+                min-height: 0;
                 overflow: auto;
+                overscroll-behavior: contain;
                 background: var(--bg-primary, #f8f8f9);
             }
             body.dark-mode .appshop-story-detail-surface {
                 background: #1d1d1f;
             }
             .appshop-story-detail-appbar {
-                min-height: 96px;
-                padding: 15px 30px;
+                min-height: var(--story-appbar-height, 96px);
+                padding: var(--story-appbar-padding, 15px 30px);
                 display: grid;
-                grid-template-columns: 62px minmax(0, 1fr) auto;
+                grid-template-columns: var(--story-app-icon-size, 62px) minmax(0, 1fr) auto;
                 gap: 16px;
                 align-items: center;
                 background: rgba(255,255,255,0.54) !important;
                 border-bottom: 1px solid rgba(0,0,0,0.08);
                 backdrop-filter: blur(22px) saturate(140%);
                 -webkit-backdrop-filter: blur(22px) saturate(140%);
+                transition: min-height 100ms linear, padding 100ms linear;
             }
             body.dark-mode .appshop-story-detail-appbar {
                 background: rgba(255,255,255,0.06) !important;
                 border-bottom-color: rgba(255,255,255,0.1);
             }
             .appshop-story-detail-appbar .appshop-list-icon {
-                width: 62px;
-                height: 62px;
-                border-radius: 15px;
+                width: var(--story-app-icon-size, 62px);
+                height: var(--story-app-icon-size, 62px);
+                border-radius: var(--story-app-icon-radius, 15px);
+                transition: width 100ms linear, height 100ms linear, border-radius 100ms linear;
             }
             .appshop-story-detail-appbar h4 {
                 margin: 0;
@@ -1178,7 +1207,17 @@ const AppShop = {
                 filter: blur(0);
                 transform: translateY(0);
             }
+            .appshop-story-overlay.content-ready .appshop-story-detail-copy {
+                opacity: var(--story-copy-opacity, 1);
+                transform: translateY(var(--story-copy-shift, 0px)) scale(var(--story-copy-scale, 1));
+                transition: transform 120ms linear, opacity 120ms linear, filter 500ms cubic-bezier(0.16,1,0.3,1);
+            }
             .appshop-story-overlay.content-ready .appshop-story-detail-appbar { transition-delay: 50ms; }
+            .appshop-story-overlay.content-ready .appshop-story-detail-appbar {
+                transition-property: min-height, padding, opacity, filter, transform;
+                transition-duration: 100ms, 100ms, 340ms, 500ms, 500ms;
+                transition-timing-function: linear, linear, ease, cubic-bezier(0.16,1,0.3,1), cubic-bezier(0.16,1,0.3,1);
+            }
             .appshop-story-overlay.content-ready .appshop-story-detail-body { transition-delay: 110ms; }
             .appshop-story-overlay.closing .appshop-story-detail-reveal {
                 transition-delay: 0ms !important;
@@ -1248,6 +1287,7 @@ const AppShop = {
                 .appshop-discover-grid { grid-template-columns: 1fr; }
                 .appshop-main { padding: 20px; min-width: 0; }
                 .appshop-story-overlay { padding: 16px; }
+                .appshop-story-modal { --story-hero-height: 310px; }
                 .appshop-story-detail-hero { height: 310px; }
                 .appshop-story-detail-icon-wrap { width: 150px; height: 150px; border-radius: 34px; }
                 .appshop-story-orbit { width: 220px; height: 220px; }
@@ -1829,7 +1869,9 @@ const AppShop = {
     },
 
     getActionLabel(app) {
-        return (this.isInstalled(app.id) || app.isSystem === true) ? '打开' : '获取';
+        return (this.isInstalled(app.id) || app.isSystem === true)
+            ? t('appshop.open')
+            : t('appshop.get');
     },
 
     renderActionButton(app) {
@@ -2020,8 +2062,11 @@ const AppShop = {
         this.render();
         
         // 监听语言和主题变化
-        State.on('languageChange', () => this.render());
-        State.on('settingsChange', () => this.render({ preserveScroll: true }));
+        State.on('languageChange', () => this.updateAppsList());
+        State.on('settingsChange', (updates) => {
+            if (!updates || !Object.prototype.hasOwnProperty.call(updates, 'appShopFeaturePreviewIndex')) return;
+            this.updateAppsList();
+        });
     },
 
     beforeClose() {
@@ -2113,8 +2158,34 @@ const AppShop = {
     },
 
     // 只更新应用列表（不重新渲染搜索框）
-    updateAppsList() {
+    updateAppsList(appId = null) {
         if (!this.container) return;
+        const preview = this.container.querySelector('.appshop-story-overlay, .appshop-detail-overlay');
+        if (preview) {
+            this._renderAfterPreviewClose = true;
+            const previewAppId = appId || preview.dataset.appId || preview.querySelector('[data-story-app-id]')?.dataset.storyAppId;
+            const app = previewAppId ? this.apps.find(item => item.id === previewAppId) : null;
+            if (app) {
+                preview.querySelectorAll(`[data-install-app-id="${app.id}"]`).forEach(button => {
+                    button.textContent = this.getActionLabel(app);
+                    button.classList.toggle('installed', this.isInstalled(app.id) || app.isSystem === true);
+                });
+                const detailButton = preview.querySelector('.appshop-detail-btn');
+                if (detailButton) {
+                    detailButton.textContent = this.getActionLabel(app);
+                    detailButton.dataset.action = (this.isInstalled(app.id) || app.isSystem === true) ? 'open' : 'install';
+                    detailButton.classList.toggle('installed', this.isInstalled(app.id) || app.isSystem === true);
+                }
+            }
+            return;
+        }
+        this._renderAfterPreviewClose = false;
+        this.render({ preserveScroll: true });
+    },
+
+    flushDeferredPreviewRender() {
+        if (!this._renderAfterPreviewClose || !this.container?.isConnected) return;
+        this._renderAfterPreviewClose = false;
         this.render({ preserveScroll: true });
     },
     
@@ -2291,7 +2362,7 @@ const AppShop = {
                 duration: 4000
             });
 
-            this.updateAppsList();
+            this.updateAppsList(appId);
         }, Math.max(0, installDelay - (Date.now() - startTime)));
     },
     
@@ -2436,6 +2507,7 @@ const AppShop = {
 
         const overlay = document.createElement('div');
         overlay.className = 'appshop-story-overlay';
+        overlay.dataset.appId = app.id;
         overlay.innerHTML = `
             <article class="appshop-story-modal" data-story-app-id="${app.id}" style="--story-a:${colors.primary};--story-b:${colors.secondary};">
                 <button class="appshop-story-detail-close" type="button">
@@ -2484,6 +2556,18 @@ const AppShop = {
         this.ensureIconColors(app, colors);
 
         const modal = overlay.querySelector('.appshop-story-modal');
+        const detailSurface = overlay.querySelector('.appshop-story-detail-surface');
+        const detailHero = overlay.querySelector('.appshop-story-detail-hero');
+        const detailParts = [
+            overlay.querySelector('.appshop-story-detail-close'),
+            detailHero,
+            detailSurface
+        ].filter(Boolean);
+        const storyTransition = {
+            duration: 620,
+            easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            fill: 'both'
+        };
         const restoreSource = () => {
             if (sourceCard?.isConnected) sourceCard.style.removeProperty('visibility');
         };
@@ -2495,51 +2579,176 @@ const AppShop = {
             const scaleY = Math.max(0.08, fromRect.height / toRect.height);
             return `translate3d(${x}px, ${y}px, 0) scale(${scaleX}, ${scaleY})`;
         };
+        const getFlipRadius = (fromRect, toRect, visualRadius = 16) => {
+            if (!fromRect || !toRect || !toRect.width || !toRect.height) return `${visualRadius}px`;
+            const scaleX = Math.max(0.08, fromRect.width / toRect.width);
+            const scaleY = Math.max(0.08, fromRect.height / toRect.height);
+            return `${visualRadius / scaleX}px / ${visualRadius / scaleY}px`;
+        };
+        const createMorphCard = () => {
+            if (!sourceCard?.isConnected) return null;
+            const cardRect = sourceCard.getBoundingClientRect();
+            const modalRect = modal.getBoundingClientRect();
+            if (!cardRect.width || !cardRect.height || !modalRect.width || !modalRect.height) return null;
+            const clone = sourceCard.cloneNode(true);
+            clone.classList.add('appshop-story-morph-card');
+            clone.removeAttribute('data-story-index');
+            clone.removeAttribute('data-story-app-id');
+            clone.style.removeProperty('visibility');
+            clone.style.setProperty('width', `${cardRect.width}px`, 'important');
+            clone.style.setProperty('height', `${cardRect.height}px`, 'important');
+            clone.style.setProperty(
+                'transform',
+                `scale(${modalRect.width / cardRect.width}, ${modalRect.height / cardRect.height})`,
+                'important'
+            );
+            clone.setAttribute('aria-hidden', 'true');
+            modal.appendChild(clone);
+            return clone;
+        };
+        const overlayBackdropFrames = (opening) => {
+            const darkMode = document.body.classList.contains('dark-mode');
+            const backdropColor = darkMode ? 'rgba(15, 18, 24, 0.38)' : 'rgba(228, 236, 246, 0.42)';
+            const clearColor = darkMode ? 'rgba(15, 18, 24, 0)' : 'rgba(228, 236, 246, 0)';
+            const clear = {
+                opacity: 0,
+                backgroundColor: clearColor,
+                backdropFilter: 'blur(0px) saturate(100%)',
+                webkitBackdropFilter: 'blur(0px) saturate(100%)'
+            };
+            const blurred = {
+                opacity: 1,
+                backgroundColor: backdropColor,
+                backdropFilter: 'blur(18px) saturate(120%)',
+                webkitBackdropFilter: 'blur(18px) saturate(120%)'
+            };
+            return opening ? [clear, blurred] : [blurred, clear];
+        };
+
+        const openingAnimations = [];
+
+        let collapseProgress = 0;
+        let expandedHeroHeight = 0;
+        const applyHeaderCollapse = (progress) => {
+            collapseProgress = Math.max(0, Math.min(1, progress));
+            if (!expandedHeroHeight) {
+                expandedHeroHeight = detailHero?.getBoundingClientRect().height || 360;
+            }
+            const compactHeroHeight = Math.max(172, Math.min(210, expandedHeroHeight * 0.52));
+            const heroHeight = expandedHeroHeight - ((expandedHeroHeight - compactHeroHeight) * collapseProgress);
+            const heroScale = 1 - (collapseProgress * 0.43);
+            const appIconSize = 62 - (collapseProgress * 16);
+
+            modal.style.setProperty('--story-hero-height', `${heroHeight.toFixed(2)}px`);
+            modal.style.setProperty('--story-hero-scale', heroScale.toFixed(3));
+            modal.style.setProperty('--story-hero-opacity', (1 - collapseProgress * 0.12).toFixed(3));
+            modal.style.setProperty('--story-copy-scale', (1 - collapseProgress * 0.16).toFixed(3));
+            modal.style.setProperty('--story-copy-opacity', (1 - collapseProgress * 0.22).toFixed(3));
+            modal.style.setProperty('--story-copy-shift', `${(-collapseProgress * 8).toFixed(2)}px`);
+            modal.style.setProperty('--story-appbar-height', `${(96 - collapseProgress * 22).toFixed(2)}px`);
+            modal.style.setProperty('--story-appbar-padding', `${(15 - collapseProgress * 5).toFixed(2)}px 30px`);
+            modal.style.setProperty('--story-app-icon-size', `${appIconSize.toFixed(2)}px`);
+            modal.style.setProperty('--story-app-icon-radius', `${(15 - collapseProgress * 4).toFixed(2)}px`);
+        };
+
+        modal.addEventListener('wheel', (event) => {
+            if (!detailSurface) return;
+            const collapsing = event.deltaY > 0 && collapseProgress < 1;
+            const expanding = event.deltaY < 0 && detailSurface.scrollTop <= 0 && collapseProgress > 0;
+            if (collapsing || expanding) {
+                event.preventDefault();
+                applyHeaderCollapse(collapseProgress + event.deltaY / 260);
+                return;
+            }
+            if (!event.target.closest('.appshop-story-detail-surface')) {
+                event.preventDefault();
+                detailSurface.scrollTop += event.deltaY;
+            }
+        }, { passive: false });
 
         requestAnimationFrame(() => {
             overlay.classList.add('show');
+            applyHeaderCollapse(0);
             const modalRect = modal.getBoundingClientRect();
+            if (!reducedMotion) {
+                openingAnimations.push(overlay.animate(overlayBackdropFrames(true), storyTransition));
+            }
             if (sourceRect && !reducedMotion) {
                 sourceCard.style.visibility = 'hidden';
-                modal.animate([
-                    { transform: getFlipTransform(sourceRect, modalRect), borderRadius: '16px', filter: 'blur(0px)' },
+                const morphCard = createMorphCard();
+                const modalOpening = modal.animate([
+                    { transform: getFlipTransform(sourceRect, modalRect), borderRadius: getFlipRadius(sourceRect, modalRect), filter: 'blur(0px)' },
                     { transform: 'translate3d(0,0,0) scale(1)', borderRadius: '22px', filter: 'blur(0px)' }
-                ], {
-                    duration: 620,
-                    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                    fill: 'both'
+                ], storyTransition);
+                openingAnimations.push(modalOpening);
+                if (morphCard) {
+                    const morphOpening = morphCard.animate([
+                        { opacity: 1, filter: 'blur(0px)' },
+                        { opacity: 0.28, filter: 'blur(12px)', offset: 0.62 },
+                        { opacity: 0, filter: 'blur(5px)' }
+                    ], { duration: 360, delay: 70, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'both' });
+                    openingAnimations.push(morphOpening);
+                    morphOpening.finished.catch(() => {}).then(() => morphCard.remove());
+                }
+                detailParts.forEach(part => {
+                    openingAnimations.push(part.animate([
+                        { opacity: 0, filter: 'blur(12px)' },
+                        { opacity: 1, filter: 'blur(0px)' }
+                    ], { duration: 380, delay: 130, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'both' }));
                 });
             }
             setTimeout(() => overlay.classList.add('content-ready'), reducedMotion ? 0 : 150);
         });
 
         let closing = false;
+        let closeFallbackTimer = null;
+        const finalizeClose = () => {
+            if (closeFallbackTimer) {
+                clearTimeout(closeFallbackTimer);
+                closeFallbackTimer = null;
+            }
+            overlay.classList.remove('show');
+            restoreSource();
+            if (overlay.isConnected) overlay.remove();
+            requestAnimationFrame(() => this.flushDeferredPreviewRender());
+        };
         const close = () => {
             if (closing) return;
             closing = true;
-            overlay.classList.remove('content-ready', 'show');
             overlay.classList.add('closing');
+            openingAnimations.forEach(animation => {
+                try { animation.cancel(); } catch (error) { /* animation already finished */ }
+            });
             const currentRect = modal.getBoundingClientRect();
             const targetRect = sourceCard?.isConnected ? sourceCard.getBoundingClientRect() : null;
             if (!targetRect || reducedMotion) {
-                setTimeout(() => {
-                    restoreSource();
-                    overlay.remove();
-                }, reducedMotion ? 0 : 260);
+                overlay.classList.remove('show');
+                closeFallbackTimer = setTimeout(finalizeClose, reducedMotion ? 0 : 260);
                 return;
             }
+            const morphCard = createMorphCard();
+            // Reveal the destination before the flying card reaches it. The modal
+            // and backdrop still cover it, but it is ready underneath for a
+            // frame-perfect handoff when the overlay fades away.
+            restoreSource();
+            detailParts.forEach(part => {
+                part.animate([
+                    { opacity: 1, filter: 'blur(0px)' },
+                    { opacity: 0.18, filter: 'blur(14px)', offset: 0.58 },
+                    { opacity: 0, filter: 'blur(7px)' }
+                ], { duration: 360, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' });
+            });
+            morphCard?.animate([
+                { opacity: 0, filter: 'blur(14px)' },
+                { opacity: 1, filter: 'blur(0px)' }
+            ], { duration: 300, delay: 90, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'both' });
+            overlay.animate(overlayBackdropFrames(false), storyTransition);
             const animation = modal.animate([
                 { transform: 'translate3d(0,0,0) scale(1)', borderRadius: '22px', filter: 'blur(0px)' },
-                { transform: getFlipTransform(targetRect, currentRect), borderRadius: '16px', filter: 'blur(1px)' }
-            ], {
-                duration: 520,
-                easing: 'cubic-bezier(0.7, 0, 0.84, 0)',
-                fill: 'both'
-            });
-            animation.finished.catch(() => {}).then(() => {
-                restoreSource();
-                overlay.remove();
-            });
+                { transform: getFlipTransform(targetRect, currentRect), borderRadius: getFlipRadius(targetRect, currentRect), filter: 'blur(0px)' }
+            ], storyTransition);
+            animation.finished.catch(() => {}).then(finalizeClose);
+            closeFallbackTimer = setTimeout(finalizeClose, storyTransition.duration + 120);
         };
         const onKeyDown = (event) => {
             if (event.key !== 'Escape') return;
@@ -2575,6 +2784,7 @@ const AppShop = {
 
         const overlay = document.createElement('div');
         overlay.className = 'appshop-detail-overlay';
+        overlay.dataset.appId = app.id;
         const categories = this.getCategories();
         overlay.innerHTML = `
             <div class="appshop-detail-modal">
@@ -2640,7 +2850,10 @@ const AppShop = {
         // 绑定事件
         const closeModal = () => {
             overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 300);
+            setTimeout(() => {
+                overlay.remove();
+                this.flushDeferredPreviewRender();
+            }, 300);
         };
         
         overlay.querySelector('.appshop-detail-close').addEventListener('click', closeModal);
@@ -2651,7 +2864,6 @@ const AppShop = {
         overlay.querySelector('.appshop-detail-btn').addEventListener('click', (e) => {
             const action = e.target.dataset.action;
             if (action === 'install') {
-                closeModal();
                 this.installApp(appId);
             } else if (action === 'open') {
                 closeModal();

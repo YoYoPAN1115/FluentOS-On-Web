@@ -271,6 +271,14 @@ const SettingsApp = {
                 return pageId || 'overview';
             },
             onNavigate: (pageId, pageEl) => {
+                // FluentWindow reuses the same page element. Clear secondary-page
+                // exit states before rendering so their fill-mode cannot keep the
+                // next page transparent.
+                pageEl.classList.remove(
+                    'settings-material-page',
+                    'settings-about-changelog',
+                    'slide-out'
+                );
                 if (this.currentPage === 'developer' && pageId !== 'developer') {
                     this._developerModeVisible = false;
                     this._aboutDevTapCount = 0;
@@ -440,27 +448,29 @@ const SettingsApp = {
                 text-shadow: none;
             }
             .settings-accent-custom {
-                width: 72px;
-                height: 48px;
+                width: 54px;
+                height: 54px;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                margin-top: 10px;
+                padding: 0;
+                box-sizing: border-box;
                 border: 2px solid var(--border-color);
+                border-radius: 8px;
                 background: var(--bg-tertiary);
-                color: var(--text-primary);
-                font-size: 28px;
                 cursor: pointer;
-                transition: border-color 0.16s ease, background 0.16s ease;
+                transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, border-color 0.16s ease, background 0.16s ease;
             }
             .settings-accent-custom:hover {
+                transform: translateY(-1px);
                 border-color: var(--accent);
                 background: var(--accent-soft);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
             }
-            .settings-accent-custom-wrap {
-                display: flex;
-                align-items: center;
-                gap: 12px;
+            .settings-accent-custom img {
+                width: 24px;
+                height: 24px;
+                display: block;
             }
             @media (prefers-reduced-motion: reduce) {
                 .settings-accent-expand-panel,
@@ -1238,11 +1248,12 @@ const SettingsApp = {
             }
             
             .app-detail-page {
-                animation: slideInFromRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
             
             .app-detail-page.slide-out {
-                animation: slideOutToRight 0.3s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
             }
             
             .app-detail-info-card {
@@ -1669,6 +1680,15 @@ const SettingsApp = {
                 animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
+            .settings-material-page {
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-material-page.slide-out {
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
+            }
+
             .settings-changelog-page.slide-out {
                 animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
                 pointer-events: none;
@@ -1935,6 +1955,8 @@ const SettingsApp = {
                 .settings-about-brand-name,
                 .settings-about-card-codename,
                 .settings-changelog-page,
+                .settings-material-page,
+                .app-detail-page,
                 .settings-changelog-entry {
                     animation: none !important;
                 }
@@ -3956,7 +3978,8 @@ const SettingsApp = {
             <span>${t('settings.personalization')}</span>
         `;
         backBtn.addEventListener('click', () => {
-            this.navigateToPage('personalization');
+            container.classList.add('slide-out');
+            setTimeout(() => this.navigateToPage('personalization'), 240);
         });
         container.appendChild(backBtn);
 
@@ -5273,12 +5296,7 @@ const SettingsApp = {
         paletteGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-windows')}</div>`;
         const grid = document.createElement('div');
         grid.className = 'settings-accent-grid';
-        this.getAccentPalette().forEach((color) => grid.appendChild(createSwatch(color)));
-        paletteGroup.appendChild(grid);
-        panel.appendChild(paletteGroup);
-
-        const customGroup = document.createElement('div');
-        customGroup.className = 'settings-accent-group';
+        this.getAccentPalette().slice(0, -1).forEach((color) => grid.appendChild(createSwatch(color)));
         const input = document.createElement('input');
         input.type = 'color';
         input.value = currentColor;
@@ -5287,16 +5305,13 @@ const SettingsApp = {
         const customBtn = document.createElement('button');
         customBtn.type = 'button';
         customBtn.className = 'settings-accent-custom';
-        customBtn.textContent = '+';
+        customBtn.innerHTML = '<img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="">';
         customBtn.setAttribute('aria-label', t('settings.accent-custom'));
         customBtn.addEventListener('click', () => input.click());
-        customGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-custom')}</div>`;
-        const customWrap = document.createElement('div');
-        customWrap.className = 'settings-accent-custom-wrap';
-        customWrap.appendChild(customBtn);
-        customWrap.appendChild(input);
-        customGroup.appendChild(customWrap);
-        panel.appendChild(customGroup);
+        grid.appendChild(customBtn);
+        grid.appendChild(input);
+        paletteGroup.appendChild(grid);
+        panel.appendChild(paletteGroup);
         wrapper.appendChild(panel);
 
         return wrapper;

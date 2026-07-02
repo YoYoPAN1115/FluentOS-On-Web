@@ -725,12 +725,21 @@ body.button-glow-enabled .pin-toggle.button-glow-target {
 }
 
 .desktop-wallpaper {
+    position: absolute;
+    inset: 0;
     background-image: url('../Theme/Picture/Fluent-2.png');
     transform: scale(1);
     filter: none;
     transition: filter 500ms cubic-bezier(0.22, 0.61, 0.36, 1),
                 transform 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
     will-change: filter, transform;
+}
+
+.desktop-wallpaper-fade-layer {
+    z-index: 0;
+    opacity: 0;
+    pointer-events: none;
+    will-change: opacity, filter, transform;
 }
 
 .desktop-icons {
@@ -1472,28 +1481,20 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
 
 .start-menu.start-all-apps-mode .start-all-apps-view,
 .start-menu.start-search-mode .start-search-results-view {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 114px;
+    margin-bottom: 0;
     opacity: 1;
     transform: translateX(0);
 }
 
 .start-menu.start-all-apps-mode .start-section,
 .start-menu.start-search-mode .start-section {
-    position: absolute;
-    left: 24px;
-    right: 24px;
     opacity: 0;
     pointer-events: none;
     transform: translateX(-22px);
-}
-
-.start-menu.start-all-apps-mode .start-search + .start-section,
-.start-menu.start-search-mode .start-search + .start-section {
-    top: 114px;
-}
-
-.start-menu.start-all-apps-mode .start-search + .start-section + .start-section,
-.start-menu.start-search-mode .start-search + .start-section + .start-section {
-    top: 370px;
 }
 
 .start-menu.start-returning-home .start-all-apps-view,
@@ -2080,7 +2081,7 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
 /* 窗口调整大小的手柄 */
 .window-resize-handle {
     position: absolute;
-    z-index: 10;
+    z-index: 200;
     touch-action: none;
 }
 
@@ -2237,7 +2238,7 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     --snap-shell: rgba(255, 255, 255, 0.9);
     --snap-border: rgba(0, 0, 0, 0.12);
     --snap-empty: rgba(15, 23, 42, 0.08);
-    --snap-fill: rgba(15, 23, 42, 0.24);
+    --snap-fill: rgba(var(--accent-rgb, 0, 120, 212), 0.42);
     position: absolute;
     top: 50px;
     right: 52px;
@@ -2264,7 +2265,7 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     --snap-shell: rgba(34, 37, 43, 0.88);
     --snap-border: rgba(255, 255, 255, 0.15);
     --snap-empty: rgba(255, 255, 255, 0.07);
-    --snap-fill: rgba(255, 255, 255, 0.2);
+    --snap-fill: rgba(var(--accent-rgb, 0, 120, 212), 0.52);
 }
 
 .window-snap-layout-menu.show {
