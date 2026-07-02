@@ -559,8 +559,7 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
     position: relative;
 }
 
-.fw-nav-icon-img,
-.fw-nav-icon-symbol {
+.fw-nav-icon-img {
     width: 20px;
     height: 20px;
     pointer-events: none;
@@ -569,15 +568,6 @@ body.fluent-v2.window-blur-disabled .window.fw-host .window-content {
 .fw-nav-icon-img {
     display: block;
     object-fit: contain;
-}
-
-.fw-nav-icon-symbol {
-    position: absolute;
-    inset: 0;
-    background: currentColor;
-    opacity: 0;
-    -webkit-mask: var(--fw-icon-url) center / contain no-repeat;
-    mask: var(--fw-icon-url) center / contain no-repeat;
 }
 
 /* 选中态：图标颜色与文字强制统一（始终跟随 --accent-contrast 的黑/白规则）。

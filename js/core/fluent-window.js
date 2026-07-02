@@ -919,13 +919,6 @@ const FluentWindow = {
                     fallbackImg.alt = '';
                     fallbackImg.draggable = false;
                     iconWrap.appendChild(fallbackImg);
-
-                    const icon = document.createElement('span');
-                    icon.className = 'fw-nav-icon-symbol';
-                    icon.dataset.iconName = item.icon;
-                    icon.style.setProperty('--fw-icon-url', `url("${iconPath}")`);
-                    icon.setAttribute('aria-hidden', 'true');
-                    iconWrap.appendChild(icon);
                 } else {
                     iconWrap.textContent = (item.label || '?').charAt(0);
                 }
@@ -955,18 +948,13 @@ const FluentWindow = {
             frame.querySelectorAll('.fw-nav-item').forEach(btn => {
                 const isActive = btn.dataset.id === instance.activeId;
                 btn.classList.toggle('active', isActive);
-                const icon = btn.querySelector('.fw-nav-icon-symbol');
-                if (icon && icon.dataset.iconName) {
+                const fallbackImg = btn.querySelector('.fw-nav-icon-img');
+                if (fallbackImg && fallbackImg.dataset.iconName) {
                     const iconPath = FluentWindow._iconPath(
-                        icon.dataset.iconName,
+                        fallbackImg.dataset.iconName,
                         isActive ? opts.activeIconType : opts.iconType
                     );
-                    icon.style.setProperty(
-                        '--fw-icon-url',
-                        `url("${iconPath}")`
-                    );
-                    const fallbackImg = btn.querySelector('.fw-nav-icon-img');
-                    if (fallbackImg) fallbackImg.src = iconPath;
+                    if (fallbackImg.src !== iconPath) fallbackImg.src = iconPath;
                 }
             });
         };
@@ -1227,10 +1215,20 @@ const FluentWindow = {
     _iconPath(name, type = 'stroke') {
         if (!name) return '';
         // 复用 FluentUI 的图标路径规则，保持系统一致
+        let path = '';
         if (typeof FluentUI !== 'undefined' && FluentUI._utils && FluentUI._utils.getIconPath) {
-            return FluentUI._utils.getIconPath(name, type);
+            path = FluentUI._utils.getIconPath(name, type);
+        } else {
+            path = `Theme/Icon/Symbol_icon/${type}/${name}.svg`;
         }
-        return `Theme/Icon/Symbol_icon/${type}/${name}.svg`;
+        // The same path is also consumed by CSS mask variables. Resolve it
+        // against the document here so CSS never treats it as relative to
+        // css/fluent-window.css and repeatedly requests /css/Theme/....
+        try {
+            return new URL(path, document.baseURI).href;
+        } catch (_) {
+            return path;
+        }
     }
 };
 

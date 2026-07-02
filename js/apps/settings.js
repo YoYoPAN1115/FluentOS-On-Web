@@ -10,6 +10,12 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-02', version: '2.0.260702', commits: [
+            { hash: '6fd0587', title: '完成全新 FluentOS 青山湖 OOBE 界面开发工作，并统一 Fluent UI 组件库的开关控件设计语言' }
+        ] },
+        { date: '2026-06-30', version: '2.0.260630', commits: [
+            { hash: '73e528e', title: '完成新版设置关于页面开发' }
+        ] },
         { date: '2026-06-27', version: '2.0.260627', commits: [
             { hash: 'fcb7056', title: '修复已知视觉BUG，进一步优化了多媒体App' }
         ] },
