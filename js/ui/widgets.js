@@ -208,7 +208,21 @@ const Widgets = {
                 this._refreshStaticBlurTexture();
             }
         }, { key: 'Widgets.staticBlur' });
-        this._refreshStaticBlurTexture();
+
+        const deferForOobe = typeof OOBE !== 'undefined'
+            && typeof OOBE.shouldShowOnFirstLaunch === 'function'
+            && OOBE.shouldShowOnFirstLaunch();
+        if (!deferForOobe) {
+            this._refreshStaticBlurTexture();
+            return;
+        }
+
+        // Full-resolution wallpaper processing is not part of the OOBE critical path.
+        const unsubscribe = State.on('viewChange', ({ newView } = {}) => {
+            if (newView !== 'desktop' && newView !== 'lock') return;
+            unsubscribe();
+            this._refreshStaticBlurTexture();
+        });
     },
 
     _applyStaticBlurMode() {

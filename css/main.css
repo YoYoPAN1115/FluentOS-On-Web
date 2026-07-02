@@ -735,6 +735,13 @@ body.button-glow-enabled .pin-toggle.button-glow-target {
     will-change: filter, transform;
 }
 
+/* Keep the browser's composition backing surface dark during boot and
+   fullscreen/viewport changes, so a transient unpainted frame cannot flash. */
+html,
+#app {
+    background: #1a1a1a;
+}
+
 .desktop-wallpaper-fade-layer {
     z-index: 0;
     opacity: 0;

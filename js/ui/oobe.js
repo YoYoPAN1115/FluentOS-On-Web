@@ -36,6 +36,8 @@ const OOBE = {
     selectedUserName: '',
     selectedUserEmail: '',
     selectedUserAvatar: 'Theme/Profile_img/UserAva.png',
+    wallpaperHighResPromises: new Map(),
+    selectedWallpaperHighResPromise: null,
     avatarThumbCache: null,
     avatarThumbBuildPromise: null,
     avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
@@ -343,7 +345,8 @@ const OOBE = {
         if (this.finishing || !this.element) return;
         this.finishing = true;
 
-        const continueToDesktop = () => {
+        const continueToDesktop = async () => {
+            await this._ensureWallpaperHighResolution(this.selectedWallpaper);
             this._applySelections();
             this._markCompleted();
             if (State && typeof State.updateSession === 'function') {
@@ -357,7 +360,9 @@ const OOBE = {
         };
 
         if (!this._shouldWarnDefaultPinBeforeFinish()) {
-            continueToDesktop();
+            continueToDesktop().catch(() => {
+                this.finishing = false;
+            });
             return;
         }
 
@@ -366,7 +371,9 @@ const OOBE = {
                 this.finishing = false;
                 return;
             }
-            continueToDesktop();
+            continueToDesktop().catch(() => {
+                this.finishing = false;
+            });
         }).catch(() => {
             this.finishing = false;
         });
@@ -523,7 +530,10 @@ const OOBE = {
 
     _getAvatarThumbSrc(src, fallback = '') {
         const cache = this._getAvatarThumbCache();
-        return cache[src] || fallback || this.avatarPlaceholderSrc;
+        const preloadSrc = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeAvatarPreview === 'function'
+            ? BootScreen.getOobeAvatarPreview(src)
+            : src;
+        return cache[src] || preloadSrc || fallback || this.avatarPlaceholderSrc;
     },
 
     async _buildAvatarThumb(src, size = 80) {
@@ -570,6 +580,8 @@ const OOBE = {
 
             for (const src of sources) {
                 if (!src || cache[src] || /^data:image\//i.test(src)) continue;
+                if (typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeAvatarPreview === 'function'
+                    && BootScreen.getOobeAvatarPreview(src) !== src) continue;
 
                 await new Promise((resolve) => {
                     if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
@@ -956,8 +968,52 @@ const OOBE = {
     _selectWallpaper(wallpaper) {
         if (!wallpaper) return;
         this.selectedWallpaper = wallpaper;
+        this.selectedWallpaperHighResPromise = this._ensureWallpaperHighResolution(wallpaper);
         this._syncWallpaperSelection();
         this._syncDesktopPreviewState();
+    },
+
+    _ensureWallpaperHighResolution(wallpaper) {
+        const src = String(wallpaper || '').trim();
+        if (!src) return Promise.resolve(false);
+
+        const existing = this.wallpaperHighResPromises.get(src);
+        if (existing) return existing;
+
+        const promise = new Promise((resolve) => {
+            let settled = false;
+            const finish = (ok) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                resolve(ok);
+            };
+            const timeout = setTimeout(() => finish(false), 15000);
+            const image = new Image();
+            image.decoding = 'async';
+            image.fetchPriority = 'high';
+            image.onload = () => finish(true);
+            image.onerror = () => finish(false);
+            image.src = src;
+            if (typeof image.decode === 'function') {
+                image.decode().then(() => finish(true)).catch(() => {});
+            }
+        }).then(async (ok) => {
+            if (!ok) {
+                this.wallpaperHighResPromises.delete(src);
+                return false;
+            }
+
+            // Also retain local wallpapers in the Fluent OS resource cache.
+            if (typeof BootScreen !== 'undefined'
+                && typeof BootScreen._fetchAndCacheAssetFromBrowserCache === 'function') {
+                await BootScreen._fetchAndCacheAssetFromBrowserCache(src);
+            }
+            return true;
+        });
+
+        this.wallpaperHighResPromises.set(src, promise);
+        return promise;
     },
 
     _syncWallpaperSelection() {
@@ -1242,9 +1298,12 @@ const OOBE = {
 
     _syncBackgroundWithLockWallpaper() {
         const lockWallpaper = State?.settings?.wallpaperLock || 'Theme/Picture/Fluent-1.png';
+        const previewWallpaper = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeWallpaperPreview === 'function'
+            ? BootScreen.getOobeWallpaperPreview(lockWallpaper)
+            : lockWallpaper;
 
         if (this.backgroundElement) {
-            this.backgroundElement.style.backgroundImage = `url('${lockWallpaper}')`;
+            this.backgroundElement.style.backgroundImage = `url('${previewWallpaper}')`;
         }
     },
 
@@ -1254,6 +1313,9 @@ const OOBE = {
         this.element.classList.toggle('oobe-theme-light', !isDark);
         document.body.classList.toggle('oobe-dark-dialog-mode', isDark && !this.element.classList.contains('hidden'));
         const accent = String(this.selectedAccentColor || '#0078d4');
+        const previewWallpaper = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeWallpaperPreview === 'function'
+            ? BootScreen.getOobeWallpaperPreview(this.selectedWallpaper)
+            : this.selectedWallpaper;
         const rgb = State && typeof State.hexToRgb === 'function'
             ? State.hexToRgb(accent)
             : { r: 0, g: 120, b: 212 };
@@ -1265,14 +1327,14 @@ const OOBE = {
             host.classList.toggle('window-blur-on', this.selectedWindowBlur);
             host.classList.toggle('window-blur-off', !this.selectedWindowBlur);
             host.style.setProperty('--oobe-preview-accent', accent);
-            if (wallpaperEl) wallpaperEl.style.backgroundImage = `url('${this.selectedWallpaper}')`;
+            if (wallpaperEl) wallpaperEl.style.backgroundImage = `url('${previewWallpaper}')`;
             if (windowEl) windowEl.setAttribute('data-material', this.selectedWindowBlur ? 'glass' : 'solid');
         });
 
         const fingoPreview = this.element.querySelector('.oobe-live-fingo');
         if (fingoPreview) {
-            fingoPreview.style.setProperty('--oobe-preview-bg', `url('${this.selectedWallpaper}')`);
-            fingoPreview.querySelector('.oobe-live-wallpaper')?.style.setProperty('background-image', `url('${this.selectedWallpaper}')`);
+            fingoPreview.style.setProperty('--oobe-preview-bg', `url('${previewWallpaper}')`);
+            fingoPreview.querySelector('.oobe-live-wallpaper')?.style.setProperty('background-image', `url('${previewWallpaper}')`);
         }
     },
 

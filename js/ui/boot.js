@@ -6,9 +6,11 @@ const BootScreen = {
     hintElement: null,
     CACHE_KEY: 'fluentos.assets_cached',
     RESOURCE_CACHE_NAME: 'fluentos-resource-pack-v1',
-    FAST_DURATION: 4000,
+    RESOURCE_META_KEY: 'fluentos.resource-manifest.v1',
+    RETURNING_MIN_DURATION: 800,
+    RETURNING_MAX_DURATION: 1800,
     FIRST_DURATION: 20000,
-    MIN_FIRST_WAIT: 5000,
+    MIN_FIRST_WAIT: 6000,
     FIRST_HINT_AT: 8000,
     _firstBootDone: false,
     _firstBootTimers: [],
@@ -17,6 +19,7 @@ const BootScreen = {
     _hintRotateTimer: null,
     _hintSwitchTimer: null,
     _projectRootUrl: null,
+    _resourceMetadata: null,
 
     init() {
         this.element = document.getElementById('boot-screen');
@@ -52,9 +55,27 @@ const BootScreen = {
         if (shouldShowOobe) {
             this._bootIntoOobeWithEssentialAssets();
         } else {
-            this._preloadAndWarmResourcePackInBackground().catch(() => {});
-            setTimeout(() => this.fadeToLock(), this.FAST_DURATION);
+            this._bootReturningUser();
         }
+    },
+
+    async _bootReturningUser() {
+        const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+        const pack = this._buildPriorityAssets();
+        const criticalReady = (async () => {
+            await this._pruneRemovedIncrementalAssets();
+            await this._preloadGroupIncremental(pack.lockWallpapers, 4);
+            await this._warmCachedGroup(pack.lockWallpapers, 2);
+        })().catch(() => {});
+
+        // Keep the logo visible briefly, but never hold a returning user for a fixed 4 seconds.
+        await Promise.race([
+            Promise.all([wait(this.RETURNING_MIN_DURATION), criticalReady]),
+            wait(this.RETURNING_MAX_DURATION)
+        ]);
+
+        this.fadeToLock();
+        this._preloadAndWarmResourcePackInBackground({ skipLockWallpapers: true }).catch(() => {});
     },
 
     async _bootIntoOobeWithEssentialAssets() {
@@ -70,7 +91,7 @@ const BootScreen = {
         };
 
         const tryEnterEarly = () => {
-            // 至少等待 5s，并且关键资源完成“缓存 + 解码渲染预热”后才提前进入。
+            // 至少等待 6s，并且关键资源完成“缓存 + 解码渲染预热”后才提前进入。
             if (minWaitReached && essentialsReady) {
                 done();
             }
@@ -101,6 +122,8 @@ const BootScreen = {
         } finally {
             essentialsReady = essentialLoadOk;
             tryEnterEarly();
+            // Non-blocking OOBE icons, app icons and the dark logo follow the critical set.
+            this._preloadOobeSupplementalResources().catch(() => {});
         }
     },
 
@@ -118,7 +141,7 @@ const BootScreen = {
         };
 
         const tryEnterEarly = () => {
-            // 资源下载完并且至少等待了 5s，才允许提前进入锁屏
+            // 资源下载完并且至少等待了 6s，才允许提前进入锁屏
             if (assetsReady && minWaitReached) {
                 done();
             }
@@ -322,26 +345,63 @@ const BootScreen = {
     },
 
     _buildOobeEssentialAssets() {
-        const pack = this._buildPriorityAssets();
-        const oobeIcons = this._uniqAssets([
-            'Theme/Icon/Fluent_logo.png',
-            'Theme/Icon/Fluent_logo_dark.png',
-            ...Array.from(document.querySelectorAll('#oobe-screen img[src]'))
+        const core = this._uniqAssets([
+            'index.html',
+            'css/main.css',
+            'css/animations.css',
+            'css/fluent-ui.css',
+            'css/oobe.css',
+            'js/core/csp.js',
+            'js/core/storage.js',
+            'js/core/state.js',
+            'js/core/i18n.js',
+            'js/core/fluent-ui.js',
+            'js/core/resource-manifest.js',
+            'js/ui/boot.js',
+            'js/ui/oobe.js'
+        ]);
+        const wallpapers = Array.from({ length: 6 }, (_, i) =>
+            `Theme/Preload/OOBE/wallpapers/Fluent-${i + 1}.jpg`
+        );
+        const avatars = [
+            'Theme/Preload/OOBE/avatars/UserAva.jpg',
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Preload/OOBE/avatars/${i + 1}.jpg`)
+        ];
+        const illustrations = this._uniqAssets(
+            Array.from(document.querySelectorAll('img[src^="Theme/illustrations/"]'))
                 .map((img) => img.getAttribute('src'))
-                .filter((src) => src && src.startsWith('Theme/Icon/'))
-        ]);
-        const illustrations = this._uniqAssets([
-            'Theme/illustrations/language-and-region.svg',
-            'Theme/illustrations/profile-data.svg',
-            'Theme/illustrations/password.svg'
-        ]);
+        );
 
         return {
-            lockWallpapers: pack.lockWallpapers,
-            avatars: pack.avatars,
-            icons: oobeIcons,
+            core,
+            wallpapers,
+            avatars,
+            icons: ['Theme/Icon/Fluent_logo.png'],
             illustrations
         };
+    },
+
+    _buildOobeSupplementalAssets() {
+        const appIcons = Array.isArray(window.Desktop?.apps)
+            ? Desktop.apps.map((app) => app.icon).filter(Boolean)
+            : [];
+        const referencedIcons = Array.from(document.querySelectorAll('#oobe-screen img[src^="Theme/Icon/"]'))
+            .map((img) => img.getAttribute('src'));
+        return this._uniqAssets([
+            'Theme/Icon/Fluent_logo_dark.png',
+            ...appIcons,
+            ...referencedIcons
+        ]).filter((src) => src !== 'Theme/Icon/Fluent_logo.png');
+    },
+
+    getOobeWallpaperPreview(src) {
+        const match = String(src || '').match(/^Theme\/Picture\/Fluent-([1-6])\.(?:png|jpe?g)$/i);
+        return match ? `Theme/Preload/OOBE/wallpapers/Fluent-${match[1]}.jpg` : src;
+    },
+
+    getOobeAvatarPreview(src) {
+        const match = String(src || '').match(/^Theme\/Profile_img\/(UserAva|[1-9]|10)\.(?:png|jpe?g)$/i);
+        return match ? `Theme/Preload/OOBE/avatars/${match[1]}.jpg` : src;
     },
 
     _buildOobeDeferredAssets() {
@@ -386,6 +446,126 @@ const BootScreen = {
         }
     },
 
+    async _fetchAndCacheAssetFromBrowserCache(src) {
+        try {
+            const assetUrl = this._assetUrl(src);
+            if (!assetUrl) return false;
+            const cache = await this._getResourceCache();
+            const cached = cache ? await cache.match(assetUrl) : null;
+            if (cached) return true;
+            const response = await fetch(assetUrl, { cache: 'force-cache' });
+            if (!response || !response.ok) return false;
+            if (cache) await cache.put(assetUrl, response.clone());
+            return true;
+        } catch (_) {
+            return false;
+        }
+    },
+
+    async _preloadOobeGroupWithResult(assets, concurrency = 6) {
+        if (!assets.length) return true;
+        let index = 0;
+        let allOk = true;
+        const workers = Array.from({ length: Math.min(concurrency, assets.length) }, async () => {
+            while (index < assets.length) {
+                const ok = await this._fetchAndCacheAssetFromBrowserCache(assets[index++]);
+                if (!ok) allOk = false;
+            }
+        });
+        await Promise.all(workers);
+        return allOk;
+    },
+
+    _getResourceManifest() {
+        const manifest = globalThis.FluentOSResourceManifest;
+        return manifest && typeof manifest === 'object' ? manifest : { systemVersion: '', resources: {} };
+    },
+
+    _getResourceRevision(src) {
+        const normalized = this._toRelativeAsset(src);
+        const resources = this._getResourceManifest().resources || {};
+        return normalized ? (resources[normalized] || '') : '';
+    },
+
+    _loadResourceMetadata() {
+        if (this._resourceMetadata) return this._resourceMetadata;
+        try {
+            const parsed = JSON.parse(localStorage.getItem(this.RESOURCE_META_KEY) || '{}');
+            this._resourceMetadata = {
+                systemVersion: String(parsed.systemVersion || ''),
+                resources: parsed.resources && typeof parsed.resources === 'object' ? parsed.resources : {}
+            };
+        } catch (_) {
+            this._resourceMetadata = { systemVersion: '', resources: {} };
+        }
+        return this._resourceMetadata;
+    },
+
+    _saveResourceMetadata() {
+        const metadata = this._loadResourceMetadata();
+        metadata.systemVersion = String(this._getResourceManifest().systemVersion || '');
+        try {
+            localStorage.setItem(this.RESOURCE_META_KEY, JSON.stringify(metadata));
+        } catch (_) {
+            // Cache metadata is an optimization; startup must continue if storage is unavailable.
+        }
+    },
+
+    async _fetchAndCacheAssetIncremental(src) {
+        try {
+            const normalized = this._toRelativeAsset(src);
+            const assetUrl = this._assetUrl(src);
+            if (!normalized || !assetUrl) return false;
+
+            const cache = await this._getResourceCache();
+            const cached = cache ? await cache.match(assetUrl) : null;
+            const revision = this._getResourceRevision(normalized);
+            const metadata = this._loadResourceMetadata();
+            const cachedRevision = String(metadata.resources[normalized] || '');
+
+            // Migration path: an existing Cache Storage entry is adopted without a second request.
+            // From this release onward, its file revision is tracked for exact incremental updates.
+            if (cached && (!revision || !cachedRevision || cachedRevision === revision)) {
+                if (revision && cachedRevision !== revision) metadata.resources[normalized] = revision;
+                return true;
+            }
+
+            // Only a missing file or a file whose own revision changed reaches the network.
+            const response = await fetch(assetUrl, { cache: 'no-cache' });
+            if (!response || !response.ok) return false;
+            if (cache) await cache.put(assetUrl, response.clone());
+            if (revision) metadata.resources[normalized] = revision;
+            return true;
+        } catch (_) {
+            return false;
+        }
+    },
+
+    async _pruneRemovedIncrementalAssets() {
+        const metadata = this._loadResourceMetadata();
+        const resources = this._getResourceManifest().resources || {};
+        const removed = Object.keys(metadata.resources).filter((src) => !resources[src]);
+        if (!removed.length) return;
+        const cache = await this._getResourceCache();
+        await Promise.all(removed.map(async (src) => {
+            const assetUrl = this._assetUrl(src);
+            if (cache && assetUrl) await cache.delete(assetUrl);
+            delete metadata.resources[src];
+        }));
+    },
+
+    async _preloadGroupIncremental(assets, concurrency = 6) {
+        if (!assets.length) return;
+        let index = 0;
+        const workers = Array.from({ length: Math.min(concurrency, assets.length) }, async () => {
+            while (index < assets.length) {
+                await this._fetchAndCacheAssetIncremental(assets[index++]);
+            }
+        });
+        await Promise.all(workers);
+        this._saveResourceMetadata();
+    },
+
     async _decodeImageAsset(src) {
         return new Promise((resolve) => {
             const assetUrl = this._assetUrl(src);
@@ -412,6 +592,51 @@ const BootScreen = {
                 });
             }
         });
+    },
+
+    async _decodeCachedImageAsset(src) {
+        try {
+            const assetUrl = this._assetUrl(src);
+            if (!assetUrl) return false;
+            const cache = await this._getResourceCache();
+            const response = cache ? await cache.match(assetUrl) : null;
+            if (!response) return this._decodeImageAsset(src);
+
+            const objectUrl = URL.createObjectURL(await response.blob());
+            try {
+                return await new Promise((resolve) => {
+                    let settled = false;
+                    const finish = (ok) => {
+                        if (settled) return;
+                        settled = true;
+                        resolve(ok);
+                    };
+                    const img = new Image();
+                    img.decoding = 'async';
+                    img.onload = () => finish(true);
+                    img.onerror = () => finish(false);
+                    img.src = objectUrl;
+                    if (typeof img.decode === 'function') {
+                        img.decode().then(() => finish(true)).catch(() => {});
+                    }
+                });
+            } finally {
+                URL.revokeObjectURL(objectUrl);
+            }
+        } catch (_) {
+            return false;
+        }
+    },
+
+    async _warmCachedGroup(assets, concurrency = 6) {
+        if (!assets.length) return;
+        let index = 0;
+        const workers = Array.from({ length: Math.min(concurrency, assets.length) }, async () => {
+            while (index < assets.length) {
+                await this._decodeCachedImageAsset(assets[index++]);
+            }
+        });
+        await Promise.all(workers);
     },
 
     async _preloadGroup(assets, concurrency = 6) {
@@ -480,24 +705,29 @@ const BootScreen = {
         await this._preloadGroup(pack.icons, 8);              // 4. 各类图标
     },
 
-    async _preloadAndWarmResourcePackInBackground() {
+    async _preloadAndWarmResourcePackInBackground(options = {}) {
         if (this._backgroundWarmPromise) return this._backgroundWarmPromise;
 
         this._backgroundWarmPromise = (async () => {
             const pack = this._buildPriorityAssets();
 
+            await this._pruneRemovedIncrementalAssets();
+
             // 优先保障锁屏首帧资源，再继续预热其余资源。
-            await this._preloadGroup(pack.lockWallpapers, 4);
-            await this._warmRenderGroup(pack.lockWallpapers, 2);
+            if (!options.skipLockWallpapers) {
+                await this._preloadGroupIncremental(pack.lockWallpapers, 4);
+                await this._warmCachedGroup(pack.lockWallpapers, 2);
+            }
 
-            await this._preloadGroup(pack.avatars, 2);
-            await this._warmRenderGroup(pack.avatars, 2);
+            await this._preloadGroupIncremental(pack.avatars, 2);
+            await this._warmCachedGroup(pack.avatars, 2);
 
-            await this._preloadGroup(pack.icons, 8);
-            await this._warmRenderGroup(pack.icons, 6);
+            await this._preloadGroupIncremental(pack.icons, 8);
+            await this._warmCachedGroup(pack.icons, 6);
 
-            await this._preloadGroup(pack.desktopWallpapers, 4);
-            await this._warmRenderGroup(pack.desktopWallpapers, 2);
+            await this._preloadGroupIncremental(pack.desktopWallpapers, 4);
+            await this._warmCachedGroup(pack.desktopWallpapers, 2);
+            this._saveResourceMetadata();
         })().finally(() => {
             this._backgroundWarmPromise = null;
         });
@@ -507,26 +737,34 @@ const BootScreen = {
 
     async _preloadOobeEssentialResources() {
         const pack = this._buildOobeEssentialAssets();
-        const lockOk = await this._preloadGroupWithResult(pack.lockWallpapers, 4); // 必要：锁屏壁纸
-        const avatarOk = await this._preloadGroupWithResult(pack.avatars, 2);       // 必要：用户头像
-        const iconOk = await this._preloadGroupWithResult(pack.icons, 8);           // 必要：OOBE 图标 + Logo
-        const illustrationOk = await this._preloadGroupWithResult(pack.illustrations, 3);
-        return lockOk && avatarOk && iconOk && illustrationOk;
+        // Strict priority: these groups are the only resources that gate OOBE entry.
+        const coreOk = await this._preloadOobeGroupWithResult(pack.core, 6);
+        const illustrationOk = await this._preloadOobeGroupWithResult(pack.illustrations, 3);
+        const logoOk = await this._preloadOobeGroupWithResult(pack.icons, 1);
+        const wallpaperOk = await this._preloadOobeGroupWithResult(pack.wallpapers, 4);
+        const avatarOk = await this._preloadOobeGroupWithResult(pack.avatars, 4);
+        return coreOk && illustrationOk && logoOk && wallpaperOk && avatarOk;
     },
 
     async _warmRenderOobeEssentialResources() {
         const pack = this._buildOobeEssentialAssets();
-        const lockOk = await this._warmRenderGroupWithResult(pack.lockWallpapers, 2);
-        const avatarOk = await this._warmRenderGroupWithResult(pack.avatars, 2);
-        const iconOk = await this._warmRenderGroupWithResult(pack.icons, 6);
+        const wallpaperOk = await this._warmRenderGroupWithResult(pack.wallpapers, 3);
+        const avatarOk = await this._warmRenderGroupWithResult(pack.avatars, 4);
+        const iconOk = await this._warmRenderGroupWithResult(pack.icons, 1);
         const illustrationOk = await this._warmRenderGroupWithResult(pack.illustrations, 3);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        return lockOk && avatarOk && iconOk && illustrationOk;
+        return wallpaperOk && avatarOk && iconOk && illustrationOk;
+    },
+
+    async _preloadOobeSupplementalResources() {
+        const icons = this._buildOobeSupplementalAssets();
+        await this._preloadOobeGroupWithResult(icons, 8);
+        await this._warmRenderGroup(icons, 6);
     },
 
     async _preloadOobeDeferredResources() {
         const pack = this._buildOobeDeferredAssets();
-        await this._preloadGroup(pack.desktopWallpapers, 4); // OOBE 中继续加载桌面壁纸
+        await this._preloadOobeSupplementalResources();
         await this._preloadGroup(pack.icons, 8);             // OOBE 中继续加载其余图标
         await this._preloadGroup(pack.aiScripts, 2);         // OOBE 中缓存 AI 组件脚本
     },
