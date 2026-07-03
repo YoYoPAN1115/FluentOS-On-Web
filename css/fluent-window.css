@@ -55,6 +55,21 @@ body.dark-mode.window-blur-disabled .window.fw-host,
     background: rgba(34, 34, 34, 0.72) !important;
 }
 
+/* 全局模糊与窗口模糊同时关闭时，主窗口退化为无模糊的不透明卡片。 */
+body.blur-disabled.window-blur-disabled .window,
+body.blur-disabled.window-blur-disabled .window.fw-host[data-app-id] {
+    background: var(--bg-primary, #f3f3f3) !important;
+    background-color: var(--bg-primary, #f3f3f3) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.dark-mode.blur-disabled.window-blur-disabled .window,
+body.dark-mode.blur-disabled.window-blur-disabled .window.fw-host[data-app-id] {
+    background: #202020 !important;
+    background-color: #202020 !important;
+}
+
 /* 副卡片材质切换：开启窗口模糊时为有色半透明，关闭时为不透明实色。 */
 body.window-blur-enabled .fw-frame {
     --fw-card-bg: rgba(255, 255, 255, 0.42);
