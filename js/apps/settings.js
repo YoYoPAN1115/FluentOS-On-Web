@@ -10,6 +10,9 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-03', version: '2.0.260703', commits: [
+            { hash: '22a89c6', title: '进一步优化小组件体验，新增横向自适应位置调整' }
+        ] },
         { date: '2026-07-02', version: '2.0.260702', commits: [
             { hash: 'ca4ffa9', title: '完成开机流程优化，大幅提高开机速度' },
             { hash: '8c6364f', title: '完善浏览器 App、收藏与搜索小组件联动，优化交互细节并修复已知 BUG' },

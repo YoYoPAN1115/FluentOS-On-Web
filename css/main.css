@@ -700,30 +700,6 @@ body.button-glow-enabled .pin-toggle.button-glow-target {
     z-index: 100;
 }
 
-.desktop-watermark {
-    position: absolute;
-    right: 18px;
-    bottom: 20px;
-    max-width: 310px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    line-height: 1.45;
-    text-align: right;
-    pointer-events: none;
-    z-index: 50;
-}
-
-.desktop-watermark-title {
-    font-weight: 600;
-    margin-bottom: 4px;
-    letter-spacing: 0.2px;
-}
-
-.desktop-watermark-desc {
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 11px;
-}
-
 .desktop-wallpaper {
     position: absolute;
     inset: 0;
