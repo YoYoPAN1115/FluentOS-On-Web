@@ -1,12 +1,13 @@
-# Fluent OS Web
+# FluentOS-On-Web 2.0
+
+[简体中文](README.md) | [English](README_EN.md)
 
 一个使用纯 HTML + CSS + JavaScript 实现的仿真操作系统界面，采用自制设计语言。
 一个由高中生自主打造的操作系统。
-注意，本操作系统仅利用AI编程技术进行制作，无人工干预调整代码，这里特别鸣谢Claude。
+注意，本操作系统仅利用AI编程技术进行制作，无人工干预调整代码，这里特别鸣谢Codex。
 
 ## 为啥要做这个系统？
-因为本人无聊，哈哈
-其实还有一个原因是因为受够了各种主流操作系统的各种Bug和冗余，一气之下利用AI技术打造一个几乎毫无Bug且速度极快的“梦中OS”
+因为本人想打造一个几乎毫无Bug且速度极快的“梦中OS”，
 
 ## ✨ 特性
 
@@ -17,303 +18,157 @@
 - 📱 响应式设计（最佳体验 ≥1024px）
 - ⚡ 纯原生实现，无任何框架依赖
 
-## 🎯 核心功能
+当前系统版本：`2.0.260703.1`（以 `js/core/resource-manifest.js` 为准）。
 
-### 系统核心
-- ✅ 开机动画
-- ✅ 锁屏界面（实时时钟、壁纸）
-- ✅ 登录系统（PIN认证，默认：1234）
-- ✅ 桌面环境（图标、壁纸、右键菜单）
+> FluentOS-On-Web 是 Web 桌面模拟项目，不是真正的操作系统。文件、设置与“安装的应用”主要保存在当前浏览器中，不能访问或管理宿主系统的真实账户、进程和完整文件系统。
 
-### 任务栏
-- ✅ 居中半透明亚克力设计
-- ✅ 固定应用图标
-- ✅ 运行状态指示
-- ✅ 开始菜单
-- ✅ 控制中心
-- ✅ 通知中心
-- ✅ 系统时间显示
+## 主要能力
 
-### 开始菜单
-- ✅ 搜索功能
-- ✅ 固定应用网格
-- ✅ 电源菜单（关机/重启/注销）
-- ✅ Alt键快捷键支持
+- 完整系统流程：资源预载、OOBE 首次设置、锁屏、PIN 登录、桌面、关机/重启/注销。
+- Fluent 风格外观：浅色/深色主题、强调色、壁纸取色、玻璃材质、模糊、动画与按钮光效。
+- 桌面与任务栏：图标选择和拖放、开始菜单、搜索、快捷设置、通知中心、任务视图及应用切换。
+- 窗口管理：拖动、八方向缩放、最小化、最大化、层级管理、边缘贴靠、悬停布局、位置记忆和后台冻结。
+- 桌面与锁屏小组件：天气、时钟、日历、照片、媒体、便笺、搜索、收藏、新闻、农历、快递、节假日等。
+- 本地状态：设置、会话、虚拟文件系统、桌面布局、通知与应用使用记录均可持久化。
+- 中英文界面：由 `I18n` 和全局 `t()` 函数提供运行时翻译。
+- Fingo 助手：内置本地指令，也可配置 OpenAI 或 SiliconFlow 兼容接口。
+- 灵翼交互：按需加载 MediaPipe，通过摄像头手势控制部分系统交互。
+- App Shop：管理内置应用与第三方 Web/PWA 目录；第三方应用在独立 iframe 窗口中运行。
 
-### 控制中心
-- ✅ Wi-Fi/蓝牙开关
-- ✅ 深浅色主题切换
-- ✅ 模糊效果开关
-- ✅ 动画效果开关
-- ✅ 音量调节
-- ✅ 亮度调节
+## 内置应用
 
-### 通知中心
-- ✅ 通知列表
-- ✅ 单条/批量清除
-- ✅ 时间显示
-- ✅ 全局 notify() API
+| 应用 | 主要功能 |
+| --- | --- |
+| 文件 | 虚拟目录、搜索、面包屑导航、回收站、外部文件导入与应用间文件打开 |
+| 设置 | 账户、网络、个性化、应用、多任务、时间与语言、隐私、Fingo、实验室及开发者选项 |
+| 计算器 | 标准/专业计算、历史记录和键盘输入 |
+| 记事本 | 多标签富文本编辑、虚拟文件读写、外部文本导入、HTML 导出和大字报模式 |
+| 浏览器 | 多标签页、地址搜索、历史记录与收藏站点；页面实际由 iframe 加载 |
+| 时钟 | 计时器、秒表、世界时钟和日历 |
+| 天气 | 城市搜索、定位、实时天气与预报，数据来自 Open-Meteo 等在线服务 |
+| 相机 | 摄像头预览、拍照、录像及媒体保存，需要浏览器授权 |
+| 照片 | Bing/本地/收藏图库、查看、缩放、旋转、翻转、调整、下载与设置壁纸 |
+| 媒体 | 本地媒体库、播放队列、播放列表、Media Session 与播放状态恢复 |
+| App Shop | 内置应用管理及第三方 Web 应用目录 |
 
-### 内置应用
+## 快速开始
 
-#### 📁 文件管理器
-- 树形文件系统
-- 快速访问（桌面/文档/下载/回收站）
-- 面包屑导航
-- 后退/前进功能
-- 文件搜索
+项目没有 npm 依赖、打包器或编译步骤。建议通过本地 HTTP 服务运行；直接双击 `index.html` 会使 `fetch`、模块资源和部分浏览器权限受到 `file://` 限制。
 
-#### ⚙️ 设置
-- **个性化**
-  - 桌面壁纸切换
-  - 锁屏壁纸切换
-  - 主题切换（浅色/深色/自动）
-  - 模糊效果开关
-  - 动画效果开关
-  - 窗口模糊开关（毛玻璃/纯色底）
-- **系统**
-  - 修改PIN
-  - 语言设置
-- **关于**
-  - 版本信息
-  - 技术栈
-  - 开源许可证
-
-#### 🔢 计算器
-- 基础四则运算
-- 百分比计算
-- 键盘支持
-- 清空/退格功能
-
-#### 📝 记事本（富文本编辑器）
-- **文件操作**
-  - 打开外部文件（.txt / .html）
-  - 保存到文件系统
-  - 导出HTML文档
-- **富文本编辑**
-  - 字体大小调整（12px - 48px）
-  - 字体颜色选择
-  - 文本高亮
-  - 加粗、斜体、下划线
-  - 左对齐、居中、右对齐
-- **大字报模式**
-  - 全屏展示
-  - 自动滚动播放
-  - 适合演讲展示
-- **用户体验**
-  - 实时字符统计
-  - Ctrl+S 快捷保存
-  - ESC 退出大字报
-
-### 窗口管理
-- ✅ 可拖拽窗口
-- ✅ 最小化（非线性动画到任务栏）
-- ✅ 最大化/还原（非线性缩放动画）
-- ✅ 关闭（淡出动画）
-- ✅ 双击标题栏最大化
-- ✅ 窗口层级管理（z-index）
-- ✅ 任务栏集成
-- ✅ 窗口模糊/纯色底切换
-
-## 🚀 快速开始
-
-### 运行项目
-
-1. 直接打开 `index.html` 文件即可运行
-2. 或使用本地服务器：
-   ```bash
-   # 使用 Python
-   python -m http.server 8000
-   
-   # 使用 Node.js
-   npx http-server
-   ```
-
-3. 在浏览器中访问
-
-### 默认登录信息
-
-- **PIN**: `1234`
-
-## 📁 项目结构
-
-```
-Fluent OS 3.0/
-├── index.html              # 主页面
-├── css/
-│   ├── main.css           # 主样式
-│   └── animations.css     # 动画样式
-├── js/
-│   ├── core/
-│   │   ├── storage.js     # localStorage管理
-│   │   └── state.js       # 全局状态管理
-│   ├── ui/
-│   │   ├── boot.js        # 开机屏幕
-│   │   ├── lockscreen.js  # 锁屏
-│   │   ├── login.js       # 登录
-│   │   ├── desktop.js     # 桌面
-│   │   ├── taskbar.js     # 任务栏
-│   │   ├── startmenu.js   # 开始菜单
-│   │   ├── controlcenter.js # 控制中心
-│   │   ├── notification-compact.js  # 通知中心
-│   │   └── window.js      # 窗口管理
-│   ├── apps/
-│   │   ├── files.js       # 文件管理器
-│   │   ├── settings.js    # 设置
-│   │   ├── calculator.js  # 计算器
-│   │   └── notes.js       # 记事本
-│   └── main.js            # 主入口
-└── Theme/
-    ├── Icon/              # 图标资源
-    │   ├── App_icon/     # 应用图标
-    │   ├── Symbol_icon/  # 符号图标
-    │   │   ├── stroke/   # 线性图标
-    │   │   └── fill/     # 填充图标
-    │   ├── Fluent_logo.png
-    │   └── UserAva.png
-    └── Picture/          # 壁纸资源
-        ├── Fluent-1.png
-        ├── Fluent-2.png
-        └── ...
+```powershell
+# 在项目根目录启动，任选一种
+python -m http.server 8000
+npx http-server . -p 8000
 ```
 
-## 🎨 设计规范
+然后访问 <http://localhost:8000/>。
 
-### 视觉风格
-- **圆角**: 16-20px
-- **阴影**: md/2xl 多层次阴影
-- **模糊**: backdrop-blur 8-12px
-- **字体**: 系统默认 (-apple-system, Segoe UI, Roboto, Noto Sans SC)
-- **字重**: 400/600
+首次打开会进入 OOBE。若首次设置数据不存在，系统会引导选择语言、壁纸、账户头像等；默认设置中的 PIN 为 `1234`，之后可在设置中修改。
 
-### 动画
-- **过渡时间**: 180-220ms
-- **缓动**: ease-out, cubic-bezier
-- **开机动画**: 2-3s
-- **窗口动画**:
-  - 打开: 250ms cubic-bezier(0.4, 0, 0.2, 1)
-  - 关闭: 250ms cubic-bezier(0.4, 0, 1, 1)
-  - 最大化/还原: 300ms cubic-bezier(0.4, 0, 0.2, 1)
-  - 最小化: 400ms cubic-bezier(0.4, 0, 0.6, 1)
+### 浏览器与权限
 
-### 颜色系统
-- **浅色模式**: #f3f3f3 背景，#1f1f1f 文字
-- **深色模式**: #202020 背景，#ffffff 文字
-- **强调色**: #0078d4 (浅色) / #60cdff (深色)
+推荐使用最新版 Chromium 系浏览器。Firefox/Safari 可运行大部分界面，但文件选择、媒体会话、全屏和摄像头行为可能不同。
 
-## ⌨️ 快捷键
+- 摄像头、剪贴板、定位、全屏和文件选择器由浏览器控制；通常要求 `localhost` 或 HTTPS，并需要用户授权。
+- 天气、Bing 壁纸、小组件、Fingo 自定义模型和灵翼依赖网络及第三方服务。
+- 某些站点通过 `X-Frame-Options` 或 CSP 禁止 iframe 嵌入，因此 App Shop 或浏览器中的对应页面可能无法显示。这不是 FluentOS 能绕过的限制。
+- Fingo API Key 属于敏感信息。优先选择临时保存；永久模式使用浏览器端加密，但仍不应在不可信设备上配置。
 
-- `Alt` / `Meta`: 打开/关闭开始菜单
-- `Esc`: 关闭当前弹窗
-- `Enter`: 提交登录
-- `Ctrl+S`: 保存记事本（在记事本应用中）
-- `ESC`: 退出大字报模式（在记事本大字报模式中）
-- Alt+F：打开 Fingo AI
-- Alt+I：快速打开设置
-- Alt+L：快速锁屏
-- Alt+E：打开文件 App
-- Alt+A：打开控制中心
-- Alt+D：一键最小化所有窗口
-- Alt+M：最小化当前置顶窗口
-- Alt+W：打开任务视图
-- 双击窗口标题栏：最大化/还原窗口
+## 常用快捷键
 
-## 🔧 API 接口
+快捷键仅在桌面视图生效，且会避开 `Ctrl`/`Meta` 组合。
 
-### 全局通知
+| 快捷键 | 操作 |
+| --- | --- |
+| `Alt` | 打开或关闭开始菜单 |
+| `Alt+F` | 打开或关闭 Fingo |
+| `Alt+I` | 打开设置 |
+| `Alt+L` | 锁屏 |
+| `Alt+E` | 打开文件应用 |
+| `Alt+A` | 打开或关闭控制中心 |
+| `Alt+C` | 打开应用切换器；继续按可循环切换 |
+| `Alt+D` | 最小化全部窗口 |
+| `Alt+M` | 最小化最上层窗口 |
+| `Alt+W` | 打开或关闭任务视图 |
+| `Esc` | 关闭当前面板、任务视图或编辑状态（视上下文而定） |
+| `Ctrl+A` | 无窗口激活时全选桌面图标 |
+| `Delete` | 无窗口激活时删除选中的桌面项目 |
+| `Ctrl+S` / `Cmd+S` | 在记事本中保存当前草稿 |
+
+## 项目结构
+
+```text
+FluentOS-On-Web 2.0/
+├─ index.html                 # 页面骨架与按顺序加载的样式/脚本
+├─ css/
+│  ├─ main.css               # 系统基础样式、主题令牌与窗口外壳
+│  ├─ fluent-ui.css          # FluentUI 组件与材质
+│  ├─ fluent-window.css      # 应用内部导航框架
+│  ├─ apps-unified.css       # 内置应用共享样式
+│  └─ ...                    # OOBE、开始菜单、通知、小组件等样式
+├─ js/
+│  ├─ core/                  # 存储、状态、国际化、组件、Fingo、灵翼等
+│  ├─ ui/                    # 系统屏幕、桌面、任务栏、窗口与小组件
+│  ├─ apps/                  # 11 个内置应用
+│  ├─ third_parts_apps/      # PWA 加载器与第三方应用目录
+│  └─ main.js                # 初始化、全局快捷键、公开 API 与调试工具
+├─ Theme/
+│  ├─ Icon/                  # 应用图标与 stroke/fill/colour 符号图标
+│  ├─ Picture/               # 内置壁纸
+│  ├─ Profile_img/           # 用户头像
+│  ├─ Preload/               # OOBE 预载资源
+│  └─ illustrations/         # 设置/OOBE 插图
+└─ docs/
+   ├─ DEVELOPER_GUIDE.md     # 架构、数据、扩展与调试
+   └─ fluent-ui-guide.md     # 设计令牌和组件 API
+```
+
+## 数据与隐私
+
+核心数据保存在当前站点源的 `localStorage` 中：
+
+| 键 | 内容 |
+| --- | --- |
+| `fluentos.settings` | 主题、用户资料、窗口行为、Fingo 与实验设置 |
+| `fluentos.session` | 登录状态与登录尝试 |
+| `fluentos.fs` | 虚拟文件系统；大体积内联内容会被主动移除以保护启动性能 |
+| `fluentos.desktopLayout` | 桌面图标布局 |
+| `fluentos.appUsage` | 应用使用时间 |
+| `fluentos.notifications` | 通知列表 |
+
+照片与媒体应用还会使用 IndexedDB 保存较大的 Blob，另有少量模块专用的 `localStorage` 键。清除站点数据将重置系统，也会删除虚拟文件和媒体库；重要内容请先导出。
+
+## 开发与调试
+
+浏览器控制台公开了 `FluentOS`：
+
 ```javascript
-notify('标题', '消息内容', 'info|success|error');
-```
-
-### FluentOS API
-```javascript
-// 打开应用
+FluentOS.version;
 FluentOS.openApp('files');
-
-// 主题切换
 FluentOS.setTheme('dark');
 FluentOS.toggleTheme();
-
-// 系统控制
-FluentOS.restart();
-FluentOS.shutdown();
-FluentOS.logout();
-
-// 调试工具
-FluentOS.debug.clearStorage();     // 清空所有数据
-FluentOS.debug.exportSettings();   // 导出设置
-FluentOS.debug.getState();         // 获取状态
+FluentOS.debug.getState();
+FluentOS.debug.getWindows();
+FluentOS.debug.resources.start();
+FluentOS.debug.resources.summary();
+FluentOS.debug.resources.stop();
 ```
 
-## 📦 数据持久化
+系统控制接口包括 `FluentOS.restart()`、`shutdown()`、`logout()` 和 `closeAllWindows()`。`FluentOS.debug.clearStorage()` 会在确认后清空当前站点的全部本地数据。
 
-所有数据存储在 localStorage 中：
+进一步开发请阅读：
 
-- `fluentos.settings`: 系统设置
-- `fluentos.session`: 会话信息
-- `fluentos.fs`: 文件系统
-- `fluentos.desktopLayout`: 桌面布局
-- `fluentos.notifications`: 通知列表
+- [开发者指南](docs/DEVELOPER_GUIDE.md)
+- [Fluent UI 指南](docs/fluent-ui-guide.md)
 
-## 🔌 扩展开发
+## 参与开发
 
-### 添加新应用
+1. 从功能分支修改代码，不要改变 `index.html` 中脚本的依赖顺序。
+2. 新界面优先复用 `FluentUI`、`FluentWindow`、主题变量和现有图标。
+3. 用户可见文本同时补充 `js/core/i18n.js` 的中文与英文翻译。
+4. 修改资源后同步发布流程中的资源清单；`js/core/resource-manifest.js` 标明为生成文件，不应手工维护哈希。
+5. 至少在浅/深主题、窗口缩放、刷新后持久化和无网络状态下检查改动。
 
-1. 在 `js/apps/` 创建新的应用文件
-2. 实现应用对象：
-```javascript
-const YourApp = {
-    init(windowId) {
-        this.container = document.getElementById(`${windowId}-content`);
-        this.render();
-    },
-    render() {
-        // 渲染应用界面
-    }
-};
-window.YourApp = YourApp;
-```
+## License
 
-3. 在 `WindowManager.appConfigs` 中注册：
-```javascript
-yourapp: {
-    title: '应用名称',
-    icon: 'Theme/Icon/App_icon/yourapp.png',
-    width: 800,
-    height: 600,
-    component: 'YourApp'
-}
-```
-
-4. 在 `Desktop.apps` 中添加桌面图标
-
-5. 在 `index.html` 中引入应用脚本
-
-## 🌟 MVP验收清单
-
-- ✅ 完成 开机→锁屏→登录(1234)→桌面 全链路
-- ✅ 任务栏样式与Fluent Design一致
-- ✅ 开始菜单可开/关
-- ✅ 控制中心、通知中心可打开
-- ✅ 通知可新增/关闭/清空
-- ✅ 文件系统可新建/重命名/删除/回收站/还原，并持久化
-- ✅ 设置可更换桌面/锁屏壁纸、切换深浅色、开关模糊与动画
-- ✅ 关机/重启/注销生效并进入对应状态
-- ✅ 刷新后状态与设置保留
-
-## 📝 开发备注
-
-- 代码采用模块化设计，便于后续扩展
-- 所有Symbol图标支持stroke/fill两种状态
-- 图标交互动画：hover时从stroke切换到fill
-- 窗口系统支持拖拽、最小化、最大化
-- 完整的状态管理和事件系统
-
-## 📄 许可证
-
-MIT License
-
----
-
-**Fluent OS** - 一个优雅的Web操作系统界面 | Made with ❤️
-
+[MIT License](LICENSE)

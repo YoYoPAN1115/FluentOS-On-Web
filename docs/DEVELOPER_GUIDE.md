@@ -1,826 +1,408 @@
-# Fluent OS 开发指南
+# FluentOS-On-Web 2.0 开发者指南
 
-> 版本 1.0.0 | 为 App Shop 应用开发准备
+[简体中文](DEVELOPER_GUIDE.md) | [English](DEVELOPER_GUIDE_EN.md)
 
----
+本文面向需要理解、调试或扩展 FluentOS-On-Web 的开发者。当前代码是传统浏览器脚本架构：没有 npm 运行时依赖、ES Module、构建产物或前端框架，模块通过 `index.html` 按顺序加载并把对象放到全局作用域。
 
-## 目录
+使用说明见[项目 README](../README.md)，视觉和组件细节见 [Fluent UI 指南](fluent-ui-guide.md)。
 
-1. [系统架构概览](#系统架构概览)
-2. [核心 API](#核心-api)
-3. [FluentUI 组件库](#fluentui-组件库)
-4. [窗口管理](#窗口管理)
-5. [状态管理](#状态管理)
-6. [文件系统](#文件系统)
-7. [国际化](#国际化)
-8. [主题与样式](#主题与样式)
-9. [应用开发规范](#应用开发规范)
-10. [最佳实践](#最佳实践)
+## 1. 运行与开发基线
 
----
+在仓库根目录启动静态服务器：
 
-## 系统架构概览
-
-```
-Fluent OS
-├── js/
-│   ├── core/           # 核心模块
-│   │   ├── state.js    # 状态管理
-│   │   ├── fluent-ui.js # UI 组件库
-│   │   └── i18n.js     # 国际化
-│   ├── ui/             # 系统 UI
-│   │   ├── desktop.js  # 桌面
-│   │   ├── taskbar.js  # 任务栏
-│   │   ├── windowmanager.js # 窗口管理器
-│   │   └── controlcenter.js # 控制中心
-│   └── apps/           # 系统应用
-├── css/
-│   ├── main.css        # 主样式
-│   └── fluent-ui.css   # 组件样式
-└── Theme/              # 主题资源
-    ├── Icon/           # 图标
-    └── Picture/        # 壁纸
+```powershell
+python -m http.server 8000
+# 或
+npx http-server . -p 8000
 ```
 
----
+打开 <http://localhost:8000/>，并使用浏览器开发者工具调试。不要以 `file://` 作为开发基线：资源预载、远程请求、摄像头、剪贴板和文件选择器会表现不同。
 
-## 核心 API
+项目当前没有自动化测试或 lint 配置。提交前至少执行 JavaScript 语法检查并进行浏览器冒烟测试：
 
-### State（状态管理）
+```powershell
+Get-ChildItem js -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
+```
 
-全局状态对象，管理系统设置、文件系统和事件。
+## 2. 架构总览
+
+```text
+index.html
+  ├─ core: CSP → Storage → State → I18n → 通用服务/组件
+  ├─ ui: Boot/OOBE → 锁屏/登录 → 桌面/面板 → WindowManager → Widgets
+  ├─ apps: 文件、设置、计算器、记事本、浏览器、时钟、天气、相机、照片、媒体
+  ├─ third_parts_apps: PWALoader 与目录
+  ├─ AppShop / Fingo
+  └─ main.js: 初始化、视图切换、快捷键、FluentOS API
+```
+
+### 目录职责
+
+| 目录 | 职责 |
+| --- | --- |
+| `js/core/` | 存储、全局状态、国际化、文件导入、收藏、FluentUI/FluentWindow、Fingo、灵翼和资源清单 |
+| `js/ui/` | 系统级屏幕与外壳：启动、OOBE、桌面、任务栏、开始菜单、控制/通知中心、任务视图、窗口和小组件 |
+| `js/apps/` | 原生应用组件；每个应用由 `WindowManager` 挂载到窗口内容区 |
+| `js/third_parts_apps/` | iframe Web/PWA 注册器与应用目录 |
+| `css/` | 基础令牌、系统外壳、组件、应用共享样式及各大型界面样式 |
+| `Theme/` | 图标、壁纸、头像、预载资源和插图 |
+
+### 脚本加载顺序
+
+全局对象有真实的先后依赖。例如 `State` 依赖 `Storage`，应用依赖 `FluentUI`、`FluentWindow`、`WindowManager` 和 `t()`，`main.js` 则负责把所有对象初始化起来。因此：
+
+- 新核心脚本应放在首个使用它的脚本之前。
+- 新原生应用脚本应在 `js/ui/window.js` 之后、`js/main.js` 之前加载。
+- `js/core/csp.js` 必须尽可能早加载，才能在其他资源执行前恢复严格 CSP。
+- 不要使用 `defer`、`async` 或随意重排脚本，除非同时消除对应的全局依赖。
+
+## 3. 启动与视图生命周期
+
+`State.view` 的主要值为 `boot`、`lock`、`login` 和 `desktop`。`main.js` 监听 `viewChange` 并切换对应屏幕。
+
+首次访问时，OOBE 根据自己的持久化标记决定是否显示；完成后进入系统流程。正常启动由 `BootScreen` 预载资源并进入锁屏。锁屏交互进入登录页，PIN 校验成功后进入桌面。
 
 ```javascript
-// 读取设置
-const theme = State.settings.theme;           // 'light' | 'dark' | 'auto'
-const language = State.settings.language;     // 'zh-CN' | 'en-US'
-const blur = State.settings.enableBlur;       // boolean
-const animation = State.settings.enableAnimation; // boolean
-const fluentV2 = State.settings.enableFluentV2;   // boolean
+State.setView('desktop');
+State.lock();
+State.logout();
+State.restart();
+State.shutdown();
+```
 
-// 更新设置
-State.updateSettings({ theme: 'dark' });
-State.updateSettings({ enableBlur: true, enableAnimation: true });
+这些 API 操作的是 Web UI 状态，不会控制宿主计算机。
 
-// 应用主题
-State.applyTheme();
+## 4. Storage 与 State
 
-// 事件监听
-State.on('settingsChange', (changes) => {
-    console.log('设置已更改:', changes);
-});
+### Storage
 
-State.on('languageChange', () => {
-    // 重新渲染界面
-});
+`Storage` 是 `localStorage` 的 JSON 包装器：
 
-State.on('fsChange', () => {
-    // 文件系统变更
+```javascript
+const settings = Storage.get(Storage.keys.SETTINGS, {});
+Storage.set(Storage.keys.SETTINGS, settings);
+Storage.remove('my.module.key');
+```
+
+核心键：
+
+```javascript
+Storage.keys.SETTINGS;       // fluentos.settings
+Storage.keys.SESSION;        // fluentos.session
+Storage.keys.FS;             // fluentos.fs
+Storage.keys.DESKTOP_LAYOUT; // fluentos.desktopLayout
+Storage.keys.APP_USAGE;      // fluentos.appUsage
+Storage.keys.NOTIFICATIONS;  // fluentos.notifications
+```
+
+`Storage.clear()` 清空当前源的全部 `localStorage`，不只删除上述核心键。不要在普通业务流程调用它。
+
+虚拟文件系统会过滤过大的 Data URL：图片约超过 128 KiB、其他内联数据约超过 2 MiB 时可能移除内容并标记节点。照片和媒体等大对象应写入 IndexedDB/Blob 存储，而不是继续塞入 `fluentos.fs`。
+
+### State
+
+`State` 是运行时唯一状态源，初始化时从 `Storage` 恢复数据：
+
+```javascript
+State.settings;
+State.session;
+State.fs;
+State.desktopLayout;
+State.notifications;
+State.runningApps;
+```
+
+更新设置时必须调用 `updateSettings()`，不要只改对象字段；该方法会保存数据、应用主题/材质等副作用并发出事件。
+
+```javascript
+State.updateSettings({
+    theme: 'dark',
+    accentColor: '#7c3aed',
+    enableAnimation: true
 });
 ```
 
-### 常用设置项
+常用设置包括：
 
-| 设置项 | 类型 | 说明 |
-|--------|------|------|
-| `theme` | string | 主题：`light` / `dark` / `auto` |
-| `language` | string | 语言：`zh-CN` / `en-US` |
-| `enableBlur` | boolean | 启用模糊效果 |
-| `enableAnimation` | boolean | 启用动画 |
-| `enableFluentV2` | boolean | 启用新版 UI |
-| `enableWindowBlur` | boolean | 窗口毛玻璃效果 |
-| `wallpaperDesktop` | string | 桌面壁纸路径 |
-| `bluetoothEnabled` | boolean | 蓝牙开关 |
-| `locationEnabled` | boolean | 位置服务 |
-| `pin` | string | 锁屏 PIN |
+| 字段 | 说明 |
+| --- | --- |
+| `theme` | `light`、`dark` 或现有界面支持的自动策略 |
+| `language` | 当前实现使用 `zh` / `en` |
+| `wallpaperDesktop`, `wallpaperLock` | 桌面与锁屏壁纸 URL/Data URL |
+| `enableBlur`, `enableWindowBlur` | 系统材质与窗口模糊 |
+| `materialType`, `blurIntensity` | 材质类型和模糊强度 |
+| `enableAnimation`, `enableButtonGlowEffect` | 动效和按钮光效 |
+| `accentColor`, `accentColorAuto` | 手动强调色和壁纸自动取色 |
+| `quickWindowSwitchEnabled` | `Alt+C` 应用切换器 |
+| `windowEdgeSnapEnabled`, `windowHoverSnapEnabled` | 窗口贴靠能力 |
+| `tombstoneBackgroundEnabled`, `tombstoneFreezeDelayMs` | 后台窗口冻结策略 |
+| `startPinnedApps` | 开始菜单固定应用 ID 列表 |
+| `enableExternalFileImport` | 是否允许外部文件导入虚拟文件系统 |
+| `strictCspEnabled` | 运行时严格 CSP |
 
----
-
-## FluentUI 组件库
-
-### 按钮 (Button)
+### 事件总线
 
 ```javascript
-// 基础按钮
-FluentUI.Button({
-    text: '确定',
-    variant: 'primary',    // 'primary' | 'secondary' | 'outline' | 'ghost'
-    size: 'medium',        // 'small' | 'medium' | 'large'
-    icon: 'Checkmark',     // 图标名称（可选）
-    iconPosition: 'left',  // 'left' | 'right'
-    disabled: false,
-    loading: false,
-    onClick: () => { /* 点击回调 */ }
-});
+const unsubscribe = State.on('settingsChange', (updates) => {
+    if ('accentColor' in updates) render();
+}, { key: 'MyApp.settings' });
 
-// 图标按钮
-FluentUI.IconButton({
-    icon: 'Settings',
-    title: '设置',
-    size: 'medium',
-    onClick: () => {}
-});
+State.once('languageChange', () => render());
+State.emit('myEvent', { value: 1 });
+unsubscribe();
 ```
 
-### 开关 (Toggle)
+常见系统事件有 `viewChange`、`settingsChange`、`languageChange`、`fsChange`、`notificationAdd`、`notificationRemove`、`notificationsClear`、`appStart`、`appStop`、`appUsageChange`、`weatherDataUpdate` 和 `clockEventsUpdate`。
+
+为长期存在或会重复初始化的组件提供稳定 `key`，并在关闭时退订，避免监听器叠加。
+
+### 虚拟文件系统
+
+标准根目录包含 `desktop`、`documents`、`pictures`、`downloads` 和 `recycle`。使用状态 API 查找和提交修改：
 
 ```javascript
-FluentUI.Toggle({
-    checked: true,
-    disabled: false,
-    onChange: (value) => {
-        console.log('开关状态:', value); // boolean
-    }
-});
+const documents = State.findNode('documents');
+const parent = State.findParentNode('some-node-id');
+
+const nextFS = structuredClone(State.fs);
+// 修改 nextFS...
+State.updateFS(nextFS); // 保存并触发 fsChange
 ```
 
-### 下拉选择 (Select)
+如果直接修改 `State.fs`，仍应调用 `State.updateFS(State.fs)` 完成持久化和通知。文件 ID 必须全局唯一；删除到回收站时保留 `_recycle.originalParentId`，以便恢复。
+
+## 5. 国际化
+
+翻译表位于 `js/core/i18n.js`，当前语言键为 `zh` 和 `en`：
 
 ```javascript
-FluentUI.Select({
-    options: [
-        { value: 'light', label: '浅色' },
-        { value: 'dark', label: '深色' },
-        { value: 'auto', label: '跟随系统' }
-    ],
-    value: 'light',
-    placeholder: '请选择',
-    onChange: (value) => {
-        console.log('选中:', value);
-    }
-});
+const title = t('settings.title');
+const message = t('settings.wallpaper-changed', { type: 'desktop' });
+I18n.setLanguage('en');
 ```
 
-### 滑块 (Slider)
+新增用户可见文本时：
+
+1. 在中英文翻译表加入相同键。
+2. 渲染时调用 `t(key, params)`，不要缓存语言相关字符串。
+3. 应用监听 `languageChange` 并重新渲染或更新文本。
+4. `WindowManager.appConfigs` 优先使用 `titleKey`，窗口标题会自动更新。
+
+缺失翻译会回退到中文，仍缺失时直接显示键名。
+
+## 6. 窗口管理
+
+`WindowManager` 负责窗口创建、聚焦、最小化、最大化、调整尺寸、贴靠、任务栏同步、位置记忆及后台冻结。一个应用 ID 默认只保留一个窗口。
 
 ```javascript
-FluentUI.Slider({
-    min: 0,
-    max: 100,
-    value: 50,
-    step: 1,
-    showValue: true,
-    onChange: (value) => {
-        console.log('当前值:', value);
-    }
-});
-```
-
-### 输入框 (Input)
-
-```javascript
-FluentUI.Input({
-    value: '',
-    placeholder: '请输入...',
-    type: 'text',          // 'text' | 'password' | 'number'
-    disabled: false,
-    onChange: (value) => {},
-    onEnter: (value) => {}
-});
-
-// 搜索框
-FluentUI.SearchBox({
-    placeholder: '搜索...',
-    onSearch: (query) => {}
-});
-```
-
-### 设置项 (SettingItem)
-
-```javascript
-FluentUI.SettingItem({
-    label: '深色模式',
-    description: '在夜间使用深色主题保护眼睛',
-    control: FluentUI.Toggle({
-        checked: State.settings.theme === 'dark',
-        onChange: (v) => State.updateSettings({ theme: v ? 'dark' : 'light' })
-    })
-});
-```
-
-### 对话框 (Dialog)
-
-```javascript
-// 警告/提示/错误对话框
-FluentUI.Dialog({
-    type: 'info',          // 'info' | 'warning' | 'error'
-    title: '提示',          // 可选，默认根据类型显示
-    content: '确定要执行此操作吗？',
-    buttons: [
-        { text: '取消', variant: 'secondary', value: 'cancel' },
-        { text: '确定', variant: 'primary', value: 'ok' }
-    ],
-    closeOnOverlay: true,  // 点击遮罩关闭
-    onClose: (result) => {
-        // result 为点击按钮的 value
-        if (result === 'ok') {
-            // 执行操作
-        }
-    }
-});
-```
-
-### 输入对话框 (InputDialog)
-
-```javascript
-FluentUI.InputDialog({
-    title: '重命名',
-    placeholder: '输入新名称',
-    defaultValue: 'old-name',
-    inputType: 'text',     // 'text' | 'password' | 'number'
-    minLength: 1,
-    maxLength: 50,
-    validateFn: (value) => {
-        if (!value) return '名称不能为空';
-        if (value.includes('/')) return '名称不能包含 /';
-        return true;       // 返回 true 表示验证通过
-    },
-    confirmText: '确定',
-    cancelText: '取消',
-    closeOnOverlay: true,
-    onConfirm: (value) => {
-        console.log('输入值:', value);
-    },
-    onCancel: () => {
-        console.log('已取消');
-    }
-});
-```
-
-### 通知 (Toast)
-
-```javascript
-FluentUI.Toast({
-    title: '保存成功',
-    message: '文件已保存到本地',
-    type: 'success',       // 'info' | 'success' | 'warning' | 'error'
-    duration: 5000,        // 显示时长（毫秒），0 表示不自动关闭
-    onClick: () => {}      // 点击通知回调（可选）
-});
-
-// 返回对象可手动关闭
-const toast = FluentUI.Toast({ ... });
-toast.close();
-```
-
-### 进度条 (Progress)
-
-```javascript
-const progress = FluentUI.Progress({
-    value: 50,
-    max: 100,
-    variant: 'default',    // 'default' | 'success' | 'warning' | 'error'
-    showLabel: true
-});
-
-// 更新进度
-progress.setValue(75);
-```
-
-### 列表 (List)
-
-```javascript
-FluentUI.List({
-    items: [
-        { id: '1', title: '项目1', description: '描述', icon: 'Folder' },
-        { id: '2', title: '项目2', description: '描述', icon: 'Document' }
-    ],
-    onItemClick: (item) => {
-        console.log('点击:', item.id);
-    }
-});
-```
-
-### 卡片 (Card)
-
-```javascript
-FluentUI.Card({
-    title: '卡片标题',
-    content: '卡片内容',
-    footer: FluentUI.Button({ text: '操作' }),
-    onClick: () => {}
-});
-```
-
-### 标签栏 (TabBar)
-
-```javascript
-FluentUI.TabBar({
-    tabs: [
-        { id: 'tab1', label: '标签1', icon: 'Home' },
-        { id: 'tab2', label: '标签2', icon: 'Settings' }
-    ],
-    activeTab: 'tab1',
-    onTabChange: (tabId) => {},
-    onTabClose: (tabId) => {},
-    showAddButton: true,
-    onAddTab: () => {}
-});
-```
-
-### 应用窗口导航 (FluentWindow)
-
-```javascript
-FluentWindow.mount({
-    container: document.getElementById(`${windowId}-content`),
-    items: [
-        { id: 'home', label: '首页', icon: 'Home' },
-        { id: 'settings', label: '设置', icon: 'Settings' }
-    ],
-    activeId: 'home',
-    onNavigate: (pageId, pageEl) => {
-        pageEl.textContent = pageId;
-    }
-});
-```
-
-### 右键菜单 (ContextMenu)
-
-```javascript
-FluentUI.ContextMenu({
-    x: event.clientX,
-    y: event.clientY,
-    items: [
-        { id: 'open', label: '打开', icon: 'Folder Open' },
-        { type: 'separator' },
-        { id: 'delete', label: '删除', icon: 'Trash', danger: true }
-    ],
-    onItemClick: (itemId) => {}
-});
-```
-
-### 空状态 (Empty)
-
-```javascript
-FluentUI.Empty({
-    icon: 'Inbox',
-    title: '暂无数据',
-    description: '还没有任何内容'
-});
-```
-
-### 加载指示器 (Spinner)
-
-```javascript
-FluentUI.Spinner({
-    size: 'medium'         // 'small' | 'medium' | 'large'
-});
-```
-
----
-
-## 窗口管理
-
-### WindowManager
-
-```javascript
-// 打开应用
-WindowManager.openApp('appId', {
-    // 传递给应用的参数
-    fileId: 'xxx'
-});
-
-// 关闭窗口
+WindowManager.openApp('notes');
+WindowManager.openApp('notes', { fileId: 'file-123' });
+WindowManager.toggleWindow('notes');
 WindowManager.closeWindow(windowId);
-
-// 最小化窗口
-WindowManager.minimizeWindow(windowId);
-
-// 最大化窗口
-WindowManager.maximizeWindow(windowId);
-
-// 获取活动窗口
-const activeWindow = WindowManager.getActiveWindow();
 ```
 
-### 系统应用 ID
-
-| 应用 ID | 说明 |
-|---------|------|
-| `settings` | 设置 |
-| `files` | 文件管理器 |
-| `browser` | 浏览器 |
-| `notes` | 记事本 |
-| `calculator` | 计算器 |
-| `clock` | 时钟 |
-| `photos` | 照片 |
-| `music` | 音乐 |
-| `weather` | 天气 |
-| `camera` | 相机 |
-
----
-
-## 文件系统
-
-### 文件节点结构
+应用配置位于 `WindowManager.appConfigs`：
 
 ```javascript
-{
-    id: 'unique-id',
-    name: '文件名',
-    type: 'file',          // 'file' | 'folder' | 'app'
-    icon: 'Document',      // 图标名称
-    modified: '2024-01-01T00:00:00.000Z',
-    content: '文件内容',   // 仅文件
-    children: [],          // 仅文件夹
-    appId: 'settings'      // 仅应用快捷方式
-}
-```
-
-### 文件操作 API
-
-```javascript
-// 查找节点
-const node = State.findNode('node-id');
-
-// 更新文件系统
-State.updateFS(State.fs);
-
-// 特殊文件夹 ID
-// 'desktop' - 桌面
-// 'documents' - 文档
-// 'pictures' - 图片
-// 'music' - 音乐
-// 'recycle' - 回收站
-```
-
----
-
-## 国际化
-
-### 使用方式
-
-```javascript
-// 获取翻译文本
-const text = t('settings.theme');
-
-// 带默认值
-const text = t('settings.custom-key') || '默认文本';
-
-// 切换语言
-State.updateSettings({ language: 'en-US' });
-```
-
-### 添加翻译
-
-在 `js/core/i18n.js` 中添加：
-
-```javascript
-const translations = {
-    'zh-CN': {
-        'app.title': '应用标题',
-        'app.description': '应用描述'
-    },
-    'en-US': {
-        'app.title': 'App Title',
-        'app.description': 'App Description'
-    }
+WindowManager.appConfigs.demo = {
+    titleKey: 'demo.title',
+    icon: 'Theme/Icon/App_icon/demo.png',
+    width: 860,
+    height: 600,
+    minWidth: 520,
+    minHeight: 360,
+    component: 'DemoApp'
 };
 ```
 
----
+原生组件可实现以下生命周期钩子：
 
-## 主题与样式
+| 方法 | 调用时机 |
+| --- | --- |
+| `init(windowId)` | 首次创建窗口后；内容容器 ID 为 `${windowId}-content` |
+| `loadFile(fileId)` | `openApp(id, { fileId })` 时优先调用 |
+| `openData(data)` | 传入其他打开参数时调用 |
+| `beforeClose()` | 关闭前调用；返回 `false` 取消，或返回解析为布尔值的 Promise |
+| `onTombstoneFreeze(windowData)` | 后台冻结时暂停计时器、媒体或网络工作 |
+| `onTombstoneRestore(windowData)` | 窗口恢复时继续工作并刷新过期内容 |
 
-### CSS 变量
+不会取消关闭的应用可在 `beforeClose()` 中解绑全局事件、断开 `ResizeObserver`、停止媒体流并销毁 `FluentWindow` 实例。若应用可能返回 `false`，则应先完成确认，只在确定关闭后执行这些清理。
 
-```css
-/* 颜色 */
---accent: #0078d4;              /* 主题色 */
---bg-primary: #ffffff;          /* 主背景 */
---bg-secondary: #f5f5f5;        /* 次背景 */
---bg-tertiary: #e5e5e5;         /* 第三背景 */
---text-primary: #1a1a1a;        /* 主文字 */
---text-secondary: #666666;      /* 次文字 */
---text-tertiary: #999999;       /* 第三文字 */
---border-color: rgba(0,0,0,0.1); /* 边框色 */
+## 7. 新增原生应用
 
-/* 圆角 */
---radius-sm: 4px;
---radius-md: 8px;
---radius-lg: 12px;
---radius-xl: 16px;
+### 7.1 创建组件
 
-/* 过渡 */
---transition-fast: 0.15s ease;
---transition-normal: 0.25s ease;
---transition-slow: 0.4s ease;
-
-/* V2 模式专用 */
---v2-blur: 40px;
---v2-blur-light: 20px;
---v2-glass-bg: rgba(255, 255, 255, 0.6);
---v2-glass-bg-dark: rgba(30, 30, 30, 0.7);
---v2-glass-border: rgba(255, 255, 255, 0.3);
-```
-
-### 深色模式适配
-
-```css
-/* 自动适配深色模式 */
-.my-element {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-}
-
-/* 深色模式特定样式 */
-.dark-mode .my-element {
-    /* 深色模式样式 */
-}
-
-/* V2 模式适配 */
-body.fluent-v2 .my-element {
-    backdrop-filter: blur(20px);
-}
-
-body.fluent-v2.dark-mode .my-element {
-    /* V2 深色模式 */
-}
-```
-
-### 图标使用
+在 `js/apps/demo.js` 中定义全局组件：
 
 ```javascript
-// 获取图标路径
-const iconPath = FluentUI._utils.getIconPath('Settings');
-// 结果: 'Theme/Icon/Symbol_icon/stroke/Settings.svg'
-
-// 在 HTML 中使用
-`<img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="设置">`
-```
-
-### 常用图标名称
-
-| 图标名称 | 说明 |
-|----------|------|
-| `Home` | 首页 |
-| `Settings` | 设置 |
-| `Folder` | 文件夹 |
-| `Document` | 文档 |
-| `Trash` | 删除 |
-| `Edit` | 编辑 |
-| `Plus Circle` | 添加 |
-| `Cancel` | 关闭/取消 |
-| `Checkmark` | 确认 |
-| `Information Circle` | 信息 |
-| `Exclamation Triangle` | 警告 |
-| `Cancel Circle` | 错误 |
-| `Search` | 搜索 |
-| `Arrow Left/Right/Up/Down` | 箭头 |
-
----
-
-## 应用开发规范
-
-### 应用结构
-
-```javascript
-const MyApp = {
+const DemoApp = {
     windowId: null,
     container: null,
-    
-    // 初始化（必需）
+    frame: null,
+
     init(windowId) {
         this.windowId = windowId;
         this.container = document.getElementById(`${windowId}-content`);
         this.render();
-        
-        // 监听设置变化
-        State.on('settingsChange', () => this.onSettingsChange());
-        State.on('languageChange', () => this.render());
     },
-    
-    // 渲染界面（必需）
+
     render() {
-        this.container.innerHTML = `
-            <div class="my-app">
-                <!-- 应用内容 -->
-            </div>
-        `;
-        this.bindEvents();
+        this.container.replaceChildren(
+            FluentUI.Card({ title: t('demo.title'), content: t('demo.welcome') })
+        );
     },
-    
-    // 绑定事件
-    bindEvents() {
-        // 事件绑定逻辑
+
+    openData(data = {}) {
+        // 已打开时接收新的启动参数
     },
-    
-    // 设置变化回调
-    onSettingsChange() {
-        // 响应设置变化
-    },
-    
-    // 清理（可选）
-    destroy() {
-        // 清理资源
+
+    beforeClose() {
+        this.frame?.destroy();
+        this.frame = null;
+        return true;
     }
 };
 
-// 注册到全局
-window.MyApp = MyApp;
+window.DemoApp = DemoApp;
 ```
 
-### 注册应用
+应用对象是单例；不要假设同一组件存在多个并行实例。
 
-在 `WindowManager` 中注册：
+### 7.2 注册与加载
 
-```javascript
-// js/ui/windowmanager.js
-const appList = {
-    myapp: {
-        title: '我的应用',
-        icon: 'Theme/Icon/apps/myapp.svg',
-        width: 800,
-        height: 600,
-        minWidth: 400,
-        minHeight: 300,
-        init: (windowId) => MyApp.init(windowId)
-    }
-};
-```
+1. 在 `WindowManager.appConfigs` 添加配置。
+2. 在 `Desktop.apps` 添加可用应用元数据。
+3. 需要默认固定时，将 ID 加入设置默认值 `startPinnedApps`，并按需要更新任务栏/应用商店逻辑。
+4. 在 `index.html` 的应用脚本区域引入 `js/apps/demo.js`。
+5. 添加应用图标、翻译键及必要样式。
 
----
+不要只修改桌面图标列表：窗口配置缺失时 `openApp()` 会拒绝启动。
 
-## 最佳实践
+### 7.3 使用应用内部导航框架
 
-### 1. 使用系统组件
+复杂应用优先使用 `FluentWindow.mount()`：
 
 ```javascript
-// ✅ 推荐：使用 FluentUI 组件
-FluentUI.Dialog({
-    type: 'warning',
-    content: '确定删除？',
-    buttons: [
-        { text: '取消', variant: 'secondary', value: false },
-        { text: '删除', variant: 'primary', value: true }
+this.frame = FluentWindow.mount({
+    container: this.container,
+    items: [
+        { id: 'home', label: t('demo.home'), icon: 'Home' },
+        { id: 'history', label: t('demo.history'), icon: 'Clock' }
     ],
-    onClose: (result) => { if (result) doDelete(); }
-});
-
-// ❌ 避免：使用原生 API
-if (confirm('确定删除？')) doDelete();
-```
-
-### 2. 使用 InputDialog 替代 prompt
-
-```javascript
-// ✅ 推荐
-FluentUI.InputDialog({
-    title: '重命名',
-    defaultValue: oldName,
-    onConfirm: (newName) => rename(newName)
-});
-
-// ❌ 避免
-const newName = prompt('重命名', oldName);
-```
-
-### 3. 使用 Toast 通知
-
-```javascript
-// ✅ 推荐：操作反馈
-FluentUI.Toast({
-    title: '保存成功',
-    message: '文件已保存',
-    type: 'success'
-});
-
-// ❌ 避免
-alert('保存成功');
-```
-
-### 4. 响应式设计
-
-```javascript
-// 监听设置变化
-State.on('settingsChange', (changes) => {
-    if (changes.theme) {
-        // 响应主题变化
-    }
-    if (changes.language) {
-        // 响应语言变化
-    }
+    footerItems: [
+        { id: 'settings', label: t('settings.title'), icon: 'Settings' }
+    ],
+    activeId: 'home',
+    preserveScrollPositions: true,
+    onNavigate: (id, pageEl) => this.renderPage(id, pageEl)
 });
 ```
 
-### 5. 使用 CSS 变量
+实例公开 `navigate()`、`setActive()`、`refresh()`、`destroy()`、滚动位置方法和侧栏搜索方法。完整示例见 [Fluent UI 指南](fluent-ui-guide.md#fluentwindow-应用框架)。
 
-```css
-/* ✅ 推荐：使用变量 */
-.my-element {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border-radius: var(--radius-md);
-}
+## 8. 小组件
 
-/* ❌ 避免：硬编码 */
-.my-element {
-    background: #ffffff;
-    color: #000000;
-}
-```
-
-### 6. 国际化
-
-```javascript
-// ✅ 推荐：使用翻译函数
-const title = t('app.title') || '默认标题';
-
-// ❌ 避免：硬编码文本
-const title = '应用标题';
-```
-
----
-
-## 附录：完整组件示例
-
-### 设置页面示例
-
-```javascript
-renderSettings(container) {
-    const section = document.createElement('div');
-    section.className = 'settings-section';
-    
-    // 标题
-    const title = document.createElement('h3');
-    title.textContent = t('settings.appearance');
-    section.appendChild(title);
-    
-    // 主题设置
-    section.appendChild(FluentUI.SettingItem({
-        label: t('settings.theme'),
-        description: t('settings.theme.desc'),
-        control: FluentUI.Select({
-            options: [
-                { value: 'light', label: t('settings.theme.light') },
-                { value: 'dark', label: t('settings.theme.dark') },
-                { value: 'auto', label: t('settings.theme.auto') }
-            ],
-            value: State.settings.theme,
-            onChange: (v) => {
-                State.updateSettings({ theme: v });
-                State.applyTheme();
-                FluentUI.Toast({
-                    title: t('settings.theme'),
-                    message: t('settings.theme.changed'),
-                    type: 'success'
-                });
-            }
-        })
-    }));
-    
-    container.appendChild(section);
-}
-```
-
----
-
-## App Shop 与 PWA 应用
-
-### 添加新的 PWA 应用
-
-在 `js/apps/appshop.js` 的 `apps` 数组中添加：
+定义集中在 `js/ui/widget-defs.js`，布局和交互由 `js/ui/widgets.js` 管理。`WidgetDefs` 按应用分组，每个 variant 描述尺寸、主题和渲染器：
 
 ```javascript
 {
-    id: 'my-app',           // 唯一标识
-    name: '我的应用',        // 显示名称
-    category: 'tools',      // 分类 ID
-    icon: 'my_app.png',     // Theme/Icon/App_icon/ 下的图标
-    developer: 'Developer', // 开发者名称
-    rating: 4.5,            // 评分
-    downloads: '100万+',    // 下载量
-    featured: false,        // 是否精选
-    isPWA: true,            // PWA 应用标记
-    url: 'https://example.com/'  // 网页 URL
+    id: 'demo-small',
+    w: 2,
+    h: 2,
+    sizeKey: 'widgets.size.small',
+    theme: 'w-demo',
+    defaultSettings: { mode: 'compact' },
+    render(body, ctx) {
+        body.textContent = ctx.instance.settings.mode;
+    },
+    onClick(ctx) {
+        WindowManager.openApp('demo');
+    },
+    getMenu(ctx) {
+        return [{ label: t('refresh'), action: () => ctx.setSettings({ updatedAt: Date.now() }) }];
+    }
 }
 ```
 
-### 可用分类
+异步数据使用已有 `WidgetData.get()`/`getJSON()` 做 TTL 缓存，并通过 `wAsync()` 提供加载与失败状态。渲染器创建的 interval、observer 或监听器必须随 DOM 移除而停止。
 
-| 分类 ID | 名称 |
-|---------|------|
-| `music` | 音乐 |
-| `video` | 视频 |
-| `social` | 社交 |
-| `shopping` | 购物 |
-| `tools` | 工具 |
-| `office` | 办公 |
-| `lifestyle` | 生活 |
+## 9. 第三方 Web/PWA 应用
 
-### 已安装应用 API
+`PWALoader.register()` 把 URL 包装成窗口组件：
 
 ```javascript
-// 获取已安装应用列表
-const apps = AppShop.getInstalledApps();
-
-// 检查应用是否已安装
-const isInstalled = AppShop.isInstalled('app-id');
-
-// 卸载应用
-AppShop.uninstallApp('app-id');
+PWALoader.register({
+    id: 'example',
+    name: 'Example',
+    icon: 'example.png',
+    url: 'https://example.com/',
+    width: 1100,
+    height: 760
+});
 ```
 
----
+目录项维护在 `js/third_parts_apps/pwa-catalog.js`。注册后还需通过 App Shop 安装流程加入窗口、桌面和固定列表。
 
-*文档最后更新: 2025.11.26*
+限制必须在产品设计中明确：跨域 iframe 的 DOM 不可读取；站点可能拒绝嵌入；登录 Cookie、弹窗、下载、媒体自动播放和权限均受浏览器策略控制。后台冻结会向 iframe 发送：
+
+```javascript
+{
+    source: 'FluentOS',
+    type: 'fluentos:tombstone',
+    action: 'freeze' // 或 restore
+}
+```
+
+可控的 Web 应用可监听该消息暂停/恢复耗时任务。
+
+## 10. 网络、权限与安全
+
+- 所有远程数据都应有加载、失败、超时或本地回退状态。
+- 将第三方返回文本写入 `innerHTML` 前必须转义；优先用 `textContent`。
+- URL 必须验证协议，外部窗口使用 `noopener,noreferrer`。
+- 摄像头流关闭时逐轨调用 `track.stop()`；定位和剪贴板失败时给出可理解提示。
+- 不把 API Key 写入代码、日志、虚拟文件系统或普通 `localStorage` 字段。
+- 严格 CSP 在 `js/core/csp.js` 中定义。新增远程源时先判断是否必要，再同步策略和无网络回退。
+- `localStorage` 和客户端加密不能抵御同源恶意脚本；它们只是持久化手段，不是可信密钥库。
+
+## 11. 调试接口
+
+```javascript
+FluentOS.version;
+FluentOS.openApp('settings');
+FluentOS.closeAllWindows();
+FluentOS.setTheme('light');
+FluentOS.toggleTheme();
+
+FluentOS.debug.getState();
+FluentOS.debug.getWindows();
+FluentOS.debug.exportSettings();
+FluentOS.debug.resources.start();
+FluentOS.debug.resources.table();
+FluentOS.debug.resources.summary();
+FluentOS.debug.resources.stop();
+```
+
+全局通知有两套用途：
+
+```javascript
+// 写入系统通知中心并持久化
+State.addNotification({ title: '完成', message: '任务已结束', type: 'success' });
+
+// 轻量右下角 Toast，不进入通知中心
+FluentUI.Toast({ title: '已保存', message: '设置已更新', type: 'success' });
+```
+
+`notify(title, message, type)` 是通知中心的便捷包装。
+
+## 12. 提交前检查
+
+- JavaScript 文件均通过 `node --check`。
+- 从清空站点数据开始完成 OOBE、锁屏、登录和桌面流程。
+- 浅色/深色主题、不同强调色和关闭动画/模糊时均可用。
+- 应用可打开、最小化、最大化、贴靠、关闭并再次打开。
+- 窗口缩到最小尺寸时没有关键控件溢出。
+- 中文和英文切换后，窗口标题、导航和动态内容同步更新。
+- 刷新后设置、文件、窗口位置和应用数据按预期恢复。
+- 无网络、拒绝摄像头/定位权限和 iframe 被拦截时不崩溃。
+- 控制台没有新增的未处理异常、重复监听或持续计时器。
