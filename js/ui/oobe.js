@@ -348,6 +348,11 @@ const OOBE = {
         const continueToDesktop = async () => {
             await this._ensureWallpaperHighResolution(this.selectedWallpaper);
             this._applySelections();
+            // OOBE may have entered browser fullscreen after Widgets initialized.
+            // Build the starter desktop against the real grid visible at this moment.
+            if (typeof Widgets !== 'undefined' && typeof Widgets.initializeDefaultDesktopLayoutForViewport === 'function') {
+                Widgets.initializeDefaultDesktopLayoutForViewport();
+            }
             this._markCompleted();
             if (State && typeof State.updateSession === 'function') {
                 State.updateSession({

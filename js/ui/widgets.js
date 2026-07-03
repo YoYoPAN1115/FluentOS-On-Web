@@ -861,6 +861,13 @@ const Widgets = {
                 inst.horizontalAnchor = 'right';
                 migrated = true;
             }
+            if (inst.responsiveGroup !== 'starter-desktop') {
+                inst.responsiveGroup = 'starter-desktop';
+                inst.responsiveGroupAnchor = 'right';
+                inst.responsiveGroupWidth = Number(inst.horizontalAnchorWidth) || 4;
+                inst.responsiveGroupOffset = Number(inst.horizontalAnchorOffset) || 0;
+                migrated = true;
+            }
         });
         if (State.settings && State.settings.widgetsDesktopDefaultInitialized === true) {
             if (migrated) this.saveLayout(layout);
@@ -891,6 +898,12 @@ const Widgets = {
                     horizontalAnchorGroup: 'starter-desktop',
                     horizontalAnchorWidth: groupWidth,
                     horizontalAnchorOffset: spec.col,
+                    responsiveCol: col,
+                    responsiveCols: m.cols,
+                    responsiveGroup: 'starter-desktop',
+                    responsiveGroupAnchor: 'right',
+                    responsiveGroupWidth: groupWidth,
+                    responsiveGroupOffset: spec.col,
                     settings: def.defaultSettings ? { ...def.defaultSettings } : {}
                 });
             });
@@ -928,6 +941,59 @@ const Widgets = {
             widgetsLockAdaptiveLayoutInitialized: true,
             widgetsLockHorizontalAdaptiveV2: true
         });
+    },
+
+    /** Recreate the untouched starter group against the viewport visible at OOBE finish. */
+    initializeDefaultDesktopLayoutForViewport() {
+        const layout = this.getLayout();
+        const starterIds = new Set([
+            'wi-default-desktop-clock',
+            'wi-default-desktop-events',
+            'wi-default-desktop-photo',
+            'wi-default-desktop-notes',
+            'wi-default-desktop-weather'
+        ]);
+        // This hook is intended for first-run OOBE. Never replace a customized desktop.
+        if (layout.desktop.some(inst => !starterIds.has(inst.id))) return false;
+
+        const m = this._metrics('desktop');
+        const groupWidth = 4;
+        const baseCol = Math.max(0, m.cols - groupWidth);
+        const specs = [
+            { id: 'clock', widgetId: 'clock-analog', col: 0, row: 0 },
+            { id: 'events', widgetId: 'calendar-events-s', col: 2, row: 0 },
+            { id: 'photo', widgetId: 'photos-s', col: 0, row: 2 },
+            { id: 'notes', widgetId: 'quicknotes-s', col: 2, row: 2 },
+            { id: 'weather', widgetId: 'weather-m', col: 0, row: 4 }
+        ];
+
+        layout.desktop = specs.map(spec => {
+            const def = this.registry.find(item => item.id === spec.widgetId);
+            if (!def) return null;
+            const col = baseCol + spec.col;
+            return {
+                id: `wi-default-desktop-${spec.id}`,
+                widgetId: spec.widgetId,
+                col,
+                row: spec.row,
+                preferredCol: col,
+                responsiveCol: col,
+                responsiveCols: m.cols,
+                responsiveGroup: 'starter-desktop',
+                responsiveGroupAnchor: 'right',
+                responsiveGroupWidth: groupWidth,
+                responsiveGroupOffset: spec.col,
+                settings: def.defaultSettings ? { ...def.defaultSettings } : {}
+            };
+        }).filter(Boolean);
+
+        State.updateSettings({
+            widgetsLayout: layout,
+            widgetsDesktopDefaultInitialized: true,
+            widgetsDesktopOobeViewportInitialized: true
+        });
+        this.renderSurface('desktop');
+        return true;
     },
 
     /** Add a proportional-layout baseline to profiles created before snapshots existed. */
@@ -1036,7 +1102,12 @@ const Widgets = {
             const normalizedX = baseMaxCol > 0
                 ? Math.min(1, Math.max(0, inst.responsiveCol / baseMaxCol))
                 : 0;
-            const desiredCol = Math.round(normalizedX * maxCol);
+            let desiredCol = Math.round(normalizedX * maxCol);
+            if (inst.responsiveGroupAnchor === 'right') {
+                const groupWidth = Math.max(1, Number(inst.responsiveGroupWidth) || def.w);
+                const groupOffset = Number(inst.responsiveGroupOffset) || 0;
+                desiredCol = Math.max(0, m.cols - groupWidth) + groupOffset;
+            }
             const preferredCol = Math.min(Math.max(desiredCol, 0), maxCol);
             let nextCol = preferredCol;
 
@@ -1263,6 +1334,10 @@ const Widgets = {
             delete next.horizontalAnchorGroup;
             delete next.horizontalAnchorWidth;
             delete next.horizontalAnchorOffset;
+            delete next.responsiveGroup;
+            delete next.responsiveGroupAnchor;
+            delete next.responsiveGroupWidth;
+            delete next.responsiveGroupOffset;
             return next;
         });
         this.saveLayout(layout);

@@ -10,7 +10,10 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
-        { date: '2026-07-03', version: '2.0.260703', commits: [
+        { date: '2026-07-03', version: '2.0.260703.1', commits: [
+            { hash: '7c07eac', title: '优化小组件位置自适应逻辑，并完善部分视觉效果' },
+            { hash: 'e9f8832', title: '删除不再使用的额外图标资源' },
+            { hash: '66422b8', title: '完成 FluentOS 青山湖首个正式版本' },
             { hash: '22a89c6', title: '进一步优化小组件体验，新增横向自适应位置调整' }
         ] },
         { date: '2026-07-02', version: '2.0.260702', commits: [
