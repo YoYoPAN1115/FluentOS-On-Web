@@ -3895,12 +3895,13 @@ body:not(.fluent-v2).dark-mode .appshop-detail-btn.fluent-btn.installed {
 
 /* 新版外观浅色模式分类标签选中状态 */
 body.fluent-v2:not(.dark-mode) .appshop-category-tab.active {
-    color: #1a1a1a;
+    color: var(--accent-contrast, #ffffff);
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
 body.fluent-v2:not(.dark-mode) .appshop-category-tab.active img {
-    filter: none;
-    opacity: 0.9;
+    opacity: 1;
 }
 /* ============ Alt+C App Switcher ============ */
 .app-switcher {

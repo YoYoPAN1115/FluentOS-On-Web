@@ -17,7 +17,7 @@ const LockScreen = {
         this.hintElement = this.element.querySelector('.lock-hint');
 
         // 绑定事件
-        this.element.addEventListener('click', () => this.unlock());
+        this.element.addEventListener('click', (event) => this.unlock(event));
         document.addEventListener('keydown', (e) => {
             // 在锁屏小组件（如搜索框）内输入时不触发解锁
             if (e.target && e.target.closest && e.target.closest('.fluent-widget')) return;
@@ -72,9 +72,12 @@ const LockScreen = {
         this.hintElement.textContent = I18n.t('lock.hint');
     },
 
-    unlock() {
+    unlock(event = null) {
         // 编辑锁屏小组件时，点击锁屏不触发解锁流程
-        if (typeof Widgets !== 'undefined' && Widgets.lockEditMode) return;
+        if (typeof Widgets !== 'undefined') {
+            if (typeof Widgets.shouldSuppressLockUnlock === 'function' && Widgets.shouldSuppressLockUnlock(event)) return;
+            if (Widgets.lockEditMode) return;
+        }
         State.setView('login');
     }
 };

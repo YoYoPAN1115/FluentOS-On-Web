@@ -37,6 +37,7 @@ const Widgets = {
     _pendingDrag: null,
     _drag: null,
     _suppressNavClick: false,
+    _lockUnlockSuppressedUntil: 0,
     _reopenTimer: null,
     _resizeTimer: null,
     _listenersBound: false,
@@ -51,6 +52,7 @@ const Widgets = {
         this._createLayers();
         this._ensureDefaultDesktopWidgets();
         this._ensureDefaultLockWidget();
+        this._ensureResponsiveLayoutSnapshots();
         this._createDrawer();
         this._createMenu();
         this.syncAppWidgetAvailability({ render: false });
@@ -101,6 +103,15 @@ const Widgets = {
                 // 视图已切换，锁屏不再由小组件编辑接管
                 this.lockEditMode = false;
                 this.done();
+            }
+            if (newView === 'lock') {
+                // The lock layer is usually display:none while the desktop is active.
+                // Re-measure it after it becomes visible so it uses the same proportional
+                // reflow path as desktop widgets instead of retaining stale columns.
+                requestAnimationFrame(() => {
+                    this._reflowHorizontal('lock');
+                    this._positionSurfaceWidgets('lock');
+                });
             }
         });
 
@@ -550,7 +561,14 @@ const Widgets = {
             const pitch = this.GRID.cell + this.GRID.gap;
             const wpx = variant.w * pitch - this.GRID.gap;
             const hpx = variant.h * pitch - this.GRID.gap;
-            const scale = Math.min(1, 310 / hpx, 430 / wpx);
+            // Fit the preview to the space the drawer actually has.  In particular,
+            // tall and large variants should remain completely visible on shorter
+            // screens instead of insisting on their near-desktop dimensions.
+            const stageWidth = stage.clientWidth || 454;
+            const stageHeight = stage.clientHeight || 346;
+            const availableWidth = Math.max(1, stageWidth - 24);
+            const availableHeight = Math.max(1, stageHeight - 38); // caption + gap
+            const scale = Math.min(1, availableWidth / wpx, availableHeight / hpx);
             slide.appendChild(this._buildPreview(variant, scale));
             const cap = document.createElement('div');
             cap.className = 'widgets-variant-caption';
@@ -714,13 +732,28 @@ const Widgets = {
         }
     },
 
-    _updateWidgetGlowPosition(target, event) {
-        const rect = target.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-        const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-        const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    _getWidgetGlowPoint(target, event, host = this._widgetGlowHost) {
+        // Preview cards are scaled and tilted in 3D. Their bounding rect is the
+        // projected trapezoid, so using it as local CSS coordinates makes the glow
+        // visibly drift. The wrapper stays axis-aligned and is a stable coordinate
+        // space; map its pointer position back onto the widget's unscaled surface.
+        const reference = host || target;
+        const rect = reference.getBoundingClientRect();
+        if (!rect.width || !rect.height) return null;
+        const width = target.offsetWidth || target.clientWidth || rect.width;
+        const height = target.offsetHeight || target.clientHeight || rect.height;
+        const x = Math.max(0, Math.min(width, ((event.clientX - rect.left) / rect.width) * width));
+        const y = Math.max(0, Math.min(height, ((event.clientY - rect.top) / rect.height) * height));
+        return { x, y, width, height };
+    },
+
+    _updateWidgetGlowPosition(target, event, host = this._widgetGlowHost) {
+        const point = this._getWidgetGlowPoint(target, event, host);
+        if (!point) return null;
+        const { x, y } = point;
         target.style.setProperty('--widget-glow-x', `${x}px`);
         target.style.setProperty('--widget-glow-y', `${y}px`);
+        return point;
     },
 
     _handleWidgetGlowMove(event) {
@@ -735,7 +768,7 @@ const Widgets = {
         }
         this._widgetGlowTarget = hit.target;
         this._widgetGlowHost = hit.host;
-        this._updateWidgetGlowPosition(hit.target, event);
+        this._updateWidgetGlowPosition(hit.target, event, hit.host);
         hit.target.classList.add('widget-glow-hover');
     },
 
@@ -751,16 +784,16 @@ const Widgets = {
         const hit = this._getWidgetGlowHit(event.target);
         if (!hit) return;
         this._prepareWidgetGlowTarget(hit.target);
-        this._updateWidgetGlowPosition(hit.target, event);
-        const rect = hit.target.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height) * 1.9;
+        const point = this._updateWidgetGlowPosition(hit.target, event, hit.host);
+        if (!point) return;
+        const size = Math.max(point.width, point.height) * 1.9;
         const ripple = document.createElement('span');
         ripple.className = 'widget-glow-ripple';
         ripple.setAttribute('aria-hidden', 'true');
         ripple.style.width = `${size}px`;
         ripple.style.height = `${size}px`;
-        ripple.style.left = `${event.clientX - rect.left}px`;
-        ripple.style.top = `${event.clientY - rect.top}px`;
+        ripple.style.left = `${point.x}px`;
+        ripple.style.top = `${point.y}px`;
         hit.target.appendChild(ripple);
         ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     },
@@ -870,7 +903,6 @@ const Widgets = {
 
     /** Add the centered lock-screen search widget once for new and existing profiles. */
     _ensureDefaultLockWidget() {
-        if (State.settings && State.settings.widgetsLockDefaultInitialized === true) return;
         const layout = this.getLayout();
         if (!layout.lock.length) {
             const def = this.registry.find(item => item.id === 'search-capsule');
@@ -889,10 +921,48 @@ const Widgets = {
                 settings: { engine: 'bing' }
             });
         }
+
         State.updateSettings({
             widgetsLayout: layout,
-            widgetsLockDefaultInitialized: true
+            widgetsLockDefaultInitialized: true,
+            widgetsLockAdaptiveLayoutInitialized: true,
+            widgetsLockHorizontalAdaptiveV2: true
         });
+    },
+
+    /** Add a proportional-layout baseline to profiles created before snapshots existed. */
+    _ensureResponsiveLayoutSnapshots() {
+        const layout = this.getLayout();
+        let changed = false;
+        ['desktop', 'lock'].forEach(surface => {
+            const cols = this._metrics(surface).cols;
+            layout[surface].forEach(inst => {
+                if (Number.isFinite(inst.responsiveCol) && Number.isFinite(inst.responsiveCols)) return;
+                inst.responsiveCol = Number(inst.col) || 0;
+                inst.responsiveCols = cols;
+                changed = true;
+            });
+        });
+        if (changed) this.saveLayout(layout);
+    },
+
+    /** Save the user's current composition as the baseline used by future resizes. */
+    _captureResponsiveLayoutSnapshot() {
+        const layout = this.getLayout();
+        ['desktop', 'lock'].forEach(surface => {
+            const cols = this._metrics(surface).cols;
+            layout[surface].forEach(inst => {
+                inst.responsiveCol = Number(inst.col) || 0;
+                inst.responsiveCols = cols;
+                // Remove the former edge/center-anchor model. Proportional snapshots
+                // now apply uniformly to every desktop and lock-screen widget.
+                delete inst.horizontalAnchor;
+                delete inst.horizontalAnchorGroup;
+                delete inst.horizontalAnchorWidth;
+                delete inst.horizontalAnchorOffset;
+            });
+        });
+        this.saveLayout(layout);
     },
 
     /* ==================== 网格计算 ==================== */
@@ -940,7 +1010,7 @@ const Widgets = {
 
     /* ==================== 渲染已放置的小组件 ==================== */
 
-    /** Keep widget rows unchanged while fitting their columns to the resized desktop. */
+    /** Proportionally remap saved columns while keeping widget rows unchanged. */
     _reflowHorizontal(surface) {
         if (surface !== 'desktop' && surface !== 'lock') return false;
         const layout = this.getLayout();
@@ -957,14 +1027,16 @@ const Widgets = {
                 changed = true;
             }
             const maxCol = Math.max(m.cols - def.w, 0);
-            const anchorWidth = Math.max(1, Number(inst.horizontalAnchorWidth) || def.w);
-            const anchorOffset = Number(inst.horizontalAnchorOffset) || 0;
-            let desiredCol = inst.preferredCol;
-            if (inst.horizontalAnchor === 'center') {
-                desiredCol = Math.max(0, Math.floor((m.cols - anchorWidth) / 2)) + anchorOffset;
-            } else if (inst.horizontalAnchor === 'right') {
-                desiredCol = Math.max(0, m.cols - anchorWidth) + anchorOffset;
+            if (!Number.isFinite(inst.responsiveCol) || !Number.isFinite(inst.responsiveCols)) {
+                inst.responsiveCol = Number(inst.col) || 0;
+                inst.responsiveCols = m.cols;
+                changed = true;
             }
+            const baseMaxCol = Math.max(inst.responsiveCols - def.w, 0);
+            const normalizedX = baseMaxCol > 0
+                ? Math.min(1, Math.max(0, inst.responsiveCol / baseMaxCol))
+                : 0;
+            const desiredCol = Math.round(normalizedX * maxCol);
             const preferredCol = Math.min(Math.max(desiredCol, 0), maxCol);
             let nextCol = preferredCol;
 
@@ -1135,10 +1207,10 @@ const Widgets = {
             this._showWidgetMenu(e.clientX, e.clientY, items);
         });
 
-        // 拖动调整位置：编辑模式下全部可拖；桌面上的小组件平时也可随时拖动
+        // 拖动调整位置：编辑模式下全部可拖；桌面和锁屏小组件平时也可自由拖动
         el.addEventListener('pointerdown', (e) => {
             if (e.button !== 0) return;
-            if (!this.isOpen && surface !== 'desktop') return;
+            if (!this.isOpen && surface !== 'desktop' && surface !== 'lock') return;
             if (e.target.closest('.fluent-widget-remove, .fluent-widget-edit')) return;
             // 普通模式下不抢占小组件内部交互（输入框、按钮等）
             if (!this.isOpen && e.target.closest('input, textarea, select, button, a')) return;
@@ -1163,10 +1235,11 @@ const Widgets = {
         const def = this.registry.find(d => d.id === widgetId);
         if (!def || !this._isWidgetAppAvailable(def.appId || widgetId)) return;
         const layout = this.getLayout();
+        const responsiveCols = this._metrics(surface).cols;
         const instanceId = `wi-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         layout[surface] = layout[surface].concat([{
-            id: instanceId,
-            widgetId, col, row, preferredCol: col,
+            id: instanceId, widgetId, col, row, preferredCol: col,
+            responsiveCol: col, responsiveCols,
             settings: (def && def.defaultSettings) ? { ...def.defaultSettings } : {}
         }]);
         this.saveLayout(layout);
@@ -1175,26 +1248,21 @@ const Widgets = {
 
     moveWidget(surface, instanceId, col, row) {
         const layout = this.getLayout();
-        const moved = layout[surface].find(inst => inst.id === instanceId);
-        const releaseAnchoredLayout = !!(moved && moved.horizontalAnchor);
-        const releaseGroup = releaseAnchoredLayout ? moved.horizontalAnchorGroup : null;
+        const responsiveCols = this._metrics(surface).cols;
         layout[surface] = layout[surface].map(inst => {
+            if (inst.id !== instanceId) return inst;
             const next = { ...inst };
-            const releasesThisAnchor = releaseAnchoredLayout && (
-                releaseGroup ? inst.horizontalAnchorGroup === releaseGroup : inst.id === instanceId
-            );
-            if (releasesThisAnchor) {
-                next.preferredCol = Number(inst.col) || 0;
-                delete next.horizontalAnchor;
-                delete next.horizontalAnchorGroup;
-                delete next.horizontalAnchorWidth;
-                delete next.horizontalAnchorOffset;
-            }
-            if (inst.id === instanceId) {
-                next.col = col;
-                next.row = row;
-                next.preferredCol = col;
-            }
+            next.col = col;
+            next.row = row;
+            next.preferredCol = col;
+            // A freely moved widget gets its own new resize baseline immediately;
+            // every other widget keeps the snapshot from the last Done action.
+            next.responsiveCol = col;
+            next.responsiveCols = responsiveCols;
+            delete next.horizontalAnchor;
+            delete next.horizontalAnchorGroup;
+            delete next.horizontalAnchorWidth;
+            delete next.horizontalAnchorOffset;
             return next;
         });
         this.saveLayout(layout);
@@ -1379,6 +1447,7 @@ const Widgets = {
     done() {
         if (!this.isOpen) return;
         if (this._editorOverlay) this.closeWidgetEditor({ resumeDrawer: false });
+        this._captureResponsiveLayoutSnapshot();
         this.isOpen = false;
         this.collapsed = false;
         clearTimeout(this._reopenTimer);
@@ -1531,6 +1600,7 @@ const Widgets = {
         // 拖动开始：抽屉自动收起；抑制首页卡片点击导航
         this._hideDrawerTemp();
         this._suppressNavClick = true;
+        if (surface === 'lock') this._lockUnlockSuppressedUntil = Number.POSITIVE_INFINITY;
 
         // 拖动跟随的幽灵元素（实时内容预览）
         const ghost = document.createElement('div');
@@ -1614,6 +1684,11 @@ const Widgets = {
         const d = this._drag;
         this._drag = null;
         setTimeout(() => { this._suppressNavClick = false; }, 80);
+        if (d.surface === 'lock') {
+            // pointerup may synthesize a click after the source widget is replaced.
+            // Keep the lock-screen unlock handler gated through that whole window.
+            this._lockUnlockSuppressedUntil = Date.now() + 500;
+        }
 
         this._hideGridOverlay(d.surface);
         d.indicator.remove();
@@ -1644,6 +1719,13 @@ const Widgets = {
 
         // 添加完成后，抽屉再次自动滑入
         this._showDrawerAgain();
+    },
+
+    shouldSuppressLockUnlock(event) {
+        if (this.lockEditMode) return true;
+        if (event?.target?.closest?.('.fluent-widget')) return true;
+        if (this._drag?.surface === 'lock' || this._pendingDrag?.surface === 'lock') return true;
+        return Date.now() < this._lockUnlockSuppressedUntil;
     },
 
     /* ==================== 网格可视化 ==================== */

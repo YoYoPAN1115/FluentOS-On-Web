@@ -523,8 +523,9 @@ const AppShop = {
                 color: #1d1d1f !important;
             }
             body:not(.dark-mode) .appshop-category-tab.active {
-                color: #0078d4 !important;
-                background: rgba(0,120,212,0.12) !important;
+                color: var(--accent-contrast, #fff) !important;
+                background: var(--accent) !important;
+                border-color: var(--accent) !important;
             }
             .appshop-category-tabs {
                 display: flex;
@@ -557,7 +558,7 @@ const AppShop = {
                 height: 16px !important;
                 flex: 0 0 16px;
             }
-            .appshop-category-tab span {
+            .appshop-category-tab > span:not(.button-edge-glow):not(.button-glow-ripple) {
                 max-width: 0;
                 opacity: 0;
                 overflow: hidden;
@@ -572,11 +573,28 @@ const AppShop = {
                 padding: 0 14px !important;
                 gap: 8px !important;
             }
-            .appshop-category-tab:hover span,
-            .appshop-category-tab:focus-visible span {
+            .appshop-category-tab.active,
+            .appshop-category-tab.active:hover,
+            .appshop-category-tab.active:focus-visible {
+                color: var(--accent-contrast, #fff) !important;
+                background: var(--accent) !important;
+                border-color: var(--accent) !important;
+            }
+            .appshop-category-tab.active img {
+                filter: brightness(0) invert(1) !important;
+                opacity: 1 !important;
+            }
+            body:not(.accent-deep) .appshop-category-tab.active img {
+                filter: brightness(0) !important;
+            }
+            .appshop-category-tab:hover > span:not(.button-edge-glow):not(.button-glow-ripple),
+            .appshop-category-tab:focus-visible > span:not(.button-edge-glow):not(.button-glow-ripple) {
                 max-width: 58px;
                 opacity: 1;
                 transform: translateX(0);
+            }
+            .appshop-category-tab.active > span:not(.button-edge-glow):not(.button-glow-ripple) {
+                color: var(--accent-contrast, #fff) !important;
             }
             body:not(.dark-mode) .appshop-discover-chip {
                 border-bottom-color: rgba(0,0,0,0.1) !important;

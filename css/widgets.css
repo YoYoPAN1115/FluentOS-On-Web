@@ -51,6 +51,15 @@ body.widgets-edit-mode .fluent-widget:active {
     cursor: grabbing;
 }
 
+/* Lock-screen widgets remain freely draggable outside edit mode, matching desktop. */
+body:not(.widgets-edit-mode) #lock-widgets-layer .fluent-widget {
+    cursor: grab;
+}
+
+body:not(.widgets-edit-mode) #lock-widgets-layer .fluent-widget:active {
+    cursor: grabbing;
+}
+
 /* 缂栬緫妯″紡涓嬪唴閮ㄥ厓绱犱笉鍝嶅簲锛堜换鎰忎綅缃彲鎷栧姩锛夛紝绉婚櫎鎸夐挳闄ゅ */
 body.widgets-edit-mode .fluent-widget .fluent-widget-body,
 body.widgets-edit-mode .fluent-widget .fluent-widget-body * {
@@ -1661,6 +1670,12 @@ body.dark-mode .fluent-widget-body.w-news .w-news-rank:not(.r1):not(.r2):not(.r3
     border-radius: 10px;
     background: transparent;
     cursor: pointer;
+}
+
+/* The global pointer-glow helper adds position: relative on first hover.
+   Keep this dialog control anchored to its top-right corner. */
+body.button-glow-enabled .favorite-add-close.button-glow-target {
+    position: absolute;
 }
 
 .favorite-add-close:hover {
