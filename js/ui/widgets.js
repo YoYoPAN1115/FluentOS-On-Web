@@ -49,6 +49,8 @@ const Widgets = {
     init() {
         this._refreshAvailableRegistry();
         this._createLayers();
+        this._ensureDefaultDesktopWidgets();
+        this._ensureDefaultLockWidget();
         this._createDrawer();
         this._createMenu();
         this.syncAppWidgetAvailability({ render: false });
@@ -75,7 +77,10 @@ const Widgets = {
         window.addEventListener('resize', () => {
             clearTimeout(this._resizeTimer);
             this._resizeTimer = setTimeout(() => {
-                this.renderAll();
+                this._reflowHorizontal('desktop');
+                this._reflowHorizontal('lock');
+                this._positionSurfaceWidgets('desktop');
+                this._positionSurfaceWidgets('lock');
                 this._refreshStaticBlurTexture();
             }, 150);
         });
@@ -813,6 +818,83 @@ const Widgets = {
         State.updateSettings({ widgetsLayout: layout });
     },
 
+    /** Add the five-widget starter arrangement to an empty desktop once. */
+    _ensureDefaultDesktopWidgets() {
+        const layout = this.getLayout();
+        let migrated = false;
+        layout.desktop.forEach(inst => {
+            if (inst.horizontalAnchorGroup !== 'starter-desktop') return;
+            if (inst.horizontalAnchor !== 'right') {
+                inst.horizontalAnchor = 'right';
+                migrated = true;
+            }
+        });
+        if (State.settings && State.settings.widgetsDesktopDefaultInitialized === true) {
+            if (migrated) this.saveLayout(layout);
+            return;
+        }
+        if (!layout.desktop.length) {
+            const m = this._metrics('desktop');
+            const groupWidth = 4;
+            const baseCol = Math.max(0, m.cols - groupWidth);
+            const specs = [
+                { id: 'clock', widgetId: 'clock-analog', col: 0, row: 0 },
+                { id: 'events', widgetId: 'calendar-events-s', col: 2, row: 0 },
+                { id: 'photo', widgetId: 'photos-s', col: 0, row: 2 },
+                { id: 'notes', widgetId: 'quicknotes-s', col: 2, row: 2 },
+                { id: 'weather', widgetId: 'weather-m', col: 0, row: 4 }
+            ];
+            specs.forEach(spec => {
+                const def = this.registry.find(item => item.id === spec.widgetId);
+                if (!def) return;
+                const col = baseCol + spec.col;
+                layout.desktop.push({
+                    id: `wi-default-desktop-${spec.id}`,
+                    widgetId: spec.widgetId,
+                    col,
+                    row: spec.row,
+                    preferredCol: col,
+                    horizontalAnchor: 'right',
+                    horizontalAnchorGroup: 'starter-desktop',
+                    horizontalAnchorWidth: groupWidth,
+                    horizontalAnchorOffset: spec.col,
+                    settings: def.defaultSettings ? { ...def.defaultSettings } : {}
+                });
+            });
+        }
+        State.updateSettings({
+            widgetsLayout: layout,
+            widgetsDesktopDefaultInitialized: true
+        });
+    },
+
+    /** Add the centered lock-screen search widget once for new and existing profiles. */
+    _ensureDefaultLockWidget() {
+        if (State.settings && State.settings.widgetsLockDefaultInitialized === true) return;
+        const layout = this.getLayout();
+        if (!layout.lock.length) {
+            const def = this.registry.find(item => item.id === 'search-capsule');
+            const m = this._metrics('lock');
+            const col = Math.max(0, Math.floor((m.cols - (def?.w || 4)) / 2));
+            layout.lock.push({
+                id: 'wi-default-lock-search',
+                widgetId: 'search-capsule',
+                col,
+                row: 1,
+                preferredCol: col,
+                horizontalAnchor: 'center',
+                horizontalAnchorGroup: 'starter-lock',
+                horizontalAnchorWidth: 4,
+                horizontalAnchorOffset: 0,
+                settings: { engine: 'bing' }
+            });
+        }
+        State.updateSettings({
+            widgetsLayout: layout,
+            widgetsLockDefaultInitialized: true
+        });
+    },
+
     /* ==================== 网格计算 ==================== */
 
     _metrics(surface) {
@@ -857,6 +939,84 @@ const Widgets = {
     },
 
     /* ==================== 渲染已放置的小组件 ==================== */
+
+    /** Keep widget rows unchanged while fitting their columns to the resized desktop. */
+    _reflowHorizontal(surface) {
+        if (surface !== 'desktop' && surface !== 'lock') return false;
+        const layout = this.getLayout();
+        const instances = layout[surface];
+        const m = this._metrics(surface);
+        const placed = [];
+        let changed = false;
+
+        instances.forEach(inst => {
+            const def = this.registry.find(d => d.id === inst.widgetId);
+            if (!def) return;
+            if (!Number.isFinite(inst.preferredCol)) {
+                inst.preferredCol = Number(inst.col) || 0;
+                changed = true;
+            }
+            const maxCol = Math.max(m.cols - def.w, 0);
+            const anchorWidth = Math.max(1, Number(inst.horizontalAnchorWidth) || def.w);
+            const anchorOffset = Number(inst.horizontalAnchorOffset) || 0;
+            let desiredCol = inst.preferredCol;
+            if (inst.horizontalAnchor === 'center') {
+                desiredCol = Math.max(0, Math.floor((m.cols - anchorWidth) / 2)) + anchorOffset;
+            } else if (inst.horizontalAnchor === 'right') {
+                desiredCol = Math.max(0, m.cols - anchorWidth) + anchorOffset;
+            }
+            const preferredCol = Math.min(Math.max(desiredCol, 0), maxCol);
+            let nextCol = preferredCol;
+
+            const collidesAt = col => placed.some(item => (
+                col < item.col + item.w && item.col < col + def.w &&
+                inst.row < item.row + item.h && item.row < inst.row + def.h
+            ));
+
+            if (collidesAt(nextCol)) {
+                const candidates = Array.from({ length: maxCol + 1 }, (_, col) => col)
+                    .sort((a, b) => Math.abs(a - preferredCol) - Math.abs(b - preferredCol) || a - b);
+                const availableCol = candidates.find(col => !collidesAt(col));
+                if (availableCol !== undefined) nextCol = availableCol;
+            }
+
+            if (inst.col !== nextCol) {
+                inst.col = nextCol;
+                changed = true;
+            }
+            placed.push({ col: nextCol, row: inst.row, w: def.w, h: def.h });
+        });
+
+        if (changed) this.saveLayout(layout);
+        return changed;
+    },
+
+    /** Reposition existing widget elements without rebuilding their live content. */
+    _positionSurfaceWidgets(surface) {
+        const layer = this.layers[surface];
+        if (!layer) return;
+        const m = this._metrics(surface);
+        this.getLayout()[surface].forEach(inst => {
+            const def = this.registry.find(d => d.id === inst.widgetId);
+            const el = layer.querySelector(`.fluent-widget[data-instance-id="${inst.id}"]`);
+            if (!def || !el) return;
+            const px = this._cellToPx(m, inst.col, inst.row, def.w, def.h);
+            const verticalInset = def.id === 'search-capsule' ? 6 : 0;
+            const visualTop = px.y + verticalInset;
+            el.style.left = `${px.x}px`;
+            el.style.top = `${visualTop}px`;
+            el.style.setProperty('--widget-blur-left', `${px.x}px`);
+            el.style.setProperty('--widget-blur-top', `${visualTop}px`);
+            el.style.setProperty('--widget-blur-offset-x', `${-px.x}px`);
+            el.style.setProperty('--widget-blur-offset-y', `${-visualTop}px`);
+            el.style.setProperty('--widget-blur-viewport-w', `${window.innerWidth}px`);
+            el.style.setProperty('--widget-blur-viewport-h', `${window.innerHeight}px`);
+        });
+
+        if (surface === 'desktop' && typeof Desktop !== 'undefined' && Desktop.iconsContainer) {
+            Desktop.renderIcons();
+        }
+    },
 
     renderAll() {
         this.renderSurface('desktop');
@@ -1003,9 +1163,10 @@ const Widgets = {
         const def = this.registry.find(d => d.id === widgetId);
         if (!def || !this._isWidgetAppAvailable(def.appId || widgetId)) return;
         const layout = this.getLayout();
+        const instanceId = `wi-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         layout[surface] = layout[surface].concat([{
-            id: `wi-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            widgetId, col, row,
+            id: instanceId,
+            widgetId, col, row, preferredCol: col,
             settings: (def && def.defaultSettings) ? { ...def.defaultSettings } : {}
         }]);
         this.saveLayout(layout);
@@ -1014,8 +1175,28 @@ const Widgets = {
 
     moveWidget(surface, instanceId, col, row) {
         const layout = this.getLayout();
-        layout[surface] = layout[surface].map(inst =>
-            inst.id === instanceId ? { ...inst, col, row } : inst);
+        const moved = layout[surface].find(inst => inst.id === instanceId);
+        const releaseAnchoredLayout = !!(moved && moved.horizontalAnchor);
+        const releaseGroup = releaseAnchoredLayout ? moved.horizontalAnchorGroup : null;
+        layout[surface] = layout[surface].map(inst => {
+            const next = { ...inst };
+            const releasesThisAnchor = releaseAnchoredLayout && (
+                releaseGroup ? inst.horizontalAnchorGroup === releaseGroup : inst.id === instanceId
+            );
+            if (releasesThisAnchor) {
+                next.preferredCol = Number(inst.col) || 0;
+                delete next.horizontalAnchor;
+                delete next.horizontalAnchorGroup;
+                delete next.horizontalAnchorWidth;
+                delete next.horizontalAnchorOffset;
+            }
+            if (inst.id === instanceId) {
+                next.col = col;
+                next.row = row;
+                next.preferredCol = col;
+            }
+            return next;
+        });
         this.saveLayout(layout);
         this.renderSurface(surface);
     },

@@ -31,6 +31,10 @@ body.widgets-edit-mode #desktop-widgets-layer {
     user-select: none;
 }
 
+body.animations-enabled .widgets-layer .fluent-widget {
+    transition: left 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .fluent-widget.capsule {
     border-radius: 999px;
 }
