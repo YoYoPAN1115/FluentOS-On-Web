@@ -482,7 +482,23 @@ const OOBE = {
                 this.hide();
             }
             this.finishing = false;
+            this._openTipsAfterFirstRun();
         }, 660);
+    },
+
+    _openTipsAfterFirstRun() {
+        const welcomeKey = 'fluentos.tips_welcome_shown';
+        try {
+            if (localStorage.getItem(welcomeKey) === '1') return;
+            const isInstalled = typeof AppShop !== 'undefined'
+                && typeof AppShop.isInstalled === 'function'
+                && AppShop.isInstalled('tips');
+            if (!isInstalled || typeof WindowManager === 'undefined') return;
+            localStorage.setItem(welcomeKey, '1');
+            setTimeout(() => WindowManager.openApp('tips', { section: 'getting-started' }), 180);
+        } catch (error) {
+            console.warn('[OOBE] Unable to launch Tips welcome experience', error);
+        }
     },
 
     _getUserAvatarOptions() {

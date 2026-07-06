@@ -44,6 +44,7 @@ const WindowManager = {
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
+        tips: { titleKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', width: 1120, height: 720, minWidth: 760, minHeight: 520, component: 'TipsApp' },
         calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
         notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 920, height: 640, minWidth: 560, minHeight: 420, component: 'NotesApp' },
         browser: { titleKey: 'browser.title', icon: 'Theme/Icon/App_icon/browser.png', width: 1000, height: 700, component: 'BrowserApp' },
@@ -1299,15 +1300,19 @@ const WindowManager = {
 
         
         if (config.component && globalThis[config.component]) {
-            globalThis[config.component].init(windowId);
+            const component = globalThis[config.component];
+            // Components may consume their initial navigation data during init so
+            // their first paint is already on the requested page.
+            const initialData = component.handlesInitialOpenData === true ? data : undefined;
+            const initialDataHandled = component.init(windowId, initialData) === true;
             
-            if (data && data.fileId && globalThis[config.component].loadFile) {
+            if (!initialDataHandled && data && data.fileId && component.loadFile) {
                 setTimeout(() => {
-                    globalThis[config.component].loadFile(data.fileId);
+                    component.loadFile(data.fileId);
                 }, 0);
-            } else if (data && globalThis[config.component].openData) {
+            } else if (!initialDataHandled && data && component.openData) {
                 setTimeout(() => {
-                    globalThis[config.component].openData(data);
+                    component.openData(data);
                 }, 0);
             }
         } else {
@@ -1629,12 +1634,6 @@ const WindowManager = {
             if (!e.target.closest('.window-snap-layout-menu')) {
                 this._hideAllSnapMenus(windowElement.id);
             }
-            this.focusWindow(windowElement.id);
-        });
-        windowElement.addEventListener('click', () => {
-            this.focusWindow(windowElement.id);
-        });
-        windowElement.addEventListener('mousedown', () => {
             this.focusWindow(windowElement.id);
         });
         windowElement.addEventListener('mouseleave', () => {

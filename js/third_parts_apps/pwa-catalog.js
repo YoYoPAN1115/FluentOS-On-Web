@@ -5,6 +5,27 @@
 
 window.FluentPWACatalog = [
     {
+        id: 'tips',
+        name: '提示',
+        category: 'tools',
+        icon: 'tips.png',
+        developer: 'Fluent OS',
+        rating: 4.9,
+        downloads: '预装',
+        featured: true,
+        appType: 'native',
+        isNative: true,
+        defaultInstalled: true,
+        component: 'TipsApp',
+        titleKey: 'tips.title',
+        width: 1120,
+        height: 720,
+        minWidth: 760,
+        minHeight: 520,
+        themeColor: '#0078d4',
+        desc: '通过动画化的真实设置预览，快速了解 Fluent OS 的个性化、账户与多任务操作。'
+    },
+    {
         id: 'camera',
         name: '相机',
         category: 'tools',
@@ -560,7 +581,7 @@ window.FluentPWACatalog = [
         developer: '学科网',
         rating: 4.6,
         downloads: '500万+',
-        url: 'https://zujuan.xkw.com/',
+        url: 'https://www.zxxk.com/',
         themeColor: '#1677ff',
         desc: '在线题库和智能组卷平台，适合教师备课、组卷和教学资源管理。'
     },

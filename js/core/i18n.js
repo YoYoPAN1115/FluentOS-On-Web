@@ -592,6 +592,7 @@ const I18n = {
             'photos.title': '照片',
             'media.title': '多媒体',
             'appshop.title': 'App Shop',
+            'tips.title': '提示',
 
             // 时钟应用
             'clock.timer': '倒计时',
@@ -1707,6 +1708,7 @@ const I18n = {
             'photos.title': 'Photos',
             'media.title': 'Multimedia',
             'appshop.title': 'App Shop',
+            'tips.title': 'Tips',
 
             // Clock
             'clock.timer': 'Timer',

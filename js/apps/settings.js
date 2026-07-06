@@ -2,6 +2,7 @@
  * 设置应用 - 使用 FluentUI 组件库
  */
 const SettingsApp = {
+    handlesInitialOpenData: true,
     windowId: null,
     container: null,
     frame: null,
@@ -135,13 +136,33 @@ const SettingsApp = {
         return this.appSizes[appId];
     },
 
-    init(windowId) {
+    init(windowId, initialData = null) {
         this.windowId = windowId || `window-${Date.now()}`;
         this.container = document.getElementById(`${this.windowId}-content`);
         // 默认打开概览页
         this.currentPage = 'overview';
+        this.currentAppDetail = null;
         this._aboutDevTapCount = 0;
         this._developerModeVisible = false;
+
+        // 首次创建窗口时先消费目标页，再进行首帧渲染，避免先显示概览页后
+        // 异步导航与 FluentWindow 的初始化渲染互相覆盖。
+        let initialDataHandled = false;
+        if (initialData && initialData.page === 'app-detail' && initialData.appId) {
+            const app = this.getAppDetailData(initialData.appId);
+            if (app) {
+                this.currentAppDetail = app;
+                this.currentPage = 'app-detail';
+                initialDataHandled = true;
+            }
+        } else if (initialData && initialData.page) {
+            const page = initialData.page;
+            const hasPage = this.getPages().some(item => item.id === page);
+            if (hasPage || page === 'personalization-advanced' || page === 'about-changelog') {
+                this.currentPage = page;
+                initialDataHandled = true;
+            }
+        }
         this.render();
         
         State.on('languageChange', () => {
@@ -165,6 +186,8 @@ const SettingsApp = {
                 this.render();
             }
         }, { key: 'SettingsApp.fingoApiKeyReady' });
+
+        return initialDataHandled;
     },
 
     openData(data) {
