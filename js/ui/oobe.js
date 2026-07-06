@@ -44,6 +44,18 @@ const OOBE = {
     avatarPlaceholderSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
     currentStep: 0,
     finishing: false,
+    completionShown: false,
+    completionTimer: null,
+    completionParticles: [],
+    completionParticleCanvas: null,
+    completionParticleContext: null,
+    completionParticleRaf: null,
+    completionParticleStartTime: 0,
+    completionParticleLastFrame: 0,
+    completionParticleResizeHandler: null,
+    completionPointerMoveHandler: null,
+    completionPointerLeaveHandler: null,
+    completionPointer: { x: 0, y: 0, vx: 0, vy: 0, active: false, lastTime: 0 },
 
     preloadingPromise: null,
     preloadCompleted: false,
@@ -134,7 +146,9 @@ const OOBE = {
 
             next: '下一步',
             back: '返回',
-            finish: '完成并进入桌面',
+            finish: '完成设置',
+            completionTitle: '大功告成',
+            enterDesktop: '进入桌面',
 
             preloadRunning: '正在后台准备离线资源包...',
             preloadDone: '离线资源包已准备完成。',
@@ -202,7 +216,9 @@ const OOBE = {
 
             next: 'Next',
             back: 'Back',
-            finish: 'Finish and enter desktop',
+            finish: 'Finish setup',
+            completionTitle: 'Done',
+            enterDesktop: 'Enter desktop',
 
             preloadRunning: 'Preparing offline resource pack in background...',
             preloadDone: 'Offline resource pack is ready.',
@@ -318,6 +334,7 @@ const OOBE = {
     hide() {
         if (!this.element) return;
 
+        this._resetCompletionScene();
         this._stopPreviewClockTimer();
         this._stopWelcomeAnimation();
         this._resetTiltEffect();
@@ -361,7 +378,7 @@ const OOBE = {
                     loginAttempts: 0
                 });
             }
-            this._enterDesktopTransition();
+            this._showCompletionScene();
         };
 
         if (!this._shouldWarnDefaultPinBeforeFinish()) {
@@ -458,24 +475,20 @@ const OOBE = {
         const desktopEl = document.getElementById('desktop-screen');
         if (desktopEl) {
             Desktop.show();
-            desktopEl.style.opacity = '0';
-            desktopEl.style.transition = 'opacity 0.62s cubic-bezier(0.22, 1, 0.36, 1)';
             desktopEl.classList.remove('hidden');
+            desktopEl.classList.remove('oobe-desktop-entering');
+            void desktopEl.offsetWidth;
+            desktopEl.classList.add('oobe-desktop-entering');
         }
 
-        this.element.style.transition = 'opacity 0.52s ease';
-        requestAnimationFrame(() => {
-            this.element.style.opacity = '0';
-            if (desktopEl) desktopEl.style.opacity = '1';
-        });
+        this.element.classList.remove('oobe-leaving');
+        void this.element.offsetWidth;
+        this.element.classList.add('oobe-leaving');
 
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         setTimeout(() => {
-            this.element.style.transition = '';
-            this.element.style.opacity = '';
-            if (desktopEl) {
-                desktopEl.style.transition = '';
-                desktopEl.style.opacity = '';
-            }
+            this.element.classList.remove('oobe-leaving');
+            desktopEl?.classList.remove('oobe-desktop-entering');
             if (State && typeof State.setView === 'function') {
                 State.setView('desktop');
             } else {
@@ -483,7 +496,280 @@ const OOBE = {
             }
             this.finishing = false;
             this._openTipsAfterFirstRun();
-        }, 660);
+        }, reducedMotion ? 80 : 1040);
+    },
+
+    _showCompletionScene() {
+        if (!this.element || this.completionShown) return;
+        this.completionShown = true;
+        this._resetTiltEffect();
+        this._refreshTexts();
+        this._buildCompletionParticles();
+        this.element.classList.add('oobe-completing');
+
+        const completion = document.getElementById('oobe-completion');
+        if (completion) completion.setAttribute('aria-hidden', 'false');
+
+        const revealDelay = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 30 : 760;
+        this.completionTimer = setTimeout(() => {
+            this.element?.classList.add('oobe-completion-visible');
+            this._startCompletionParticleBurst();
+            this.completionTimer = null;
+        }, revealDelay);
+    },
+
+    _buildCompletionParticles() {
+        this._stopCompletionParticles();
+        const canvas = document.getElementById('oobe-completion-particles');
+        const context = canvas?.getContext?.('2d');
+        if (!canvas || !context) return;
+
+        this.completionParticleCanvas = canvas;
+        this.completionParticleContext = context;
+        const resize = () => {
+            const oldWidth = Number(canvas.dataset.cssWidth) || window.innerWidth;
+            const oldHeight = Number(canvas.dataset.cssHeight) || window.innerHeight;
+            const width = Math.max(1, window.innerWidth);
+            const height = Math.max(1, window.innerHeight);
+            const dpr = Math.min(2, window.devicePixelRatio || 1);
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            canvas.dataset.cssWidth = String(width);
+            canvas.dataset.cssHeight = String(height);
+            context.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (this.completionParticles.length && oldWidth && oldHeight) {
+                const scaleX = width / oldWidth;
+                const scaleY = height / oldHeight;
+                this.completionParticles.forEach((particle) => {
+                    particle.x *= scaleX;
+                    particle.y *= scaleY;
+                    particle.originX = width / 2;
+                    particle.originY = height / 2;
+                });
+            }
+        };
+        this.completionParticleResizeHandler = resize;
+        window.addEventListener('resize', resize);
+        resize();
+
+        const width = Number(canvas.dataset.cssWidth);
+        const height = Number(canvas.dataset.cssHeight);
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const compact = width <= 520;
+        const burstCount = compact
+            ? 130
+            : Math.min(300, Math.max(235, Math.round((width * height) / 5000)));
+        const ambientCount = compact
+            ? 250
+            : Math.min(620, Math.max(500, Math.round((width * height) / 4000)));
+        const count = burstCount + ambientCount;
+
+        this.completionParticles = Array.from({ length: count }, (_, index) => {
+            const ambient = index >= burstCount;
+            const angle = Math.random() * Math.PI * 2;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const xLimit = cos > 0 ? (width - centerX - 8) / cos : cos < 0 ? (8 - centerX) / cos : Infinity;
+            const yLimit = sin > 0 ? (height - centerY - 8) / sin : sin < 0 ? (8 - centerY) / sin : Infinity;
+            const edgeDistance = Math.min(xLimit, yLimit);
+            const distance = edgeDistance * (0.25 + Math.pow(Math.random(), 0.52) * 0.72);
+            const damping = 0.966 + Math.random() * 0.012;
+            const speed = distance * (1 - damping) * (1.2 + Math.random() * 0.18);
+            return {
+                x: ambient ? 8 + Math.random() * Math.max(1, width - 16) : centerX,
+                y: ambient ? 8 + Math.random() * Math.max(1, height - 16) : centerY,
+                originX: centerX,
+                originY: centerY,
+                vx: ambient ? 0 : cos * speed,
+                vy: ambient ? 0 : sin * speed,
+                damping,
+                angle: angle + (Math.random() - 0.5) * 0.5,
+                spin: ambient ? 0 : (Math.random() - 0.5) * 0.34,
+                size: ambient ? 1 + Math.random() * 2.5 : 1.4 + Math.random() * 3.8,
+                length: ambient ? 2 + Math.random() * 8 : 3 + Math.random() * 13,
+                hue: 188 + Math.random() * 46,
+                alpha: ambient ? 0.28 + Math.random() * 0.48 : 0.46 + Math.random() * 0.5,
+                shape: index % 5,
+                delay: ambient ? 1050 + Math.random() * 1450 : Math.random() * 150,
+                ambient,
+                highlight: 0
+            };
+        });
+
+        const pointer = this.completionPointer;
+        pointer.active = false;
+        pointer.vx = 0;
+        pointer.vy = 0;
+        this.completionPointerMoveHandler = (event) => {
+            if (!this.completionShown) return;
+            const now = performance.now();
+            const elapsed = Math.max(8, now - (pointer.lastTime || now));
+            const nextVx = ((event.clientX - pointer.x) / elapsed) * 16.67;
+            const nextVy = ((event.clientY - pointer.y) / elapsed) * 16.67;
+            pointer.vx = Math.max(-34, Math.min(34, nextVx));
+            pointer.vy = Math.max(-34, Math.min(34, nextVy));
+            pointer.x = event.clientX;
+            pointer.y = event.clientY;
+            pointer.lastTime = now;
+            pointer.active = true;
+        };
+        this.completionPointerLeaveHandler = () => {
+            pointer.active = false;
+            pointer.vx = 0;
+            pointer.vy = 0;
+        };
+        window.addEventListener('pointermove', this.completionPointerMoveHandler, { passive: true });
+        document.documentElement.addEventListener('pointerleave', this.completionPointerLeaveHandler);
+    },
+
+    _startCompletionParticleBurst() {
+        if (!this.completionParticleCanvas || !this.completionParticleContext) return;
+        this.completionParticleStartTime = performance.now();
+        this.completionParticleLastFrame = 0;
+        this.completionParticleRaf = requestAnimationFrame((time) => this._animateCompletionParticles(time));
+    },
+
+    _animateCompletionParticles(time) {
+        const canvas = this.completionParticleCanvas;
+        const context = this.completionParticleContext;
+        if (!canvas || !context || !this.completionShown) return;
+
+        const width = Number(canvas.dataset.cssWidth) || window.innerWidth;
+        const height = Number(canvas.dataset.cssHeight) || window.innerHeight;
+        const delta = this.completionParticleLastFrame
+            ? Math.min(4.2, Math.max(0.45, (time - this.completionParticleLastFrame) / 16.67))
+            : 1;
+        this.completionParticleLastFrame = time;
+        const burstAge = time - this.completionParticleStartTime;
+        const pointer = this.completionPointer;
+        const interactionRadius = Math.min(210, Math.max(145, width * 0.115));
+
+        context.clearRect(0, 0, width, height);
+        context.globalCompositeOperation = 'lighter';
+        this.completionParticles.forEach((particle) => {
+            const age = burstAge - particle.delay;
+            if (age < 0) return;
+
+            const damping = Math.pow(particle.damping, delta);
+            particle.vx *= damping;
+            particle.vy *= damping;
+            particle.spin *= Math.pow(0.982, delta);
+
+            if (pointer.active) {
+                const dx = particle.x - pointer.x;
+                const dy = particle.y - pointer.y;
+                const distance = Math.hypot(dx, dy) || 1;
+                if (distance < interactionRadius) {
+                    const force = Math.pow(1 - distance / interactionRadius, 2);
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    const flowX = pointer.vx * 0.075;
+                    const flowY = pointer.vy * 0.075;
+                    particle.vx += (nx * 0.62 - ny * 0.48 + flowX) * force * delta;
+                    particle.vy += (ny * 0.62 + nx * 0.48 + flowY) * force * delta;
+                    particle.spin += (pointer.vx + pointer.vy) * 0.0018 * force;
+                    particle.highlight = Math.max(particle.highlight, force);
+                }
+            }
+
+            particle.x += particle.vx * delta;
+            particle.y += particle.vy * delta;
+            particle.angle += particle.spin * delta;
+            particle.highlight *= Math.pow(0.91, delta);
+
+            const margin = 5;
+            if (particle.x < margin || particle.x > width - margin) {
+                particle.x = Math.max(margin, Math.min(width - margin, particle.x));
+                particle.vx *= -0.28;
+            }
+            if (particle.y < margin || particle.y > height - margin) {
+                particle.y = Math.max(margin, Math.min(height - margin, particle.y));
+                particle.vy *= -0.28;
+            }
+
+            const appear = Math.min(1, age / (particle.ambient ? 1050 : 150));
+            const burstGlow = particle.ambient ? 0 : Math.max(0, 1 - age / 1450);
+            const glow = Math.max(burstGlow * 0.76, particle.highlight);
+            const lightness = 68 + glow * 24;
+            const color = `hsl(${particle.hue} 100% ${lightness}%)`;
+            context.save();
+            context.translate(particle.x, particle.y);
+            context.rotate(particle.angle);
+            context.globalAlpha = particle.alpha * appear * (0.78 + glow * 0.32);
+            context.fillStyle = color;
+            context.strokeStyle = color;
+            if (glow > 0.08) {
+                context.shadowColor = color;
+                context.shadowBlur = 5 + glow * 19;
+            }
+
+            if (particle.shape === 0 || particle.shape === 3) {
+                context.beginPath();
+                context.moveTo(-particle.length / 2, -particle.size * 0.38);
+                context.lineTo(particle.length / 2, -particle.size * 0.18);
+                context.lineTo(particle.length * 0.34, particle.size * 0.62);
+                context.lineTo(-particle.length * 0.42, particle.size * 0.34);
+                context.closePath();
+                context.fill();
+            } else if (particle.shape === 1) {
+                context.beginPath();
+                context.arc(0, 0, particle.size * 0.72, 0, Math.PI * 2);
+                context.fill();
+            } else if (particle.shape === 2) {
+                context.rotate(Math.PI / 4);
+                context.fillRect(-particle.size, -particle.size, particle.size * 2, particle.size * 2);
+            } else {
+                context.lineWidth = Math.max(1, particle.size * 0.45);
+                context.beginPath();
+                context.arc(0, 0, particle.size * 1.15, 0, Math.PI * 2);
+                context.stroke();
+            }
+            context.restore();
+        });
+        context.globalCompositeOperation = 'source-over';
+        pointer.vx *= 0.9;
+        pointer.vy *= 0.9;
+        this.completionParticleRaf = requestAnimationFrame((nextTime) => this._animateCompletionParticles(nextTime));
+    },
+
+    _stopCompletionParticles() {
+        if (this.completionParticleRaf) cancelAnimationFrame(this.completionParticleRaf);
+        this.completionParticleRaf = null;
+        if (this.completionParticleResizeHandler) window.removeEventListener('resize', this.completionParticleResizeHandler);
+        if (this.completionPointerMoveHandler) window.removeEventListener('pointermove', this.completionPointerMoveHandler);
+        if (this.completionPointerLeaveHandler) document.documentElement.removeEventListener('pointerleave', this.completionPointerLeaveHandler);
+        this.completionParticleResizeHandler = null;
+        this.completionPointerMoveHandler = null;
+        this.completionPointerLeaveHandler = null;
+        this.completionParticleContext?.clearRect(
+            0,
+            0,
+            Number(this.completionParticleCanvas?.dataset.cssWidth) || window.innerWidth,
+            Number(this.completionParticleCanvas?.dataset.cssHeight) || window.innerHeight
+        );
+        this.completionParticles = [];
+        this.completionParticleCanvas = null;
+        this.completionParticleContext = null;
+    },
+
+    _resetCompletionScene() {
+        if (this.completionTimer) clearTimeout(this.completionTimer);
+        this.completionTimer = null;
+        this._stopCompletionParticles();
+        this.completionShown = false;
+        this.element?.classList.remove('oobe-completing', 'oobe-completion-visible');
+        const completion = document.getElementById('oobe-completion');
+        if (completion) completion.setAttribute('aria-hidden', 'true');
+    },
+
+    enterDesktopFromCompletion() {
+        if (!this.completionShown) return;
+        const button = document.getElementById('oobe-enter-desktop');
+        if (button) button.disabled = true;
+        this._enterDesktopTransition();
     },
 
     _openTipsAfterFirstRun() {
@@ -1134,6 +1420,7 @@ const OOBE = {
         const back5 = document.getElementById('oobe-back-5');
         const back6 = document.getElementById('oobe-back-6');
         const finish = document.getElementById('oobe-finish');
+        const enterDesktop = document.getElementById('oobe-enter-desktop');
 
         if (next1) {
             next1.addEventListener('click', () => {
@@ -1155,6 +1442,7 @@ const OOBE = {
         if (back5) back5.addEventListener('click', () => this._setStep(4));
         if (back6) back6.addEventListener('click', () => this._setStep(5));
         if (finish) finish.addEventListener('click', () => this.completeAndEnterDesktop());
+        if (enterDesktop) enterDesktop.addEventListener('click', () => this.enterDesktopFromCompletion());
 
         if (this.userNameInputEl) {
             this.userNameInputEl.addEventListener('input', () => {
@@ -1265,6 +1553,7 @@ const OOBE = {
     },
 
     _resetFlow() {
+        this._resetCompletionScene();
         this.finishing = false;
         this.selectedLang = this._detectBrowserLanguage();
         this.selectedTheme = State?.settings?.theme === 'dark' ? 'dark' : 'light';
@@ -2419,6 +2708,8 @@ const OOBE = {
         setText('oobe-title-password', d.passwordPageTitle);
         setText('oobe-subtitle-password', d.passwordPageSubtitle);
         setText('oobe-pin-title', d.pinTitle);
+        setText('oobe-completion-title', d.completionTitle);
+        setText('oobe-enter-desktop', d.enterDesktop);
 
         const pinInput = document.getElementById('oobe-pin-input');
         if (pinInput) pinInput.placeholder = d.pinPlaceholder;
@@ -2453,6 +2744,11 @@ const OOBE = {
         if (finishButton) {
             finishButton.title = d.finish;
             finishButton.setAttribute('aria-label', d.finish);
+        }
+        const enterDesktopButton = document.getElementById('oobe-enter-desktop');
+        if (enterDesktopButton) {
+            enterDesktopButton.disabled = false;
+            enterDesktopButton.setAttribute('aria-label', d.enterDesktop);
         }
 
         if (this.welcomeBrandTextEl) {
