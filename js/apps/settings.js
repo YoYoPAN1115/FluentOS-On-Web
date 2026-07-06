@@ -11,6 +11,11 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-06', version: '2.0.260706', commits: [
+            { hash: '112ae34', title: '优化 OOBE 视觉效果，新增“大功告成”完成页、交互式粒子动画与非线性桌面过渡' },
+            { hash: '77859ed', title: '进一步优化时钟 App 体验，提醒事项支持及时通知' },
+            { hash: '50d4526', title: '完成全新提示 App，帮助用户了解新功能并完成入门引导' }
+        ] },
         { date: '2026-07-03', version: '2.0.260703.1', commits: [
             { hash: '7c07eac', title: '优化小组件位置自适应逻辑，并完善部分视觉效果' },
             { hash: 'e9f8832', title: '删除不再使用的额外图标资源' },
