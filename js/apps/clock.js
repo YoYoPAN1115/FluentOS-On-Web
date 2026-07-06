@@ -77,6 +77,9 @@ const ClockApp = {
         if (typeof State !== 'undefined' && typeof State.emit === 'function') {
             State.emit('clockEventsUpdate', { events: this.calendarEvents });
         }
+        if (typeof ClockReminderService !== 'undefined') {
+            ClockReminderService.checkDueEvents();
+        }
     },
 
     render() {
@@ -225,21 +228,21 @@ const ClockApp = {
             .dark-mode .calendar-day:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .calendar-nav-btn:hover { background: rgba(255, 255, 255, 0.1); }
             
-            body.fluent-v2 .clock-app .timer-btn.fluent-btn { min-width: 148px; }
-            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn,
-            body.fluent-v2:not(.dark-mode) .clock-app .timer-btn.fluent-btn .fluent-btn-text {
-                color: #111111 !important;
-                -webkit-text-fill-color: #111111;
-                background-clip: border-box;
-                -webkit-background-clip: border-box;
+            body.fluent-v2 .clock-content .timer-btn.fluent-btn { min-width: 148px; }
+            body:not(.dark-mode) .clock-content .timer-btn.fluent-btn,
+            body:not(.dark-mode) .clock-content .timer-btn.fluent-btn .fluent-btn-text {
+                color: #000000 !important;
+                -webkit-text-fill-color: #000000 !important;
+                background-clip: border-box !important;
+                -webkit-background-clip: border-box !important;
                 background-image: none !important;
             }
-            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn,
-            body.fluent-v2.dark-mode .clock-app .timer-btn.fluent-btn .fluent-btn-text {
+            body.dark-mode .clock-content .timer-btn.fluent-btn,
+            body.dark-mode .clock-content .timer-btn.fluent-btn .fluent-btn-text {
                 color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff;
-                background-clip: border-box;
-                -webkit-background-clip: border-box;
+                -webkit-text-fill-color: #ffffff !important;
+                background-clip: border-box !important;
+                -webkit-background-clip: border-box !important;
                 background-image: none !important;
             }
         `;
@@ -754,7 +757,9 @@ const ClockApp = {
                             id: `event-${Date.now()}`,
                             date: this.selectedDate.toISOString(),
                             time: time,
-                            title: title
+                            title: title,
+                            completed: false,
+                            reminderEnabled: true
                         };
 
                         this.calendarEvents.push(event);
@@ -950,6 +955,7 @@ const ClockApp = {
             if (isEdit) {
                 event.title = title;
                 event.time = normalizedTime;
+                event.reminderEnabled = true;
                 this.saveData();
                 this.renderKeepingClockScroll(dialogScrollTop);
                 FluentUI.Toast({ title: t('clock.event-updated'), message: `${title} - ${normalizedTime}`, type: 'success' });
@@ -959,7 +965,8 @@ const ClockApp = {
                     date: this.selectedDate.toISOString(),
                     time: normalizedTime,
                     title,
-                    completed: false
+                    completed: false,
+                    reminderEnabled: true
                 };
 
                 this.calendarEvents.push(newEvent);
@@ -1030,4 +1037,133 @@ const ClockApp = {
 };
 
 // 将应用暴露到全局，供 WindowManager 调用
+const ClockReminderService = {
+    intervalId: null,
+    deliveryStorageKey: 'clock_reminder_deliveries',
+    toastHandles: new Map(),
+
+    init() {
+        if (this.intervalId) return;
+        State.on('notificationRemove', notificationId => this.closeReminderPopup(notificationId));
+        State.on('viewChange', ({ newView } = {}) => {
+            if (newView === 'desktop') this.showPendingReminderPopups();
+        });
+        this.checkDueEvents();
+        this.intervalId = setInterval(() => this.checkDueEvents(), 10000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this.checkDueEvents();
+        });
+    },
+
+    getEventDueDate(event) {
+        if (!event || !event.date || !ClockApp.isValidCalendarTime(event.time)) return null;
+        const eventDate = new Date(event.date);
+        if (Number.isNaN(eventDate.getTime())) return null;
+        const [hours, minutes] = ClockApp.normalizeCalendarTime(event.time).split(':').map(Number);
+        return new Date(
+            eventDate.getFullYear(),
+            eventDate.getMonth(),
+            eventDate.getDate(),
+            hours,
+            minutes,
+            0,
+            0
+        );
+    },
+
+    getEventSignature(event, dueDate) {
+        const datePart = [
+            dueDate.getFullYear(),
+            String(dueDate.getMonth() + 1).padStart(2, '0'),
+            String(dueDate.getDate()).padStart(2, '0')
+        ].join('-');
+        return `${event.id}|${datePart}|${ClockApp.normalizeCalendarTime(event.time)}`;
+    },
+
+    showReminderPopup(notificationId, notification) {
+        if (State.view !== 'desktop' || typeof FluentUI === 'undefined' || !FluentUI.Toast) return;
+        if (this.toastHandles.has(notificationId)) return;
+
+        const toastHandle = FluentUI.Toast({
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            duration: 0,
+            onClose: () => {
+                this.toastHandles.delete(notificationId);
+                if (State.notifications.some(item => item.id === notificationId)) {
+                    State.removeNotification(notificationId);
+                }
+            }
+        });
+        this.toastHandles.set(notificationId, toastHandle);
+    },
+
+    showPendingReminderPopups() {
+        State.notifications
+            .filter(notification =>
+                notification.manualDismissOnly === true && Boolean(notification.reminderSignature)
+            )
+            .forEach(notification => this.showReminderPopup(notification.id, notification));
+    },
+
+    closeReminderPopup(notificationId) {
+        const toastHandle = this.toastHandles.get(notificationId);
+        if (!toastHandle) return;
+        this.toastHandles.delete(notificationId);
+        toastHandle.close();
+    },
+
+    checkDueEvents() {
+        if (typeof Storage === 'undefined' || typeof State === 'undefined') return;
+        const data = Storage.get('clock_data') || {};
+        const events = Array.isArray(data.events) ? data.events : [];
+        const deliveries = Storage.get(this.deliveryStorageKey) || {};
+        const now = new Date();
+        let deliveriesChanged = false;
+
+        events.forEach(event => {
+            if (!event || event.reminderEnabled !== true || event.completed === true) return;
+            const dueDate = this.getEventDueDate(event);
+            if (!dueDate || dueDate > now) return;
+
+            const signature = this.getEventSignature(event, dueDate);
+            if (deliveries[event.id] === signature) return;
+
+            const alreadyQueued = State.notifications.some(notification =>
+                notification.reminderSignature === signature
+            );
+            if (!alreadyQueued) {
+                const notification = {
+                    title: t('clock.reminder-title'),
+                    message: t('clock.reminder-message', {
+                        title: String(event.title || ''),
+                        time: ClockApp.normalizeCalendarTime(event.time)
+                    }),
+                    type: 'info',
+                    manualDismissOnly: true,
+                    showOnLockScreen: true,
+                    dismissOnClick: false,
+                    reminderSignature: signature,
+                    onClickAction: {
+                        type: 'openApp',
+                        appId: 'clock',
+                        data: { tab: 'calendar' }
+                    }
+                };
+                const notificationId = State.addNotification(notification);
+                this.showReminderPopup(notificationId, notification);
+            }
+
+            deliveries[event.id] = signature;
+            deliveriesChanged = true;
+        });
+
+        if (deliveriesChanged) {
+            Storage.set(this.deliveryStorageKey, deliveries);
+        }
+    }
+};
+
 window.ClockApp = ClockApp;
+window.ClockReminderService = ClockReminderService;

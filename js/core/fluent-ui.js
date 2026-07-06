@@ -1029,7 +1029,8 @@ const FluentUI = {
             type = 'info',  // 'info' | 'success' | 'warning' | 'error'
             duration = 5000,  // 显示时间，毫秒
             icon = null,
-            onClick = null
+            onClick = null,
+            onClose = null
         } = opts;
         
         // 类型对应的图标
@@ -1057,17 +1058,26 @@ const FluentUI = {
                 <img src="${this._utils.getIconPath(toastIcon)}" alt="">
             </div>
             <div class="fluent-toast-body">
-                ${title ? `<div class="fluent-toast-title">${title}</div>` : ''}
-                ${message ? `<div class="fluent-toast-message">${message}</div>` : ''}
+                ${title ? '<div class="fluent-toast-title"></div>' : ''}
+                ${message ? '<div class="fluent-toast-message"></div>' : ''}
             </div>
             <button type="button" class="fluent-toast-close">
                 <img src="${this._utils.getIconPath('Cancel')}" alt="关闭">
             </button>
         `;
+
+        const titleElement = toast.querySelector('.fluent-toast-title');
+        const messageElement = toast.querySelector('.fluent-toast-message');
+        if (titleElement) titleElement.textContent = title;
+        if (messageElement) messageElement.textContent = message;
         
         // 关闭通知的方法
+        let closed = false;
         const close = () => {
+            if (closed) return;
+            closed = true;
             toast.classList.add('fluent-toast-exit');
+            if (typeof onClose === 'function') onClose();
             setTimeout(() => {
                 toast.remove();
                 // 如果没有通知了，移除容器

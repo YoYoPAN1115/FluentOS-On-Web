@@ -1108,10 +1108,13 @@ const State = {
         };
         this.notifications.unshift(newNotification);
         
-        // 最多保留50条通知
-        if (this.notifications.length > 50) {
-            this.notifications = this.notifications.slice(0, 50);
-        }
+        // 普通通知最多保留 50 条；手动关闭型提醒不参与自动淘汰。
+        let regularNotificationCount = 0;
+        this.notifications = this.notifications.filter(item => {
+            if (item.manualDismissOnly === true) return true;
+            regularNotificationCount += 1;
+            return regularNotificationCount <= 50;
+        });
         
         Storage.set(Storage.keys.NOTIFICATIONS, this.notifications);
         this.emit('notificationAdd', newNotification);
@@ -1127,8 +1130,9 @@ const State = {
 
     // 清空所有通知
     clearNotifications() {
-        this.notifications = [];
-        Storage.set(Storage.keys.NOTIFICATIONS, []);
+        // 需要用户明确点击关闭按钮的提醒不能被“全部清除”误删。
+        this.notifications = this.notifications.filter(notification => notification.manualDismissOnly === true);
+        Storage.set(Storage.keys.NOTIFICATIONS, this.notifications);
         this.emit('notificationsClear');
     },
 

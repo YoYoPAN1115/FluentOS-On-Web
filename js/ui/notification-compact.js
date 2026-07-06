@@ -74,7 +74,9 @@ const NotificationCenter = {
         }
 
         this.emptyElement.classList.add('hidden');
-        if (this.clearBtn) this.clearBtn.disabled = false;
+        if (this.clearBtn) {
+            this.clearBtn.disabled = !State.notifications.some(notification => notification.manualDismissOnly !== true);
+        }
 
         State.notifications.forEach(notification => {
             const item = this.createNotificationItem(notification);
@@ -93,15 +95,18 @@ const NotificationCenter = {
         item.innerHTML = `
             <div class="notification-item-header">
                 <div>
-                    <div class="notification-item-title">${notification.title}</div>
+                    <div class="notification-item-title"></div>
                     <div class="notification-item-time">${timeStr}</div>
                 </div>
                 <button class="notification-item-close" ${notification.persistent ? 'style="display:none;"' : ''}>
                     <img src="Theme/Icon/Symbol_icon/stroke/Cancel.svg" alt="关闭">
                 </button>
             </div>
-            <div class="notification-item-content">${notification.message}</div>
+            <div class="notification-item-content"></div>
         `;
+
+        item.querySelector('.notification-item-title').textContent = notification.title || '';
+        item.querySelector('.notification-item-content').textContent = notification.message || '';
 
         const closeBtn = item.querySelector('.notification-item-close');
         closeBtn.addEventListener('click', () => {

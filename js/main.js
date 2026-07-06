@@ -215,6 +215,7 @@ function initModules() {
     StartMenu.init();
     ControlCenter.init();
     NotificationCenter.init();
+    if (typeof ClockReminderService !== 'undefined') { ClockReminderService.init(); }
     WindowManager.init();
     if (typeof FavoriteSites !== 'undefined') { FavoriteSites.init(); }
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
