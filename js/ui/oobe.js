@@ -363,8 +363,11 @@ const OOBE = {
         this.finishing = true;
 
         const continueToDesktop = async () => {
-            await this._ensureWallpaperHighResolution(this.selectedWallpaper);
-            this._applySelections();
+            const selectedWallpaperPreview = typeof WallpaperStore !== 'undefined' && WallpaperStore.isReference(this.selectedWallpaper)
+                ? State.getResolvedWallpaper('desktop')
+                : this.selectedWallpaper;
+            await this._ensureWallpaperHighResolution(selectedWallpaperPreview);
+            await this._applySelections();
             // OOBE may have entered browser fullscreen after Widgets initialized.
             // Build the starter desktop against the real grid visible at this moment.
             if (typeof Widgets !== 'undefined' && typeof Widgets.initializeDefaultDesktopLayoutForViewport === 'function') {
@@ -1607,7 +1610,9 @@ const OOBE = {
     },
 
     _syncBackgroundWithLockWallpaper() {
-        const lockWallpaper = State?.settings?.wallpaperLock || 'Theme/Picture/Fluent-1.png';
+        const lockWallpaper = typeof State?.getResolvedWallpaper === 'function'
+            ? State.getResolvedWallpaper('lock')
+            : (State?.settings?.wallpaperLock || 'Theme/Picture/Fluent-1.png');
         const previewWallpaper = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeWallpaperPreview === 'function'
             ? BootScreen.getOobeWallpaperPreview(lockWallpaper)
             : lockWallpaper;
@@ -1623,9 +1628,12 @@ const OOBE = {
         this.element.classList.toggle('oobe-theme-light', !isDark);
         document.body.classList.toggle('oobe-dark-dialog-mode', isDark && !this.element.classList.contains('hidden'));
         const accent = String(this.selectedAccentColor || '#0078d4');
-        const previewWallpaper = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeWallpaperPreview === 'function'
-            ? BootScreen.getOobeWallpaperPreview(this.selectedWallpaper)
+        const selectedWallpaperPreview = typeof WallpaperStore !== 'undefined' && WallpaperStore.isReference(this.selectedWallpaper)
+            ? State.getResolvedWallpaper('desktop')
             : this.selectedWallpaper;
+        const previewWallpaper = typeof BootScreen !== 'undefined' && typeof BootScreen.getOobeWallpaperPreview === 'function'
+            ? BootScreen.getOobeWallpaperPreview(selectedWallpaperPreview)
+            : selectedWallpaperPreview;
         const rgb = State && typeof State.hexToRgb === 'function'
             ? State.hexToRgb(accent)
             : { r: 0, g: 120, b: 212 };
@@ -2198,7 +2206,7 @@ const OOBE = {
         });
     },
 
-    _applySelections() {
+    async _applySelections() {
         const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
         const name = String(this.selectedUserName || '').trim();
         const email = String(this.selectedUserEmail || '').trim();
@@ -2206,7 +2214,6 @@ const OOBE = {
 
         const updates = {
             theme: this.selectedTheme,
-            wallpaperDesktop: this.selectedWallpaper,
             enableWindowBlur: this.selectedWindowBlur,
             accentColor: this.selectedAccentColor,
             accentColorAuto: false,
@@ -2225,6 +2232,18 @@ const OOBE = {
 
         if (State && typeof State.updateSettings === 'function') {
             State.updateSettings(updates);
+            if (typeof State.setWallpaper === 'function') {
+                try {
+                    await State.setWallpaper('desktop', this.selectedWallpaper, {
+                        sourceType: /^https?:/i.test(String(this.selectedWallpaper || '')) ? 'bing' : 'oobe'
+                    });
+                } catch (error) {
+                    console.warn('[OOBE] Wallpaper cache failed; using the built-in default.', error);
+                    await State.setWallpaper('desktop', 'Theme/Picture/Fluent-2.png', { sourceType: 'built-in' });
+                }
+            } else {
+                State.updateSettings({ wallpaperDesktop: this.selectedWallpaper });
+            }
         }
 
         if (this.selectedLang && I18n && typeof I18n.setLanguage === 'function') {

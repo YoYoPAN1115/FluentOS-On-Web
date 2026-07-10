@@ -253,13 +253,20 @@ const Widgets = {
         document.body.classList.toggle('widgets-lock-fallback-blur', enabled && hasLockFallbackBlur);
     },
 
-    _refreshStaticBlurTexture() {
+    async _refreshStaticBlurTexture() {
+        const requestId = (this._staticBlurRequestId || 0) + 1;
+        this._staticBlurRequestId = requestId;
         if (State.settings.forceRealtimeBlur === true) {
             this._applyStaticBlurMode();
             return;
         }
-        const desktopWallpaper = (State.settings && State.settings.wallpaperDesktop) || 'Theme/Picture/Fluent-2.png';
-        const lockWallpaper = (State.settings && State.settings.wallpaperLock) || 'Theme/Picture/Fluent-1.png';
+        const [desktopWallpaper, lockWallpaper] = typeof State.resolveWallpaper === 'function'
+            ? await Promise.all([State.resolveWallpaper('desktop'), State.resolveWallpaper('lock')])
+            : [
+                (State.settings && State.settings.wallpaperDesktop) || 'Theme/Picture/Fluent-2.png',
+                (State.settings && State.settings.wallpaperLock) || 'Theme/Picture/Fluent-1.png'
+            ];
+        if (this._staticBlurRequestId !== requestId) return;
         this._refreshStaticBlurTextureFor('desktop', desktopWallpaper);
         this._refreshStaticBlurTextureFor('lock', lockWallpaper);
     },

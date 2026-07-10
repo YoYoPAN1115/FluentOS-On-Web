@@ -1453,6 +1453,18 @@ const SettingsApp = {
                 animation: aboutCardEnter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
+            /* The hero participates in the system-wide pointer glow API. */
+            body.button-glow-enabled .settings-about-hero-card.button-glow-target > .button-edge-glow {
+                width: 280px;
+                height: 280px;
+                z-index: 10;
+                filter: blur(12px);
+            }
+
+            body.button-glow-enabled .settings-about-hero-card.button-glow-target > .button-glow-ripple {
+                z-index: 9;
+            }
+
             .settings-about-landscape {
                 position: absolute;
                 inset: -1px;
@@ -2486,7 +2498,9 @@ const SettingsApp = {
         // 设备信息头部（显示壁纸和电脑名称）
         const header = document.createElement('div');
         header.className = 'settings-overview-header';
-        const wallpaper = State.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
+        const wallpaper = typeof State.getResolvedWallpaper === 'function'
+            ? State.getResolvedWallpaper('desktop')
+            : (State.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png');
         header.innerHTML = `
             <div class="settings-overview-device">
                 <div class="settings-overview-wallpaper">
@@ -3783,8 +3797,8 @@ const SettingsApp = {
                     const data = await response.json();
                     if (data && data.url) {
                         const wp = data.url;
-                        State.updateSettings({ wallpaperDesktop: wp });
-                        Desktop.updateWallpaper();
+                        await State.setWallpaper('desktop', wp, { sourceType: 'bing', sourceUrl: wp });
+                        await Desktop.updateWallpaper();
                         this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.bing-wallpaper'), 'personalization');
                         State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.bing-applied'), type: 'success' });
                         this.render();
@@ -3806,20 +3820,21 @@ const SettingsApp = {
         uploadInput.type = 'file';
         uploadInput.accept = 'image/*';
         uploadInput.style.display = 'none';
-        uploadInput.onchange = (e) => {
+        uploadInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const wp = event.target.result;
-                    State.updateSettings({ wallpaperDesktop: wp });
-                    Desktop.updateWallpaper();
+                try {
+                    await State.setWallpaper('desktop', file, { sourceType: 'upload', name: file.name, mime: file.type });
+                    await Desktop.updateWallpaper();
                     this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.custom-applied'), 'personalization');
                     State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.custom-applied'), type: 'success' });
                     this.render();
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Desktop wallpaper cache failed', error);
+                    State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
+                }
             }
+            e.target.value = '';
         };
         
         const uploadBtn = FluentUI.Button({
@@ -3851,8 +3866,8 @@ const SettingsApp = {
                     const response = await fetch('https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN');
                     const data = await response.json();
                     if (data.url) {
-                        State.updateSettings({ wallpaperLock: data.url });
-                        LockScreen.updateWallpaper && LockScreen.updateWallpaper();
+                        await State.setWallpaper('lock', data.url, { sourceType: 'bing', sourceUrl: data.url });
+                        if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                         State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-bing-applied'), type: 'success' });
                         this.render();
                     }
@@ -3866,19 +3881,20 @@ const SettingsApp = {
         lockUploadInput.type = 'file';
         lockUploadInput.accept = 'image/*';
         lockUploadInput.style.display = 'none';
-        lockUploadInput.onchange = (e) => {
+        lockUploadInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const wp = event.target.result;
-                    State.updateSettings({ wallpaperLock: wp });
-                    LockScreen.updateWallpaper && LockScreen.updateWallpaper();
+                try {
+                    await State.setWallpaper('lock', file, { sourceType: 'upload', name: file.name, mime: file.type });
+                    if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                     State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-custom-applied'), type: 'success' });
                     this.render();
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Lock wallpaper cache failed', error);
+                    State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
+                }
             }
+            e.target.value = '';
         };
         
         const lockUploadBtn = FluentUI.Button({
@@ -5375,13 +5391,13 @@ const SettingsApp = {
             const item = document.createElement('div');
             item.className = `wallpaper-item ${wp === selected ? 'selected' : ''}`;
             item.innerHTML = `<img src="${wp}" alt="壁纸">`;
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 if (type === 'desktop') {
-                    State.updateSettings({ wallpaperDesktop: wp });
-                    Desktop.updateWallpaper();
+                    await State.setWallpaper('desktop', wp, { sourceType: 'built-in' });
+                    await Desktop.updateWallpaper();
                 } else {
-                    State.updateSettings({ wallpaperLock: wp });
-                    if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) LockScreen.updateWallpaper();
+                    await State.setWallpaper('lock', wp, { sourceType: 'built-in' });
+                    if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                 }
                 this.render();
                 State.addNotification({ title: t('settings.personalization'), message: t('settings.wallpaper-changed', { type: type === 'desktop' ? t('settings.desktop') : t('settings.lockscreen') }), type: 'success' });

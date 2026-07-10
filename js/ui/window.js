@@ -1974,9 +1974,23 @@ const WindowManager = {
         this._syncAllTaskbarAppStates();
     },
 
-    closeWindow(windowId) {
+    requestCloseWindow(windowId) {
+        return new Promise((resolve) => {
+            const existing = this.windows.find(w => w.id === windowId);
+            if (!existing) {
+                resolve(true);
+                return;
+            }
+            this.closeWindow(windowId, { onClosed: resolve });
+        });
+    },
+
+    closeWindow(windowId, options = {}) {
         const windowData = this.windows.find(w => w.id === windowId);
-        if (!windowData) return;
+        if (!windowData) {
+            options.onClosed?.(true);
+            return;
+        }
         this._hideSnapMenu(windowData.element, true);
         this._hideDragSnapHint(true);
         this._persistWindowBounds(windowData);
@@ -2018,6 +2032,7 @@ const WindowManager = {
                 // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
                 this._syncAllTaskbarAppStates();
+                options.onClosed?.(true);
             }, closeDuration);
         };
 
@@ -2029,11 +2044,20 @@ const WindowManager = {
             if (component && typeof component.beforeClose === 'function') {
                 const result = component.beforeClose();
                 if (result && typeof result.then === 'function') {
-                    result.then((ok) => { if (ok === false) return; proceedClose(); })
+                    result.then((ok) => {
+                        if (ok === false) {
+                            options.onClosed?.(false);
+                            return;
+                        }
+                        proceedClose();
+                    })
                           .catch(() => proceedClose());
                     return; // 等待用户确认 - Wait for user confirmation
                 }
-                if (result === false) return; // 用户取消关闭 - User cancelled close
+                if (result === false) {
+                    options.onClosed?.(false);
+                    return;
+                } // 用户取消关闭 - User cancelled close
             }
         }catch (e) {
             console.warn('beforeClose 执行失败，继续关闭窗口 - beforeClose failed, continue closing', e);

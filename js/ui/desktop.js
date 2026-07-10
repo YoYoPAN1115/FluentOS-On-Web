@@ -8,6 +8,7 @@ const Desktop = {
     contextMenu: null,
     selectedIcon: null,
     selectedIcons: [], // 多选图标数组
+    contextSelectionIds: [],
     
     // 框选相关
     isSelecting: false,
@@ -57,6 +58,41 @@ const Desktop = {
             icon.classList.toggle('repairing', isRepairing);
             icon.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
         });
+    },
+
+    setFileDragImage(dataTransfer, node, count = 1, sourceImage = null, clientX = 0, clientY = 0) {
+        if (!dataTransfer || typeof dataTransfer.setDragImage !== 'function' || !node) return;
+        const ghost = document.createElement('div');
+        ghost.className = 'taskbar-drag-ghost desktop-native-drag-ghost';
+        ghost.style.left = `${Number(clientX) || 0}px`;
+        ghost.style.top = `${Number(clientY) || 0}px`;
+
+        const image = sourceImage?.cloneNode(false) || document.createElement('img');
+        image.src = sourceImage?.currentSrc || sourceImage?.src || this.getDesktopIcon(node);
+        image.alt = '';
+        ghost.appendChild(image);
+
+        if (count > 1) {
+            const badge = document.createElement('span');
+            badge.textContent = String(count);
+            ghost.appendChild(badge);
+        }
+
+        document.body.appendChild(ghost);
+        // Chromium only captures a DOM drag image reliably while it is rendered
+        // in the viewport. This mirrors the Start-menu App drag ghost and keeps
+        // the actual file/folder/App artwork visible.
+        ghost.getBoundingClientRect();
+        dataTransfer.setDragImage(ghost, 26, 26);
+        setTimeout(() => ghost.remove(), 0);
+    },
+
+    getSelectedIconElements() {
+        if (!this.iconsContainer) return [];
+        const selected = Array.from(this.iconsContainer.querySelectorAll('.desktop-icon.selected'));
+        this.selectedIcons = selected;
+        this.selectedIcon = selected[selected.length - 1] || null;
+        return selected;
     },
     
     bindDragDropEvents() {
@@ -272,10 +308,16 @@ const Desktop = {
         this.element.classList.add('hidden');
     },
 
-    updateWallpaper() {
-        const wallpaper = State.settings.wallpaperDesktop;
+    async updateWallpaper() {
+        const wallpaperSetting = State.settings.wallpaperDesktop;
+        const requestId = (this._wallpaperRequestId || 0) + 1;
+        this._wallpaperRequestId = requestId;
+        const wallpaper = typeof State.resolveWallpaper === 'function'
+            ? await State.resolveWallpaper('desktop')
+            : wallpaperSetting;
+        if (this._wallpaperRequestId !== requestId) return;
         const applyWallpaper = () => {
-            if (State.settings.wallpaperDesktop !== wallpaper) return;
+            if (this._wallpaperRequestId !== requestId) return;
             if (this._currentWallpaper === wallpaper && !this._wallpaperTransitionLayer) return;
             const currentImage = this.wallpaperElement.style.backgroundImage;
             const nextImage = `url("${String(wallpaper).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`;
@@ -319,7 +361,7 @@ const Desktop = {
         image.onerror = applyWallpaper;
         image.src = wallpaper;
         if (document.body && State.applyMaterialSetting) {
-            State.applyMaterialSetting();
+            State.applyMaterialSetting(wallpaper);
         }
         // 检测壁纸亮度并更新图标样式
         this.detectWallpaperBrightness(wallpaper);
@@ -395,6 +437,14 @@ const Desktop = {
             'pptx': 'Theme/Icon/Symbol_icon/colour/ppt.svg'
         };
         return colourIcons[ext] || 'Theme/Icon/Symbol_icon/fill/File.svg';
+    },
+
+    getDesktopImagePreview(node) {
+        if (!node || node.type !== 'file' || typeof FilesApp === 'undefined') return '';
+        if (typeof FilesApp.isImageNode !== 'function' || !FilesApp.isImageNode(node)) return '';
+        return typeof FilesApp.getImagePreviewSrc === 'function'
+            ? FilesApp.getImagePreviewSrc(node)
+            : String(node.thumb || '');
     },
 
     /**
@@ -522,8 +572,9 @@ const Desktop = {
                 el.setAttribute('aria-disabled', repairing ? 'true' : 'false');
             }
             el.draggable = true;
-            const icon = this.getDesktopIcon(node);
-            el.innerHTML = `<img src="${icon}" alt="${node.name}"><span>${node.name}</span>`;
+            const imagePreview = this.getDesktopImagePreview(node);
+            const icon = imagePreview || this.getDesktopIcon(node);
+            el.innerHTML = `<img${imagePreview ? ' class="desktop-icon-image-preview"' : ''} src="${icon}" alt="${node.name}"><span>${node.name}</span>`;
             // 计算位置：图标居中放在所属格子上
             const x = grid.marginX + cell.col * grid.pitch + iconOffset;
             const y = grid.marginTop + cell.row * grid.pitch + iconOffset;
@@ -534,7 +585,7 @@ const Desktop = {
             // 拖拽事件
             let draggingIds = [node.id];
             el.addEventListener('dragstart', (e) => {
-                const multiSelectedIds = this.selectedIcons
+                const multiSelectedIds = this.getSelectedIconElements()
                     .map(iconEl => iconEl.dataset.nodeId)
                     .filter(Boolean);
                 const useMultiSelection = el.classList.contains('selected') && multiSelectedIds.length > 1;
@@ -548,6 +599,14 @@ const Desktop = {
                     type: node.type,
                     source: 'desktop'
                 }));
+                this.setFileDragImage(
+                    e.dataTransfer,
+                    node,
+                    draggingIds.length,
+                    el.querySelector('img'),
+                    e.clientX,
+                    e.clientY
+                );
                 draggingIds.forEach((id) => {
                     const iconEl = this.iconsContainer.querySelector(`.desktop-icon[data-node-id="${id}"]`);
                     if (iconEl) iconEl.classList.add('dragging');
@@ -703,6 +762,7 @@ const Desktop = {
             
             // 只在桌面空白区域显示右键菜单
             e.preventDefault();
+            this.contextSelectionIds = [];
             this.showContextMenu(e.clientX, e.clientY);
         });
 
@@ -719,8 +779,20 @@ const Desktop = {
             const icon = e.target.closest('.desktop-icon');
             if (!icon) return; // 空白区域用已有菜单
             e.preventDefault();
+            // 右键已有多选中的任意一项时保留整组选择；右键未选中的
+            // 项目时则将它切换为唯一选择，行为与原生桌面一致。
+            if (!icon.classList.contains('selected')) {
+                this.deselectAll();
+                this.selectIcon(icon);
+            } else {
+                this.getSelectedIconElements();
+                this.selectedIcon = icon;
+            }
             const nodeId = icon.dataset.nodeId;
             this.contextTargetId = nodeId;
+            this.contextSelectionIds = this.getSelectedIconElements()
+                .map((selected) => selected.dataset.nodeId)
+                .filter(Boolean);
             this.showDesktopItemMenu(e.clientX, e.clientY, nodeId);
         });
 
@@ -804,19 +876,20 @@ const Desktop = {
             if (isEditableTarget) return;
             if (State.view !== 'desktop') return;
 
-            // 只在桌面激活且没有窗口焦点时响应
-            const hasActiveWindow = document.querySelector('.window:not(.minimized)');
-            if (hasActiveWindow) return;
+            // 只在桌面激活且系统当前没有活动窗口时响应。
+            if (typeof WindowManager !== 'undefined' && WindowManager.activeWindowId) return;
 
             let key = String(e.key || '').toLowerCase();
             if ((!key || !/^[a-z]$/.test(key)) && /^Key[A-Z]$/.test(String(e.code || ''))) {
                 key = String(e.code).slice(3).toLowerCase();
             }
 
-            if (e.key === 'Delete' && this.selectedIcons.length > 0) {
-                e.preventDefault();
-                this.deleteSelectedIcons();
-                return;
+            if (e.key === 'Delete') {
+                if (this.getSelectedIconElements().length > 0) {
+                    e.preventDefault();
+                    this.deleteSelectedIcons();
+                    return;
+                }
             }
 
             if (e.ctrlKey && !e.altKey && !e.metaKey && key === 'a') {
@@ -826,8 +899,15 @@ const Desktop = {
         });
     },
     
-    deleteSelectedIcons() {
-        if (this.selectedIcons.length === 0) return;
+    async deleteSelectedIcons(ids = null) {
+        const liveIds = this.getSelectedIconElements()
+            .map((icon) => icon.dataset.nodeId)
+            .filter(Boolean);
+        const selectedIds = [...new Set(Array.isArray(ids) && ids.length ? ids : liveIds)];
+        if (selectedIds.length === 0) return;
+        if (typeof FilesApp !== 'undefined' && typeof FilesApp.ensureNodesCanBeDeleted === 'function') {
+            if (!await FilesApp.ensureNodesCanBeDeleted(selectedIds)) return;
+        }
         
         const desktop = State.findNode('desktop');
         if (!desktop || !desktop.children) {
@@ -841,31 +921,26 @@ const Desktop = {
             return;
         }
         
-        const count = this.selectedIcons.length;
-        
-        // 移动所有选中的图标到回收站
-        this.selectedIcons.forEach(icon => {
-            const nodeId = icon.dataset.nodeId;
-            const node = State.findNode(nodeId);
-            if (!node) return;
-            
-            // 从桌面移除
+        recycle.children = recycle.children || [];
+        let count = 0;
+
+        // 先快照全部 ID，再修改文件树，避免桌面重绘后 DOM 引用失效。
+        selectedIds.forEach((nodeId) => {
             const idx = desktop.children.findIndex(c => c.id === nodeId);
             if (idx !== -1) {
                 const removedNode = desktop.children.splice(idx, 1)[0];
                 removedNode._recycle = { originalParentId: desktop.id };
-                
-                // 添加到回收站
-                recycle.children = recycle.children || [];
                 recycle.children.unshift(removedNode);
+                count += 1;
             }
         });
-        
+
+        if (count === 0) return;
+        this.selectedIcons = [];
+        this.selectedIcon = null;
+
         // 更新文件系统
         State.updateFS(State.fs);
-        
-        // 清除选择
-        this.deselectAll();
         
         // 显示通知
         State.addNotification({
@@ -909,9 +984,12 @@ const Desktop = {
     },
 
     /** 把桌面上的单个节点移入回收站 */
-    moveDesktopNodeToRecycle(nodeId) {
+    async moveDesktopNodeToRecycle(nodeId) {
         const desktop = State.findNode('desktop');
         if (!desktop || !desktop.children) return false;
+        if (typeof FilesApp !== 'undefined' && typeof FilesApp.ensureNodesCanBeDeleted === 'function') {
+            if (!await FilesApp.ensureNodesCanBeDeleted([nodeId])) return false;
+        }
         const idx = desktop.children.findIndex(c => c.id === nodeId);
         if (idx === -1) return false;
         const node = desktop.children.splice(idx, 1)[0];
@@ -1039,9 +1117,10 @@ const Desktop = {
     showDesktopItemMenu(x, y, nodeId) {
         const node = State.findNode(nodeId);
         if (!node) return;
-        
+
+        const selectedCount = this.contextSelectionIds.length || this.getSelectedIconElements().length;
         // 判断是否多选
-        const isMultiSelect = this.selectedIcons.length > 1;
+        const isMultiSelect = selectedCount > 1;
         const disabledClass = isMultiSelect ? ' disabled' : '';
         const totalIcons = this.iconsContainer ? this.iconsContainer.querySelectorAll('.desktop-icon').length : 0;
         const allSelected = totalIcons > 0 && this.selectedIcons.length === totalIcons;
@@ -1056,7 +1135,7 @@ const Desktop = {
             </div>
             <div class="context-menu-item" data-action="delete">
                 <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
-                <span>${t('desktop.menu.delete')}${isMultiSelect ? ` (${this.selectedIcons.length})` : ''}</span>
+                <span>${t('desktop.menu.delete')}${isMultiSelect ? ` (${selectedCount})` : ''}</span>
             </div>
             <div class="context-menu-item" data-action="${selectAction}">
                 <img src="Theme/Icon/Symbol_icon/stroke/Select Box.svg" alt="">
@@ -1125,7 +1204,9 @@ const Desktop = {
                 FluentUI.InputDialog({
                     title: '重命名',
                     placeholder: '输入新名称',
-                    defaultValue: node.name,
+                    defaultValue: node.type === 'file' && node.name.lastIndexOf('.') > 0
+                        ? node.name.slice(0, node.name.lastIndexOf('.'))
+                        : node.name,
                     validateFn: (value) => {
                         if (!value) return '名称不能为空';
                         if (value.includes('/') || value.includes('\\')) return '名称不能包含 / 或 \\';
@@ -1155,6 +1236,14 @@ const Desktop = {
                             const isExecutableExt = (ext) => extList.includes(String(ext || '').toLowerCase());
 
                             const oldParts = splitFileExt(node.name);
+                            if (oldParts.hasExt) {
+                                const oldSuffix = `.${oldParts.ext}`;
+                                let visibleName = String(newName || '').trim();
+                                if (visibleName.toLowerCase().endsWith(oldSuffix.toLowerCase())) {
+                                    visibleName = visibleName.slice(0, -oldSuffix.length);
+                                }
+                                newName = `${visibleName || oldParts.base}${oldSuffix}`;
+                            }
                             const newParts = splitFileExt(newName);
 
                             if (!oldParts.hasExt) {
@@ -1189,8 +1278,9 @@ const Desktop = {
             }
             case 'delete': {
                 // 多选时删除所有选中的文件
-                if (this.selectedIcons.length > 1) {
-                    this.deleteSelectedIcons();
+                if (this.contextSelectionIds.length > 1) {
+                    this.deleteSelectedIcons(this.contextSelectionIds);
+                    this.contextSelectionIds = [];
                     break;
                 }
                 // 单选时删除单个文件
@@ -1204,6 +1294,7 @@ const Desktop = {
                 }
                 this.moveDesktopNodeToRecycle(id);
                 this.deselectAll();
+                this.contextSelectionIds = [];
                 break;
             }
             case 'properties': {

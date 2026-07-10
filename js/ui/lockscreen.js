@@ -69,8 +69,13 @@ const LockScreen = {
         this.dateElement.textContent = `${year}/${month}/${day}`;
     },
 
-    updateWallpaper() {
-        const wallpaper = State.settings.wallpaperLock;
+    async updateWallpaper() {
+        const requestId = (this._wallpaperRequestId || 0) + 1;
+        this._wallpaperRequestId = requestId;
+        const wallpaper = typeof State.resolveWallpaper === 'function'
+            ? await State.resolveWallpaper('lock')
+            : State.settings.wallpaperLock;
+        if (this._wallpaperRequestId !== requestId) return;
         this.wallpaperElement.style.backgroundImage = `url('${wallpaper}')`;
     },
 

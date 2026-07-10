@@ -255,7 +255,8 @@ const BootScreen = {
     },
 
     _toRelativeAsset(src) {
-        if (!src || typeof src !== 'string' || src.startsWith('data:')) return null;
+        if (!src || typeof src !== 'string' || src.startsWith('data:') || src.startsWith('blob:')) return null;
+        if (typeof WallpaperStore !== 'undefined' && WallpaperStore.isReference(src)) return null;
         const normalize = (value) => {
             const normalized = String(value || '').replace(/^\.\//, '').replace(/^\//, '');
             return normalized.startsWith('css/Theme/') ? normalized.slice(4) : normalized;

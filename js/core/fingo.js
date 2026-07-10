@@ -1428,8 +1428,8 @@ const Fingo = {
             const res = await fetch('https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN');
             const data = await res.json();
             if (data && data.url) {
-                State.updateSettings({ wallpaperDesktop: data.url });
-                if (typeof Desktop !== 'undefined') Desktop.updateWallpaper();
+                await State.setWallpaper('desktop', data.url, { sourceType: 'bing', sourceUrl: data.url });
+                if (typeof Desktop !== 'undefined') await Desktop.updateWallpaper();
                 setTimeout(() => this.addMessage(lang === 'zh' ? '壁纸已更换 🖼️\n想要更多精彩壁纸？试试打开「照片」应用吧！' : 'Wallpaper changed 🖼️\nWant more? Try the Photos app!', 'bot'), 1200);
             } else { throw new Error('No URL'); }
         } catch (e) {

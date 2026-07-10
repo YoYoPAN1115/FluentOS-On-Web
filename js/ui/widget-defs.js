@@ -1806,28 +1806,23 @@ function wMediaText(key) {
     return map[key] || key;
 }
 
-function wMediaInvoke(action) {
-    if (!(window.MediaApp && MediaApp.container && MediaApp.library.length)) return false;
+async function wMediaInvoke(action) {
+    if (!window.MediaApp) return false;
+    if (!MediaApp.library.length && typeof MediaApp.ensureLibraryReady === 'function') {
+        await MediaApp.ensureLibraryReady();
+    }
+    if (!MediaApp.library.length) return false;
     if (action === 'previous') MediaApp.playPrevious();
     else if (action === 'next') MediaApp.playNext();
-    else MediaApp.togglePlay(action === 'start');
+    else await MediaApp.togglePlay(action === 'start');
     return true;
 }
 
 function wMediaControl(ctx, action) {
     if (!wClickable(ctx) || ctx.surface !== 'desktop') return;
-    if (wMediaInvoke(action)) return;
-    WindowManager.openApp('media');
-    const pendingAction = action === 'play' ? 'start' : action;
-    let tries = 0;
-    const timer = setInterval(() => {
-        tries += 1;
-        if (wMediaInvoke(pendingAction)) {
-            clearInterval(timer);
-        } else if (tries > 24) {
-            clearInterval(timer);
-        }
-    }, 250);
+    // Playback is provided by MediaApp's window-independent audio engine.
+    // A widget control must never need to open the full application first.
+    void wMediaInvoke(action);
 }
 
 function wMediaControlButton(action, track) {

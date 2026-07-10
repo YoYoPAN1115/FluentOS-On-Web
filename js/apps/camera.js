@@ -650,17 +650,22 @@ const CameraApp = {
         }, 440);
     },
 
-    setCurrentAsWallpaper() {
+    async setCurrentAsWallpaper() {
         const capture = this.captures[this.currentViewerIndex];
         if (!capture || capture.type !== 'photo') return;
         if (typeof State !== 'undefined' && typeof Desktop !== 'undefined') {
-            State.updateSettings({ wallpaperDesktop: capture.url });
-            Desktop.updateWallpaper();
-            State.addNotification({
-                title: t('camera.wallpaper'),
-                message: t('camera.wallpaper-set'),
-                type: 'success'
-            });
+            try {
+                await State.setWallpaper('desktop', capture.url, { sourceType: 'camera', name: capture.name || 'camera-wallpaper' });
+                await Desktop.updateWallpaper();
+                State.addNotification({
+                    title: t('camera.wallpaper'),
+                    message: t('camera.wallpaper-set'),
+                    type: 'success'
+                });
+            } catch (error) {
+                console.error('[CameraApp] Failed to cache wallpaper', error);
+                FluentUI.Toast({ title: t('camera.wallpaper'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
+            }
         }
     },
 

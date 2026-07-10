@@ -1184,6 +1184,7 @@
     };
 
     const PhotosApp = {
+        handlesInitialOpenData: true,
         windowId: null,
         container: null,
         frame: null,
@@ -1217,7 +1218,7 @@
             return text(key, params);
         },
 
-        init(windowId) {
+        init(windowId, initialData = null) {
             this.beforeClose();
             this.windowId = windowId;
             this.container = document.getElementById(`${windowId}-content`);
@@ -1261,6 +1262,8 @@
                 }, 80);
             };
             window.addEventListener('photos-cache-ready', this._cacheReadyHandler);
+            if (initialData?.fileId) this.loadFile(initialData.fileId);
+            return !!initialData?.fileId;
         },
 
         beforeClose() {
@@ -1290,12 +1293,25 @@
             if (data && data.fileId) this.loadFile(data.fileId);
         },
 
+        isFileOpen(fileId) {
+            const viewer = this.container?.querySelector('.photos-viewer');
+            if (!viewer || viewer.style.display === 'none') return false;
+            const item = this.viewerItems[this.currentIndex];
+            return !!item && (item.nodeId === fileId || item.id === fileId || item.node?.refId === fileId);
+        },
+
         loadFile(fileId) {
             if (!fileId) return;
             const node = typeof State !== 'undefined' && State.findNode ? State.findNode(fileId) : null;
             if (!node || !PhotosDataStore.isImageNode(node)) return;
             const folders = PhotosDataStore.ensureLibraryFolders();
-            const view = folders.favorites?.children?.some(child => child && child.id === fileId) ? 'favorites' : 'local';
+            const inFavorites = folders.favorites?.children?.some(child => child && (child.id === fileId || child.refId === fileId));
+            const inLocal = folders.local?.children?.some(child => child && child.id === fileId);
+            if (!inFavorites && !inLocal) {
+                this.openStandaloneNode(node);
+                return;
+            }
+            const view = inFavorites ? 'favorites' : 'local';
             const open = () => {
                 const items = this.getItemsForView(view);
                 const index = items.findIndex(item => item.nodeId === fileId || item.id === fileId);
@@ -1312,7 +1328,7 @@
         },
 
         openStandaloneNode(node) {
-            this.openViewer(0, [this.itemFromNode(node, 'local')]);
+            this.openViewer(0, [{ ...this.itemFromNode(node, 'local'), standalone: true }]);
         },
 
         reconcileViewerAfterFSChange() {
@@ -1320,6 +1336,13 @@
             if (!viewer || viewer.style.display === 'none' || this.currentIndex < 0) return;
             const current = this.viewerItems[this.currentIndex];
             if (!current || current.kind === 'bing') return;
+            if (current.standalone) {
+                const node = State.findNode(current.nodeId || current.id);
+                if (node && PhotosDataStore.isImageNode(node)) return;
+                this.currentIndex = -1;
+                this.closeViewer();
+                return;
+            }
             const view = current.kind === 'favorite' ? 'favorites' : 'local';
             const items = this.getItemsForView(view);
             const index = items.findIndex(item => item.id === current.id || item.nodeId === current.nodeId);
@@ -2148,6 +2171,16 @@
             const img = viewer?.querySelector('.photos-main-img');
             let item = this.viewerItems[this.currentIndex];
             if (!viewer || !img || !item) return;
+            if (!item.src && item.thumb) {
+                img.src = item.thumb;
+                img.alt = item.title;
+                viewer.style.display = 'flex';
+                viewer.style.opacity = '1';
+                img.style.opacity = '1';
+                this.setViewerChromeOpacity(viewer, 1);
+                if (frame) frame.style.visibility = 'hidden';
+                this.updateViewerChrome();
+            }
             if (!item.src) {
                 const src = await this.ensureItemSrc(item);
                 if (this._viewerMotionId !== motionId) return;
@@ -2219,7 +2252,8 @@
             }
             const tileImg = item ? this.findTileImage(item.id) : null;
             const fromRect = img ? this.rectInContainer(img.getBoundingClientRect()) : null;
-            const toRect = tileImg ? this.rectInContainer(tileImg.getBoundingClientRect()) : null;
+            const tileRect = tileImg ? this.rectInContainer(tileImg.getBoundingClientRect()) : null;
+            const toRect = tileRect || this.getViewerDownDismissRect(fromRect);
             if (!item || !this.canUseViewerMotion(fromRect, toRect)) {
                 viewer.style.display = 'none';
                 viewer.style.opacity = '1';
@@ -2236,7 +2270,7 @@
                 fromRect,
                 toRect,
                 fromRadius: '0px',
-                toRadius: this.getTileImageRadius(tileImg),
+                toRadius: tileImg ? this.getTileImageRadius(tileImg) : '18px',
                 viewer,
                 direction: 'close'
             }).then(() => {
@@ -2325,6 +2359,20 @@
             return {
                 left: canvasRect.left - containerRect.left + (canvasRect.width - width) / 2,
                 top: canvasRect.top - containerRect.top + (canvasRect.height - height) / 2,
+                width,
+                height
+            };
+        },
+
+        getViewerDownDismissRect(fromRect) {
+            if (!fromRect || !this.container) return null;
+            const containerRect = this.container.getBoundingClientRect();
+            const scale = 0.94;
+            const width = fromRect.width * scale;
+            const height = fromRect.height * scale;
+            return {
+                left: fromRect.left + (fromRect.width - width) / 2,
+                top: containerRect.height + 28,
                 width,
                 height
             };
@@ -2624,22 +2672,46 @@
             this.frame?.refresh();
         },
 
-        setAsDesktopWallpaper() {
-            const item = this.viewerItems[this.currentIndex];
-            if (!item || !item.src || typeof State === 'undefined') return;
-            State.updateSettings({ wallpaperDesktop: item.src });
-            if (typeof Desktop !== 'undefined' && Desktop.updateWallpaper) Desktop.updateWallpaper();
-            this.toast(this.tr('desktopSet'), 'success');
-            this.hidePanels();
+        async setAsDesktopWallpaper() {
+            let item = this.viewerItems[this.currentIndex];
+            if (!item || typeof State === 'undefined') return;
+            const source = item.src || await this.ensureItemSrc(item);
+            if (!source) return;
+            try {
+                await State.setWallpaper('desktop', source, {
+                    sourceType: item.kind === 'bing' ? 'bing' : 'photo',
+                    sourceUrl: item.kind === 'bing' ? source : '',
+                    name: item.name || item.title,
+                    mime: item.mime
+                });
+                if (typeof Desktop !== 'undefined' && Desktop.updateWallpaper) await Desktop.updateWallpaper();
+                this.toast(this.tr('desktopSet'), 'success');
+                this.hidePanels();
+            } catch (error) {
+                console.error('[PhotosApp] Failed to cache desktop wallpaper', error);
+                this.toast(this.i18n('settings.custom-wallpaper-fail', 'Wallpaper cache failed'), 'error');
+            }
         },
 
-        setAsLockWallpaper() {
-            const item = this.viewerItems[this.currentIndex];
-            if (!item || !item.src || typeof State === 'undefined') return;
-            State.updateSettings({ wallpaperLock: item.src });
-            if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) LockScreen.updateWallpaper();
-            this.toast(this.tr('lockSet'), 'success');
-            this.hidePanels();
+        async setAsLockWallpaper() {
+            let item = this.viewerItems[this.currentIndex];
+            if (!item || typeof State === 'undefined') return;
+            const source = item.src || await this.ensureItemSrc(item);
+            if (!source) return;
+            try {
+                await State.setWallpaper('lock', source, {
+                    sourceType: item.kind === 'bing' ? 'bing' : 'photo',
+                    sourceUrl: item.kind === 'bing' ? source : '',
+                    name: item.name || item.title,
+                    mime: item.mime
+                });
+                if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
+                this.toast(this.tr('lockSet'), 'success');
+                this.hidePanels();
+            } catch (error) {
+                console.error('[PhotosApp] Failed to cache lock wallpaper', error);
+                this.toast(this.i18n('settings.custom-wallpaper-fail', 'Wallpaper cache failed'), 'error');
+            }
         },
 
         toggleFullscreen() {

@@ -7,6 +7,7 @@ const State = {
     
     // 设置
     settings: {},
+    _resolvedWallpapers: { desktop: '', lock: '' },
     
     // 会话
     session: {},
@@ -78,6 +79,55 @@ const State = {
         // 应用亮度设置
         this.applyBrightness();
         this.applyVolume();
+    },
+
+    wallpaperSettingKey(slot) {
+        return slot === 'lock' ? 'wallpaperLock' : 'wallpaperDesktop';
+    },
+
+    getResolvedWallpaper(slot) {
+        const id = slot === 'lock' ? 'lock' : 'desktop';
+        if (this._resolvedWallpapers[id]) return this._resolvedWallpapers[id];
+        const value = this.settings[this.wallpaperSettingKey(id)];
+        if (typeof WallpaperStore !== 'undefined' && WallpaperStore.isBuiltIn(value)) return value;
+        return typeof WallpaperStore !== 'undefined'
+            ? WallpaperStore.DEFAULTS[id]
+            : (id === 'lock' ? 'Theme/Picture/Fluent-1.png' : 'Theme/Picture/Fluent-2.png');
+    },
+
+    async resolveWallpaper(slot) {
+        const id = slot === 'lock' ? 'lock' : 'desktop';
+        const key = this.wallpaperSettingKey(id);
+        const value = this.settings[key];
+        if (typeof WallpaperStore === 'undefined') return value;
+        const resolved = await WallpaperStore.resolveSetting(id, value);
+        if (this.settings[key] !== value) return this.getResolvedWallpaper(id);
+        this._resolvedWallpapers[id] = resolved.url;
+        if ((resolved.migrated || resolved.reset) && resolved.reference && resolved.reference !== value) {
+            this.settings = { ...this.settings, [key]: resolved.reference };
+            Storage.set(Storage.keys.SETTINGS, this.settings);
+            this.emit('settingsChange', { [key]: resolved.reference });
+        }
+        return resolved.url;
+    },
+
+    async setWallpaper(slot, source, meta = {}) {
+        const id = slot === 'lock' ? 'lock' : 'desktop';
+        const key = this.wallpaperSettingKey(id);
+        if (typeof WallpaperStore === 'undefined' || WallpaperStore.isBuiltIn(source)) {
+            const fallback = id === 'lock' ? 'Theme/Picture/Fluent-1.png' : 'Theme/Picture/Fluent-2.png';
+            const value = String(source || fallback);
+            this._resolvedWallpapers[id] = value;
+            if (typeof WallpaperStore !== 'undefined') await WallpaperStore.clearSlot(id);
+            this.updateSettings({ [key]: value });
+            return value;
+        }
+        const reference = await WallpaperStore.saveForSlot(id, source, meta);
+        const url = await WallpaperStore.resolveReference(reference);
+        if (!url) throw new Error('wallpaper_cache_unavailable');
+        this._resolvedWallpapers[id] = url;
+        this.updateSettings({ [key]: reference });
+        return reference;
     },
 
     // 确保文件系统关键目录存在
@@ -742,7 +792,10 @@ const State = {
 
     async updateAccentFromWallpaper(wallpaper) {
         if (typeof document === 'undefined') return null;
-        const source = wallpaper || this.settings.wallpaperDesktop;
+        let source = wallpaper || this.settings.wallpaperDesktop;
+        if (typeof WallpaperStore !== 'undefined' && !WallpaperStore.isBuiltIn(source)) {
+            source = await this.resolveWallpaper('desktop');
+        }
         if (!source) return null;
         const token = (this._accentExtractionToken || 0) + 1;
         this._accentExtractionToken = token;
@@ -913,14 +966,14 @@ const State = {
         document.body.classList.add('fluent-v2');
     },
 
-    applyMaterialSetting() {
+    applyMaterialSetting(wallpaperOverride = null) {
         const material = this.settings.materialType === 'mica' ? 'mica' : 'gaussian';
         const blur = Math.max(10, Math.min(70, Number(this.settings.blurIntensity ?? 40)));
         const materialBlur = blur;
         const micaBlur = Math.max(10, Math.min(90, Math.round(blur * 1.25)));
         const lightBlur = Math.max(8, Math.round(materialBlur * 0.5));
         const smallBlur = Math.max(6, Math.round(materialBlur * 0.35));
-        const wallpaper = this.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
+        const wallpaper = wallpaperOverride || this.getResolvedWallpaper('desktop');
         const safeWallpaper = String(wallpaper).replace(/\\/g, '/').replace(/"/g, '\\"');
 
         document.body.classList.remove(
@@ -979,6 +1032,7 @@ const State = {
             '.network-option-item',
             '.app-list-item',
             '.wallpaper-item',
+            '.settings-about-hero-card',
             '.widgets-sidebar-item'
         ].join(',');
 

@@ -1120,6 +1120,15 @@ document.addEventListener('contextmenu', () => {
     window.closeAllContextMenus();
 }, true);
 
+// Dismiss menus before a click opens an App, navigates, or activates a panel.
+document.addEventListener('pointerdown', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const activeMenu = target?.closest('.context-menu, .fluent-context-menu') || null;
+    window.closeAllContextMenus(activeMenu);
+}, true);
+
+window.addEventListener('blur', () => window.closeAllContextMenus());
+
 document.addEventListener('contextmenu', (e) => {
     // 检查是否在记事本应用内
     const notesApp = e.target.closest('.notes-app');

@@ -90,6 +90,10 @@ const FilesApp = {
     },
 
     beforeClose() {
+        if (this._keyHandler) {
+            document.removeEventListener('keydown', this._keyHandler);
+            this._keyHandler = null;
+        }
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
             this.frame = null;
@@ -858,7 +862,7 @@ const FilesApp = {
         FluentUI.InputDialog({
             title: t('files.rename-title'),
             placeholder: t('files.rename-placeholder'),
-            defaultValue: node.name,
+            defaultValue: node.type === 'file' ? splitFileExt(node.name).base : node.name,
             validateFn: (value) => {
                 if (!value) return t('files.rename-empty');
                 if (value.includes('/') || value.includes('\\')) return t('files.rename-invalid');
@@ -871,6 +875,14 @@ const FilesApp = {
                 }
 
                 const oldParts = splitFileExt(node.name);
+                if (oldParts.hasExt) {
+                    const oldSuffix = `.${oldParts.ext}`;
+                    let visibleName = String(newName || '').trim();
+                    if (visibleName.toLowerCase().endsWith(oldSuffix.toLowerCase())) {
+                        visibleName = visibleName.slice(0, -oldSuffix.length);
+                    }
+                    newName = `${visibleName || oldParts.base}${oldSuffix}`;
+                }
                 const newParts = splitFileExt(newName);
                 const isExecutableExt = (ext) => this.EXECUTABLE_EXTENSIONS.includes(String(ext || '').toLowerCase());
 
@@ -927,7 +939,78 @@ const FilesApp = {
         });
     },
 
-    moveToRecycle(id) {
+    collectFileIdsForNodes(nodeIds) {
+        const fileIds = new Set();
+        const visit = (node) => {
+            if (!node) return;
+            if (node.type === 'file') fileIds.add(node.id);
+            if (Array.isArray(node.children)) node.children.forEach(visit);
+        };
+        Array.from(nodeIds || []).forEach((id) => visit(State.findNode(id)));
+        return [...fileIds];
+    },
+
+    getOpenFileBlockers(nodeIds) {
+        if (typeof WindowManager === 'undefined') return [];
+        const fileIds = this.collectFileIdsForNodes(nodeIds);
+        if (!fileIds.length) return [];
+        return (WindowManager.windows || []).filter((windowData) => {
+            if (!windowData || !windowData.element || windowData.element.classList.contains('closing')) return false;
+            const config = WindowManager.appConfigs?.[windowData.appId];
+            const component = config?.component ? globalThis[config.component] : null;
+            return component && typeof component.isFileOpen === 'function'
+                && fileIds.some((fileId) => component.isFileOpen(fileId));
+        }).map((windowData) => ({
+            windowData,
+            component: globalThis[WindowManager.appConfigs?.[windowData.appId]?.component],
+            appName: WindowManager.getAppConfig(windowData.appId)?.title || windowData.appId,
+            fileIds
+        }));
+    },
+
+    async ensureNodesCanBeDeleted(nodeIds) {
+        const blockers = this.getOpenFileBlockers(nodeIds);
+        if (!blockers.length) return true;
+        const fileIds = this.collectFileIdsForNodes(nodeIds);
+        const fileNames = fileIds
+            .map((id) => State.findNode(id)?.name)
+            .filter(Boolean);
+        const shownNames = fileNames.length > 2
+            ? `${fileNames.slice(0, 2).join('、')} 等 ${fileNames.length} 个文件`
+            : fileNames.join('、');
+        const appNames = [...new Set(blockers.map((item) => item.appName))].join('、');
+        const escapeDialogText = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+
+        const choice = await new Promise((resolve) => {
+            FluentUI.Dialog({
+                type: 'warning',
+                title: t('files.in-use-title'),
+                content: t('files.in-use-content', {
+                    name: escapeDialogText(shownNames),
+                    apps: escapeDialogText(appNames)
+                }),
+                buttons: [
+                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                    { text: t('files.close-delete'), variant: 'danger', value: 'close-delete' }
+                ],
+                onClose: resolve
+            });
+        });
+        if (choice !== 'close-delete') return false;
+
+        const results = await Promise.all(blockers.map(({ windowData }) =>
+            WindowManager.requestCloseWindow(windowData.id)
+        ));
+        if (results.some((result) => result === false)) return false;
+        blockers.forEach(({ component }) => {
+            if (typeof component?.releaseFiles === 'function') component.releaseFiles(fileIds);
+        });
+        return true;
+    },
+
+    async moveToRecycle(id) {
         const parent = this.currentNode;
         if (!parent || !parent.children) return;
 
@@ -935,6 +1018,7 @@ const FilesApp = {
         if (parent.id === 'root' && this.SYSTEM_ROOT_FOLDERS.includes(id)) {
             return;
         }
+        if (!await this.ensureNodesCanBeDeleted([id])) return;
 
         const idx = parent.children.findIndex(c => c.id === id);
         if (idx === -1) return;
@@ -979,9 +1063,10 @@ const FilesApp = {
         this.renderFileList();
     },
 
-    deleteNodePermanent(id) {
+    async deleteNodePermanent(id) {
         const recycle = State.findNode('recycle');
         if (!recycle || !recycle.children) return;
+        if (!await this.ensureNodesCanBeDeleted([id])) return;
         const idx = recycle.children.findIndex(c => c.id === id);
         if (idx === -1) return;
         recycle.children.splice(idx, 1);
@@ -994,14 +1079,16 @@ const FilesApp = {
         this.renderFileList();
     },
 
-    deleteSelectedPermanent() {
+    async deleteSelectedPermanent() {
         if (this.selectedItems.length === 0) return;
         
         const recycle = State.findNode('recycle');
         if (!recycle || !recycle.children) return;
         
-        const count = this.selectedItems.length;
-        const selectedSet = new Set(this.selectedItems);
+        const selectedIds = this.selectedItems.map((item) => item.dataset.id).filter(Boolean);
+        if (!await this.ensureNodesCanBeDeleted(selectedIds)) return;
+        const count = selectedIds.length;
+        const selectedSet = new Set(selectedIds);
         
         // 使用 filter 删除所有选中的文件
         recycle.children = recycle.children.filter(c => !selectedSet.has(c.id));
@@ -1268,6 +1355,16 @@ const FilesApp = {
                     type: node.type,
                     source: 'files'
                 }));
+                if (window.Desktop && typeof Desktop.setFileDragImage === 'function') {
+                    Desktop.setFileDragImage(
+                        e.dataTransfer,
+                        node,
+                        draggingIds.length,
+                        item.querySelector('img'),
+                        e.clientX,
+                        e.clientY
+                    );
+                }
                 draggingIds.forEach((id) => {
                     const itemEl = filesList.querySelector(`.file-item[data-id="${id}"]`);
                     if (itemEl) itemEl.classList.add('dragging');
@@ -1450,9 +1547,17 @@ const FilesApp = {
             return true;
         }
 
-        // Office 应用已下线，所有文件统一使用记事本打开
-        WindowManager.openApp('notes', { fileId: node.id });
-        return true;
+        // Route imported file types to their system default Apps.
+        const ext = String(node.name || '').split('.').pop().toLowerCase();
+        if (ext === 'mp3') {
+            WindowManager.openApp('media', { fileId: node.id });
+            return true;
+        }
+        if (ext === 'txt' || ext === 'md') {
+            WindowManager.openApp('notes', { fileId: node.id });
+            return true;
+        }
+        return false;
     },
     
     // 选择相关方法
@@ -1698,10 +1803,10 @@ const FilesApp = {
     },
     
     bindKeyboardEvents() {
-        document.addEventListener('keydown', (e) => {
+        if (this._keyHandler) return;
+        this._keyHandler = (e) => {
             // 检查当前窗口是否是文件App
-            const activeWindow = document.querySelector('.window:not(.minimized)');
-            if (!activeWindow || !activeWindow.id.includes(this.windowId)) return;
+            if (!this.windowId || WindowManager.activeWindowId !== this.windowId) return;
 
             const target = e.target;
             const isEditableTarget = target && (
@@ -1759,11 +1864,13 @@ const FilesApp = {
                 e.preventDefault();
                 this.pasteFromClipboard();
             }
-        });
+        };
+        document.addEventListener('keydown', this._keyHandler);
     },
     
-    deleteSelectedItems() {
+    async deleteSelectedItems() {
         if (this.selectedItems.length === 0) return;
+        const selectedIds = this.selectedItems.map((item) => item.dataset.id).filter(Boolean);
         
         // 根级系统文件夹不允许删除
         if (this.currentNode && this.currentNode.id === 'root') {
@@ -1781,11 +1888,11 @@ const FilesApp = {
             return;
         }
         
-        const count = this.selectedItems.length;
+        if (!await this.ensureNodesCanBeDeleted(selectedIds)) return;
+        const count = selectedIds.length;
         
         // 移动所有选中的项到回收站
-        this.selectedItems.forEach(item => {
-            const nodeId = item.dataset.id;
+        selectedIds.forEach(nodeId => {
             const node = State.findNode(nodeId);
             if (!node) return;
             

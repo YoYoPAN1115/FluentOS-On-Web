@@ -33,6 +33,10 @@ const MediaApp = {
     mediaDbName: 'FluentOSMediaLibrary',
     mediaDbStore: 'files',
     restoreStarted: false,
+    restorePromise: null,
+    isRestoring: false,
+    audioElement: null,
+    audioHost: null,
     pendingPlaybackState: null,
     suppressNextPageAnimation: false,
     _lastPlaybackSaveAt: 0,
@@ -62,9 +66,10 @@ const MediaApp = {
         this.addStyles();
         this.syncVolumeFromState();
         this.loadPlaybackPreferences();
+        this.isRestoring = !this.library.length && this.getLibraryManifest().length > 0;
         this.render();
         this.startProgressLoop();
-        this.restoreLibraryFromStorage();
+        void this.restoreLibraryFromStorage();
 
         if (!this._languageListenerBound && typeof State !== 'undefined' && typeof State.on === 'function') {
             this._langHandler = () => {
@@ -80,13 +85,14 @@ const MediaApp = {
 
     destroy() {
         const media = this.mediaElement;
-        if (media) media.pause();
+        // Audio belongs to the system playback engine and must survive closing
+        // the Media window. Video remains window-scoped and stops on close.
+        if (media?.tagName === 'VIDEO') media.pause();
         this.stopProgressLoop();
         if (this.responsiveResizeObserver) {
             this.responsiveResizeObserver.disconnect();
             this.responsiveResizeObserver = null;
         }
-        this.revokeObjectUrls();
     },
 
     beforeClose() {
@@ -96,9 +102,8 @@ const MediaApp = {
             this.frame.destroy();
             this.frame = null;
         }
-        this.library = [];
-        this.currentIndex = -1;
-        this.restoreStarted = false;
+        this.container = null;
+        this.windowId = null;
         return true;
     },
 
@@ -107,30 +112,29 @@ const MediaApp = {
     },
 
     get mediaElement() {
-        if (!this.container) return null;
-
         const current = this.activeItem;
         if (current?.type === 'audio') {
-            return this.container.querySelector('.media-audio-host audio#media-player-element')
-                || this.container.querySelector('audio#media-player-element')
-                || null;
+            return this.audioElement || null;
         }
         if (current?.type === 'video') {
-            return this.container.querySelector('video#media-player-element') || null;
+            return this.container?.querySelector('video#media-player-element') || null;
         }
 
-        return this.container.querySelector('#media-player-element') || null;
+        return this.audioElement || this.container?.querySelector('#media-player-element') || null;
     },
 
     ensureAudioHost() {
-        if (!this.container) return null;
-        let host = this.container.querySelector('.media-audio-host');
+        let host = this.audioHost;
+        if (host?.isConnected) return host;
+        host = document.getElementById('media-system-audio-host');
         if (!host) {
             host = document.createElement('div');
             host.className = 'media-audio-host';
+            host.id = 'media-system-audio-host';
             host.setAttribute('aria-hidden', 'true');
-            this.container.appendChild(host);
+            document.body.appendChild(host);
         }
+        this.audioHost = host;
         return host;
     },
 
@@ -147,6 +151,106 @@ const MediaApp = {
     getExt(name = '') {
         const dot = String(name).lastIndexOf('.');
         return dot >= 0 ? String(name).slice(dot + 1).toLowerCase() : '';
+    },
+
+    async fileFromFsNode(node) {
+        if (!node || node.type !== 'file') return null;
+        if (node.encoding === 'media-local-cache') {
+            try {
+                const stored = await this.readStoredMedia(node.mediaRecordId || `fs-${node.id}`);
+                if (stored?.file instanceof File && stored.file.type) return stored.file;
+                if (stored?.file instanceof File) {
+                    return new File([stored.file], stored.file.name || node.name || 'audio.mp3', {
+                        type: stored.mimeType || node.mime || 'audio/mpeg',
+                        lastModified: stored.lastModified || stored.file.lastModified || Date.now()
+                    });
+                }
+                if (stored?.file instanceof Blob) {
+                    return new File([stored.file], node.name || 'audio.mp3', {
+                        type: stored.mimeType || node.mime || 'audio/mpeg',
+                        lastModified: stored.lastModified || Date.now()
+                    });
+                }
+            } catch (_) {}
+        }
+        const content = String(node.content || '');
+        if (!content.startsWith('data:')) return null;
+        const comma = content.indexOf(',');
+        if (comma < 0) return null;
+
+        const header = content.slice(5, comma);
+        const payload = content.slice(comma + 1);
+        const mime = (header.split(';')[0] || node.mime || 'audio/mpeg').trim();
+        const isBase64 = /;base64(?:;|$)/i.test(`;${header}`);
+        let bytes;
+        if (isBase64) {
+            const binary = atob(payload);
+            bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        } else {
+            bytes = new TextEncoder().encode(decodeURIComponent(payload));
+        }
+        return new File([bytes], node.name || 'audio.mp3', {
+            type: mime || 'audio/mpeg',
+            lastModified: node.modified ? Date.parse(node.modified) || Date.now() : Date.now()
+        });
+    },
+
+    async loadFile(fileId) {
+        const node = typeof State !== 'undefined' && State.findNode ? State.findNode(fileId) : null;
+        if (!node || node.type !== 'file' || this.getExt(node.name) !== 'mp3') return false;
+
+        await this.ensureLibraryReady();
+        const stableId = `fs-${node.id}`;
+        const existing = this.library.find((item) => item.id === stableId || item.sourceNodeId === node.id);
+        if (existing) {
+            await this.playItemById(existing.id);
+            return true;
+        }
+
+        const file = await this.fileFromFsNode(node);
+        if (!file) return false;
+        const item = await this.createMediaItem(file);
+        item.id = stableId;
+        item.sourceNodeId = node.id;
+        this.library.push(item);
+        this.currentIndex = this.library.length - 1;
+        this.activeView = 'now';
+        this.persistMediaItem(item);
+        this.saveLibraryManifest();
+        this.render();
+        await this.playItemById(item.id);
+        return true;
+    },
+
+    isFileOpen(fileId) {
+        const item = this.activeItem;
+        return !!fileId && !!item && (item.sourceNodeId === fileId || item.id === `fs-${fileId}`);
+    },
+
+    releaseFiles(fileIds) {
+        const ids = new Set(Array.from(fileIds || []));
+        if (!ids.size) return;
+        const shouldRemove = (item) => ids.has(item?.sourceNodeId) || ids.has(String(item?.id || '').replace(/^fs-/, ''));
+        const active = this.activeItem;
+        if (active && shouldRemove(active)) {
+            const media = this.mediaElement;
+            if (media) {
+                media.pause();
+                media.removeAttribute('src');
+                media.load();
+            }
+            if (this.audioElement === media) this.audioElement = null;
+        }
+        this.library.filter(shouldRemove).forEach((item) => {
+            if (!item?.url) return;
+            try { URL.revokeObjectURL(item.url); } catch (_) {}
+            this.objectUrls.delete(item.url);
+        });
+        this.library = this.library.filter((item) => !shouldRemove(item));
+        this.currentIndex = this.library.length ? Math.min(this.currentIndex, this.library.length - 1) : -1;
+        this.saveLibraryManifest();
+        this.savePlaybackSnapshot(true);
     },
 
     getLanguage() {
@@ -303,6 +407,7 @@ const MediaApp = {
     },
 
     render() {
+        if (!this.container || !this.container.isConnected) return;
         const initialPlaybackState = this.capturePlaybackState() || this.getPendingPlaybackStateForActiveItem();
         const initialCurrent = this.activeItem;
         const initialPreservedAudio = this.detachReusableAudio(initialCurrent, true);
@@ -339,7 +444,7 @@ const MediaApp = {
 
             const current = this.activeItem;
             const filteredItems = this.getFilteredItems();
-            pageEl.classList.add('media-fw-page');
+            pageEl.classList.add('media-fw-page', 'media-content');
             pageEl.innerHTML = `
                 <div class="media-app media-fw-app ${this.playerExpanded ? 'player-expanded' : ''} ${suppressPageMotion ? 'media-suppress-page-motion' : ''}">
                     <main class="media-main media-fw-main">
@@ -436,7 +541,7 @@ const MediaApp = {
             return null;
         }
 
-        const stableHost = this.container?.querySelector('.media-audio-host');
+        const stableHost = this.ensureAudioHost();
         if (!forceDetach && stableHost && stableHost.contains(media)) {
             return media;
         }
@@ -446,7 +551,8 @@ const MediaApp = {
     },
 
     attachReusableAudio(media) {
-        if (!media || !this.container) return;
+        if (!media) return;
+        this.audioElement = media;
         media.className = 'media-audio-hidden';
         const host = this.ensureAudioHost();
         if (host && media.parentElement !== host) {
@@ -556,6 +662,7 @@ const MediaApp = {
     },
 
     renderMainContent(filteredItems, current) {
+        if (this.isRestoring && !this.library.length) return this.renderLoadingPage();
         if (this.activeView === 'settings') return this.renderSettingsPage();
         if (!this.library.length) return this.renderImportEmptyPage();
         if (this.activeView === 'recent') return this.renderRecentPage(current);
@@ -601,6 +708,18 @@ const MediaApp = {
                         <button class="media-action-secondary" data-action="open-folder">${this.localText('openFolder')}</button>
                     </div>
                 </div>
+            </section>
+        `;
+    },
+
+    renderLoadingPage() {
+        const label = this.getLanguage() === 'en'
+            ? 'Loading imported songs…'
+            : '\u6b63\u5728\u52a0\u8f7d\u5df2\u5bfc\u5165\u7684\u6b4c\u66f2\u2026';
+        return `
+            <section class="media-library-loading media-page-shell" role="status" aria-live="polite">
+                <div class="fluent-spinner fluent-spinner-large" aria-hidden="true"></div>
+                <strong>${label}</strong>
             </section>
         `;
     },
@@ -1057,41 +1176,88 @@ const MediaApp = {
         }));
     },
 
+    async readAllStoredMedia() {
+        return this.withMediaStore('readonly', (store) => new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+            request.onerror = () => reject(request.error);
+        }));
+    },
+
     async restoreLibraryFromStorage() {
-        if (this.restoreStarted) return;
+        if (this.library.length) {
+            this.isRestoring = false;
+            return this.library;
+        }
+        if (this.restorePromise) return this.restorePromise;
         this.restoreStarted = true;
         const manifest = this.getLibraryManifest();
-        if (!manifest.length) return;
+        if (!manifest.length) {
+            this.isRestoring = false;
+            return [];
+        }
 
-        const restored = [];
-        for (const saved of manifest) {
+        this.isRestoring = true;
+        this.restorePromise = (async () => {
+            let records = [];
             try {
-                const record = await this.readStoredMedia(saved.id);
-                if (!record?.file) continue;
-                const item = await this.createMediaItemFromStored({ ...saved, ...record });
-                restored.push(item);
-                this.loadDuration(item);
+                records = await this.readAllStoredMedia();
             } catch (_) {
-                // Ignore stale manifest entries whose blobs are no longer available.
+                // IndexedDB may be unavailable; leave the import page usable.
             }
-        }
+            const recordsById = new Map(records.map((record) => [record.id, record]));
+            const restored = manifest
+                .map((saved) => {
+                    const record = recordsById.get(saved.id);
+                    if (!record?.file) return null;
+                    try {
+                        return this.createMediaItemFromStoredFast({ ...saved, ...record });
+                    } catch (_) {
+                        return null;
+                    }
+                })
+                .filter(Boolean);
 
-        if (!restored.length) {
-            try { localStorage.removeItem(this.mediaStorageKey); } catch (_) {}
-            return;
-        }
-        this.library = restored;
-        const storedState = this.getStoredPlaybackState();
-        const storedIndex = storedState.currentItemId
-            ? restored.findIndex((item) => item.id === storedState.currentItemId)
-            : -1;
-        const recentIndex = restored.reduce((best, item, index) => {
-            if (best < 0) return Number(item.lastPlayed || 0) > 0 ? index : best;
-            return Number(item.lastPlayed || 0) > Number(restored[best].lastPlayed || 0) ? index : best;
-        }, -1);
-        this.currentIndex = storedIndex >= 0 ? storedIndex : (recentIndex >= 0 ? recentIndex : 0);
-        this.saveLibraryManifest();
-        this.render();
+            if (!restored.length) {
+                try { localStorage.removeItem(this.mediaStorageKey); } catch (_) {}
+                return [];
+            }
+            this.library = restored;
+            const storedState = this.getStoredPlaybackState();
+            const storedIndex = storedState.currentItemId
+                ? restored.findIndex((item) => item.id === storedState.currentItemId)
+                : -1;
+            const recentIndex = restored.reduce((best, item, index) => {
+                if (best < 0) return Number(item.lastPlayed || 0) > 0 ? index : best;
+                return Number(item.lastPlayed || 0) > Number(restored[best].lastPlayed || 0) ? index : best;
+            }, -1);
+            this.currentIndex = storedIndex >= 0 ? storedIndex : (recentIndex >= 0 ? recentIndex : 0);
+            this.loadPlaybackPreferences();
+            if (typeof State !== 'undefined') this.syncVolumeFromState();
+            this.saveLibraryManifest();
+            this.loadCurrentMedia(false);
+            const media = this.mediaElement;
+            const restorePosition = () => {
+                const savedTime = Number(storedState.currentTime || 0);
+                if (media && Number.isFinite(savedTime) && savedTime > 0 && Number.isFinite(media.duration)) {
+                    media.currentTime = Math.min(savedTime, media.duration || savedTime);
+                }
+            };
+            if (media?.readyState >= 1) restorePosition();
+            else media?.addEventListener('loadedmetadata', restorePosition, { once: true });
+            this.hydrateRestoredMetadata(restored);
+            return restored;
+        })().finally(() => {
+            this.isRestoring = false;
+            this.restorePromise = null;
+            this.render();
+        });
+        return this.restorePromise;
+    },
+
+    async ensureLibraryReady() {
+        if (this.library.length) return this.library;
+        return this.restoreLibraryFromStorage();
     },
 
     renderExpandedPlayer(item) {
@@ -1136,7 +1302,7 @@ const MediaApp = {
                 </div>
                 <div class="media-expanded-aux">
                     <label class="media-volume">
-                        <button data-action="mute" title="${this.localText('volume')}">${this.symbolIcon(this.muted ? 'Volume Mute.svg' : 'Volume Up.svg')}</button>
+                        <span class="media-volume-icon media-volume-icon-low" aria-hidden="true">${this.symbolIcon('Volume Down.svg')}</span>
                         ${this.renderRangeControl({
                             id: 'media-volume',
                             className: 'media-volume-slider fluent-slider',
@@ -1146,6 +1312,7 @@ const MediaApp = {
                             value: this.volume,
                             label: this.localText('volume')
                         })}
+                        <span class="media-volume-icon media-volume-icon-high" aria-hidden="true">${this.symbolIcon('Volume Up.svg')}</span>
                     </label>
                 </div>
             </section>
@@ -1258,6 +1425,15 @@ const MediaApp = {
         this.container.querySelectorAll('[data-action]').forEach((button) => {
             button.addEventListener('click', (event) => this.handleAction(button.dataset.action, event));
         });
+
+        const playerBar = this.container.querySelector('.media-player-bar:not(.is-hidden)');
+        if (playerBar) {
+            playerBar.addEventListener('click', (event) => {
+                const target = event.target instanceof Element ? event.target : null;
+                if (target?.closest('button, input, label, [data-action]')) return;
+                this.setExpandedPlayer(true);
+            });
+        }
 
         this.bindTrackListEvents();
 
@@ -1457,14 +1633,6 @@ const MediaApp = {
             case 'repeat':
                 event?.stopPropagation();
                 this.setRepeatMode(this.repeatMode === 'none' ? 'all' : 'none');
-                break;
-            case 'mute':
-                if (this.muted || Number(State.settings.volume ?? 50) <= 0) {
-                    State.updateSettings({ volume: Math.round((this.lastNonZeroVolume || 0.5) * 100) });
-                } else {
-                    State.updateSettings({ volume: 0 });
-                }
-                this.render();
                 break;
             case 'expanded-options':
                 event?.stopPropagation();
@@ -1692,6 +1860,65 @@ const MediaApp = {
         };
     },
 
+    createMediaItemFromStoredFast(record) {
+        const file = record.file instanceof File
+            ? record.file
+            : new File([record.file], record.name || this.localText('unknownTitle'), {
+                type: record.mimeType || record.file?.type || '',
+                lastModified: record.lastModified || Date.now()
+            });
+        const type = this.isVideoFile(file) ? 'video' : 'audio';
+        const url = URL.createObjectURL(file);
+        this.objectUrls.add(url);
+        return {
+            id: record.id,
+            file,
+            url,
+            type,
+            typeLabel: this.getTypeLabel(type),
+            name: record.name || file.name,
+            title: record.title || this.stripExt(file.name) || this.localText('unknownTitle'),
+            artist: record.artist || '',
+            album: record.album || '',
+            coverUrl: '',
+            themeColors: Array.isArray(record.themeColors) ? record.themeColors : null,
+            gradientIndex: Number.isInteger(record.gradientIndex) ? record.gradientIndex : 0,
+            recommendRank: Math.random(),
+            size: Number(record.size || file.size || 0),
+            mimeType: record.mimeType || file.type || '',
+            lastModified: record.lastModified || file.lastModified || Date.now(),
+            duration: Number(record.duration || 0),
+            lastPlayed: Number(record.lastPlayed || 0),
+            playCount: Number(record.playCount || 0),
+            error: false
+        };
+    },
+
+    hydrateRestoredMetadata(items) {
+        const queue = items.filter((item) => item.type === 'audio' && this.getExt(item.name) === 'mp3');
+        if (!queue.length) return;
+        const run = async () => {
+            // Metadata artwork is intentionally hydrated after the usable queue
+            // appears, keeping startup independent of MP3 tag parsing time.
+            for (const item of queue) {
+                try {
+                    const metadata = await this.readMp3Metadata(item.file);
+                    if (metadata.coverUrl) item.coverUrl = metadata.coverUrl;
+                    if (!item.artist && metadata.artist) item.artist = metadata.artist;
+                    if (!item.album && metadata.album) item.album = metadata.album;
+                    if (metadata.coverUrl) await this.applyThemeColors(item);
+                } catch (_) {}
+            }
+            this.saveLibraryManifest();
+            this.render();
+        };
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(() => { void run(); }, { timeout: 1200 });
+        } else {
+            setTimeout(() => { void run(); }, 0);
+        }
+    },
+
     async readMp3Metadata(file) {
         const buffer = await file.slice(0, Math.min(file.size, 1024 * 1024)).arrayBuffer();
         const view = new DataView(buffer);
@@ -1803,7 +2030,7 @@ const MediaApp = {
     },
 
     refreshTrackListOnly() {
-        const list = this.container.querySelector('.media-track-list');
+        const list = this.container?.querySelector('.media-track-list');
         if (!list) return;
         const filteredItems = this.getFilteredItems();
         list.innerHTML = filteredItems.length
@@ -1856,7 +2083,8 @@ const MediaApp = {
             media.preload = 'metadata';
             media.className = 'media-audio-hidden';
             const host = this.ensureAudioHost();
-            (host || this.container).appendChild(media);
+            host?.appendChild(media);
+            this.audioElement = media;
             this.bindMediaElementEvents(media);
         }
         if (!media) return;
@@ -1914,9 +2142,6 @@ const MediaApp = {
         this.applyMediaSettings();
         if (this.container) {
             this.container.querySelectorAll('#media-volume').forEach((volume) => this.syncRangeControl(volume, String(this.volume)));
-            this.container.querySelectorAll('[data-action="mute"]').forEach((button) => {
-                button.innerHTML = this.symbolIcon(this.muted ? 'Volume Mute.svg' : 'Volume Up.svg');
-            });
         }
     },
 
@@ -2140,6 +2365,777 @@ const MediaApp = {
     },
 
     addStyles() {
+        if (document.getElementById('media-app-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'media-app-styles';
+        style.textContent = `
+            /* Media uses FluentWindow for the complete shell. These rules only
+               style content inside the framework-owned .fw-card. */
+            .media-content.media-fw-page {
+                height: 100%;
+                min-height: 0;
+                padding: 0 !important;
+                overflow: hidden;
+                color: var(--text-primary);
+            }
+            .media-fw-app {
+                --media-accent: var(--accent, #0078d4);
+                --media-pill-scroll-tail: 132px;
+                position: relative;
+                display: block !important;
+                width: 100%;
+                height: 100%;
+                min-height: 0;
+                padding: 24px 32px 0;
+                box-sizing: border-box;
+                overflow: hidden;
+                container-type: size;
+                container-name: media-player;
+                background: transparent !important;
+                color: var(--text-primary);
+            }
+            .media-fw-main {
+                width: 100%;
+                height: 100%;
+                min-width: 0;
+                min-height: 0;
+                overflow: auto;
+                padding: 0 !important;
+                scroll-padding-bottom: var(--media-pill-scroll-tail);
+                scrollbar-width: none;
+            }
+            .media-fw-main::-webkit-scrollbar { display: none; }
+            .media-fw-app:has(.media-player-bar:not(.is-hidden)) .media-fw-main::after {
+                content: '';
+                display: block;
+                width: 100%;
+                height: var(--media-pill-scroll-tail);
+                background: transparent;
+                pointer-events: none;
+            }
+            .media-page-shell { width: 100%; min-height: 100%; box-sizing: border-box; }
+
+            .media-home-head { margin: 0 0 24px; }
+            .media-home-head p {
+                margin: 0 0 4px;
+                color: var(--text-secondary);
+                font-size: 13px;
+                font-weight: 600;
+            }
+            .media-home-head h1 {
+                margin: 0;
+                font-size: clamp(28px, 4vw, 40px);
+                line-height: 1.1;
+                letter-spacing: -0.035em;
+            }
+            .media-section-title {
+                margin: 24px 0 12px;
+                color: var(--text-secondary);
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .media-feature-row {
+                display: grid;
+                grid-auto-flow: column;
+                grid-auto-columns: minmax(168px, 22%);
+                gap: 14px;
+                overflow-x: auto;
+                padding: 2px 0 6px;
+                scroll-snap-type: x proximity;
+            }
+            .media-frequency-row {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+            }
+            .media-home-card {
+                position: relative;
+                min-width: 0;
+                min-height: 164px;
+                padding: 0;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+                border-radius: 18px;
+                background: var(--bg-tertiary);
+                color: #fff;
+                text-align: left;
+                cursor: pointer;
+                scroll-snap-align: start;
+                transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+            }
+            .media-home-card.is-featured { min-height: 210px; }
+            .media-home-card:hover {
+                transform: translateY(-2px);
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), .36);
+                box-shadow: 0 10px 24px rgba(0, 0, 0, .12);
+            }
+            .media-home-card.active {
+                box-shadow: inset 0 0 0 2px var(--media-accent), 0 8px 20px rgba(0, 0, 0, .12);
+            }
+            .media-card-art,
+            .media-card-shade {
+                position: absolute;
+                inset: 0;
+                display: grid;
+                place-items: center;
+                background-position: center;
+                background-size: cover;
+            }
+            .media-card-shade { background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,.76)); }
+            .media-card-placeholder-icon { width: 42px; height: 42px; filter: invert(1); opacity: .86; }
+            .media-home-card .media-card-label,
+            .media-home-card > strong,
+            .media-home-card > small {
+                position: absolute;
+                z-index: 2;
+                left: 16px;
+                right: 14px;
+            }
+            .media-card-label { bottom: 54px; font-size: 12px; opacity: .86; }
+            .media-home-card > strong {
+                bottom: 31px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 17px;
+            }
+            .media-home-card > small {
+                bottom: 13px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                opacity: .82;
+                font-size: 12px;
+            }
+            .media-home-card.is-empty { padding: 18px; color: var(--text-primary); }
+
+            .media-library-panel,
+            .media-settings-panel,
+            .media-now-hero,
+            .media-video-shell {
+                margin-top: 20px;
+                border: 1px solid var(--border-color);
+                border-radius: 18px;
+                background: var(--bg-tertiary);
+            }
+            .media-library-panel { padding: 18px; }
+            .media-panel-head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+            .media-panel-kicker { color: var(--text-secondary); font-size: 12px; }
+            .media-panel-head h2 { margin: 3px 0 0; font-size: 20px; }
+            .media-track-list { display: grid; gap: 4px; }
+            .media-track {
+                display: grid;
+                grid-template-columns: 42px 28px minmax(0, 1fr) 72px 58px;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+                min-height: 54px;
+                padding: 6px 10px;
+                border: 0;
+                border-radius: 10px;
+                background: transparent;
+                color: var(--text-primary);
+                text-align: left;
+                cursor: pointer;
+            }
+            .media-track:hover { background: var(--bg-hover); }
+            .media-track.active { background: rgba(var(--accent-rgb, 0, 120, 212), .14); }
+            .media-track-index,
+            .media-track-type,
+            .media-track-duration { color: var(--text-secondary); font-size: 12px; }
+            .media-track-main { min-width: 0; display: grid; gap: 2px; }
+            .media-track-main strong,
+            .media-track-main em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .media-track-main strong { font-size: 14px; }
+            .media-track-main em { color: var(--text-secondary); font-size: 12px; font-style: normal; }
+
+            .media-small-art,
+            .media-large-art {
+                display: block;
+                object-fit: cover;
+                background-position: center;
+                background-size: cover;
+            }
+            .media-small-art { width: 42px; height: 42px; border-radius: 9px; }
+            .media-large-art { width: 148px; height: 148px; border-radius: 20px; }
+            .media-art-placeholder { display: grid; place-items: center; }
+            .media-art-placeholder .media-symbol { width: 42%; height: 42%; filter: invert(1); opacity: .86; }
+
+            .media-settings-panel { display: grid; overflow: hidden; }
+            .media-settings-option {
+                display: grid;
+                grid-template-columns: 40px minmax(0, 1fr);
+                align-items: center;
+                gap: 12px;
+                min-height: 64px;
+                padding: 10px 16px;
+                border: 0;
+                border-bottom: 1px solid var(--border-color);
+                background: transparent;
+                color: var(--text-primary);
+                text-align: left;
+                cursor: pointer;
+            }
+            .media-settings-option:last-child { border-bottom: 0; }
+            .media-settings-option:hover { background: var(--bg-hover); }
+            .media-settings-option > span { grid-row: 1 / span 2; display: grid; place-items: center; }
+            .media-settings-option .media-symbol { width: 22px; height: 22px; }
+            .media-settings-option small { color: var(--text-secondary); }
+            .media-settings-danger { color: var(--error, #c42b1c); }
+
+            .media-import-empty,
+            .media-library-loading,
+            .media-empty {
+                min-height: 100%;
+                display: grid;
+                place-content: center;
+                justify-items: center;
+                text-align: center;
+            }
+            .media-import-empty-card { max-width: 480px; }
+            .media-empty-icon { width: 52px; height: 52px; opacity: .72; }
+            .media-import-empty h1,
+            .media-empty h3 { margin: 14px 0 6px; }
+            .media-import-empty p,
+            .media-empty p { margin: 0; color: var(--text-secondary); line-height: 1.6; }
+            .media-import-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+            .media-action-primary,
+            .media-action-secondary {
+                min-height: 36px;
+                padding: 0 16px;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                cursor: pointer;
+            }
+            .media-action-primary { border-color: var(--media-accent); background: var(--media-accent); color: var(--accent-contrast, #fff); }
+            .media-library-loading { gap: 14px; color: var(--text-secondary); }
+
+            .media-now-hero { display: flex; align-items: center; gap: 22px; padding: 20px; }
+            .media-now-hero p { margin: 0; color: var(--text-secondary); }
+            .media-now-hero h2 { margin: 5px 0; font-size: 28px; }
+            .media-now-hero span { color: var(--text-secondary); }
+            .media-video-shell { padding: 12px; overflow: hidden; }
+            .media-video { display: block; width: 100%; max-height: 420px; border-radius: 12px; background: #000; }
+            .media-video-title { display: flex; justify-content: space-between; gap: 12px; padding: 10px 4px 0; }
+            .media-video-title span { color: var(--text-secondary); }
+
+            .media-player-bar {
+                position: absolute;
+                z-index: 20;
+                left: 32px;
+                right: 32px;
+                bottom: 18px;
+                min-height: 68px;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                align-items: center;
+                gap: 16px;
+                padding: 8px 12px;
+                border: 1px solid var(--border-color);
+                border-radius: 16px;
+                background: var(--bg-tertiary);
+                box-shadow: 0 8px 24px rgba(0,0,0,.12);
+                box-sizing: border-box;
+            }
+            .media-player-bar.is-hidden { display: none; }
+            .media-now-card { min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+            .media-now-card > div:last-child { min-width: 0; display: grid; gap: 2px; }
+            .media-now-card strong,
+            .media-now-card span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .media-now-card span { color: var(--text-secondary); font-size: 12px; }
+            .media-button-row,
+            .media-options { display: flex; align-items: center; justify-content: center; gap: 6px; }
+            .media-options { justify-content: flex-end; }
+            .media-button-row button,
+            .media-options button,
+            .media-expanded button {
+                width: 36px;
+                height: 36px;
+                display: grid;
+                place-items: center;
+                padding: 0;
+                border: 0;
+                border-radius: 50%;
+                background: transparent;
+                color: var(--text-primary);
+                cursor: pointer;
+            }
+            .media-button-row button:hover,
+            .media-options button:hover,
+            .media-expanded button:hover { background: var(--bg-hover); }
+            .media-play-btn { background: var(--media-accent) !important; }
+            .media-play-btn .media-symbol { filter: brightness(0) invert(1) !important; }
+            .media-options button.active { color: var(--media-accent); }
+            .media-symbol { width: 20px; height: 20px; pointer-events: none; }
+            .dark-mode .media-symbol { filter: invert(1); }
+            .media-hidden-input,
+            #media-system-audio-host { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+
+            .media-native-range {
+                width: 100%;
+                height: 18px;
+                margin: 0;
+                accent-color: var(--media-accent);
+                cursor: pointer;
+            }
+            .media-expanded {
+                position: absolute;
+                z-index: 40;
+                inset: 0;
+                display: grid;
+                grid-template-columns: minmax(220px, .8fr) minmax(300px, 1.2fr);
+                grid-template-areas: 'art info' 'art progress' 'art controls' 'art aux';
+                align-content: center;
+                align-items: center;
+                gap: 18px 38px;
+                padding: 56px clamp(32px, 6vw, 76px);
+                box-sizing: border-box;
+                overflow: hidden;
+                background: var(--bg-primary);
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+                transition: opacity .2s ease, visibility .2s ease;
+            }
+            .media-expanded.active { opacity: 1; visibility: visible; pointer-events: auto; }
+            .media-expanded-bg { position: absolute; inset: -12%; background-position: center !important; background-size: cover !important; filter: blur(70px); opacity: .2; transform: scale(1.1); }
+            .media-expanded::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, color-mix(in srgb, var(--bg-primary) 88%, transparent), color-mix(in srgb, var(--bg-primary) 74%, transparent)); }
+            .media-expanded > *:not(.media-expanded-bg) { position: relative; z-index: 2; }
+            .media-collapse-btn { position: absolute !important; top: 18px; left: 22px; }
+            .media-expanded-art { grid-area: art; justify-self: end; width: min(34vw, 330px); aspect-ratio: 1; border-radius: 24px; background-position: center !important; background-size: cover !important; box-shadow: 0 18px 50px rgba(0,0,0,.25); display: grid; place-items: center; }
+            .media-expanded-placeholder-icon { width: 72px; height: 72px; filter: invert(1); opacity: .8; }
+            .media-expanded-info { grid-area: info; min-width: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
+            .media-expanded-info h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(28px, 4vw, 46px); }
+            .media-expanded-info p { margin: 7px 0 0; color: var(--text-secondary); font-size: 17px; }
+            .media-expanded-progress-row { grid-area: progress; display: grid; gap: 5px; }
+            .media-time-row { display: flex; justify-content: space-between; color: var(--text-secondary); font-size: 12px; }
+            .media-expanded-controls { grid-area: controls; display: flex; align-items: center; justify-content: center; gap: 10px; }
+            .media-expanded-controls button { width: 44px; height: 44px; background: var(--bg-tertiary); }
+            .media-expanded-controls .media-expanded-play { width: 54px; height: 54px; }
+            .media-expanded-aux { grid-area: aux; }
+            .media-volume { display: grid; grid-template-columns: 36px minmax(0, 220px); align-items: center; gap: 10px; }
+            .media-expanded-options { position: relative; }
+            .media-expanded-options-menu,
+            .media-expanded-speed-menu {
+                position: absolute;
+                z-index: 60;
+                right: 0;
+                top: calc(100% + 8px);
+                display: grid;
+                gap: 4px;
+                min-width: 190px;
+                padding: 6px;
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                background: var(--bg-secondary);
+                box-shadow: var(--shadow-lg);
+                opacity: 0;
+                visibility: hidden;
+                transform: translateY(-4px);
+                transition: opacity .15s ease, transform .15s ease, visibility .15s ease;
+            }
+            .media-expanded-speed-menu { right: calc(100% + 8px); top: 0; }
+            .media-expanded-options.is-open .media-expanded-options-menu,
+            .media-expanded-options.speed-open .media-expanded-speed-menu { opacity: 1; visibility: visible; transform: none; }
+            .media-expanded-option,
+            .media-expanded-speed-option {
+                width: 100% !important;
+                min-height: 36px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                gap: 12px;
+                padding: 0 10px !important;
+                border-radius: 8px !important;
+                background: transparent !important;
+                text-align: left;
+            }
+            .media-expanded-option:hover,
+            .media-expanded-speed-option:hover,
+            .media-expanded-option.active,
+            .media-expanded-speed-option.active { background: var(--bg-hover) !important; color: var(--media-accent); }
+            .media-expanded-option em { color: var(--text-secondary); font-size: 12px; font-style: normal; }
+
+            @media (max-width: 900px) {
+                .media-fw-app { padding: 20px 22px 0; }
+                .media-player-bar { left: 22px; right: 22px; }
+                .media-feature-row { grid-auto-columns: minmax(160px, 38%); }
+                .media-frequency-row { grid-template-columns: 1fr 1fr; }
+                .media-track { grid-template-columns: 42px minmax(0,1fr) 54px; }
+                .media-track-index, .media-track-type { display: none; }
+                .media-expanded { grid-template-columns: 1fr; grid-template-areas: 'art' 'info' 'progress' 'controls' 'aux'; gap: 12px; padding: 48px 26px 24px; overflow: auto; }
+                .media-expanded-art { justify-self: center; width: min(38vh, 260px); }
+            }
+            @media (max-width: 680px) {
+                .media-frequency-row { grid-template-columns: 1fr; }
+                .media-player-bar { grid-template-columns: minmax(0,1fr) auto; }
+                .media-options { display: none; }
+                .media-now-card span { display: none; }
+                .media-feature-row { grid-auto-columns: 72%; }
+            }
+
+            /* Restore the original floating pill and cinematic second-level
+               player while retaining the FluentWindow application shell. */
+            .media-player-bar {
+                left: 50% !important;
+                right: auto !important;
+                bottom: 18px !important;
+                width: min(760px, calc(100% - 64px)) !important;
+                min-height: 68px !important;
+                padding: 8px 14px !important;
+                border: 1px solid rgba(255,255,255,.48) !important;
+                border-radius: 999px !important;
+                background: rgba(252,252,252,.76) !important;
+                box-shadow: 0 14px 38px rgba(0,0,0,.16) !important;
+                backdrop-filter: blur(24px) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+                cursor: pointer;
+                transform: translateX(-50%) !important;
+                transform-origin: center bottom !important;
+                transition:
+                    opacity 360ms cubic-bezier(.16,1,.3,1),
+                    filter 520ms cubic-bezier(.16,1,.3,1),
+                    transform 520ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            body.dark-mode .media-player-bar {
+                border-color: rgba(255,255,255,.12) !important;
+                background: rgba(32,32,32,.76) !important;
+                box-shadow: 0 16px 42px rgba(0,0,0,.36) !important;
+            }
+            .media-player-bar .media-small-art { width: 46px; height: 46px; border-radius: 13px; }
+            .media-player-bar .media-play-btn {
+                width: 42px !important;
+                height: 42px !important;
+                border: 1px solid rgba(0,0,0,.08) !important;
+                background: rgba(255,255,255,.86) !important;
+                box-shadow: 0 4px 14px rgba(0,0,0,.1) !important;
+            }
+            .media-player-bar .media-play-btn .media-symbol { filter: brightness(0) !important; }
+            body.dark-mode .media-player-bar .media-play-btn {
+                border-color: rgba(255,255,255,.14) !important;
+                background: rgba(255,255,255,.16) !important;
+            }
+            body.dark-mode .media-player-bar .media-play-btn .media-symbol { filter: brightness(0) invert(1) !important; }
+            .media-app.player-expanded .media-player-bar,
+            .media-app:has(.media-expanded.active) .media-player-bar {
+                opacity: 0 !important;
+                pointer-events: none !important;
+                filter: blur(12px) saturate(.92) !important;
+                transform: translateX(-50%) translateY(22px) scale(.86) !important;
+            }
+
+            .media-expanded {
+                --media-art-size: clamp(180px, min(35cqw, 62cqh), 380px);
+                --media-control-width: clamp(250px, 43cqw, 520px);
+                --media-title-size: clamp(30px, 4.5cqw, 56px);
+                --media-subtitle-size: clamp(14px, 1.55cqw, 19px);
+                --media-control-size: clamp(38px, 3.8cqw, 48px);
+                --media-play-size: clamp(52px, 5cqw, 60px);
+                --media-layout-shift: clamp(30px, 5.5cqw, 54px);
+                visibility: visible !important;
+                display: grid !important;
+                grid-template-columns: var(--media-art-size) minmax(0,1fr) !important;
+                grid-template-areas: 'art info' 'art progress' 'art controls' 'art aux' !important;
+                row-gap: clamp(10px, 1.8cqh, 18px) !important;
+                column-gap: clamp(24px, 4cqw, 52px) !important;
+                padding:
+                    clamp(22px, 5cqh, 56px)
+                    clamp(18px, 3cqw, 38px)
+                    clamp(22px, 5cqh, 56px)
+                    clamp(42px, 8cqw, 92px) !important;
+                overflow: hidden !important;
+                pointer-events: none !important;
+                opacity: 0 !important;
+                border-radius: 999px !important;
+                transform-origin: var(--media-origin-x, 50%) var(--media-origin-y, calc(100% - 54px)) !important;
+                transform: scale(.18) !important;
+                clip-path: inset(
+                    var(--media-collapse-top, calc(100% - 90px))
+                    var(--media-collapse-right, 24%)
+                    var(--media-collapse-bottom, 18px)
+                    var(--media-collapse-left, 24%)
+                    round 999px
+                ) !important;
+                background:
+                    radial-gradient(circle at 22% 14%, color-mix(in srgb, var(--media-theme-c,#d8f3ff) 54%, transparent), transparent 36%),
+                    color-mix(in srgb, var(--media-theme-a,#5ac8fa) 16%, rgba(248,249,255,.5)) !important;
+                backdrop-filter: blur(34px) saturate(160%) !important;
+                -webkit-backdrop-filter: blur(34px) saturate(160%) !important;
+                transition:
+                    opacity 260ms cubic-bezier(.16,1,.3,1),
+                    transform 660ms cubic-bezier(.16,1,.3,1),
+                    border-radius 660ms cubic-bezier(.16,1,.3,1),
+                    clip-path 660ms cubic-bezier(.16,1,.3,1),
+                    grid-template-columns 480ms cubic-bezier(.16,1,.3,1),
+                    column-gap 480ms cubic-bezier(.16,1,.3,1),
+                    row-gap 480ms cubic-bezier(.16,1,.3,1),
+                    padding 480ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded.active {
+                visibility: visible !important;
+                pointer-events: auto !important;
+                opacity: 1 !important;
+                border-radius: 0 !important;
+                transform: scale(1) !important;
+                clip-path: inset(0 0 0 0 round 0) !important;
+            }
+            .media-expanded::before {
+                content: '';
+                position: absolute;
+                z-index: 0;
+                inset: -46%;
+                pointer-events: none;
+                opacity: .96;
+                background:
+                    radial-gradient(circle at 12% 20%, color-mix(in srgb, var(--media-theme-a,#5ac8fa) 96%, transparent), transparent 28%),
+                    radial-gradient(circle at 86% 14%, color-mix(in srgb, var(--media-theme-b,#0078d4) 90%, transparent), transparent 32%),
+                    radial-gradient(circle at 66% 84%, color-mix(in srgb, var(--media-theme-c,#d8f3ff) 94%, transparent), transparent 35%),
+                    linear-gradient(145deg, var(--media-theme-a,#5ac8fa), var(--media-theme-b,#0078d4) 48%, var(--media-theme-c,#d8f3ff));
+                background-size: 180% 180%;
+                filter: blur(50px) saturate(1.62) brightness(1.1);
+                animation: mediaFluentThemeDrift 14s cubic-bezier(.45,0,.2,1) infinite alternate;
+                transition: opacity 2.6s cubic-bezier(.16,1,.3,1), filter 2.6s cubic-bezier(.16,1,.3,1);
+            }
+            .media-expanded::after {
+                content: '';
+                position: absolute;
+                z-index: 1;
+                inset: 0;
+                pointer-events: none;
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,.36), rgba(255,255,255,.12) 42%, rgba(255,255,255,.28)),
+                    radial-gradient(circle at 50% 8%, rgba(255,255,255,.46), transparent 38%) !important;
+                transition: opacity 1.1s cubic-bezier(.16,1,.3,1), background 1.1s cubic-bezier(.16,1,.3,1) !important;
+            }
+            body.dark-mode .media-expanded {
+                background: color-mix(in srgb, var(--media-theme-b,#12263d) 20%, rgba(16,20,24,.64)) !important;
+            }
+            body.dark-mode .media-expanded::before { opacity: .78; filter: blur(58px) saturate(1.46) brightness(.9); }
+            body.dark-mode .media-expanded::after {
+                background: linear-gradient(180deg, rgba(10,12,18,.28), rgba(10,12,18,.46)), radial-gradient(circle at 50% 8%, rgba(255,255,255,.12), transparent 38%) !important;
+            }
+            .media-expanded-bg {
+                z-index: 0 !important;
+                opacity: .28 !important;
+                filter: blur(62px) saturate(1.28) !important;
+                transform: scale(1.22);
+                animation: mediaCoverDrift 18s cubic-bezier(.45,0,.2,1) infinite alternate;
+                transition: opacity 1.2s cubic-bezier(.16,1,.3,1), filter 1.2s cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded.is-paused::before {
+                opacity: .54 !important;
+                filter: blur(58px) saturate(1.08) brightness(1.12) !important;
+                animation-play-state: paused !important;
+            }
+            .media-expanded.is-playing::before {
+                opacity: .98 !important;
+                filter: blur(48px) saturate(1.76) brightness(.96) !important;
+                animation-play-state: running !important;
+            }
+            .media-expanded.is-paused::after { opacity: .92; }
+            .media-expanded.is-playing::after { opacity: .58; }
+            .media-expanded.is-paused .media-expanded-bg {
+                opacity: .14 !important;
+                filter: blur(68px) saturate(.92) brightness(1.12) !important;
+                animation-play-state: paused !important;
+            }
+            .media-expanded.is-playing .media-expanded-bg {
+                opacity: .36 !important;
+                filter: blur(56px) saturate(1.52) brightness(.94) !important;
+                animation-play-state: running !important;
+            }
+            .media-expanded:not(.active)::before,
+            .media-expanded:not(.active) .media-expanded-bg { animation-play-state: paused !important; }
+            body.dark-mode .media-expanded.is-paused::before { opacity: .38 !important; filter: blur(64px) saturate(.92) brightness(.72) !important; }
+            body.dark-mode .media-expanded.is-playing::before { opacity: .82 !important; filter: blur(54px) saturate(1.56) brightness(.86) !important; }
+            body.dark-mode .media-expanded.is-paused::after { opacity: .86; }
+            body.dark-mode .media-expanded.is-playing::after { opacity: .62; }
+            .media-collapse-btn,
+            .media-expanded-art,
+            .media-expanded-info,
+            .media-expanded-progress-row,
+            .media-expanded-controls,
+            .media-expanded-aux { position: relative !important; z-index: 2 !important; }
+            .media-expanded-art,
+            .media-expanded-info,
+            .media-expanded-progress-row,
+            .media-expanded-controls,
+            .media-expanded-aux {
+                transition:
+                    opacity 520ms cubic-bezier(.16,1,.3,1),
+                    transform 620ms cubic-bezier(.16,1,.3,1),
+                    width 480ms cubic-bezier(.16,1,.3,1),
+                    height 480ms cubic-bezier(.16,1,.3,1),
+                    border-radius 480ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded:not(.active) .media-expanded-art { transform: translate(-26%,48%) scale(.32) !important; opacity: 0 !important; }
+            .media-expanded:not(.active) .media-expanded-info,
+            .media-expanded:not(.active) .media-expanded-progress-row,
+            .media-expanded:not(.active) .media-expanded-controls,
+            .media-expanded:not(.active) .media-expanded-aux { transform: translateY(28px) scale(.96) !important; opacity: 0 !important; }
+            .media-expanded.active .media-expanded-art,
+            .media-expanded.active .media-expanded-info,
+            .media-expanded.active .media-expanded-progress-row,
+            .media-expanded.active .media-expanded-controls,
+            .media-expanded.active .media-expanded-aux {
+                transform: translateX(var(--media-layout-shift)) !important;
+            }
+            .media-expanded-art,
+            .media-expanded-bg {
+                background: var(--media-expanded-art-bg, var(--media-theme-a,#5ac8fa)) !important;
+                background-position: center !important;
+                background-size: cover !important;
+            }
+            .media-expanded-art {
+                width: var(--media-art-size) !important;
+                height: var(--media-art-size) !important;
+                max-width: none !important;
+                border-radius: clamp(18px, 2.2cqw, 26px) !important;
+                justify-self: end !important;
+                align-self: center !important;
+            }
+            .media-expanded-info {
+                width: min(100%, calc(var(--media-control-width) + 56px));
+                align-self: end;
+            }
+            .media-expanded-info h2 {
+                font-size: var(--media-title-size) !important;
+                line-height: 1.04 !important;
+                transition: font-size 480ms cubic-bezier(.16,1,.3,1), line-height 480ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded-info p {
+                font-size: var(--media-subtitle-size) !important;
+                transition: font-size 480ms cubic-bezier(.16,1,.3,1), margin 480ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded-progress-row,
+            .media-expanded-controls,
+            .media-expanded-aux {
+                width: min(100%, var(--media-control-width)) !important;
+                justify-self: start !important;
+                box-sizing: border-box;
+            }
+            .media-expanded-progress,
+            .media-expanded-progress.fluent-slider,
+            .media-expanded-aux .media-volume-slider,
+            .media-expanded-aux .media-volume-slider.fluent-slider {
+                width: 100% !important;
+                min-width: 0 !important;
+                max-width: none !important;
+                box-sizing: border-box !important;
+            }
+            .media-expanded-aux .media-volume {
+                display: grid !important;
+                grid-template-columns: clamp(24px, 2.7cqw, 30px) minmax(0, 1fr) clamp(24px, 2.7cqw, 30px) !important;
+                align-items: center !important;
+                gap: clamp(8px, 1cqw, 12px) !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                margin: 0 !important;
+            }
+            .media-expanded-aux .media-volume-icon {
+                display: grid;
+                place-items: center;
+                width: 100%;
+                height: 30px;
+                color: var(--text-primary);
+            }
+            .media-expanded-aux .media-volume-icon .media-symbol {
+                width: clamp(17px, 1.8cqw, 20px) !important;
+                height: clamp(17px, 1.8cqw, 20px) !important;
+            }
+            .media-expanded-controls button {
+                width: var(--media-control-size) !important;
+                min-width: var(--media-control-size) !important;
+                height: var(--media-control-size) !important;
+                transition: width 480ms cubic-bezier(.16,1,.3,1), min-width 480ms cubic-bezier(.16,1,.3,1), height 480ms cubic-bezier(.16,1,.3,1), transform 220ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            .media-expanded-meta button,
+            .media-expanded-controls button,
+            .media-collapse-btn {
+                border: 1px solid rgba(255,255,255,.28) !important;
+                background: rgba(255,255,255,.28) !important;
+                backdrop-filter: blur(18px) saturate(145%) !important;
+                -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
+            }
+            body.dark-mode .media-expanded-meta button,
+            body.dark-mode .media-expanded-controls button,
+            body.dark-mode .media-collapse-btn { border-color: rgba(255,255,255,.12) !important; background: rgba(255,255,255,.1) !important; }
+            .media-expanded-controls .media-expanded-play {
+                width: var(--media-play-size) !important;
+                min-width: var(--media-play-size) !important;
+                height: var(--media-play-size) !important;
+                background: rgba(255,255,255,.76) !important;
+            }
+            .media-expanded-play .media-symbol { filter: brightness(0) !important; }
+            .media-app.player-collapsing .media-expanded { pointer-events: none !important; }
+            .media-app.player-collapsing .media-expanded:not(.active) {
+                opacity: 0 !important;
+                transition: opacity 300ms cubic-bezier(.5,0,.2,1), transform 660ms cubic-bezier(.16,1,.3,1), border-radius 660ms cubic-bezier(.16,1,.3,1), clip-path 660ms cubic-bezier(.16,1,.3,1) !important;
+            }
+            @keyframes mediaFluentThemeDrift {
+                0% { transform: translate3d(-9%,-6%,0) scale(1.12) rotate(-2deg); background-position: 0% 34%; }
+                50% { transform: translate3d(8%,-8%,0) scale(1.18) rotate(6deg); background-position: 62% 14%; }
+                100% { transform: translate3d(-7%,11%,0) scale(1.2) rotate(4deg); background-position: 18% 100%; }
+            }
+            @keyframes mediaCoverDrift {
+                0% { transform: translate3d(-3%,-2%,0) scale(1.2) rotate(-1deg); }
+                50% { transform: translate3d(3%,-4%,0) scale(1.27) rotate(2deg); }
+                100% { transform: translate3d(2%,4%,0) scale(1.24) rotate(-2deg); }
+            }
+            @container media-player (max-width: 780px) and (min-width: 601px) {
+                .media-expanded {
+                    --media-art-size: clamp(170px, min(34cqw, 58cqh), 280px);
+                    --media-control-width: clamp(235px, 43cqw, 360px);
+                    --media-title-size: clamp(28px, 5cqw, 40px);
+                    column-gap: clamp(20px, 3.5cqw, 32px) !important;
+                    padding-left: clamp(30px, 5cqw, 42px) !important;
+                    padding-right: clamp(16px, 2.5cqw, 24px) !important;
+                }
+            }
+            @container media-player (max-height: 480px) and (min-width: 601px) {
+                .media-expanded {
+                    --media-art-size: clamp(150px, min(30cqw, 58cqh), 250px);
+                    --media-control-width: clamp(230px, 42cqw, 440px);
+                    --media-title-size: clamp(25px, 4cqw, 38px);
+                    row-gap: 8px !important;
+                    padding-top: 16px !important;
+                    padding-bottom: 16px !important;
+                }
+                .media-expanded-info p { margin-top: 3px !important; }
+            }
+            @container media-player (max-width: 600px) or (max-aspect-ratio: 4 / 5) {
+                .media-player-bar { width: calc(100% - 24px) !important; bottom: 12px !important; }
+                .media-expanded {
+                    --media-art-size: clamp(180px, min(68cqw, 34cqh), 300px);
+                    --media-control-width: min(78cqw, 420px);
+                    --media-title-size: clamp(25px, 8cqw, 36px);
+                    --media-subtitle-size: clamp(14px, 4cqw, 18px);
+                    --media-layout-shift: 0px;
+                    grid-template-columns: 1fr !important;
+                    grid-template-areas: 'art' 'info' 'progress' 'controls' 'aux' !important;
+                    align-content: center !important;
+                    row-gap: clamp(9px, 1.5cqh, 14px) !important;
+                    padding: 48px 18px 22px !important;
+                    overflow: auto !important;
+                    text-align: center;
+                }
+                .media-expanded-art { justify-self: center !important; }
+                .media-expanded-info,
+                .media-expanded-progress-row,
+                .media-expanded-controls,
+                .media-expanded-aux { justify-self: center !important; }
+                .media-expanded-info { justify-content: center !important; align-items: center !important; }
+                .media-expanded-meta { position: absolute; right: 0; top: 0; }
+                .media-expanded-aux .media-volume { margin: 0 auto !important; }
+            }
+        `;
+        document.head.appendChild(style);
+    },
+
+    addLegacyStyles() {
         if (document.getElementById('media-app-styles')) return;
         const style = document.createElement('style');
         style.id = 'media-app-styles';
@@ -6230,6 +7226,76 @@ const MediaApp = {
                 background-color: transparent !important;
                 background-image: none !important;
             }
+
+            /* The titlebar is part of the host material; do not paint a second
+               translucent card over it. */
+            body .window[data-app-id="media"].fw-host .window-titlebar {
+                background: transparent !important;
+                background-color: transparent !important;
+                background-image: none !important;
+                border-bottom: 0 !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                position: relative;
+                z-index: 30;
+            }
+
+            /* Extend the main Fluent card behind the app titlebar. The titlebar
+               remains above it for window dragging and control-button input,
+               while page content keeps its original vertical starting point. */
+            body .window[data-app-id="media"].fw-host {
+                /* 48px titlebar + Fluent content's 2px top inset. */
+                --media-titlebar-overlap: 50px;
+            }
+            body .window[data-app-id="media"].fw-host .window-content {
+                overflow: visible !important;
+            }
+            body .window[data-app-id="media"].fw-host .fw-card {
+                margin-top: calc(-1 * var(--media-titlebar-overlap));
+            }
+            body .window[data-app-id="media"].fw-host .media-fw-page {
+                padding-top: var(--media-titlebar-overlap) !important;
+            }
+
+            .media-library-loading {
+                min-height: 100%;
+                display: grid;
+                place-content: center;
+                justify-items: center;
+                gap: 16px;
+                color: var(--text-secondary, #5f6368);
+            }
+            .media-library-loading strong {
+                font-size: 14px;
+                font-weight: 600;
+            }
+            #media-system-audio-host {
+                position: fixed;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                pointer-events: none;
+                opacity: 0;
+            }
+
+            /* Expanded-player flyouts are opaque command surfaces. */
+            .window[data-app-id="media"].fw-host .media-expanded-options-menu,
+            .window[data-app-id="media"].fw-host .media-expanded-speed-menu {
+                background: #f7f7f7 !important;
+                background-color: #f7f7f7 !important;
+                background-image: none !important;
+                border-color: rgba(0, 0, 0, 0.12) !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            body.dark-mode .window[data-app-id="media"].fw-host .media-expanded-options-menu,
+            body.dark-mode .window[data-app-id="media"].fw-host .media-expanded-speed-menu {
+                background: #2b2b2b !important;
+                background-color: #2b2b2b !important;
+                background-image: none !important;
+                border-color: rgba(255, 255, 255, 0.14) !important;
+            }
             @keyframes mediaThemeDrift {
                 0% {
                     transform: translate3d(-9%, -6%, 0) scale(1.12) rotate(-2deg);
@@ -6255,4 +7321,7 @@ const MediaApp = {
 
 if (typeof window !== 'undefined') {
     window.MediaApp = MediaApp;
+    // Warm the persisted queue independently of the window. Reopening Media is
+    // then immediate, and the desktop widget can play without launching it.
+    setTimeout(() => { void MediaApp.ensureLibraryReady(); }, 0);
 }

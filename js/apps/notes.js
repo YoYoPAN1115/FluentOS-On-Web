@@ -611,6 +611,10 @@ const NotesApp = {
         this.navigateAfterPendingChanges(() => this.openEditor(fileId));
     },
 
+    isFileOpen(fileId) {
+        return !!fileId && this.editorState?.fileId === fileId;
+    },
+
     openData(data = {}) {
         this.ensureSettings();
         this.navigateAfterPendingChanges(() => this.applyOpenData(data));
@@ -1652,7 +1656,10 @@ const NotesApp = {
     async renameNote(fileId) {
         const item = this.getNoteItem(fileId);
         if (!item) return;
-        const nextName = await this.askForText(this.tr('renameTitle'), item.node.name);
+        const nextName = await this.askForText(
+            this.tr('renameTitle'),
+            this.splitFileName(item.node.name).base
+        );
         if (nextName === null) return;
         const clean = nextName.trim();
         if (!this.isValidFileName(clean)) {
@@ -1843,9 +1850,12 @@ const NotesApp = {
 
     normalizeRenamedFileName(oldName, nextName) {
         const oldSplit = this.splitFileName(oldName);
-        const nextSplit = this.splitFileName(nextName);
-        if (!nextSplit.ext && oldSplit.ext) return nextName + oldSplit.ext;
-        return nextName;
+        let visibleName = String(nextName || '').trim();
+        if (!oldSplit.ext) return visibleName;
+        if (visibleName.toLowerCase().endsWith(oldSplit.ext.toLowerCase())) {
+            visibleName = visibleName.slice(0, -oldSplit.ext.length);
+        }
+        return `${visibleName || oldSplit.base}${oldSplit.ext}`;
     },
 
     splitFileName(name) {
