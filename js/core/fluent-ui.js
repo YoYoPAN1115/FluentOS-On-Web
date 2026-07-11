@@ -5,7 +5,6 @@
  * 组件列表：
  * - FluentUI.Button / IconButton  按钮
  * - FluentUI.TabBar              标签栏
- * - FluentUI.Sidebar             侧边栏
  * - FluentUI.NavigationBar       导航栏
  * - FluentUI.ToolBar             工具栏
  * - FluentUI.Breadcrumb          面包屑导航
@@ -46,264 +45,6 @@ const FluentUI = {
     },
 
     // ============ 按钮 ============
-    _nativeScrollFxInitialized: false,
-    _nativeScrollHideTimers: new WeakMap(),
-    _nativeScrollBounceStates: new WeakMap(),
-    _nativeScrollUseTranslate: null,
-
-    initNativeScrollEffects() {
-        if (this._nativeScrollFxInitialized || typeof document === 'undefined') return;
-        this._nativeScrollFxInitialized = true;
-
-        const HOST_SELECTOR = '.window-content, .settings-app, .files-app, .appshop, .start-menu, .fluent-sidebar, .fluent-select-dropdown, .fluent-modal-content';
-        const HIDE_DELAY = 4000;
-        const BOUNCE_MAX_OFFSET = 22;
-        const BOUNCE_MAX_VELOCITY = 10;
-        const BOUNCE_IMPULSE_FACTOR = 0.022;
-        const BOUNCE_IMPULSE_MAX = 4.8;
-        const BOUNCE_SPRING = 0.17;
-        const BOUNCE_DAMPING = 0.8;
-        const BOUNCE_REST_OFFSET = 0.08;
-        const BOUNCE_REST_VELOCITY = 0.08;
-        this._nativeScrollUseTranslate = this._nativeScrollUseTranslate === null
-            ? ('translate' in document.documentElement.style)
-            : this._nativeScrollUseTranslate;
-        const useTranslate = this._nativeScrollUseTranslate === true;
-
-        const isScrollableElement = (el) => {
-            if (!(el instanceof HTMLElement)) return false;
-            const style = window.getComputedStyle(el);
-            const overflowY = style.overflowY;
-            const canScroll = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
-            return canScroll && el.scrollHeight > el.clientHeight + 1;
-        };
-
-        const isInScope = (el) => {
-            if (!(el instanceof Element)) return false;
-            return el.matches(HOST_SELECTOR) || !!el.closest(HOST_SELECTOR);
-        };
-
-        const findScrollable = (start) => {
-            let current = start instanceof Element ? start : null;
-            while (current && current !== document.body) {
-                if (current.classList.contains('fluent-scroll-viewport')) return null;
-                if (isScrollableElement(current) && isInScope(current)) return current;
-                current = current.parentElement;
-            }
-            return null;
-        };
-
-        const markScrollableActive = (scrollable) => {
-            if (!scrollable || !isInScope(scrollable)) return;
-            const prevTimer = this._nativeScrollHideTimers.get(scrollable);
-            if (prevTimer) clearTimeout(prevTimer);
-            scrollable.classList.add('fluent-scrollbar-active');
-            const timer = setTimeout(() => {
-                scrollable.classList.remove('fluent-scrollbar-active');
-                this._nativeScrollHideTimers.delete(scrollable);
-            }, HIDE_DELAY);
-            this._nativeScrollHideTimers.set(scrollable, timer);
-        };
-
-        const collectTopLevelTargets = (scrollable) => {
-            if (!(scrollable instanceof Element)) return [];
-            const blocks = Array.from(scrollable.children)
-                .filter((el) => el instanceof HTMLElement)
-                .filter((el) => !el.classList.contains('window-edge-snap-hint'))
-                .filter((el) => !el.classList.contains('window-snap-layout-menu'));
-            return blocks;
-        };
-
-        const normalizeTargets = (targets, scrollable) => {
-            const targetList = Array.isArray(targets) ? targets : [];
-            if (targetList.length === 0) return [scrollable];
-            const unique = [];
-            const seen = new Set();
-            targetList.forEach((el) => {
-                if (!(el instanceof Element)) return;
-                if (!el.isConnected) return;
-                if (seen.has(el)) return;
-                seen.add(el);
-                unique.push(el);
-            });
-            if (unique.length === 0) return [scrollable];
-            return unique;
-        };
-
-        const getBounceTargets = (scrollable) => {
-            if (!(scrollable instanceof Element)) return [scrollable];
-            const isSettingsContent = scrollable.classList.contains('settings-content');
-            const isSidebar = scrollable.classList.contains('fluent-sidebar');
-            const isFilesContent = scrollable.classList.contains('files-content');
-            const isAppShopContent = scrollable.classList.contains('appshop-content');
-            const isWindowContent = scrollable.classList.contains('window-content');
-            const isModalContent = scrollable.classList.contains('fluent-modal-content');
-            const isSelectDropdown = scrollable.classList.contains('fluent-select-dropdown');
-
-            if (isSidebar) {
-                const sidebarTargets = Array.from(scrollable.querySelectorAll([
-                    '.fluent-sidebar-item',
-                    '.fluent-sidebar-section-title',
-                    '.fluent-sidebar-header > *'
-                ].join(', '))).filter((el) => el instanceof Element);
-                return normalizeTargets(sidebarTargets, scrollable);
-            }
-
-            if (isSettingsContent) {
-                const sections = collectTopLevelTargets(scrollable);
-                if (sections.length > 0) return normalizeTargets(sections, scrollable);
-                const settingsFallback = Array.from(scrollable.querySelectorAll([
-                    '.fluent-setting-item',
-                    '.settings-recommend-item',
-                    '.settings-recent-item',
-                    '.network-hero-card',
-                    '.network-option-item',
-                    '.network-expand-panel',
-                    '.app-list-item',
-                    '.wallpaper-item'
-                ].join(', '))).filter((el) => el instanceof Element);
-                return normalizeTargets(settingsFallback, scrollable);
-            }
-
-            if (isFilesContent || isAppShopContent || isModalContent || isSelectDropdown || isWindowContent) {
-                const topLevel = collectTopLevelTargets(scrollable);
-                return normalizeTargets(topLevel, scrollable);
-            }
-
-            const fallback = collectTopLevelTargets(scrollable);
-            return normalizeTargets(fallback, scrollable);
-        };
-
-        const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-        const applyBounceOffset = (state) => {
-            if (!state || !state.targets || state.targets.length === 0) return;
-            if (Math.abs(state.offset) < 0.01) {
-                state.targets.forEach((el) => {
-                    if (useTranslate) {
-                        el.style.translate = '';
-                    } else {
-                        el.style.transform = '';
-                    }
-                    el.style.willChange = '';
-                });
-                return;
-            }
-            const translateValue = `0 ${state.offset.toFixed(3)}px`;
-            const transformValue = `translate3d(0, ${state.offset.toFixed(3)}px, 0)`;
-            state.targets.forEach((el) => {
-                el.style.willChange = 'transform';
-                if (useTranslate) {
-                    el.style.translate = translateValue;
-                } else {
-                    el.style.transform = transformValue;
-                }
-            });
-        };
-
-        const stopBounce = (state) => {
-            if (!state) return;
-            if (state.rafId) {
-                cancelAnimationFrame(state.rafId);
-                state.rafId = 0;
-            }
-            state.offset = 0;
-            state.velocity = 0;
-            applyBounceOffset(state);
-        };
-
-        const ensureBounceState = (scrollable) => {
-            let state = this._nativeScrollBounceStates.get(scrollable);
-            if (!state) {
-                state = {
-                    scrollable,
-                    targets: getBounceTargets(scrollable),
-                    offset: 0,
-                    velocity: 0,
-                    rafId: 0,
-                    lastTargetSyncAt: 0
-                };
-                this._nativeScrollBounceStates.set(scrollable, state);
-            }
-            const now = performance.now();
-            const needsRefresh = (now - state.lastTargetSyncAt) > 140 ||
-                !state.targets ||
-                state.targets.length === 0 ||
-                state.targets.some((el) => !el.isConnected);
-            if (needsRefresh) {
-                state.targets = getBounceTargets(scrollable);
-                state.lastTargetSyncAt = now;
-            }
-            return state;
-        };
-
-        const startBounceLoop = (state) => {
-            if (!state || state.rafId) return;
-            const tick = () => {
-                const host = state.scrollable;
-                if (!(host instanceof Element) || !host.isConnected) {
-                    stopBounce(state);
-                    return;
-                }
-
-                const prevOffset = state.offset;
-                state.velocity += (-state.offset) * BOUNCE_SPRING;
-                state.velocity *= BOUNCE_DAMPING;
-                const nextOffset = clamp(state.offset + state.velocity, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
-                const crossedZero = (prevOffset > 0 && nextOffset < 0) || (prevOffset < 0 && nextOffset > 0);
-                if (crossedZero) {
-                    stopBounce(state);
-                    return;
-                }
-                state.offset = nextOffset;
-                applyBounceOffset(state);
-
-                if (Math.abs(state.offset) <= BOUNCE_REST_OFFSET && Math.abs(state.velocity) <= BOUNCE_REST_VELOCITY) {
-                    stopBounce(state);
-                    return;
-                }
-
-                state.rafId = requestAnimationFrame(tick);
-            };
-            state.rafId = requestAnimationFrame(tick);
-        };
-
-        const pushBounceImpulse = (scrollable, deltaY) => {
-            if (!scrollable || !isInScope(scrollable)) return;
-            const state = ensureBounceState(scrollable);
-            const impulse = clamp(-deltaY * BOUNCE_IMPULSE_FACTOR, -BOUNCE_IMPULSE_MAX, BOUNCE_IMPULSE_MAX);
-            state.velocity = clamp(state.velocity + impulse, -BOUNCE_MAX_VELOCITY, BOUNCE_MAX_VELOCITY);
-            state.offset = clamp(state.offset + impulse * 0.55, -BOUNCE_MAX_OFFSET, BOUNCE_MAX_OFFSET);
-            applyBounceOffset(state);
-            startBounceLoop(state);
-        };
-
-        document.addEventListener('wheel', (e) => {
-            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-            const scrollable = findScrollable(e.target);
-            if (!scrollable) return;
-
-            markScrollableActive(scrollable);
-            const maxScroll = Math.max(0, scrollable.scrollHeight - scrollable.clientHeight);
-            if (maxScroll <= 0) return;
-
-            const atTop = scrollable.scrollTop <= 0;
-            const atBottom = scrollable.scrollTop >= maxScroll - 1;
-            if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
-                e.preventDefault();
-                pushBounceImpulse(scrollable, e.deltaY);
-            }
-        }, { capture: true, passive: false });
-
-        document.addEventListener('scroll', (e) => {
-            const target = e.target;
-            if (!(target instanceof Element)) return;
-            if (!isScrollableElement(target) || !isInScope(target)) return;
-            if (target.classList.contains('fluent-scroll-viewport')) return;
-            markScrollableActive(target);
-        }, true);
-    },
-
     Button(opts = {}) {
         const { text = '', variant = 'secondary', size = 'medium', icon = null, iconPosition = 'left',
                 disabled = false, loading = false, onClick = null, id = null, className = '' } = opts;
@@ -360,36 +101,6 @@ const FluentUI = {
         container.appendChild(tabsWrapper);
         if (showAddButton) container.appendChild(this.IconButton({ icon: 'Plus Circle', title: '新建标签页', size: 'small', className: 'fluent-tabbar-add', onClick: onAddTab }));
         return container;
-    },
-
-    // ============ 侧边栏 ============
-    Sidebar(opts = {}) {
-        const { items = [], sections = [], activeItem = null, onItemClick = null, header = null, width = '200px', id = null, className = '' } = opts;
-        const sidebar = this._utils.createElement('div', { className: this._utils.classNames('fluent-sidebar', className), id, styles: { width } });
-        
-        if (header) sidebar.appendChild(this._utils.createElement('div', { className: 'fluent-sidebar-header', html: `<span>${header}</span>` }));
-        
-        const renderItems = (list, parent) => {
-            list.forEach(item => {
-                const el = this._utils.createElement('div', {
-                    className: this._utils.classNames('fluent-sidebar-item', item.id === activeItem && 'active'),
-                    data: { id: item.id }
-                });
-                el.innerHTML = (item.icon ? `<img src="${this._utils.getIconPath(item.icon)}" class="fluent-sidebar-item-icon" alt="">` : '') + `<span class="fluent-sidebar-item-label">${item.label}</span>`;
-                el.addEventListener('click', () => onItemClick && onItemClick(item.id, item));
-                parent.appendChild(el);
-            });
-        };
-        
-        if (sections.length > 0) {
-            sections.forEach(sec => {
-                const secEl = this._utils.createElement('div', { className: 'fluent-sidebar-section' });
-                if (sec.title) secEl.appendChild(this._utils.createElement('div', { className: 'fluent-sidebar-section-title', text: sec.title }));
-                renderItems(sec.items || [], secEl);
-                sidebar.appendChild(secEl);
-            });
-        } else renderItems(items, sidebar);
-        return sidebar;
     },
 
     // ============ 导航栏 ============
@@ -552,14 +263,15 @@ const FluentUI = {
         };
 
         const openDropdown = () => {
-            if (disabled) return;
-            // 关闭其他可能打开的下拉菜单
-            document.querySelectorAll('.fluent-select-dropdown.open').forEach(el => {
-                el.classList.remove('open');
-            });
-            document.querySelectorAll('.fluent-select-wrapper.active').forEach(el => {
-                el.classList.remove('active');
-            });
+            if (disabled || isOpen) return;
+            const closeEvent = typeof CustomEvent === 'function'
+                ? new CustomEvent('fluent-select-close-all', { detail: { source: wrapper } })
+                : (() => {
+                    const event = document.createEvent('CustomEvent');
+                    event.initCustomEvent('fluent-select-close-all', false, false, { source: wrapper });
+                    return event;
+                })();
+            document.dispatchEvent(closeEvent);
 
             isOpen = true;
             wrapper.classList.add('active');
@@ -595,7 +307,13 @@ const FluentUI = {
             }
         };
 
+        const handleCloseAll = (e) => {
+            if (e.detail && e.detail.source === wrapper) return;
+            closeDropdown();
+        };
+
         trigger.addEventListener('click', toggleDropdown);
+        document.addEventListener('fluent-select-close-all', handleCloseAll);
         
         wrapper.appendChild(trigger);
         // 不再将 dropdown 放入 wrapper，而是动态挂载到 body
@@ -614,13 +332,18 @@ const FluentUI = {
         };
         
         // 清理：当 wrapper 从 DOM 移除时，也移除 dropdown
-        const observer = new MutationObserver(() => {
-            if (!document.body.contains(wrapper) && dropdown.parentElement) {
-                dropdown.remove();
-                observer.disconnect();
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        let observer = null;
+        if (typeof MutationObserver !== 'undefined') {
+            observer = new MutationObserver(() => {
+                if (!document.body.contains(wrapper)) {
+                    closeDropdown();
+                    if (dropdown.parentElement) dropdown.remove();
+                    document.removeEventListener('fluent-select-close-all', handleCloseAll);
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
         
         return wrapper;
     },
@@ -631,10 +354,31 @@ const FluentUI = {
         const wrapper = this._utils.createElement('label', { className: this._utils.classNames('fluent-toggle-wrapper', disabled && 'fluent-toggle-disabled', className), id });
         const toggle = this._utils.createElement('div', { className: this._utils.classNames('fluent-toggle', checked && 'active') });
         toggle.innerHTML = '<div class="fluent-toggle-track"><div class="fluent-toggle-thumb"></div></div>';
-        if (!disabled) toggle.addEventListener('click', () => { toggle.classList.toggle('active'); onChange && onChange(toggle.classList.contains('active')); });
+        toggle.setAttribute('role', 'switch');
+        toggle.setAttribute('aria-checked', checked ? 'true' : 'false');
+        toggle.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        toggle.tabIndex = disabled ? -1 : 0;
+
+        const setChecked = (value, notify = false) => {
+            const next = value === true;
+            toggle.classList.toggle('active', next);
+            toggle.setAttribute('aria-checked', next ? 'true' : 'false');
+            if (notify && onChange) onChange(next);
+        };
+        const toggleChecked = () => setChecked(!toggle.classList.contains('active'), true);
+
+        if (!disabled) {
+            toggle.addEventListener('click', toggleChecked);
+            toggle.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                toggleChecked();
+            });
+        }
         wrapper.appendChild(toggle);
         if (label) wrapper.appendChild(this._utils.createElement('span', { className: 'fluent-toggle-label', text: label }));
-        wrapper.isChecked = () => toggle.classList.contains('active'); wrapper.setChecked = v => toggle.classList.toggle('active', v);
+        wrapper.isChecked = () => toggle.classList.contains('active');
+        wrapper.setChecked = value => setChecked(value, false);
         return wrapper;
     },
 
@@ -644,11 +388,30 @@ const FluentUI = {
         const wrapper = this._utils.createElement('div', { className: this._utils.classNames('fluent-slider-wrapper', disabled && 'fluent-slider-disabled', className), id });
         const slider = this._utils.createElement('input', { className: 'fluent-slider', attrs: { type: 'range', min, max, value, step } });
         slider.disabled = disabled;
-        slider.addEventListener('input', e => { onChange && onChange(Number(e.target.value)); if (showValue) valueEl.textContent = e.target.value; });
-        wrapper.appendChild(slider);
         let valueEl = null;
-        if (showValue) { valueEl = this._utils.createElement('span', { className: 'fluent-slider-value', text: value }); wrapper.appendChild(valueEl); }
-        wrapper.getValue = () => Number(slider.value); wrapper.setValue = v => { slider.value = v; if (valueEl) valueEl.textContent = v; };
+        if (showValue) valueEl = this._utils.createElement('span', { className: 'fluent-slider-value', text: value });
+        const updateSliderVisual = () => {
+            const minValue = Number(slider.min);
+            const maxValue = Number(slider.max);
+            const currentValue = Number(slider.value);
+            const range = Math.max(1, maxValue - minValue);
+            const progress = Math.max(0, Math.min(100, ((currentValue - minValue) / range) * 100));
+            slider.style.setProperty('--fluent-slider-progress', progress + '%');
+        };
+        slider.addEventListener('input', e => {
+            updateSliderVisual();
+            onChange && onChange(Number(e.target.value));
+            if (showValue) valueEl.textContent = e.target.value;
+        });
+        updateSliderVisual();
+        wrapper.appendChild(slider);
+        if (showValue) wrapper.appendChild(valueEl);
+        wrapper.getValue = () => Number(slider.value);
+        wrapper.setValue = v => {
+            slider.value = v;
+            updateSliderVisual();
+            if (valueEl) valueEl.textContent = v;
+        };
         return wrapper;
     },
 
@@ -1043,8 +806,8 @@ const FluentUI = {
         // 类型对应的图标和标题
         const typeConfig = {
             info: { icon: 'Information Circle', defaultTitle: '提示' },
-            warning: { icon: 'Exclamation Triangle', defaultTitle: '警告' },
-            error: { icon: 'Cancel Circle', defaultTitle: '错误' }
+            warning: { icon: 'Question Mark Circle', defaultTitle: '警告' },
+            error: { icon: 'Question Mark Circle', defaultTitle: '错误' }
         };
         const config = typeConfig[type] || typeConfig.info;
         const dialogTitle = title || config.defaultTitle;
@@ -1266,15 +1029,16 @@ const FluentUI = {
             type = 'info',  // 'info' | 'success' | 'warning' | 'error'
             duration = 5000,  // 显示时间，毫秒
             icon = null,
-            onClick = null
+            onClick = null,
+            onClose = null
         } = opts;
         
         // 类型对应的图标
         const typeIcons = {
             info: 'Information Circle',
-            success: 'Checkmark Circle',
-            warning: 'Exclamation Triangle',
-            error: 'Cancel Circle'
+            success: 'Check Circle',
+            warning: 'Question Mark Circle',
+            error: 'Question Mark Circle'
         };
         const toastIcon = icon || typeIcons[type] || typeIcons.info;
         
@@ -1294,17 +1058,26 @@ const FluentUI = {
                 <img src="${this._utils.getIconPath(toastIcon)}" alt="">
             </div>
             <div class="fluent-toast-body">
-                ${title ? `<div class="fluent-toast-title">${title}</div>` : ''}
-                ${message ? `<div class="fluent-toast-message">${message}</div>` : ''}
+                ${title ? '<div class="fluent-toast-title"></div>' : ''}
+                ${message ? '<div class="fluent-toast-message"></div>' : ''}
             </div>
             <button type="button" class="fluent-toast-close">
                 <img src="${this._utils.getIconPath('Cancel')}" alt="关闭">
             </button>
         `;
+
+        const titleElement = toast.querySelector('.fluent-toast-title');
+        const messageElement = toast.querySelector('.fluent-toast-message');
+        if (titleElement) titleElement.textContent = title;
+        if (messageElement) messageElement.textContent = message;
         
         // 关闭通知的方法
+        let closed = false;
         const close = () => {
+            if (closed) return;
+            closed = true;
             toast.classList.add('fluent-toast-exit');
+            if (typeof onClose === 'function') onClose();
             setTimeout(() => {
                 toast.remove();
                 // 如果没有通知了，移除容器
@@ -1350,5 +1123,4 @@ const FluentUI = {
 // 导出到全局
 if (typeof window !== 'undefined') {
     window.FluentUI = FluentUI;
-    FluentUI.initNativeScrollEffects();
 }

@@ -125,8 +125,10 @@ body.animations-enabled .boot-loading-ring svg {
     animation: boot-ring-spin 1.2s linear infinite;
 }
 
+/* Boot is already visible in the initial HTML paint. Replaying fadeIn after
+   State adds animations-enabled exposes the light body background as a flash. */
 body.animations-enabled #boot-screen {
-    animation: fadeIn 0.5s ease-out;
+    animation: none;
 }
 
 body.animations-enabled #lock-screen.show {
@@ -345,7 +347,6 @@ body.animations-enabled .control-center.closing {
         border-radius: 0;
     }
 }
-
 @keyframes windowRestore {
     from {
         border-radius: 0;
@@ -355,9 +356,31 @@ body.animations-enabled .control-center.closing {
     }
 }
 
+@keyframes windowFocusPop {
+    0% { transform: scale(1); }
+    52% { transform: scale(1.014); }
+    100% { transform: scale(1); }
+}
+
+@keyframes windowFocusDip {
+    0% { transform: scale(1); }
+    48% { transform: scale(0.992); }
+    100% { transform: scale(1); }
+}
+
 /* 窗口打开动画 */
 body.animations-enabled .window.opening {
     animation: windowOpen 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+body.animations-enabled .window.window-focus-pop {
+    animation: windowFocusPop 280ms cubic-bezier(0.2, 0.9, 0.28, 1);
+    transform-origin: center center;
+}
+
+body.animations-enabled .window.window-focus-dip {
+    animation: windowFocusDip 280ms cubic-bezier(0.2, 0.9, 0.28, 1);
+    transform-origin: center center;
 }
 
 /* 窗口关闭动画 */

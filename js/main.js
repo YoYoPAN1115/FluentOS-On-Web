@@ -215,8 +215,11 @@ function initModules() {
     StartMenu.init();
     ControlCenter.init();
     NotificationCenter.init();
+    if (typeof ClockReminderService !== 'undefined') { ClockReminderService.init(); }
     WindowManager.init();
+    if (typeof FavoriteSites !== 'undefined') { FavoriteSites.init(); }
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
+    if (typeof Widgets !== 'undefined') { Widgets.init(); }
     Fingo.init();
     initGlobalShortcuts();
     initGlobalFileDragOverlay();
@@ -729,11 +732,17 @@ function startSystem() {
     scheduleAutoEnterFullscreen();
 }
 
+/** 同步当前视图对应的 body 状态类（供锁屏小组件景深等样式使用） */
+function syncViewBodyClasses(newView) {
+    document.body.classList.toggle('view-login', newView === 'login');
+}
+
 /**
  * 处理视图变化
  */
 function handleViewChange({ oldView, newView }) {
     console.log(`视图切换: ${oldView} → ${newView}`);
+    syncViewBodyClasses(newView);
 
     // 特殊处理：锁屏 → 登录的动画
     if (oldView === 'lock' && newView === 'login') {
@@ -782,8 +791,12 @@ function handlePowerAction({ action }) {
     const textEl = document.getElementById('power-overlay-text');
 
     // 关闭所有打开的窗口
-    if (typeof WindowManager !== 'undefined') {
-        WindowManager.windows.forEach(w => WindowManager.closeWindow(w.id));
+    if (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows)) {
+        WindowManager.windows.slice().forEach((w) => {
+            if (w && typeof WindowManager.closeWindow === 'function') {
+                WindowManager.closeWindow(w.id);
+            }
+        });
     }
 
     // 根据操作类型设置文字
@@ -793,7 +806,8 @@ function handlePowerAction({ action }) {
         logout: { title: t('power.logout.title'), status: t('power.logout.status') }
     };
 
-    const info = texts[action];
+    const info = texts[action] || texts.logout;
+    if (!overlay || !titleEl || !textEl) return;
     titleEl.textContent = info.title;
     textEl.textContent = info.status;
 
@@ -887,6 +901,7 @@ function handleLockToLogin() {
     }
     
     // 3. 显示登录界面（只为了显示密码卡片）
+    if (!loginScreen) return;
     loginScreen.classList.remove('hidden');
     loginScreen.classList.add('show');
     
@@ -928,9 +943,11 @@ window.handleLoginToLock = function() {
         loginCard.classList.add('exit-to-lock');
     }
     
-    // 3. 延迟 100ms 后移除模糊类，锁屏元素恢复清晰
+    // 3. 延迟 100ms 后移除模糊类，锁屏元素（时钟 + 小组件）同步恢复清晰
+    //    注意：此路径直接赋值 State.view，不会触发 viewChange，
+    //    因此 view-login 必须在这里手动移除，否则锁屏小组件会永久隐藏
     setTimeout(() => {
-        document.body.classList.remove('lock-to-login');
+        document.body.classList.remove('lock-to-login', 'view-login');
     }, 100);
     
     // 4. 动画完成后清理状态
@@ -941,6 +958,7 @@ window.handleLoginToLock = function() {
         }
         LoginScreen.hide();
         State.view = 'lock';
+        syncViewBodyClasses('lock');
     }, 500);
 };
 
@@ -1008,6 +1026,7 @@ function handleLoginToDesktop() {
     document.body.classList.add('login-to-desktop-blur');
     
     // 2. 立即准备桌面（模糊状态，透明）
+    if (!desktopScreen || !loginScreen) return;
     desktopScreen.classList.remove('hidden');
     desktopScreen.style.opacity = '0';
     document.body.classList.add('desktop-blur-in');
@@ -1088,6 +1107,28 @@ window.addEventListener('error', (e) => {
 /**
  * 全局禁用右键菜单和文字复制（记事本除外）
  */
+window.closeAllContextMenus = (except = null) => {
+    document.querySelectorAll('.context-menu, .fluent-context-menu').forEach((menu) => {
+        if (menu === except || (except && menu.contains(except))) return;
+        if (typeof menu.hide === 'function') menu.hide();
+        else menu.classList.add('hidden');
+    });
+};
+
+// 捕获阶段先收起旧菜单；目标区域随后可在冒泡阶段打开自己的菜单。
+document.addEventListener('contextmenu', () => {
+    window.closeAllContextMenus();
+}, true);
+
+// Dismiss menus before a click opens an App, navigates, or activates a panel.
+document.addEventListener('pointerdown', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const activeMenu = target?.closest('.context-menu, .fluent-context-menu') || null;
+    window.closeAllContextMenus(activeMenu);
+}, true);
+
+window.addEventListener('blur', () => window.closeAllContextMenus());
+
 document.addEventListener('contextmenu', (e) => {
     // 检查是否在记事本应用内
     const notesApp = e.target.closest('.notes-app');
@@ -1463,7 +1504,7 @@ const ResourceMonitor = {
 };
 
 window.FluentOS = {
-    version: '1.0.0',
+    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.0.260710',
     State,
     Storage,
     notify,

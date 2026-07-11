@@ -2,19 +2,98 @@
  * 设置应用 - 使用 FluentUI 组件库
  */
 const SettingsApp = {
+    handlesInitialOpenData: true,
     windowId: null,
     container: null,
+    frame: null,
     currentPage: 'overview',
     _aboutDevTapCount: 0,
     _developerModeVisible: false,
-    _pageScrollTop: {},
-    _scrollRestoreRaf: null,
-    _scrollRestoreTimer: null,
-    _lastRestoredScrollKey: '',
-    _lastScrollRestoreAt: 0,
-    _sidebarScrollTop: 0,
-    _sidebarScrollRestoreRaf: null,
-    _sidebarScrollRestoreTimer: null,
+    // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
+    aboutChangelog: [
+        { date: '2026-07-10', version: '2.0.260710', commits: [
+            { hash: 'local', title: '大幅度提升系统稳定性，对多媒体、照片、小组件等多项功能和App针对性优化，并完善了从外部导入文件的逻辑，优化了桌面交互动画，修复了再某些情况下壁纸会丢失的BUG' },
+            { hash: 'local', title: '完成系统版本号发布前最后的迭代，补充了更新日志的细节' }
+        ] },
+        { date: '2026-07-06', version: '2.0.260706', commits: [
+            { hash: '112ae34', title: '优化 OOBE 视觉效果，新增“大功告成”完成页、交互式粒子动画与非线性桌面过渡' },
+            { hash: '77859ed', title: '进一步优化时钟 App 体验，提醒事项支持及时通知' },
+            { hash: '50d4526', title: '完成全新提示 App，帮助用户了解新功能并完成入门引导' }
+        ] },
+        { date: '2026-07-03', version: '2.0.260703.1', commits: [
+            { hash: '7c07eac', title: '优化小组件位置自适应逻辑，并完善部分视觉效果' },
+            { hash: 'e9f8832', title: '删除不再使用的额外图标资源' },
+            { hash: '66422b8', title: '完成 FluentOS 青山湖首个正式版本' },
+            { hash: '22a89c6', title: '进一步优化小组件体验，新增横向自适应位置调整' }
+        ] },
+        { date: '2026-07-02', version: '2.0.260702', commits: [
+            { hash: 'ca4ffa9', title: '完成开机流程优化，大幅提高开机速度' },
+            { hash: '8c6364f', title: '完善浏览器 App、收藏与搜索小组件联动，优化交互细节并修复已知 BUG' },
+            { hash: '0a5b367', title: '修复已知 BUG，提升系统稳定性' },
+            { hash: '6c5173f', title: '修复大量已知 BUG，提升系统稳定性，并优化 App Shop 交互动画' },
+            { hash: '3c3c65b', title: '修复按钮图标错误请求导致的后台大量报错问题' },
+            { hash: '6fd0587', title: '完成全新 FluentOS 青山湖 OOBE 界面开发工作，并统一 Fluent UI 组件库的开关控件设计语言' }
+        ] },
+        { date: '2026-06-30', version: '2.0.260630', commits: [
+            { hash: '73e528e', title: '完成新版设置关于页面开发' }
+        ] },
+        { date: '2026-06-27', version: '2.0.260627', commits: [
+            { hash: 'fcb7056', title: '修复已知视觉BUG，进一步优化了多媒体App' }
+        ] },
+        { date: '2026-06-26', version: '2.0.260626', commits: [
+            { hash: '20833ed', title: '彻底修复大量已知BUG，大幅度提高系统稳定性' },
+            { hash: 'd140b7b', title: '照片App大升级，采用新一代App框架，统一设计语言，并支持导入本地照片功能，和文件App完成联动，修复大量已知BUG，并调整了部分场景下的动画' }
+        ] },
+        { date: '2026-06-24', version: '2.0.260624', commits: [
+            { hash: '110ff49', title: '完成对时钟App的日历方面重构，但仍需优化，新增提醒事项小组件，修复大量已知BUG，新增任务栏App窗口预览功能，彻底重构了相机App' }
+        ] },
+        { date: '2026-06-18', version: '2.0.260618', commits: [
+            { hash: '72f21fa', title: '全新计算器App已上线，快记App新增大量编辑功能，进一步优化了快记App，修复大量已知BUG' },
+            { hash: '16edb5e', title: '新增全新的性能工具开关，进一步优化了窗口逻辑' }
+        ] },
+        { date: '2026-06-17', version: '2.0.260617', commits: [
+            { hash: '86fbd64', title: '进一步优化了小组件的设计，调整了天气、音乐卡片，新增日历小组件，优化了窗口逻辑，修复大量已知BUG' }
+        ] },
+        { date: '2026-06-14', version: '2.0.260614', commits: [
+            { hash: 'e1d97c5', title: '基本完成对新一代Notes的开发工作80%' }
+        ] },
+        { date: '2026-06-13', version: '2.0.260613', commits: [
+            { hash: '02916ed', title: '进一步完善了小组件编辑界面以及相关动画优化' }
+        ] },
+        { date: '2026-06-12', version: '2.0.260612', commits: [
+            { hash: '62f2e02', title: '新增统一的小组件编辑功能，优化了窗口切换动画' }
+        ] },
+        { date: '2026-06-11', version: '2.0.260611', commits: [
+            { hash: '5f85669', title: '修复大量已知BUG，天气App新增搜索和当前位置天气的功能，优化了小组件' },
+            { hash: '5a6987c', title: '完善小组件交互细节，修复大量小组间产生的BUG' }
+        ] },
+        { date: '2026-06-10', version: '2.0.260610', commits: [
+            { hash: '1ced11a', title: '解决实时模糊层可能会导致的意外白线/黑线出现过于频繁的问题，采用实时+静态模糊动态调整，大幅降低GPU渲染压力，大幅减少意外线条出现' },
+            { hash: '695e4c8', title: '进一步完善小组件开发工作90%' },
+            { hash: 'd49a310', title: '优化了侧边栏的UI，修复侧边栏不能滚动的BUG' },
+            { hash: 'b5450d2', title: '基本完成全新小组件的功能开发80%' },
+            { hash: '8c84760', title: '完成FluentOS全新UI开发，精简并统一了原生级App的窗口代码模块' }
+        ] },
+        { date: '2026-06-09', version: '2.0.260609', commits: [
+            { hash: '845f78f', title: '完成一些小BUG的修补工作' }
+        ] },
+        { date: '2026-06-08', version: '2.0.260608', commits: [
+            { hash: '5b1d15d', title: '完善窗口逻辑，新增全新自定义主题色' },
+            { hash: '239c50e', title: 'App Shop全新版本基本完成开发' },
+            { hash: 'c1a8214', title: 'App Shop新版开发工作60%' },
+            { hash: '70ddb46', title: '完成App Shop应用扩充' }
+        ] },
+        { date: '2026-06-07', version: '2.0.260607', commits: [
+            { hash: '45428a5', title: '完成全新高光效果开发' },
+            { hash: 'fd9d197', title: '基本完成模糊程度+云母材质效果切换' },
+            { hash: '544ea15', title: '更换图标并优化UI界面' }
+        ] },
+        { date: '2026-06-06', version: '2.0.260606', baseline: true, commits: [] }
+    ],
+
+    _isMounted() {
+        return !!(this.container && this.container.isConnected);
+    },
 
     getPages() {
         const pages = [
@@ -66,74 +145,113 @@ const SettingsApp = {
         return this.appSizes[appId];
     },
 
-    init(windowId) {
+    init(windowId, initialData = null) {
         this.windowId = windowId || `window-${Date.now()}`;
         this.container = document.getElementById(`${this.windowId}-content`);
         // 默认打开概览页
         this.currentPage = 'overview';
+        this.currentAppDetail = null;
         this._aboutDevTapCount = 0;
         this._developerModeVisible = false;
-        this._pageScrollTop = {};
-        this._sidebarScrollTop = 0;
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-            this._scrollRestoreRaf = null;
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
-        }
-        this._lastRestoredScrollKey = '';
-        this._lastScrollRestoreAt = 0;
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
-        }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
+
+        // 首次创建窗口时先消费目标页，再进行首帧渲染，避免先显示概览页后
+        // 异步导航与 FluentWindow 的初始化渲染互相覆盖。
+        let initialDataHandled = false;
+        if (initialData && initialData.page === 'app-detail' && initialData.appId) {
+            const app = this.getAppDetailData(initialData.appId);
+            if (app) {
+                this.currentAppDetail = app;
+                this.currentPage = 'app-detail';
+                initialDataHandled = true;
+            }
+        } else if (initialData && initialData.page) {
+            const page = initialData.page;
+            const hasPage = this.getPages().some(item => item.id === page);
+            if (hasPage || page === 'personalization-advanced' || page === 'about-changelog') {
+                this.currentPage = page;
+                initialDataHandled = true;
+            }
         }
         this.render();
         
-        // 监听语言切换事件
-        State.on('languageChange', () => this.render());
-        
-        // 监听应用安装变化，实时刷新应用列表
-        if (!this._installedAppsListener) {
-            this._installedAppsListener = true;
-            State.on('settingsChange', () => {
-                if (this.currentPage === 'applications' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('languageChange', () => {
+            if (this._isMounted()) this.render();
+        }, { key: 'SettingsApp.languageChange' });
 
-        if (!this._appUsageListener) {
-            this._appUsageListener = true;
-            State.on('appUsageChange', () => {
-                if (this.currentPage === 'applications' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('settingsChange', () => {
+            if (this._isMounted() && this.currentPage === 'applications') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.settingsChange' });
 
-        if (!this._fingoApiListener) {
-            this._fingoApiListener = true;
-            State.on('fingoApiKeyReady', () => {
-                if (this.currentPage === 'fingo' && this.container) {
-                    this.render();
-                }
-            });
-        }
+        State.on('appUsageChange', () => {
+            if (this._isMounted() && this.currentPage === 'applications') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.appUsageChange' });
+
+        State.on('fingoApiKeyReady', () => {
+            if (this._isMounted() && this.currentPage === 'fingo') {
+                this.render();
+            }
+        }, { key: 'SettingsApp.fingoApiKeyReady' });
+
+        return initialDataHandled;
     },
 
     openData(data) {
-        if (!data || data.page !== 'app-detail' || !data.appId) return;
+        if (!data || !data.page) return;
+        if (data.page !== 'app-detail') {
+            const hasPage = this.getPages().some(page => page.id === data.page);
+            if (hasPage || data.page === 'personalization-advanced' || data.page === 'about-changelog') {
+                this.currentAppDetail = null;
+                this.navigateToPage(data.page);
+            }
+            return;
+        }
+        if (!data.appId) return;
         const app = this.getAppDetailData(data.appId);
         if (!app) return;
         this.currentAppDetail = app;
-        this.currentPage = 'app-detail';
-        this.render();
+        this.navigateToPage('app-detail');
+    },
+
+    navigateToPage(pageId, options = {}) {
+        if (!pageId) return;
+        const previousPage = this.currentPage;
+        this.currentPage = pageId;
+        if (this.frame && typeof this.frame.navigate === 'function' && previousPage !== pageId) {
+            this.frame.navigate(pageId);
+        } else {
+            this.render();
+        }
+        if (typeof options.after === 'function') {
+            setTimeout(options.after, options.delay || 180);
+        }
+    },
+
+    refreshCurrentPage(options = {}) {
+        if (!this.frame || typeof this.frame.refresh !== 'function') {
+            this.render();
+            return;
+        }
+
+        const preserveScroll = options.preserveScroll !== false;
+        const card = this.frame.cardEl;
+        const scrollTop = preserveScroll && card ? card.scrollTop : 0;
+        this.frame.refresh();
+
+        if (!preserveScroll || !card) return;
+        const restore = () => {
+            if (!card.isConnected) return;
+            const maxScroll = Math.max(0, card.scrollHeight - card.clientHeight);
+            card.scrollTop = Math.min(scrollTop, maxScroll);
+        };
+        requestAnimationFrame(() => {
+            restore();
+            requestAnimationFrame(restore);
+        });
+        setTimeout(restore, 180);
     },
 
     getAppDetailData(appId) {
@@ -155,208 +273,74 @@ const SettingsApp = {
     },
 
     beforeClose() {
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
         }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
-        }
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-            this._scrollRestoreRaf = null;
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
-        }
+        this.container = null;
+        this.windowId = null;
         return true;
     },
 
-    _getScrollRouteKey(content = null) {
-        const pageId = (content && content.dataset && content.dataset.pageId) || this.currentPage || 'overview';
-        if (pageId === 'app-detail') {
-            const appId = (content && content.dataset && content.dataset.detailAppId) ||
-                (this.currentAppDetail && this.currentAppDetail.id) ||
-                'unknown';
-            return `app-detail:${appId}`;
-        }
-        return pageId;
-    },
-
-    _saveCurrentScrollPosition() {
-        if (!this.container) return;
-        const content = this.container.querySelector('.settings-content');
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        const prevTop = this._pageScrollTop[scrollKey];
-        const nextTop = content.scrollTop;
-        const restoreGap = performance.now() - this._lastScrollRestoreAt;
-        const isTransientReset = scrollKey === this._lastRestoredScrollKey &&
-            restoreGap < 260 &&
-            Number.isFinite(prevTop) &&
-            prevTop > 2 &&
-            nextTop <= 1;
-        if (isTransientReset) return;
-        this._pageScrollTop[scrollKey] = nextTop;
-    },
-
-    _restoreScrollPosition(content) {
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        const savedTop = this._pageScrollTop[scrollKey];
-        if (!Number.isFinite(savedTop)) return;
-        if (this._scrollRestoreRaf) {
-            cancelAnimationFrame(this._scrollRestoreRaf);
-        }
-        if (this._scrollRestoreTimer) {
-            clearTimeout(this._scrollRestoreTimer);
-            this._scrollRestoreTimer = null;
-        }
-
-        let frameCount = 0;
-        const maxFrames = 8;
-        const applyRestore = () => {
-            if (!content.isConnected) {
-                this._scrollRestoreRaf = null;
-                return;
-            }
-
-            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
-            const targetTop = Math.min(savedTop, maxScroll);
-            if (Math.abs(content.scrollTop - targetTop) > 1) {
-                content.scrollTop = targetTop;
-            }
-
-            frameCount += 1;
-            const stillGrowing = savedTop > maxScroll + 1 && frameCount < maxFrames;
-            if (stillGrowing) {
-                this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
-                return;
-            }
-
-            this._lastRestoredScrollKey = scrollKey;
-            this._lastScrollRestoreAt = performance.now();
-            this._scrollRestoreRaf = null;
-        };
-        this._scrollRestoreRaf = requestAnimationFrame(applyRestore);
-
-        this._scrollRestoreTimer = setTimeout(() => {
-            if (!content.isConnected) return;
-            const maxScroll = Math.max(0, content.scrollHeight - content.clientHeight);
-            const targetTop = Math.min(savedTop, maxScroll);
-            if (Math.abs(content.scrollTop - targetTop) > 1) {
-                content.scrollTop = targetTop;
-            }
-            this._lastRestoredScrollKey = scrollKey;
-            this._lastScrollRestoreAt = performance.now();
-            this._scrollRestoreTimer = null;
-        }, 140);
-    },
-
-    _bindScrollTracking(content) {
-        if (!content) return;
-        const scrollKey = this._getScrollRouteKey(content);
-        content.addEventListener('scroll', () => {
-            this._pageScrollTop[scrollKey] = content.scrollTop;
-        }, { passive: true });
-    },
-
-    _saveSidebarScrollPosition() {
-        if (!this.container) return;
-        const sidebar = this.container.querySelector('.settings-app > .fluent-sidebar');
-        if (!sidebar) return;
-        this._sidebarScrollTop = sidebar.scrollTop;
-    },
-
-    _restoreSidebarScrollPosition(sidebar) {
-        if (!sidebar) return;
-        const savedTop = this._sidebarScrollTop;
-        if (!Number.isFinite(savedTop) || savedTop <= 0) return;
-
-        if (this._sidebarScrollRestoreRaf) {
-            cancelAnimationFrame(this._sidebarScrollRestoreRaf);
-            this._sidebarScrollRestoreRaf = null;
-        }
-        if (this._sidebarScrollRestoreTimer) {
-            clearTimeout(this._sidebarScrollRestoreTimer);
-            this._sidebarScrollRestoreTimer = null;
-        }
-
-        this._sidebarScrollRestoreRaf = requestAnimationFrame(() => {
-            if (!sidebar.isConnected) {
-                this._sidebarScrollRestoreRaf = null;
-                return;
-            }
-            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
-            sidebar.scrollTop = Math.min(savedTop, maxScroll);
-            this._sidebarScrollRestoreRaf = null;
-        });
-
-        this._sidebarScrollRestoreTimer = setTimeout(() => {
-            if (!sidebar.isConnected) return;
-            const maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
-            sidebar.scrollTop = Math.min(savedTop, maxScroll);
-            this._sidebarScrollRestoreTimer = null;
-        }, 120);
-    },
-
-    _bindSidebarScrollTracking(sidebar) {
-        if (!sidebar) return;
-        sidebar.addEventListener('scroll', () => {
-            this._sidebarScrollTop = sidebar.scrollTop;
-        }, { passive: true });
-    },
-
     render() {
-        this._saveCurrentScrollPosition();
-        this._saveSidebarScrollPosition();
-        if (this.container) this.container.style.overflow = 'hidden';
+        if (!this.container) return;
+        this.container.style.overflow = 'hidden';
         this.container.innerHTML = '';
         if (this.currentPage !== 'developer' && this._developerModeVisible) {
             this._developerModeVisible = false;
             this._aboutDevTapCount = 0;
         }
-        
-        const app = document.createElement('div');
-        app.className = 'settings-app';
-        
-        // 使用 FluentUI.Sidebar 创建侧边栏
-        const sidebar = FluentUI.Sidebar({
+
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[SettingsApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
             items: this.getPages().map(p => ({ id: p.id, label: t(p.label), icon: p.icon })),
-            activeItem: this.currentPage,
-            onItemClick: (pageId) => {
+            activeId: this.currentPage,
+            preserveScrollPositions: true,
+            getScrollKey: (pageId) => {
+                if (pageId === 'app-detail') {
+                    const appId = this.currentAppDetail && this.currentAppDetail.id;
+                    return `app-detail:${appId || 'unknown'}`;
+                }
+                return pageId || 'overview';
+            },
+            onNavigate: (pageId, pageEl) => {
+                // FluentWindow reuses the same page element. Clear secondary-page
+                // exit states before rendering so their fill-mode cannot keep the
+                // next page transparent.
+                pageEl.classList.remove(
+                    'settings-material-page',
+                    'settings-about-changelog',
+                    'slide-out'
+                );
                 if (this.currentPage === 'developer' && pageId !== 'developer') {
                     this._developerModeVisible = false;
                     this._aboutDevTapCount = 0;
                 }
                 this.currentPage = pageId;
-                this.render();
+                pageEl.classList.add('settings-content', 'settings-fw-content');
+                pageEl.id = 'settings-content';
+                pageEl.dataset.pageId = this.currentPage;
+                if (this.currentPage === 'app-detail' && this.currentAppDetail && this.currentAppDetail.id) {
+                    pageEl.dataset.detailAppId = this.currentAppDetail.id;
+                } else {
+                    delete pageEl.dataset.detailAppId;
+                }
+
+                this.renderPage(pageEl);
+                pageEl.classList.add('fw-page', 'settings-content', 'settings-fw-content');
+                this.addStyles();
             }
         });
-        
-        // 内容区域
-        const content = document.createElement('div');
-        content.className = 'settings-content';
-        content.id = 'settings-content';
-        content.dataset.pageId = this.currentPage;
-        if (this.currentPage === 'app-detail' && this.currentAppDetail && this.currentAppDetail.id) {
-            content.dataset.detailAppId = this.currentAppDetail.id;
-        } else {
-            delete content.dataset.detailAppId;
-        }
-        this.renderPage(content);
-        this._bindScrollTracking(content);
-        this._restoreScrollPosition(content);
-        this._bindSidebarScrollTracking(sidebar);
-        this._restoreSidebarScrollPosition(sidebar);
-        
-        app.appendChild(sidebar);
-        app.appendChild(content);
-        this.container.appendChild(app);
-        
-        this.addStyles();
     },
 
     addStyles() {
@@ -366,35 +350,181 @@ const SettingsApp = {
         style.id = 'settings-app-styles';
         style.textContent = `
             .settings-app { display: flex; height: 100%; min-height: 0; overflow: hidden; }
-            .settings-app > .fluent-sidebar {
-                min-height: 0;
-            }
-            .settings-app > .fluent-sidebar .fluent-sidebar-item {
-                box-sizing: border-box !important;
-                transition:
-                    gap 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    padding 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    margin 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    font-size 430ms cubic-bezier(0.16, 1, 0.3, 1),
-                    background 260ms cubic-bezier(0.16, 1, 0.3, 1),
-                    color 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
-            }
-            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item {
-                min-height: 44px !important;
-                margin-bottom: 6px !important;
-            }
-            body.fluent-v2 .settings-app > .fluent-sidebar .fluent-sidebar-item:last-child {
-                margin-bottom: 0 !important;
-            }
-            .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 0; }
+            .settings-content { flex: 1; overflow-y: auto; padding: 32px; min-height: 100%; box-sizing: border-box; }
             .settings-section { margin-bottom: 32px; }
             .settings-section-title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+            .settings-appearance-section > .fluent-setting-item,
+            .settings-appearance-section > .settings-accent-panel {
+                margin: 0 0 10px 0;
+            }
+            .settings-appearance-section > .fluent-setting-item:last-child,
+            .settings-appearance-section > .settings-accent-panel:last-child {
+                margin-bottom: 0;
+            }
+            .settings-appearance-section > .fluent-setting-item,
+            .settings-appearance-section .settings-accent-entry {
+                min-height: 80px;
+                padding: 16px 20px;
+                box-sizing: border-box;
+            }
             .wallpaper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 200px)); gap: 12px; justify-content: start; transition: all 0.3s ease; }
             .wallpaper-item { width: 200px; height: 112px; border-radius: var(--radius-md); overflow: hidden; cursor: pointer; border: 3px solid transparent; transition: all 0.3s ease; position: relative; }
             .wallpaper-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
             .wallpaper-item:hover img { transform: scale(1.05); }
             .wallpaper-item.selected { border-color: var(--accent); }
             .wallpaper-item.selected::after { content: '✓'; position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+            .settings-accent-panel {
+                display: flex;
+                flex-direction: column;
+                margin: 12px 0 18px;
+            }
+            .settings-accent-entry {
+                margin-bottom: 0;
+            }
+            .settings-accent-entry.is-expanded {
+                border-bottom-left-radius: 0 !important;
+                border-bottom-right-radius: 0 !important;
+            }
+            .settings-accent-entry-swatch {
+                width: 30px;
+                height: 30px;
+                border-radius: 9px;
+                border: 2px solid rgba(255, 255, 255, 0.72);
+                background: var(--accent);
+                background-color: var(--accent);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.1),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+            }
+            .dark-mode .settings-accent-entry-swatch {
+                border-color: rgba(255, 255, 255, 0.32);
+                box-shadow:
+                    0 0 0 1px rgba(0, 0, 0, 0.32),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+            }
+            .settings-accent-entry .expand-arrow {
+                transition: transform 360ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease;
+            }
+            .settings-accent-entry.is-expanded .expand-arrow {
+                transform: rotate(90deg);
+            }
+            .settings-accent-expand-panel {
+                overflow: hidden;
+                padding: 18px 20px 22px 20px;
+                transform-origin: top center;
+                animation: settingsAccentExpand 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+            .settings-accent-panel.is-collapsing .settings-accent-expand-panel {
+                animation: settingsAccentCollapse 260ms cubic-bezier(0.4, 0, 0.2, 1) both;
+                pointer-events: none;
+            }
+            @keyframes settingsAccentExpand {
+                0% { opacity: 0; max-height: 0; transform: translateY(-12px) scaleY(0.96); filter: blur(2px); }
+                55% { opacity: 1; filter: blur(0); }
+                100% { opacity: 1; max-height: 720px; transform: translateY(0) scaleY(1); filter: blur(0); }
+            }
+            @keyframes settingsAccentCollapse {
+                0% { opacity: 1; max-height: 720px; transform: translateY(0) scaleY(1); filter: blur(0); }
+                100% { opacity: 0; max-height: 0; transform: translateY(-10px) scaleY(0.96); filter: blur(2px); }
+            }
+            .settings-accent-auto-row {
+                gap: 16px;
+            }
+            .settings-accent-group {
+                margin-top: 20px;
+            }
+            .settings-accent-group-title {
+                margin-bottom: 10px;
+                font-size: 14px;
+                color: var(--text-primary);
+            }
+            .settings-accent-row,
+            .settings-accent-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                max-width: 500px;
+            }
+            .settings-accent-swatch {
+                width: 54px;
+                height: 54px;
+                position: relative;
+                padding: 0;
+                appearance: none;
+                -webkit-appearance: none;
+                box-sizing: border-box;
+                border: 3px solid transparent;
+                border-radius: 8px;
+                background: var(--swatch-color) !important;
+                background-color: var(--swatch-color) !important;
+                background-image: none !important;
+                cursor: pointer;
+                transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, border-color 180ms ease;
+            }
+            .settings-accent-swatch:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            }
+            .settings-accent-swatch.selected {
+                border-color: var(--accent);
+                box-shadow:
+                    0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.2),
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+            }
+            .settings-accent-swatch.selected::after {
+                content: '✓';
+                position: absolute;
+                top: 6px;
+                right: 6px;
+                width: 22px;
+                height: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                background: var(--accent);
+                color: #fff;
+                font-size: 14px;
+                font-weight: 600;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+                text-shadow: none;
+            }
+            .settings-accent-custom {
+                width: 54px;
+                height: 54px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+                box-sizing: border-box;
+                border: 2px solid var(--border-color);
+                border-radius: 8px;
+                background: var(--bg-tertiary);
+                cursor: pointer;
+                transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease, border-color 0.16s ease, background 0.16s ease;
+            }
+            .settings-accent-custom:hover {
+                transform: translateY(-1px);
+                border-color: var(--accent);
+                background: var(--accent-soft);
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            }
+            .settings-accent-custom img {
+                width: 24px;
+                height: 24px;
+                display: block;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .settings-accent-expand-panel,
+                .settings-accent-panel.is-collapsing .settings-accent-expand-panel {
+                    animation: none;
+                }
+                .settings-accent-entry .expand-arrow,
+                .settings-accent-swatch {
+                    transition: none;
+                }
+            }
             
             /* 概览页面样式 */
             .settings-overview { padding: 24px 32px; }
@@ -422,7 +552,7 @@ const SettingsApp = {
             
             /* 最近设置 */
             .settings-recent-list { display: flex; flex-direction: column; gap: 4px; }
-            .settings-recent-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-tertiary); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.3s ease; }
+            .settings-recent-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: var(--bg-tertiary); border-radius: var(--radius-md); cursor: pointer; transition: all 0.3s ease; }
             .settings-recent-item:hover { background: var(--bg-hover); }
             .settings-recent-info { display: flex; gap: 12px; align-items: center; }
             .settings-recent-label { font-size: 13px; font-weight: 500; }
@@ -430,20 +560,20 @@ const SettingsApp = {
             .settings-recent-time { font-size: 12px; color: var(--text-tertiary); }
             
             /* 设置项高亮动画 */
-            .fluent-setting-item.highlight { background: rgba(0, 120, 212, 0.15) !important; transition: background 0.3s ease; }
+            .fluent-setting-item.highlight { background: rgba(var(--accent-rgb, 0, 120, 212), 0.15) !important; transition: background 0.3s ease; }
             .fluent-setting-item.highlight-fade { background: transparent !important; transition: background 0.5s ease; }
-            .fluent-setting-item.highlight-soft-blue { background: rgba(111, 203, 255, 0.28) !important; transition: background 0.2s ease; }
+            .fluent-setting-item.highlight-soft-blue { background: rgba(var(--accent-rgb, 0, 120, 212), 0.24) !important; transition: background 0.2s ease; }
             .fluent-setting-item.highlight-soft-blue-fade { background: transparent !important; transition: background 0.3s ease; }
             body.fluent-v2 .fluent-setting-item.highlight-soft-blue {
-                background: rgba(98, 196, 255, 0.42) !important;
-                border-color: rgba(54, 142, 255, 0.62) !important;
-                box-shadow: 0 0 0 1px rgba(54, 142, 255, 0.32), 0 8px 22px rgba(54, 142, 255, 0.2) !important;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.32) !important;
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.62) !important;
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.32), 0 8px 22px rgba(var(--accent-rgb, 0, 120, 212), 0.2) !important;
                 transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
             }
             body.fluent-v2.dark-mode .fluent-setting-item.highlight-soft-blue {
-                background: rgba(84, 170, 255, 0.34) !important;
-                border-color: rgba(122, 196, 255, 0.7) !important;
-                box-shadow: 0 0 0 1px rgba(122, 196, 255, 0.42), 0 10px 24px rgba(39, 129, 255, 0.28) !important;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.28) !important;
+                border-color: rgba(var(--accent-rgb, 0, 120, 212), 0.68) !important;
+                box-shadow: 0 0 0 1px rgba(var(--accent-rgb, 0, 120, 212), 0.42), 0 10px 24px rgba(var(--accent-rgb, 0, 120, 212), 0.28) !important;
             }
             body.fluent-v2 .fluent-setting-item.highlight-soft-blue-fade {
                 transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
@@ -551,19 +681,50 @@ const SettingsApp = {
             body.fluent-v2 .settings-recent-item,
             body.fluent-v2 .network-hero-card,
             body.fluent-v2 .network-option-item,
+            body.fluent-v2 .network-expand-panel,
+            body.fluent-v2 .app-list-item,
+            body.fluent-v2 .wallpaper-item,
+            body.fluent-v2 .settings-overview-wallpaper,
             body.fluent-v2 .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
                 border-radius: 16px !important;
             }
             
             body.fluent-v2 .settings-recommend-item:hover,
             body.fluent-v2 .settings-recent-item:hover,
             body.fluent-v2 .network-option-item:hover,
+            body.fluent-v2 .app-list-item:hover,
             body.fluent-v2 .fluent-setting-item:hover {
-                background: rgba(255, 255, 255, 0.7) !important;
+                background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62)) !important;
+            }
+
+            body.fluent-v2 .settings-content .settings-recommend-item,
+            body.fluent-v2 .settings-content .settings-recent-item,
+            body.fluent-v2 .settings-content .network-hero-card,
+            body.fluent-v2 .settings-content .network-option-item,
+            body.fluent-v2 .settings-content .network-expand-panel,
+            body.fluent-v2 .settings-content .app-list-item,
+            body.fluent-v2 .settings-content .wallpaper-item,
+            body.fluent-v2 .settings-content .settings-overview-wallpaper,
+            body.fluent-v2 .settings-content .fluent-setting-item {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                background-color: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                background-image: none !important;
+            }
+
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-recommend-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-recent-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .network-option-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .network-expand-panel:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .app-list-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .wallpaper-item:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .settings-overview-wallpaper:hover,
+            body.fluent-v2 .settings-content.fluent-scroll-hover-locked .fluent-setting-item:hover {
+                background-color: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
             }
             
             /* 深色模式 - 所有卡片统一透明度 */
@@ -571,16 +732,45 @@ const SettingsApp = {
             body.fluent-v2.dark-mode .settings-recent-item,
             body.fluent-v2.dark-mode .network-hero-card,
             body.fluent-v2.dark-mode .network-option-item,
+            body.fluent-v2.dark-mode .network-expand-panel,
+            body.fluent-v2.dark-mode .app-list-item,
+            body.fluent-v2.dark-mode .wallpaper-item,
+            body.fluent-v2.dark-mode .settings-overview-wallpaper,
             body.fluent-v2.dark-mode .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             body.fluent-v2.dark-mode .settings-recommend-item:hover,
             body.fluent-v2.dark-mode .settings-recent-item:hover,
             body.fluent-v2.dark-mode .network-option-item:hover,
+            body.fluent-v2.dark-mode .app-list-item:hover,
             body.fluent-v2.dark-mode .fluent-setting-item:hover {
-                background: rgba(255, 255, 255, 0.18) !important;
+                background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58)) !important;
+            }
+
+            body.fluent-v2.dark-mode .settings-content .settings-recommend-item,
+            body.fluent-v2.dark-mode .settings-content .settings-recent-item,
+            body.fluent-v2.dark-mode .settings-content .network-hero-card,
+            body.fluent-v2.dark-mode .settings-content .network-option-item,
+            body.fluent-v2.dark-mode .settings-content .network-expand-panel,
+            body.fluent-v2.dark-mode .settings-content .app-list-item,
+            body.fluent-v2.dark-mode .settings-content .wallpaper-item,
+            body.fluent-v2.dark-mode .settings-content .settings-overview-wallpaper,
+            body.fluent-v2.dark-mode .settings-content .fluent-setting-item {
+                background-color: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                background-image: none !important;
+            }
+
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-recommend-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-recent-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .network-option-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .network-expand-panel:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .app-list-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .wallpaper-item:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .settings-overview-wallpaper:hover,
+            body.fluent-v2.dark-mode .settings-content.fluent-scroll-hover-locked .fluent-setting-item:hover {
+                background-color: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
             }
 
             body.fluent-v2.window-blur-disabled .settings-app,
@@ -600,6 +790,7 @@ const SettingsApp = {
             body.fluent-v2.window-blur-disabled .settings-recent-item,
             body.fluent-v2.window-blur-disabled .network-hero-card,
             body.fluent-v2.window-blur-disabled .network-option-item,
+            body.fluent-v2.window-blur-disabled .network-expand-panel,
             body.fluent-v2.window-blur-disabled .fluent-setting-item {
                 backdrop-filter: none !important;
                 -webkit-backdrop-filter: none !important;
@@ -610,6 +801,7 @@ const SettingsApp = {
             body.fluent-v2.window-blur-disabled .settings-recommend-item:hover,
             body.fluent-v2.window-blur-disabled .settings-recent-item:hover,
             body.fluent-v2.window-blur-disabled .network-option-item:hover,
+            body.fluent-v2.window-blur-disabled .network-expand-panel:hover,
             body.fluent-v2.window-blur-disabled .fluent-setting-item:hover {
                 background: var(--bg-hover) !important;
             }
@@ -659,8 +851,15 @@ const SettingsApp = {
             .network-device-empty span { font-size: 12px; color: var(--text-tertiary); }
             
             /* V2网络展开面板 */
-            body.fluent-v2 .network-expand-panel { background: rgba(255,255,255,0.45) !important; border-radius: 0 0 16px 16px !important; }
-            body.fluent-v2.dark-mode .network-expand-panel { background: rgba(255,255,255,0.08) !important; }
+            body.fluent-v2 .network-expand-panel {
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
+                border-radius: 0 0 16px 16px !important;
+            }
+            body.fluent-v2.dark-mode .network-expand-panel {
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
+            }
             
             /* 应用程序页面样式 */
             .storage-card-content {
@@ -686,21 +885,33 @@ const SettingsApp = {
             
             .storage-bar-wrapper {
                 height: 10px;
-                background: var(--bg-hover);
+                background: #d3d3d3;
                 border-radius: 5px;
                 overflow: hidden;
                 display: flex;
                 margin-bottom: 14px;
             }
             
+            .dark-mode .storage-bar-wrapper {
+                background: #5a5a5a;
+            }
+            
             .storage-bar-fill.apps {
-                background: linear-gradient(90deg, #ff6b6b, #ff8787);
+                background: linear-gradient(90deg, #ff6b6b, #ff8787) !important;
                 height: 100%;
             }
             
             .storage-bar-fill.system {
-                background: linear-gradient(90deg, #868e96, #adb5bd);
+                background: linear-gradient(90deg, #868e96, #adb5bd) !important;
                 height: 100%;
+            }
+            
+            body.fluent-v2 .storage-bar-wrapper {
+                background: #d3d3d3 !important;
+            }
+            
+            body.fluent-v2.dark-mode .storage-bar-wrapper {
+                background: #5a5a5a !important;
             }
             
             .storage-legend {
@@ -719,12 +930,23 @@ const SettingsApp = {
             .legend-dot {
                 width: 10px;
                 height: 10px;
+                min-width: 10px;
+                min-height: 10px;
                 border-radius: 50%;
+                flex-shrink: 0;
+                display: inline-block;
             }
             
-            .legend-dot.apps { background: #ff6b6b; }
-            .legend-dot.system { background: #868e96; }
-            .legend-dot.available { background: var(--bg-hover); border: 1px solid var(--border-color); }
+            .legend-dot-apps { background-color: #ff6b6b !important; }
+            .legend-dot-system { background-color: #868e96 !important; }
+            .legend-dot-available {
+                background-color: #d3d3d3 !important;
+                border: 1px solid var(--border-color);
+            }
+            
+            .dark-mode .legend-dot-available {
+                background-color: #5a5a5a !important;
+            }
             
             .apps-list-header {
                 display: flex;
@@ -752,7 +974,7 @@ const SettingsApp = {
             }
             
             .apps-sort-btn:hover {
-                background: rgba(0, 120, 212, 0.1);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
             }
             
             .apps-list {
@@ -935,23 +1157,23 @@ const SettingsApp = {
             /* V2 应用列表样式 */
             body.fluent-v2 .app-list-item {
                 background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
                 border: 1px solid rgba(255, 255, 255, 0.3) !important;
                 border-radius: 16px !important;
             }
             
             body.fluent-v2 .app-list-item:hover {
-                background: rgba(255, 255, 255, 0.7) !important;
+                background: var(--fluent-card-bg-light-hover, rgba(255, 255, 255, 0.62)) !important;
             }
             
             body.fluent-v2.dark-mode .app-list-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             body.fluent-v2.dark-mode .app-list-item:hover {
-                background: rgba(255, 255, 255, 0.18) !important;
+                background: var(--fluent-card-bg-dark-hover, rgba(34, 40, 52, 0.58)) !important;
             }
             
             body.fluent-v2 .apps-list {
@@ -986,16 +1208,16 @@ const SettingsApp = {
             
             /* V2 模式下应用详情页卡片样式 */
             body.fluent-v2 .app-detail-page .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.55) !important;
-                backdrop-filter: blur(20px) saturate(150%) !important;
-                -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3) !important;
+                background: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(150%) !important;
+                border: 1px solid var(--fluent-card-border-light, rgba(255, 255, 255, 0.3)) !important;
                 border-radius: 16px !important;
             }
             
             body.fluent-v2.dark-mode .app-detail-page .fluent-setting-item {
-                background: rgba(255, 255, 255, 0.12) !important;
-                border-color: rgba(255, 255, 255, 0.1) !important;
+                background: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+                border-color: var(--fluent-card-border-dark, rgba(255, 255, 255, 0.1)) !important;
             }
             
             .app-detail-back {
@@ -1069,11 +1291,12 @@ const SettingsApp = {
             }
             
             .app-detail-page {
-                animation: slideInFromRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
             
             .app-detail-page.slide-out {
-                animation: slideOutToRight 0.3s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
             }
             
             .app-detail-info-card {
@@ -1222,54 +1445,243 @@ const SettingsApp = {
             }
 
             .settings-about-hero-card {
+                min-height: 146px;
                 display: flex;
                 align-items: center;
-                gap: 18px;
+                gap: 28px;
+                overflow: hidden;
+                position: relative;
+                padding: 24px 28px;
+                box-sizing: border-box;
+                isolation: isolate;
+                animation: aboutCardEnter 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
-            .settings-about-logo-wrap {
-                width: 84px;
-                height: 84px;
-                flex-shrink: 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+            /* The hero participates in the system-wide pointer glow API. */
+            body.button-glow-enabled .settings-about-hero-card.button-glow-target > .button-edge-glow {
+                width: 280px;
+                height: 280px;
+                z-index: 10;
+                filter: blur(12px);
             }
 
-            .settings-about-logo-wrap img {
-                width: 84px;
-                height: 84px;
-                object-fit: contain;
+            body.button-glow-enabled .settings-about-hero-card.button-glow-target > .button-glow-ripple {
+                z-index: 9;
+            }
+
+            .settings-about-landscape {
+                position: absolute;
+                inset: -1px;
+                z-index: 0;
+                overflow: hidden;
+                border-radius: inherit;
+                background: #d5d9dc;
+                pointer-events: none;
+            }
+
+            .settings-about-landscape::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: 9;
+                background:
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.18) 44%, rgba(255, 255, 255, 0.02)),
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 64%);
+            }
+
+            .dark-mode .settings-about-landscape {
+                background: #1f2630;
+            }
+
+            .dark-mode .settings-about-landscape::after {
+                background:
+                    linear-gradient(90deg, rgba(12, 16, 24, 0.36), rgba(12, 16, 24, 0.24) 46%, rgba(12, 16, 24, 0.08)),
+                    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01) 64%);
+            }
+
+            .settings-about-landscape-layer {
+                position: absolute;
+                left: 0;
                 display: block;
+                pointer-events: none;
+                user-select: none;
+                object-fit: fill;
+                transform-origin: center bottom;
+            }
+
+            .settings-about-landscape-sky {
+                z-index: 1;
+                inset: -1px;
+                width: calc(100% + 2px);
+                height: calc(100% + 2px);
+                animation: aboutLandscapeSkyEnter 920ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-water-base {
+                z-index: 2;
+                left: -1px;
+                bottom: -1px;
+                width: calc(100% + 2px);
+                height: 30%;
+                animation: aboutLandscapeWaterEnter 760ms 110ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-reflection {
+                z-index: 3;
+                left: -1px;
+                bottom: -1px;
+                width: 100%;
+                height: 30%;
+                transform-origin: left center;
+                animation: aboutLandscapeReflectionEnter 820ms 190ms cubic-bezier(0.2, 0.82, 0.22, 1) both;
+            }
+
+            .settings-about-landscape-mountain-middle {
+                z-index: 4;
+                left: -1px;
+                bottom: 29.4%;
+                width: 98.5%;
+                height: 32.21%;
+                animation: aboutLandscapeMiddleEnter 880ms 230ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-mountain-dark {
+                z-index: 5;
+                left: 4.5%;
+                bottom: 29.4%;
+                width: 102%;
+                height: 32.21%;
+                animation: aboutLandscapePeaksEnter 920ms 310ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-land {
+                z-index: 6;
+                left: 5%;
+                bottom: -1px;
+                width: 100%;
+                height: 30%;
+                animation: aboutLandscapeLandEnter 820ms 390ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-landscape-trees {
+                z-index: 7;
+                left: 23.56%;
+                bottom: 28.64%;
+                width: 76.44%;
+                height: 11.76%;
+                animation: aboutLandscapeTreesEnter 760ms 470ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-brand {
+                position: relative;
+                z-index: 2;
+                display: flex;
+                align-items: center;
+                gap: 28px;
+                min-width: 0;
+                color: #1d1d1f;
+            }
+
+            .dark-mode .settings-about-brand {
+                color: rgba(255, 255, 255, 0.94);
+            }
+
+            .settings-about-brand-logo {
+                width: clamp(96px, 11.5vw, 118px);
+                height: clamp(96px, 11.5vw, 118px);
+                flex: 0 0 auto;
+                display: grid;
+                place-items: center;
+                background: transparent;
                 box-shadow: none;
+                animation: aboutBrandLogoEnter 760ms 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-brand-logo img {
+                width: 100%;
+                height: 100%;
+                display: block;
+                object-fit: contain;
+                filter: drop-shadow(0 10px 22px rgba(17, 31, 52, 0.18));
+            }
+
+            .settings-about-logo-dark { display: none !important; }
+            .dark-mode .settings-about-logo-light { display: none !important; }
+            .dark-mode .settings-about-logo-dark { display: block !important; }
+
+            .settings-about-brand-name {
+                font-size: clamp(38px, 6vw, 54px);
+                font-weight: 760;
+                line-height: 1;
+                letter-spacing: -0.045em;
+                text-shadow: 0 10px 28px rgba(255, 255, 255, 0.4);
+                animation: aboutBrandNameEnter 760ms 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .dark-mode .settings-about-brand-name {
+                text-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+            }
+
+            .settings-about-card-codename {
+                position: absolute;
+                right: 24px;
+                bottom: 18px;
+                z-index: 2;
+                max-width: min(320px, calc(100% - 48px));
+                overflow: hidden;
+                color: rgba(255, 255, 255, 0.88);
+                font-size: 13px;
+                font-weight: 650;
+                text-align: right;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-shadow: 0 2px 10px rgba(0, 0, 0, 0.36);
+                animation: aboutCodenameEnter 620ms 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
             .settings-about-hero-text {
                 min-width: 0;
-                flex: 1;
                 text-align: left;
-                min-height: 84px;
-                display: flex;
-                align-items: center;
+                animation: aboutTextEnter 640ms 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-hero-kicker {
+                color: var(--accent);
+                font-size: 12px;
+                font-weight: 760;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
             }
 
             .settings-about-hero-name {
                 font-size: 40px;
-                font-weight: 700;
+                font-weight: 750;
                 line-height: 1;
                 margin: 0;
             }
 
             .settings-about-hero-meta {
-                font-size: 14px;
                 color: var(--text-secondary);
-                word-break: break-word;
+                font-size: 14px;
+            }
+
+            .settings-about-version-pill {
+                justify-self: start;
+                margin-top: 6px;
+                padding: 6px 11px;
+                border-radius: 999px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
+                color: var(--accent);
+                font-size: 12px;
+                font-weight: 650;
+                font-variant-numeric: tabular-nums;
             }
 
             .settings-about-meta-card {
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                animation: aboutCardEnter 560ms 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
             .settings-about-meta-row {
@@ -1301,9 +1713,307 @@ const SettingsApp = {
                 text-decoration: underline;
             }
 
+            .settings-about-list {
+                animation: aboutCardEnter 560ms 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-about-list .fluent-list-item[data-id="changelog"] {
+                cursor: pointer;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.075);
+            }
+
+            .settings-about-list .fluent-list-item[data-id="changelog"]:hover {
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.14);
+            }
+
+            .settings-about-list .fluent-list-item-extra {
+                font-size: 20px;
+                color: var(--accent);
+            }
+
+            .settings-changelog-page {
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-material-page {
+                animation: aboutChangelogEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+
+            .settings-material-page.slide-out {
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
+            }
+
+            .settings-changelog-page.slide-out {
+                animation: aboutChangelogExit 260ms cubic-bezier(0.4, 0, 1, 1) both;
+                pointer-events: none;
+            }
+
+            .settings-changelog-header {
+                display: flex;
+                align-items: flex-end;
+                justify-content: space-between;
+                gap: 18px;
+                margin-bottom: 18px;
+            }
+
+            .settings-changelog-title {
+                margin: 0;
+                font-size: 28px;
+                line-height: 1.15;
+            }
+
+            .settings-changelog-subtitle {
+                margin: 6px 0 0;
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+
+            .settings-changelog-count {
+                flex-shrink: 0;
+                padding: 6px 11px;
+                border-radius: 999px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
+                color: var(--accent);
+                font-size: 12px;
+            }
+
+            .settings-changelog-timeline {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                padding-left: 18px;
+            }
+
+            .settings-changelog-timeline::before {
+                content: '';
+                position: absolute;
+                left: 5px;
+                top: 18px;
+                bottom: 18px;
+                width: 2px;
+                border-radius: 2px;
+                background: linear-gradient(180deg, var(--accent), rgba(var(--accent-rgb, 0, 120, 212), 0.12));
+            }
+
+            .settings-changelog-entry {
+                position: relative;
+                margin-bottom: 0;
+                animation: aboutLogItemEnter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+                animation-delay: min(calc(var(--log-index) * 42ms), 420ms);
+            }
+
+            .settings-changelog-entry::before {
+                content: '';
+                position: absolute;
+                left: -20px;
+                top: 23px;
+                width: 10px;
+                height: 10px;
+                box-sizing: border-box;
+                border-radius: 50%;
+                background: var(--bg-primary);
+                border: 3px solid var(--accent);
+                z-index: 2;
+            }
+
+            .settings-changelog-entry.is-baseline::before {
+                border-color: var(--text-tertiary);
+            }
+
+            .settings-changelog-entry-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 11px;
+            }
+
+            .settings-changelog-version {
+                font-size: 16px;
+                font-weight: 650;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .settings-changelog-date {
+                color: var(--text-secondary);
+                font-size: 12px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .settings-changelog-commits {
+                display: flex;
+                flex-direction: column;
+                gap: 9px;
+            }
+
+            .settings-changelog-commit {
+                display: grid;
+                grid-template-columns: 58px minmax(0, 1fr);
+                align-items: start;
+                gap: 10px;
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+            .settings-changelog-hash {
+                margin-top: 1px;
+                padding: 2px 5px;
+                border-radius: 5px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.09);
+                color: var(--accent);
+                font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+                text-align: center;
+            }
+
+            .settings-changelog-baseline {
+                color: var(--text-secondary);
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+            @keyframes aboutCardEnter {
+                from { opacity: 0; transform: translateY(18px) scale(0.985); }
+                to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+
+            @keyframes aboutTextEnter {
+                from { opacity: 0; transform: translateX(22px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes aboutLandscapeSkyEnter {
+                from { opacity: 0; transform: scale(1.035); filter: saturate(0.82); }
+                to { opacity: 1; transform: scale(1); filter: saturate(1); }
+            }
+
+            @keyframes aboutLandscapeWaterEnter {
+                from { opacity: 0; transform: translateY(22px) scaleY(0.78); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapeReflectionEnter {
+                from { opacity: 0; transform: translateY(16px) scaleX(0.88); }
+                to { opacity: 1; transform: translateY(0) scaleX(1); }
+            }
+
+            @keyframes aboutLandscapeMiddleEnter {
+                from { opacity: 0; transform: translateY(30px) scaleY(0.76); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapePeaksEnter {
+                from { opacity: 0; transform: translateY(34px) scaleY(0.72); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutLandscapeLandEnter {
+                from { opacity: 0; transform: translateY(24px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @keyframes aboutLandscapeTreesEnter {
+                from { opacity: 0; transform: translateY(16px) scaleY(0.45); }
+                to { opacity: 1; transform: translateY(0) scaleY(1); }
+            }
+
+            @keyframes aboutBrandLogoEnter {
+                from { opacity: 0; transform: translateX(-22px) scale(0.86); filter: blur(4px); }
+                70% { opacity: 1; transform: translateX(2px) scale(1.035); filter: blur(0); }
+                to { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+            }
+
+            @keyframes aboutBrandNameEnter {
+                from { opacity: 0; transform: translateX(28px); filter: blur(5px); }
+                to { opacity: 1; transform: translateX(0); filter: blur(0); }
+            }
+
+            @keyframes aboutCodenameEnter {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @keyframes aboutChangelogEnter {
+                from { opacity: 0; transform: translateX(34px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            @keyframes aboutChangelogExit {
+                from { opacity: 1; transform: translateX(0); }
+                to { opacity: 0; transform: translateX(34px); }
+            }
+
+            @keyframes aboutLogItemEnter {
+                from { opacity: 0; transform: translateY(14px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
             @media (max-width: 900px) {
-                .settings-about-hero-name {
-                    font-size: 30px;
+                .settings-about-hero-card {
+                    min-height: 140px;
+                    padding: 22px 24px;
+                }
+
+                .settings-about-brand {
+                    gap: 24px;
+                }
+            }
+
+            @media (max-width: 620px) {
+                .settings-about-hero-card {
+                    min-height: 128px;
+                    padding: 20px;
+                }
+
+                .settings-about-brand {
+                    gap: 16px;
+                }
+
+                .settings-about-brand-logo {
+                    width: 78px;
+                    height: 78px;
+                }
+
+                .settings-about-brand-name {
+                    font-size: 34px;
+                }
+
+                .settings-about-card-codename {
+                    right: 18px;
+                    bottom: 14px;
+                    font-size: 12px;
+                }
+
+                .settings-changelog-header {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+
+                .settings-changelog-commit {
+                    grid-template-columns: 1fr;
+                    gap: 5px;
+                }
+
+                .settings-changelog-hash {
+                    width: max-content;
+                }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .settings-about-hero-card,
+                .settings-about-meta-card,
+                .settings-about-list,
+                .settings-about-hero-text,
+                .settings-about-landscape-layer,
+                .settings-about-brand-logo,
+                .settings-about-brand-name,
+                .settings-about-card-codename,
+                .settings-changelog-page,
+                .settings-material-page,
+                .app-detail-page,
+                .settings-changelog-entry {
+                    animation: none !important;
                 }
             }
 
@@ -1397,6 +2107,228 @@ const SettingsApp = {
                 line-height: 1.7;
             }
 
+            .settings-page-back {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                height: 36px;
+                padding: 0 12px;
+                margin: 0 0 18px 0;
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                cursor: pointer;
+                font: inherit;
+                transition: background var(--transition-fast), transform var(--transition-fast);
+            }
+
+            .settings-page-back:hover {
+                background: var(--bg-hover);
+                transform: translateY(-1px);
+            }
+
+            .settings-page-back img {
+                width: 16px;
+                height: 16px;
+            }
+
+            .settings-advanced-entry .fluent-setting-item-control {
+                min-width: auto;
+                display: flex;
+                align-items: center;
+            }
+
+            .settings-entry-arrow {
+                width: 18px;
+                height: 18px;
+                opacity: 0.62;
+                transition: opacity var(--transition-fast), transform var(--transition-fast);
+            }
+
+            .dark-mode .settings-entry-arrow {
+                filter: brightness(0) invert(1);
+            }
+
+            .settings-advanced-entry:hover .settings-entry-arrow {
+                opacity: 1;
+                transform: translateX(2px);
+            }
+
+            .settings-beta-badge {
+                display: inline-flex;
+                align-items: center;
+                height: 18px;
+                margin-left: 8px;
+                padding: 0 7px;
+                border-radius: 999px;
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.14);
+                color: var(--accent);
+                font-size: 11px;
+                font-weight: 600;
+                vertical-align: middle;
+            }
+
+            .settings-slider-control {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                min-width: 260px;
+            }
+
+            .settings-slider-control .fluent-slider-wrapper {
+                flex: 1;
+            }
+
+            .settings-blur-strength-item {
+                max-height: 96px;
+                transition:
+                    max-height 220ms ease,
+                    margin-bottom 220ms ease,
+                    padding 220ms ease,
+                    opacity 160ms ease,
+                    transform 220ms ease,
+                    background 180ms ease;
+            }
+
+            .settings-mica-hidden {
+                max-height: 0;
+                margin-bottom: 0 !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+                opacity: 0;
+                overflow: hidden;
+                pointer-events: none;
+                background: transparent !important;
+                border-color: transparent !important;
+                transform: translateY(-6px);
+                transition:
+                    max-height 220ms ease,
+                    margin-bottom 220ms ease,
+                    padding 220ms ease,
+                    opacity 160ms ease,
+                    transform 220ms ease,
+                    background 180ms ease;
+            }
+
+            .settings-inline-value {
+                min-width: 56px;
+                color: var(--text-secondary);
+                font-size: 13px;
+                text-align: right;
+            }
+
+            .material-preview {
+                position: relative;
+                height: 168px;
+                margin-bottom: 16px;
+                overflow: hidden;
+                border-radius: 18px;
+                border: 1px solid var(--border-color);
+                background: linear-gradient(135deg, #d7ebff, #f8fbff 44%, #dbeafe);
+                box-shadow: var(--shadow-md);
+            }
+
+            .dark-mode .material-preview {
+                background: linear-gradient(135deg, #151923, #252b36 46%, #111827);
+            }
+
+            .material-preview-wallpaper {
+                position: absolute;
+                inset: 0;
+                background:
+                    radial-gradient(circle at 20% 25%, rgba(var(--accent-rgb, 0, 120, 212), 0.44), transparent 28%),
+                    radial-gradient(circle at 78% 22%, rgba(255, 145, 77, 0.38), transparent 30%),
+                    radial-gradient(circle at 52% 86%, rgba(105, 92, 255, 0.34), transparent 34%),
+                    var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
+                background-size: cover;
+                background-position: center;
+            }
+
+            .material-preview-panel {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                width: min(320px, calc(100% - 56px));
+                padding: 24px 28px;
+                transform: translate(-50%, -50%);
+                overflow: hidden;
+                border-radius: 22px;
+                border: 1px solid rgba(255, 255, 255, 0.58);
+                background: rgba(255, 255, 255, 0.42);
+                backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(170%);
+                -webkit-backdrop-filter: blur(var(--fluent-material-blur, 40px)) saturate(170%);
+                box-shadow:
+                    0 18px 42px rgba(24, 68, 120, 0.18),
+                    inset 0 1px 0 rgba(255,255,255,0.74);
+            }
+
+            .material-preview-mica .material-preview-panel {
+                background: rgba(238, 244, 255, 0.42);
+                backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) brightness(1.04);
+                -webkit-backdrop-filter: blur(var(--fluent-mica-blur, 75px)) saturate(135%) brightness(1.04);
+            }
+
+            .material-preview-mica .material-preview-panel::before {
+                content: '';
+                position: absolute;
+                inset: -42px;
+                z-index: 0;
+                background:
+                    radial-gradient(circle at 18% 24%, rgba(var(--accent-rgb, 0, 120, 212), 0.36), transparent 30%),
+                    radial-gradient(circle at 76% 26%, rgba(255, 145, 77, 0.28), transparent 32%),
+                    radial-gradient(circle at 54% 84%, rgba(105, 92, 255, 0.28), transparent 36%),
+                    var(--fluent-wallpaper-url, linear-gradient(135deg, #d7ebff, #f8fbff));
+                background-size: cover;
+                background-position: center;
+                filter: blur(28px) saturate(145%);
+                transform: scale(1.08);
+            }
+
+            .material-preview-mica .material-preview-panel::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                z-index: 0;
+                background: linear-gradient(135deg, rgba(255,255,255,0.64), rgba(255,255,255,0.34));
+                pointer-events: none;
+            }
+
+            .dark-mode .material-preview-panel {
+                border-color: rgba(255, 255, 255, 0.16);
+                background: rgba(28, 31, 38, 0.58);
+                box-shadow:
+                    0 22px 48px rgba(0, 0, 0, 0.48),
+                    inset 0 1px 0 rgba(255,255,255,0.16);
+            }
+
+            .dark-mode .material-preview-mica .material-preview-panel {
+                background: rgba(18, 22, 30, 0.54);
+            }
+
+            .dark-mode .material-preview-mica .material-preview-panel::before {
+                filter: blur(28px) saturate(125%) brightness(0.72);
+            }
+
+            .dark-mode .material-preview-mica .material-preview-panel::after {
+                background: linear-gradient(135deg, rgba(30,34,42,0.72), rgba(10,12,18,0.48));
+            }
+
+            .material-preview-title {
+                position: relative;
+                z-index: 1;
+                font-size: 24px;
+                font-weight: 700;
+            }
+
+            .material-preview-subtitle {
+                position: relative;
+                z-index: 1;
+                margin-top: 4px;
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+
             .settings-reset-countdown {
                 margin-top: 10px;
                 color: #d13438;
@@ -1419,6 +2351,9 @@ const SettingsApp = {
                 break;
             case 'personalization':
                 this.renderPersonalization(container);
+                break;
+            case 'personalization-advanced':
+                this.renderPersonalizationAdvanced(container);
                 break;
             case 'applications':
                 this.renderApplications(container);
@@ -1443,6 +2378,9 @@ const SettingsApp = {
                 break;
             case 'about':
                 this.renderAbout(container);
+                break;
+            case 'about-changelog':
+                this.renderAboutChangelog(container);
                 break;
             case 'developer':
                 this.renderDeveloper(container);
@@ -1564,7 +2502,9 @@ const SettingsApp = {
         // 设备信息头部（显示壁纸和电脑名称）
         const header = document.createElement('div');
         header.className = 'settings-overview-header';
-        const wallpaper = State.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png';
+        const wallpaper = typeof State.getResolvedWallpaper === 'function'
+            ? State.getResolvedWallpaper('desktop')
+            : (State.settings.wallpaperDesktop || 'Theme/Picture/Fluent-2.png');
         header.innerHTML = `
             <div class="settings-overview-device">
                 <div class="settings-overview-wallpaper">
@@ -1611,8 +2551,7 @@ const SettingsApp = {
                 <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" class="settings-recommend-arrow" alt="">
             `;
             item.addEventListener('click', () => {
-                this.currentPage = rec.pageId;
-                this.render();
+                this.navigateToPage(rec.pageId);
             });
             recommendList.appendChild(item);
         });
@@ -1639,10 +2578,10 @@ const SettingsApp = {
                     <span class="settings-recent-time">${rec.time}</span>
                 `;
                 item.addEventListener('click', () => {
-                    this.currentPage = rec.pageId;
-                    this.render();
-                    // 高亮对应设置项
-                    this.highlightSetting(rec.label);
+                    this.navigateToPage(rec.pageId, {
+                        after: () => this.highlightSetting(rec.label),
+                        delay: 220
+                    });
                 });
                 recentList.appendChild(item);
             });
@@ -1660,22 +2599,13 @@ const SettingsApp = {
 
     getAvatarThumbCache() {
         if (this._avatarThumbCache) return this._avatarThumbCache;
-        try {
-            const raw = localStorage.getItem(this._avatarThumbStorageKey);
-            const parsed = raw ? JSON.parse(raw) : {};
-            this._avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
-        } catch (_) {
-            this._avatarThumbCache = {};
-        }
+        const parsed = Storage.get(this._avatarThumbStorageKey, {});
+        this._avatarThumbCache = parsed && typeof parsed === 'object' ? parsed : {};
         return this._avatarThumbCache;
     },
 
     saveAvatarThumbCache() {
-        try {
-            localStorage.setItem(this._avatarThumbStorageKey, JSON.stringify(this._avatarThumbCache || {}));
-        } catch (_) {
-            // ignore storage errors
-        }
+        Storage.set(this._avatarThumbStorageKey, this._avatarThumbCache || {});
     },
 
     getAvatarThumbSrc(src, fallback = '') {
@@ -2096,11 +3026,7 @@ const SettingsApp = {
         }
 
         setTimeout(() => {
-            try {
-                localStorage.clear();
-            } catch (error) {
-                console.error('Failed to clear localStorage:', error);
-            }
+            Storage.clear();
             window.location.reload();
         }, 900);
     },
@@ -2281,7 +3207,28 @@ const SettingsApp = {
 
     renderMultitask(container) {
         container.className = 'settings-content';
-        const section = this.createSection(t('settings.multitask-title'));
+        const performanceSection = this.createSection(t('settings.performance-title'));
+
+        performanceSection.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-background'),
+            description: t('settings.tombstone-background-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.tombstoneBackgroundEnabled === true,
+                onChange: (v) => {
+                    State.updateSettings({ tombstoneBackgroundEnabled: v });
+                    this.addRecentSetting(t('settings.tombstone-background'), v ? t('settings.on') : t('settings.off'), 'multitask');
+                    State.addNotification({
+                        title: t('settings.performance-title'),
+                        message: v ? t('settings.tombstone-background-on') : t('settings.tombstone-background-off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        container.appendChild(performanceSection);
+
+        const section = this.createSection(t('settings.multitask-window-title'));
 
         section.appendChild(FluentUI.SettingItem({
             label: t('settings.multitask-quick-switch'),
@@ -2755,9 +3702,10 @@ const SettingsApp = {
     },
 
     _goPrivacyAndHighlightStrictCsp() {
-        this.currentPage = 'privacy';
-        this.render();
-        this.highlightSettingByDataId('privacy-strict-csp', 1200);
+        this.navigateToPage('privacy', {
+            after: () => this.highlightSettingByDataId('privacy-strict-csp', 1200),
+            delay: 220
+        });
     },
 
     _getFingoApiStorageStatusText(type) {
@@ -2853,8 +3801,8 @@ const SettingsApp = {
                     const data = await response.json();
                     if (data && data.url) {
                         const wp = data.url;
-                        State.updateSettings({ wallpaperDesktop: wp });
-                        Desktop.updateWallpaper();
+                        await State.setWallpaper('desktop', wp, { sourceType: 'bing', sourceUrl: wp });
+                        await Desktop.updateWallpaper();
                         this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.bing-wallpaper'), 'personalization');
                         State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.bing-applied'), type: 'success' });
                         this.render();
@@ -2876,20 +3824,21 @@ const SettingsApp = {
         uploadInput.type = 'file';
         uploadInput.accept = 'image/*';
         uploadInput.style.display = 'none';
-        uploadInput.onchange = (e) => {
+        uploadInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const wp = event.target.result;
-                    State.updateSettings({ wallpaperDesktop: wp });
-                    Desktop.updateWallpaper();
+                try {
+                    await State.setWallpaper('desktop', file, { sourceType: 'upload', name: file.name, mime: file.type });
+                    await Desktop.updateWallpaper();
                     this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.custom-applied'), 'personalization');
                     State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.custom-applied'), type: 'success' });
                     this.render();
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Desktop wallpaper cache failed', error);
+                    State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
+                }
             }
+            e.target.value = '';
         };
         
         const uploadBtn = FluentUI.Button({
@@ -2921,8 +3870,8 @@ const SettingsApp = {
                     const response = await fetch('https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN');
                     const data = await response.json();
                     if (data.url) {
-                        State.updateSettings({ wallpaperLock: data.url });
-                        LockScreen.updateWallpaper && LockScreen.updateWallpaper();
+                        await State.setWallpaper('lock', data.url, { sourceType: 'bing', sourceUrl: data.url });
+                        if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                         State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-bing-applied'), type: 'success' });
                         this.render();
                     }
@@ -2936,19 +3885,20 @@ const SettingsApp = {
         lockUploadInput.type = 'file';
         lockUploadInput.accept = 'image/*';
         lockUploadInput.style.display = 'none';
-        lockUploadInput.onchange = (e) => {
+        lockUploadInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const wp = event.target.result;
-                    State.updateSettings({ wallpaperLock: wp });
-                    LockScreen.updateWallpaper && LockScreen.updateWallpaper();
+                try {
+                    await State.setWallpaper('lock', file, { sourceType: 'upload', name: file.name, mime: file.type });
+                    if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                     State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-custom-applied'), type: 'success' });
                     this.render();
-                };
-                reader.readAsDataURL(file);
+                } catch (error) {
+                    console.error('Lock wallpaper cache failed', error);
+                    State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
+                }
             }
+            e.target.value = '';
         };
         
         const lockUploadBtn = FluentUI.Button({
@@ -2965,6 +3915,7 @@ const SettingsApp = {
         
         // 外观设置
         const appearanceSection = this.createSection(t('settings.appearance'));
+        appearanceSection.classList.add('settings-appearance-section');
         
         // 主题选择 - 使用 FluentUI.SettingItem + FluentUI.Select
         appearanceSection.appendChild(FluentUI.SettingItem({
@@ -2986,6 +3937,8 @@ const SettingsApp = {
                 }
             })
         }));
+
+        appearanceSection.appendChild(this.createAccentColorPanel());
         
         // 模糊效果
         appearanceSection.appendChild(FluentUI.SettingItem({
@@ -3051,6 +4004,130 @@ const SettingsApp = {
         }));
         
         container.appendChild(appearanceSection);
+
+        const advancedSection = this.createSection(t('settings.advanced-options'));
+        const advancedItem = FluentUI.SettingItem({
+            label: t('settings.advanced-options'),
+            description: t('settings.advanced-options.desc'),
+            control: (() => {
+                const arrow = document.createElement('img');
+                arrow.className = 'settings-entry-arrow';
+                arrow.src = 'Theme/Icon/Symbol_icon/stroke/Arrow Right.svg';
+                arrow.alt = '';
+                return arrow;
+            })(),
+            className: 'settings-advanced-entry'
+        });
+        advancedItem.style.cursor = 'pointer';
+        advancedItem.addEventListener('click', () => {
+            this.navigateToPage('personalization-advanced');
+        });
+        advancedSection.appendChild(advancedItem);
+        container.appendChild(advancedSection);
+    },
+
+    renderPersonalizationAdvanced(container) {
+        container.className = 'settings-content settings-material-page';
+
+        const backBtn = document.createElement('button');
+        backBtn.type = 'button';
+        backBtn.className = 'settings-page-back';
+        backBtn.innerHTML = `
+            <img src="Theme/Icon/Symbol_icon/stroke/Arrow Left.svg" alt="">
+            <span>${t('settings.personalization')}</span>
+        `;
+        backBtn.addEventListener('click', () => {
+            container.classList.add('slide-out');
+            setTimeout(() => this.navigateToPage('personalization'), 240);
+        });
+        container.appendChild(backBtn);
+
+        const section = this.createSection(t('settings.advanced-options'));
+        const currentMaterial = State.settings.materialType === 'mica' ? 'mica' : 'gaussian';
+        const materialLabels = {
+            gaussian: t('settings.material.gaussian'),
+            mica: t('settings.material.mica')
+        };
+
+        const preview = document.createElement('div');
+        preview.className = `material-preview material-preview-${currentMaterial}`;
+        preview.innerHTML = `
+            <div class="material-preview-wallpaper"></div>
+            <div class="material-preview-panel">
+                <div class="material-preview-title">${t('settings.material')}</div>
+                <div class="material-preview-subtitle">${materialLabels[currentMaterial]}</div>
+            </div>
+        `;
+        section.appendChild(preview);
+
+        let blurItem = null;
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.material'),
+            description: t('settings.material.desc'),
+            control: FluentUI.Select({
+                value: currentMaterial,
+                options: [
+                    { value: 'gaussian', label: t('settings.material.gaussian') },
+                    { value: 'mica', label: t('settings.material.mica') }
+                ],
+                onChange: (value) => {
+                    State.updateSettings({ materialType: value });
+                    preview.className = `material-preview material-preview-${value}`;
+                    preview.querySelector('.material-preview-subtitle').textContent = materialLabels[value] || value;
+                    if (blurItem) {
+                        const isMica = value === 'mica';
+                        blurItem.classList.toggle('settings-mica-hidden', isMica);
+                        const blurSlider = blurItem.querySelector('.fluent-slider');
+                        const blurSliderWrapper = blurItem.querySelector('.fluent-slider-wrapper');
+                        if (blurSlider) blurSlider.disabled = isMica;
+                        if (blurSliderWrapper) blurSliderWrapper.classList.toggle('fluent-slider-disabled', isMica);
+                    }
+                    this.addRecentSetting(t('settings.material'), materialLabels[value] || value, 'personalization');
+                    State.addNotification({
+                        title: t('settings.material'),
+                        message: t('settings.material.changed', { material: materialLabels[value] || value }),
+                        type: 'success'
+                    });
+                }
+            })
+        }));
+
+        const blur = Math.max(10, Math.min(70, Number(State.settings.blurIntensity ?? 40)));
+        blurItem = FluentUI.SettingItem({
+            label: t('settings.blur-intensity'),
+            description: t('settings.blur-intensity.desc'),
+            control: FluentUI.Slider({
+                min: 10,
+                max: 70,
+                value: blur,
+                step: 1,
+                disabled: currentMaterial === 'mica',
+                showValue: true,
+                onChange: (v) => State.updateSettings({ blurIntensity: v })
+            }),
+            className: `settings-blur-strength-item ${currentMaterial === 'mica' ? 'settings-mica-hidden' : ''}`
+        });
+        section.appendChild(blurItem);
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.button-glow-effect'),
+            description: t('settings.button-glow-effect.desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.enableButtonGlowEffect !== false,
+                onChange: (v) => {
+                    State.updateSettings({ enableButtonGlowEffect: v });
+                    this.addRecentSetting(t('settings.button-glow-effect'), v ? t('settings.on') : t('settings.off'), 'personalization');
+                    State.addNotification({
+                        title: t('settings.button-glow-effect'),
+                        message: v ? t('settings.on') : t('settings.off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        container.appendChild(section);
     },
 
     renderLab(container) {
@@ -3079,6 +4156,24 @@ const SettingsApp = {
                     State.addNotification({
                         title: t('settings.lab-title'),
                         message: `${t('settings.lab-file-import')}：${v ? t('settings.on') : t('settings.off')}`,
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        // 强制始终实时模糊开关(默认关闭:桌面小组件使用静态模糊贴图降低 GPU 压力)
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.lab-realtime-blur'),
+            description: t('settings.lab-realtime-blur-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.forceRealtimeBlur === true,
+                onChange: (v) => {
+                    State.updateSettings({ forceRealtimeBlur: v });
+                    this.addRecentSetting(t('settings.lab-realtime-blur'), v ? t('settings.on') : t('settings.off'), 'lab');
+                    State.addNotification({
+                        title: t('settings.lab-title'),
+                        message: `${t('settings.lab-realtime-blur')}：${v ? t('settings.on') : t('settings.off')}`,
                         type: 'info'
                     });
                 }
@@ -3363,7 +4458,7 @@ const SettingsApp = {
     appSortOrder: 'desc', // 'desc' 或 'asc'
     
     // 系统应用列表（不可卸载）
-    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
 
     // 应用描述
     getAppDescription(appId) {
@@ -3376,6 +4471,7 @@ const SettingsApp = {
             'clock': 'settings.app-desc-clock',
             'weather': 'settings.app-desc-weather',
             'appshop': 'settings.app-desc-appshop',
+            'camera': 'settings.app-desc-camera',
             'photos': 'settings.app-desc-photos',
             'media': 'settings.app-desc-media'
         };
@@ -3388,7 +4484,7 @@ const SettingsApp = {
         
         // 存储信息
         const totalStorage = 10 * 1024; // 10 GB in MB
-        const systemSize = 486; // 系统占用 486 MB
+        const systemSize = 1126; // 系统占用 1.1 GB
         
         // 获取系统应用列表
         const systemApps = [
@@ -3397,19 +4493,28 @@ const SettingsApp = {
             { id: 'calculator', name: t('settings.app-calculator'), icon: 'Theme/Icon/App_icon/calculator.png' },
             { id: 'notes', name: t('settings.app-notes'), icon: 'Theme/Icon/App_icon/notes.png' },
             { id: 'browser', name: t('settings.app-browser'), icon: 'Theme/Icon/App_icon/browser.png' },
-            { id: 'clock', name: t('settings.app-clock'), icon: 'Theme/Icon/App_icon/system_clock.png' },
+            { id: 'clock', name: t('settings.app-clock'), icon: 'Theme/Icon/App_icon/clock.png' },
             { id: 'weather', name: t('settings.app-weather'), icon: 'Theme/Icon/App_icon/weather.png' },
-            { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' },
-            { id: 'photos', name: t('settings.app-photos'), icon: 'Theme/Icon/App_icon/gallery.png' },
-            { id: 'media', name: t('settings.app-media'), icon: 'Theme/Icon/App_icon/system_music.png' }
+            { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' }
         ];
         
-        // 获取已安装的 PWA 应用（实时检测）
+        // 获取已安装的 App Shop 应用（实时检测）
         const installedPWAs = State.settings.installedApps || [];
         const pwaApps = installedPWAs.map(appId => {
             const appConfig = typeof PWALoader !== 'undefined' ? PWALoader.apps[appId] : null;
             if (appConfig) {
                 return { id: appId, name: appConfig.name, icon: appConfig.icon, isPWA: true, desc: appConfig.description || t('settings.app-desc-default') };
+            }
+            const shopApp = typeof AppShop !== 'undefined' ? AppShop.apps.find(app => app.id === appId) : null;
+            if (shopApp) {
+                return {
+                    id: appId,
+                    name: shopApp.titleKey ? t(shopApp.titleKey) : shopApp.name,
+                    icon: AppShop.getIconPath(shopApp.icon),
+                    isPWA: !AppShop.isNativeApp(shopApp),
+                    isNative: AppShop.isNativeApp(shopApp),
+                    desc: shopApp.desc || t('settings.app-desc-default')
+                };
             }
             return null;
         }).filter(Boolean);
@@ -3420,7 +4525,7 @@ const SettingsApp = {
             appsSize += this.getAppSize(app.id, false);
         });
         pwaApps.forEach(app => {
-            appsSize += this.getAppSize(app.id, true);
+            appsSize += this.getAppSize(app.id, app.isPWA !== false);
         });
         
         const usedStorage = systemSize + appsSize;
@@ -3441,9 +4546,9 @@ const SettingsApp = {
                     <div class="storage-bar-fill system" style="width: ${systemPercent.toFixed(1)}%"></div>
                 </div>
                 <div class="storage-legend">
-                    <span class="storage-legend-item"><span class="legend-dot apps"></span>${t('settings.storage-apps')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot system"></span>${t('settings.storage-system')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot available"></span>${t('settings.storage-available')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-apps"></span>${t('settings.storage-apps')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-system"></span>${t('settings.storage-system')}</span>
+                    <span class="storage-legend-item"><span class="legend-dot legend-dot-available"></span>${t('settings.storage-available')}</span>
                 </div>
             </div>
         `;
@@ -3486,8 +4591,8 @@ const SettingsApp = {
             })),
             ...pwaApps.map(app => ({ 
                 ...app, 
-                size: this.getAppSize(app.id, true), 
-                isPWA: true 
+                size: this.getAppSize(app.id, app.isPWA !== false),
+                isPWA: app.isPWA !== false
             }))
         ];
         
@@ -3683,39 +4788,12 @@ const SettingsApp = {
                         ],
                         onClose: (result) => {
                             if (result === 'uninstall') {
-                                const installed = State.settings.installedApps || [];
-                                const newInstalled = installed.filter(id => id !== app.id);
-                                State.updateSettings({ installedApps: newInstalled });
-
-                                // 从 Desktop.apps 移除
-                                const dIdx = Desktop.apps.findIndex(a => a.id === app.id);
-                                if (dIdx !== -1) Desktop.apps.splice(dIdx, 1);
-
-                                // 从 PWALoader 注销
-                                if (typeof PWALoader !== 'undefined' && PWALoader.unregister) {
-                                    PWALoader.unregister(app.id);
+                                if (typeof AppShop !== 'undefined' && AppShop.uninstallApp) {
+                                    AppShop.uninstallApp(app.id, {
+                                        skipConfirm: true,
+                                        skipRunningCheck: true
+                                    });
                                 }
-
-                                // 如果固定在任务栏，自动取消固定
-                                if (typeof Taskbar !== 'undefined' && Taskbar.unpinApp) {
-                                    const pinned = State.settings.pinnedApps || [];
-                                    if (pinned.includes(app.id)) {
-                                        Taskbar.unpinApp(app.id);
-                                    }
-                                }
-
-                                // 刷新开始菜单
-                                const startPinned = State.settings.startPinnedApps || [];
-                                if (startPinned.includes(app.id)) {
-                                    State.updateSettings({ startPinnedApps: startPinned.filter(id => id !== app.id) });
-                                }
-
-                                if (typeof StartMenu !== 'undefined' && StartMenu.renderApps) {
-                                    StartMenu.renderApps();
-                                }
-
-                                FluentUI.Toast({ title: app.name, message: t('settings.app-uninstalled'), type: 'info' });
-
                                 this.currentPage = 'applications';
                                 this.currentAppDetail = null;
                                 this.render();
@@ -3821,19 +4899,32 @@ const SettingsApp = {
         container.className = 'settings-content settings-about';
 
         const section = this.createSection(t('settings.about-title'));
-        const aboutLogo = (State?.settings?.theme === 'dark')
-            ? 'Theme/Icon/Fluent_logo_dark.png'
-            : 'Theme/Icon/Fluent_logo.png';
+        const currentVersion = this.aboutChangelog[0].version;
+        const qingshanLakeName = t('settings.about.qingshan-lake');
+        const qingshanLakeCodename = qingshanLakeName && qingshanLakeName !== 'Qingshan Lake'
+            ? `${t('settings.about.codename')}：${qingshanLakeName}`
+            : 'Qingshan Lake';
 
         const heroCard = document.createElement('div');
         heroCard.className = 'fluent-setting-item settings-about-hero-card';
         heroCard.innerHTML = `
-            <div class="settings-about-logo-wrap">
-                <img src="${aboutLogo}" alt="FluentOS">
+            <div class="settings-about-landscape" aria-hidden="true">
+                <img class="settings-about-landscape-layer settings-about-landscape-sky" src="Theme/Qingshan_lake/03_sky_far_background_mountains.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-water-base" src="Theme/Qingshan_lake/04_water_base_gradient_bands.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-reflection" src="Theme/Qingshan_lake/05_water_reflection_bands.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-mountain-middle" src="Theme/Qingshan_lake/06_middle_colored_mountain_slopes.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-mountain-dark" src="Theme/Qingshan_lake/07_dark_mountain_peaks.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-land" src="Theme/Qingshan_lake/09_foreground_dark_land.png" alt="">
+                <img class="settings-about-landscape-layer settings-about-landscape-trees" src="Theme/Qingshan_lake/10_tree_silhouettes.png" alt="">
             </div>
-            <div class="settings-about-hero-text">
-                <div class="settings-about-hero-name">FluentOS</div>
+            <div class="settings-about-brand">
+                <div class="settings-about-brand-logo">
+                    <img class="settings-about-logo-light" src="Theme/Icon/Fluent_logo.png" alt="">
+                    <img class="settings-about-logo-dark" src="Theme/Icon/Fluent_logo_dark.png" alt="">
+                </div>
+                <div class="settings-about-brand-name">FluentOS</div>
             </div>
+            <div class="settings-about-card-codename">${qingshanLakeCodename}</div>
         `;
         section.appendChild(heroCard);
         const aboutTitleEl = section.querySelector('.settings-section-title');
@@ -3857,13 +4948,107 @@ const SettingsApp = {
         section.appendChild(metaCard);
 
         const list = FluentUI.List({
+            className: 'settings-about-list',
             items: [
-                { id: 'version', title: t('settings.version'), description: '1.5.0 MVP', icon: 'Information Circle' },
+                { id: 'changelog', title: t('settings.about.changelog'), description: t('settings.about.changelog-desc'), icon: 'Document', extra: '›' },
+                { id: 'version', title: t('settings.version'), description: currentVersion, icon: 'Information Circle' },
                 { id: 'tech', title: t('settings.tech-stack'), description: 'HTML5 + CSS3 + JavaScript', icon: 'Database 2' },
                 { id: 'license', title: t('settings.license'), description: 'MIT License', icon: 'Document' }
-            ]
+            ],
+            onItemClick: (id) => {
+                if (id === 'changelog') this.navigateToPage('about-changelog');
+            }
         });
+        const changelogItem = list.querySelector('[data-id="changelog"]');
+        if (changelogItem) {
+            changelogItem.setAttribute('role', 'button');
+            changelogItem.tabIndex = 0;
+            changelogItem.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                this.navigateToPage('about-changelog');
+            });
+        }
         section.appendChild(list);
+        container.appendChild(section);
+    },
+
+    renderAboutChangelog(container) {
+        container.className = 'settings-content settings-about-changelog';
+
+        const section = document.createElement('section');
+        section.className = 'settings-section settings-changelog-page';
+
+        const backBtn = document.createElement('div');
+        backBtn.className = 'app-detail-back settings-changelog-back';
+        backBtn.innerHTML = `
+            <img src="Theme/Icon/Symbol_icon/stroke/Chevron Left.svg" alt="">
+            <span>${t('settings.about-title')}</span>
+        `;
+        backBtn.addEventListener('click', () => {
+            section.classList.add('slide-out');
+            setTimeout(() => this.navigateToPage('about'), 240);
+        });
+        section.appendChild(backBtn);
+
+        const commitCount = this.aboutChangelog.reduce((total, release) => total + release.commits.length, 0);
+        const header = document.createElement('header');
+        header.className = 'settings-changelog-header';
+        header.innerHTML = `
+            <div>
+                <h1 class="settings-changelog-title">${t('settings.about.changelog')}</h1>
+                <p class="settings-changelog-subtitle">${t('settings.about.changelog-subtitle')}</p>
+            </div>
+            <div class="settings-changelog-count">${t('settings.about.commit-count', { count: commitCount })}</div>
+        `;
+        section.appendChild(header);
+
+        const timeline = document.createElement('div');
+        timeline.className = 'settings-changelog-timeline';
+
+        this.aboutChangelog.forEach((release, index) => {
+            const entry = document.createElement('article');
+            entry.className = `fluent-setting-item settings-changelog-entry${release.baseline ? ' is-baseline' : ''}`;
+            entry.style.setProperty('--log-index', index);
+
+            const entryHead = document.createElement('div');
+            entryHead.className = 'settings-changelog-entry-head';
+            entryHead.innerHTML = `
+                <div class="settings-changelog-version">${release.version}</div>
+                <time class="settings-changelog-date" datetime="${release.date}">${release.date}</time>
+            `;
+            entry.appendChild(entryHead);
+
+            if (release.baseline) {
+                const baseline = document.createElement('div');
+                baseline.className = 'settings-changelog-baseline';
+                baseline.textContent = t('settings.about.baseline');
+                entry.appendChild(baseline);
+            } else {
+                const commits = document.createElement('div');
+                commits.className = 'settings-changelog-commits';
+                release.commits.forEach(commit => {
+                    const commitRow = document.createElement('div');
+                    commitRow.className = 'settings-changelog-commit';
+
+                    const hash = document.createElement('span');
+                    hash.className = 'settings-changelog-hash';
+                    hash.textContent = commit.hash;
+
+                    const title = document.createElement('span');
+                    title.className = 'settings-changelog-commit-title';
+                    title.textContent = commit.title;
+
+                    commitRow.append(hash, title);
+                    commits.appendChild(commitRow);
+                });
+                entry.appendChild(commits);
+            }
+
+            timeline.appendChild(entry);
+        });
+
+        section.appendChild(timeline);
         container.appendChild(section);
     },
 
@@ -3898,6 +5083,54 @@ const SettingsApp = {
         this.render();
     },
 
+    formatTombstoneFreezeDelay(ms) {
+        const seconds = Math.max(3, Math.min(600, Math.round(Number(ms || 60000) / 1000)));
+        const isEn = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        if (seconds < 60) return `${seconds}s`;
+        const minutes = Math.floor(seconds / 60);
+        const rest = seconds % 60;
+        if (rest === 0) return isEn ? `${minutes} min` : `${minutes} 分钟`;
+        return isEn ? `${minutes} min ${rest}s` : `${minutes} 分 ${rest} 秒`;
+    },
+
+    getTombstoneFreezeDelayMs() {
+        const raw = State.settings.tombstoneFreezeDelayMs;
+        if (State.normalizeTombstoneFreezeDelay) {
+            return State.normalizeTombstoneFreezeDelay(raw);
+        }
+        const numeric = Number(raw);
+        if (!Number.isFinite(numeric)) return 60 * 1000;
+        return Math.max(3 * 1000, Math.min(10 * 60 * 1000, Math.round(numeric)));
+    },
+
+    createTombstoneFreezeDelayControl() {
+        const currentMs = this.getTombstoneFreezeDelayMs();
+        const control = document.createElement('div');
+        control.className = 'settings-slider-control';
+
+        const valueLabel = document.createElement('span');
+        valueLabel.className = 'fluent-slider-value';
+        valueLabel.style.minWidth = '68px';
+        valueLabel.textContent = this.formatTombstoneFreezeDelay(currentMs);
+
+        const slider = FluentUI.Slider({
+            min: 3,
+            max: 600,
+            value: Math.round(currentMs / 1000),
+            step: 1,
+            showValue: false,
+            onChange: (seconds) => {
+                const nextMs = Math.max(3, Math.min(600, Number(seconds))) * 1000;
+                valueLabel.textContent = this.formatTombstoneFreezeDelay(nextMs);
+                State.updateSettings({ tombstoneFreezeDelayMs: nextMs });
+            }
+        });
+
+        control.appendChild(slider);
+        control.appendChild(valueLabel);
+        return control;
+    },
+
     renderDeveloper(container) {
         container.className = 'settings-content';
         const section = this.createSection(t('settings.developer-title'));
@@ -3919,9 +5152,230 @@ const SettingsApp = {
             })
         }));
 
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-freeze-delay'),
+            description: t('settings.tombstone-freeze-delay-desc'),
+            control: this.createTombstoneFreezeDelayControl()
+        }));
+
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.tombstone-dim-frozen-apps'),
+            description: t('settings.tombstone-dim-frozen-apps-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.tombstoneDimFrozenAppsEnabled !== false,
+                onChange: (v) => {
+                    State.updateSettings({ tombstoneDimFrozenAppsEnabled: v });
+                    this.addRecentSetting(t('settings.tombstone-dim-frozen-apps'), v ? t('settings.on') : t('settings.off'), 'developer');
+                    State.addNotification({
+                        title: t('settings.developer-title'),
+                        message: v ? t('settings.tombstone-dim-frozen-apps-on') : t('settings.tombstone-dim-frozen-apps-off'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
+        const appShopFeatureOptions = [
+            { value: 'auto', label: '自动按日期切换' },
+            ...Array.from({ length: 16 }, (_, index) => ({
+                value: String(index + 1),
+                label: `第 ${index + 1} 期精选`
+            }))
+        ];
+        const currentAppShopPreview = Number(State.settings.appShopFeaturePreviewIndex);
+        section.appendChild(FluentUI.SettingItem({
+            label: 'App Shop 精选预览',
+            description: '用于开发调试：手动选择 App Shop 首页展示第几期精选内容。',
+            control: FluentUI.Select({
+                options: appShopFeatureOptions,
+                value: Number.isInteger(currentAppShopPreview) && currentAppShopPreview >= 1 && currentAppShopPreview <= 16
+                    ? String(currentAppShopPreview)
+                    : 'auto',
+                onChange: (value) => {
+                    const nextValue = value === 'auto' ? 'auto' : String(value);
+                    State.updateSettings({ appShopFeaturePreviewIndex: nextValue });
+                    this.addRecentSetting('App Shop 精选预览', value === 'auto' ? '自动' : `第 ${value} 期`, 'developer');
+                    State.addNotification({
+                        title: t('settings.developer-title'),
+                        message: value === 'auto' ? 'App Shop 精选已恢复自动切换。' : `App Shop 精选已切换到第 ${value} 期。`,
+                        type: 'info'
+                    });
+                }
+            })
+        }));
+
         container.appendChild(section);
     },
     
+    getAccentPalette() {
+        return [
+            '#ffb900', '#ff8c00', '#f7630c', '#ca5010', '#da3b01', '#ef6950', '#d13438', '#ff4343',
+            '#e74856', '#e81123', '#e3008c', '#bf0077', '#c30052', '#9a0089', '#b146c2', '#881798',
+            '#0078d4', '#0063b1', '#8e8cd8', '#6b69d6', '#8764b8', '#744da9', '#b24bc2', '#881798',
+            '#0099bc', '#2d7d9a', '#00b7c3', '#038387', '#00a98f', '#018574', '#00cc6a', '#10893e',
+            '#7a7574', '#5d5a58', '#68768a', '#515c6b', '#567c73', '#486860', '#498205', '#107c10',
+            '#767676', '#4c4a48', '#69797e', '#4a5459', '#647c64', '#525e54', '#847545', '#7e735f'
+        ];
+    },
+
+    createAccentColorPanel() {
+        const currentColor = State.normalizeAccentColor
+            ? State.normalizeAccentColor(State.settings.accentColor)
+            : (State.settings.accentColor || '#0078d4');
+        const autoEnabled = State.settings.accentColorAuto === true;
+        const readabilityEnabled = State.settings.accentColorReadability === true;
+        const expanded = State.settings.accentColorExpanded === true;
+        const recentColors = State.normalizeRecentAccentColors
+            ? State.normalizeRecentAccentColors(State.settings.recentAccentColors)
+            : (State.settings.recentAccentColors || []);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = `settings-accent-panel ${expanded ? 'is-expanded' : ''}`;
+
+        const entry = document.createElement('div');
+        entry.className = `network-option-item network-option-expandable settings-accent-entry ${expanded ? 'is-expanded' : ''}`;
+        entry.innerHTML = `
+            <div class="network-option-icon">
+                <span class="settings-accent-entry-swatch" style="--accent: ${currentColor}; background: ${currentColor}; background-color: ${currentColor};"></span>
+            </div>
+            <div class="network-option-info">
+                <h4>${t('settings.accent-color')}</h4>
+                <p>${autoEnabled ? t('settings.accent-auto') : currentColor.toUpperCase()}</p>
+            </div>
+            <img src="Theme/Icon/Symbol_icon/stroke/Arrow Right.svg" class="network-option-arrow expand-arrow" alt="">
+        `;
+        entry.addEventListener('click', () => {
+            if (expanded) {
+                wrapper.classList.add('is-collapsing');
+                const reducedMotion = typeof window !== 'undefined'
+                    && window.matchMedia
+                    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                setTimeout(() => {
+                    State.updateSettings({ accentColorExpanded: false });
+                    this.refreshCurrentPage();
+                }, reducedMotion ? 0 : 260);
+                return;
+            }
+            State.updateSettings({ accentColorExpanded: true });
+            this.refreshCurrentPage();
+        });
+        wrapper.appendChild(entry);
+
+        const selectColor = (color) => {
+            const normalized = State.normalizeAccentColor ? State.normalizeAccentColor(color) : color;
+            State.updateSettings({
+                accentColor: normalized,
+                accentColorAuto: false,
+                recentAccentColors: State.addRecentAccentColor ? State.addRecentAccentColor(normalized) : [normalized, ...recentColors].slice(0, 8)
+            });
+            this.addRecentSetting(t('settings.accent-color'), normalized, 'personalization');
+            State.addNotification({ title: t('settings.accent-color'), message: t('settings.accent-color-changed'), type: 'success' });
+            this.refreshCurrentPage();
+        };
+
+        const createSwatch = (color) => {
+            const normalized = State.normalizeAccentColor ? State.normalizeAccentColor(color) : color;
+            const swatch = document.createElement('button');
+            swatch.type = 'button';
+            swatch.className = `settings-accent-swatch ${normalized === currentColor ? 'selected' : ''}`;
+            swatch.style.setProperty('--swatch-color', normalized);
+            swatch.style.background = normalized;
+            swatch.style.backgroundColor = normalized;
+            swatch.title = normalized;
+            swatch.setAttribute('aria-label', normalized);
+            swatch.addEventListener('click', () => selectColor(normalized));
+            return swatch;
+        };
+
+        if (!expanded) {
+            return wrapper;
+        }
+
+        const panel = document.createElement('div');
+        panel.className = 'network-expand-panel settings-accent-expand-panel';
+
+        const autoRow = document.createElement('div');
+        autoRow.className = 'network-expand-row settings-accent-auto-row';
+        autoRow.innerHTML = `<span>${t('settings.accent-auto')}</span>`;
+        const autoToggle = FluentUI.Toggle({
+            checked: autoEnabled,
+            onChange: async (next) => {
+                State.updateSettings({ accentColorAuto: next });
+                this.addRecentSetting(t('settings.accent-color'), next ? t('settings.on') : t('settings.off'), 'personalization');
+                State.addNotification({
+                    title: t('settings.accent-color'),
+                    message: next ? t('settings.accent-auto-on') : t('settings.accent-auto-off'),
+                    type: next ? 'info' : 'success'
+                });
+                if (next && State.updateAccentFromWallpaper) {
+                    const color = await State.updateAccentFromWallpaper(State.settings.wallpaperDesktop);
+                    if (color) {
+                        this.refreshCurrentPage();
+                        return;
+                    }
+                }
+                this.refreshCurrentPage();
+            }
+        });
+        autoRow.appendChild(autoToggle);
+        panel.appendChild(autoRow);
+
+        const readabilityRow = document.createElement('div');
+        readabilityRow.className = 'network-expand-row settings-accent-auto-row';
+        readabilityRow.innerHTML = `<span>${t('settings.accent-readability')}</span>`;
+        const readabilityToggle = FluentUI.Toggle({
+            checked: readabilityEnabled,
+            onChange: (next) => {
+                State.updateSettings({ accentColorReadability: next });
+                this.addRecentSetting(t('settings.accent-color'), next ? t('settings.on') : t('settings.off'), 'personalization');
+                State.addNotification({
+                    title: t('settings.accent-color'),
+                    message: next ? t('settings.accent-readability-on') : t('settings.accent-readability-off'),
+                    type: next ? 'info' : 'success'
+                });
+                this.refreshCurrentPage();
+            }
+        });
+        readabilityRow.appendChild(readabilityToggle);
+        panel.appendChild(readabilityRow);
+
+        if (recentColors.length) {
+            const recentGroup = document.createElement('div');
+            recentGroup.className = 'settings-accent-group';
+            recentGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-recent')}</div>`;
+            const row = document.createElement('div');
+            row.className = 'settings-accent-row';
+            recentColors.forEach((color) => row.appendChild(createSwatch(color)));
+            recentGroup.appendChild(row);
+            panel.appendChild(recentGroup);
+        }
+
+        const paletteGroup = document.createElement('div');
+        paletteGroup.className = 'settings-accent-group';
+        paletteGroup.innerHTML = `<div class="settings-accent-group-title">${t('settings.accent-windows')}</div>`;
+        const grid = document.createElement('div');
+        grid.className = 'settings-accent-grid';
+        this.getAccentPalette().slice(0, -1).forEach((color) => grid.appendChild(createSwatch(color)));
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = currentColor;
+        input.style.display = 'none';
+        input.addEventListener('input', (event) => selectColor(event.target.value));
+        const customBtn = document.createElement('button');
+        customBtn.type = 'button';
+        customBtn.className = 'settings-accent-custom';
+        customBtn.innerHTML = '<img src="Theme/Icon/Symbol_icon/stroke/Add.svg" alt="">';
+        customBtn.setAttribute('aria-label', t('settings.accent-custom'));
+        customBtn.addEventListener('click', () => input.click());
+        grid.appendChild(customBtn);
+        grid.appendChild(input);
+        paletteGroup.appendChild(grid);
+        panel.appendChild(paletteGroup);
+        wrapper.appendChild(panel);
+
+        return wrapper;
+    },
+
     // 辅助方法：创建分区
     createSection(title) {
         const section = document.createElement('div');
@@ -3941,13 +5395,13 @@ const SettingsApp = {
             const item = document.createElement('div');
             item.className = `wallpaper-item ${wp === selected ? 'selected' : ''}`;
             item.innerHTML = `<img src="${wp}" alt="壁纸">`;
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 if (type === 'desktop') {
-                    State.updateSettings({ wallpaperDesktop: wp });
-                    Desktop.updateWallpaper();
+                    await State.setWallpaper('desktop', wp, { sourceType: 'built-in' });
+                    await Desktop.updateWallpaper();
                 } else {
-                    State.updateSettings({ wallpaperLock: wp });
-                    if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) LockScreen.updateWallpaper();
+                    await State.setWallpaper('lock', wp, { sourceType: 'built-in' });
+                    if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                 }
                 this.render();
                 State.addNotification({ title: t('settings.personalization'), message: t('settings.wallpaper-changed', { type: type === 'desktop' ? t('settings.desktop') : t('settings.lockscreen') }), type: 'success' });

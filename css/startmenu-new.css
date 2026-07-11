@@ -31,6 +31,12 @@
     flex-shrink: 0;
 }
 
+.recent-item-thumb {
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+
 .recent-item-info {
     flex: 1;
     min-width: 0;

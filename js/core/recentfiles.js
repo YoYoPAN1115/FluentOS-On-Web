@@ -3,13 +3,19 @@
  */
 const RecentFiles = {
     maxItems: 12,
+
+    toMillis(value) {
+        if (typeof value === 'number') return value;
+        const time = Date.parse(value);
+        return Number.isFinite(time) ? time : 0;
+    },
     
     // 获取最近文件列表
     getRecentFiles() {
         const files = [];
         this.traverseFS(State.fs.root, files);
         // 按修改时间排序
-        files.sort((a, b) => (b.modified || 0) - (a.modified || 0));
+        files.sort((a, b) => this.toMillis(b.modified) - this.toMillis(a.modified));
         return files.slice(0, this.maxItems);
     },
     
@@ -28,7 +34,9 @@ const RecentFiles = {
                 path: [...path, node.name].join('/'),
                 type: node.type,
                 modified: node.modified || Date.now(),
-                icon: this.getFileIcon(node.name)
+                icon: this.getFileIcon(node.name),
+                isImage: this.isImageNode(node),
+                preview: this.getFilePreview(node)
             });
         } else if (node.type === 'folder' && node.children) {
             node.children.forEach(child => {
@@ -42,11 +50,36 @@ const RecentFiles = {
         // 推荐项目统一使用文本文件图标
         return 'Theme/Icon/Symbol_icon/stroke/Document.svg';
     },
+
+    isImageNode(node) {
+        if (typeof PhotosDataStore !== 'undefined' && PhotosDataStore && typeof PhotosDataStore.isImageNode === 'function') {
+            return PhotosDataStore.isImageNode(node);
+        }
+        if (!node || node.type !== 'file') return false;
+        const mime = String(node.mime || '').toLowerCase();
+        if (mime.startsWith('image/')) return true;
+        if (node.encoding === 'url' || node.encoding === 'photos-local-cache' || node.encoding === 'photos-ref') return true;
+        return node.encoding === 'dataurl' && /^data:image\//i.test(String(node.content || ''));
+    },
+
+    getFilePreview(node) {
+        if (!this.isImageNode(node)) return '';
+        if (typeof PhotosDataStore !== 'undefined' && PhotosDataStore && typeof PhotosDataStore.peekImageSrc === 'function') {
+            return PhotosDataStore.peekImageSrc(node, { loadThumb: false }) || '';
+        }
+        if (typeof PhotosDataStore !== 'undefined' && PhotosDataStore && typeof PhotosDataStore.resolveImageSrc === 'function') {
+            return PhotosDataStore.resolveImageSrc(node, new Set(), { load: false }) || '';
+        }
+        if (/^data:image\//i.test(String(node.content || ''))) return node.content;
+        if (/^https?:\/\//i.test(String(node.url || node.content || ''))) return node.url || node.content;
+        return '';
+    },
     
     // 格式化时间
     formatTime(timestamp) {
         const now = Date.now();
-        const diff = now - timestamp;
+        const time = this.toMillis(timestamp);
+        const diff = time > 0 ? now - time : 0;
         const minutes = Math.floor(diff / 60000);
         const hours = Math.floor(diff / 3600000);
         const days = Math.floor(diff / 86400000);

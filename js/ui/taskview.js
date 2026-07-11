@@ -102,6 +102,13 @@ const TaskView = {
         return State.settings.enableAnimation !== false;
     },
 
+    _shouldDimFrozenWindows() {
+        if (typeof WindowManager !== 'undefined' && typeof WindowManager._shouldDimFrozenWindows === 'function') {
+            return WindowManager._shouldDimFrozenWindows();
+        }
+        return !(typeof State !== 'undefined' && State.settings && State.settings.tombstoneDimFrozenAppsEnabled === false);
+    },
+
     _effectiveDuration(duration) {
         if (!this._isAnimationEnabled()) return 0;
         return Math.max(0, Math.round(duration || 0));
@@ -179,6 +186,7 @@ const TaskView = {
 
     _clearTaskViewManaged(el) {
         if (!el) return;
+        el.classList.remove('taskview-window-frozen');
         delete el.dataset.taskviewManaged;
         delete el.dataset.taskviewOrigDisplay;
         delete el.dataset.taskviewOrigZ;
@@ -196,7 +204,7 @@ const TaskView = {
             if (!el || el.dataset.taskviewManaged !== '1') return;
 
             const origDisplay = el.dataset.taskviewOrigDisplay || '';
-            el.classList.remove('taskview-window-active');
+            el.classList.remove('taskview-window-active', 'taskview-window-frozen');
             el.style.transition = el.dataset.taskviewOrigTransition || '';
             el.style.transform = el.dataset.taskviewOrigTransform || '';
             el.style.transformOrigin = el.dataset.taskviewOrigTransformOrigin || '';
@@ -270,6 +278,7 @@ const TaskView = {
             origOpacity: el.style.opacity || '',
             origPointerEvents: el.style.pointerEvents || '',
             wasMinimized: windowData.isMinimized === true,
+            wasFrozen: windowData.isFrozen === true,
             bounds: this._resolveWindowBounds(windowData, el),
             clickHandler: null
         };
@@ -367,6 +376,10 @@ const TaskView = {
             el.style.zIndex = '9100';
             el.style.pointerEvents = 'auto';
             el.classList.add('taskview-window-active');
+            el.classList.toggle(
+                'taskview-window-frozen',
+                this._shouldDimFrozenWindows() && (state.wasFrozen === true || windowData.isFrozen === true)
+            );
 
             if (wasMinimized) {
                 const dockPoint = this._getDockPoint(windowData);
@@ -433,7 +446,7 @@ const TaskView = {
                 el.removeEventListener('mousedown', state.clickHandler, true);
             }
 
-            el.classList.remove('taskview-window-active');
+            el.classList.remove('taskview-window-active', 'taskview-window-frozen');
             el.style.pointerEvents = 'none';
             const visualState = this._captureVisualState(el);
             this._primeExitAnimation(el, visualState);
@@ -482,6 +495,10 @@ const TaskView = {
                 if (state.wasMinimized) {
                     if (windowId === targetId) {
                         targetWindow.isMinimized = false;
+                        targetWindow.minimizedAt = null;
+                        if (typeof WindowManager !== 'undefined' && typeof WindowManager._restoreWindowFromTombstone === 'function') {
+                            WindowManager._restoreWindowFromTombstone(targetWindow);
+                        }
                         el.style.display = 'flex';
                     } else {
                         el.style.display = state.origDisplay || 'none';
@@ -541,7 +558,7 @@ const TaskView = {
                 el.removeEventListener('mousedown', state.clickHandler, true);
             }
 
-            el.classList.remove('taskview-window-active');
+            el.classList.remove('taskview-window-active', 'taskview-window-frozen');
             el.style.pointerEvents = 'none';
             const visualState = this._captureVisualState(el);
             this._primeExitAnimation(el, visualState);

@@ -28,7 +28,7 @@ const Fingo = {
         this.historyEl = document.getElementById('fingo-history');
         this.contentEl = this.element?.querySelector('.fingo-content');
         this._updateInputPlaceholder();
-        State.on('languageChange', () => this._updateInputPlaceholder());
+        State.on('languageChange', () => this._updateInputPlaceholder(), { key: 'Fingo.languageChange' });
         this._ensureContextMenu();
         this._loadConversations();
         if (!this.currentId) this.newConversation(true);
@@ -516,20 +516,16 @@ const Fingo = {
 
     // --- 对话历史管理 ---
     _loadConversations() {
-        try {
-            const raw = localStorage.getItem(this.STORAGE_KEY);
-            if (raw) {
-                this.conversations = JSON.parse(raw);
-                if (this.conversations.length) {
-                    this.currentId = this.conversations[0].id;
-                    this._renderMessages(this.conversations[0].messages);
-                }
-            }
-        } catch(e) { this.conversations = []; }
+        const conversations = Storage.get(this.STORAGE_KEY, []);
+        this.conversations = Array.isArray(conversations) ? conversations : [];
+        if (this.conversations.length) {
+            this.currentId = this.conversations[0].id;
+            this._renderMessages(this.conversations[0].messages);
+        }
     },
 
     _saveConversations() {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.conversations));
+        Storage.set(this.STORAGE_KEY, this.conversations);
     },
 
     newConversation(silent) {
@@ -1231,6 +1227,15 @@ const Fingo = {
         const installed = this._findApp(lower);
         if (installed) {
             const name = Desktop.getAppName(installed);
+            if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(installed.id)) {
+                setTimeout(() => this.addMessage(
+                    lang === 'zh'
+                        ? `${name} 正在修复中，请等待修复完成后再打开。`
+                        : `${name} is being repaired. Please wait until the repair is complete.`,
+                    'bot'
+                ), 300);
+                return;
+            }
             setTimeout(() => {
                 WindowManager.openApp(installed.id);
                 this._ensurePanelForeground();
@@ -1254,15 +1259,28 @@ const Fingo = {
 
     _doInstallAndOpen(shopApp) {
         const lang = this.lang();
-        Desktop.apps.push({ id: shopApp.id, name: shopApp.name, icon: `Theme/Icon/App_icon/${shopApp.icon}`, isPWA: true, url: shopApp.url });
+        Desktop.apps.push({ id: shopApp.id, name: shopApp.name, icon: `Theme/Icon/App_icon/${shopApp.icon}`, isPWA: true, url: shopApp.url, openMode: shopApp.openMode });
         const installed = State.settings.installedApps || [];
         installed.push(shopApp.id);
         State.updateSettings({ installedApps: installed });
         Desktop.renderIcons();
         if (typeof StartMenu !== 'undefined') StartMenu.renderApps();
-        const script = document.createElement('script');
-        script.src = `js/third_parts_apps/${shopApp.id}.js`;
-        document.head.appendChild(script);
+        if (typeof AppShop !== 'undefined' && AppShop.ensurePWARegistered) {
+            AppShop.ensurePWARegistered(shopApp);
+            const savedApps = AppShop.getInstalledApps();
+            if (!savedApps.some(app => app.id === shopApp.id)) {
+                savedApps.push({
+                    id: shopApp.id,
+                    name: shopApp.name,
+                    icon: AppShop.getIconPath(shopApp.icon),
+                    url: shopApp.url,
+                    openMode: shopApp.openMode,
+                    scriptLoaded: true,
+                    installedAt: new Date().toISOString()
+                });
+                AppShop.saveInstalledApps(savedApps);
+            }
+        }
         setTimeout(() => {
             WindowManager.openApp(shopApp.id);
             this._ensurePanelForeground();
@@ -1352,16 +1370,28 @@ const Fingo = {
             return;
         }
         // 执行安装
-        Desktop.apps.push({ id: found.id, name: found.name, icon: `Theme/Icon/App_icon/${found.icon}`, isPWA: true, url: found.url });
+        Desktop.apps.push({ id: found.id, name: found.name, icon: `Theme/Icon/App_icon/${found.icon}`, isPWA: true, url: found.url, openMode: found.openMode });
         const installed = State.settings.installedApps || [];
         installed.push(found.id);
         State.updateSettings({ installedApps: installed });
         Desktop.renderIcons();
         if (typeof StartMenu !== 'undefined') StartMenu.renderApps();
-        // 加载脚本
-        const script = document.createElement('script');
-        script.src = `js/third_parts_apps/${found.id}.js`;
-        document.head.appendChild(script);
+        if (typeof AppShop !== 'undefined' && AppShop.ensurePWARegistered) {
+            AppShop.ensurePWARegistered(found);
+            const savedApps = AppShop.getInstalledApps();
+            if (!savedApps.some(app => app.id === found.id)) {
+                savedApps.push({
+                    id: found.id,
+                    name: found.name,
+                    icon: AppShop.getIconPath(found.icon),
+                    url: found.url,
+                    openMode: found.openMode,
+                    scriptLoaded: true,
+                    installedAt: new Date().toISOString()
+                });
+                AppShop.saveInstalledApps(savedApps);
+            }
+        }
         setTimeout(() => this.addMessage(lang === 'zh' ? `${found.name} 安装成功 ✅` : `${found.name}installed successfully ✅`, 'bot'), 400);
     },
 
@@ -1398,8 +1428,8 @@ const Fingo = {
             const res = await fetch('https://bing.biturl.top/?resolution=1920&format=json&index=0&mkt=zh-CN');
             const data = await res.json();
             if (data && data.url) {
-                State.updateSettings({ wallpaperDesktop: data.url });
-                if (typeof Desktop !== 'undefined') Desktop.updateWallpaper();
+                await State.setWallpaper('desktop', data.url, { sourceType: 'bing', sourceUrl: data.url });
+                if (typeof Desktop !== 'undefined') await Desktop.updateWallpaper();
                 setTimeout(() => this.addMessage(lang === 'zh' ? '壁纸已更换 🖼️\n想要更多精彩壁纸？试试打开「照片」应用吧！' : 'Wallpaper changed 🖼️\nWant more? Try the Photos app!', 'bot'), 1200);
             } else { throw new Error('No URL'); }
         } catch (e) {

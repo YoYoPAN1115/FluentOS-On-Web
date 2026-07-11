@@ -13,20 +13,8 @@
     const rand = () => Math.random().toString(36).slice(2, 10);
 
     const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB soft limit to avoid blowing up localStorage
-    const ALLOWED_IMPORT_EXTENSIONS = new Set(['txt', 'doc', 'docx', 'ppt', 'pptx', 'xlsx', 'xls', 'pdf', 'png', 'jpg', 'jpeg']);
-    const ALLOWED_IMPORT_MIME_TYPES = new Set([
-        'text/plain',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/pdf',
-        'image/png',
-        'image/jpeg'
-    ]);
-    const ALLOWED_IMPORT_ACCEPT = '.txt,.doc,.docx,.ppt,.pptx,.xlsx,.xls,.pdf,.png,.jpg,.jpeg';
+    const ALLOWED_IMPORT_EXTENSIONS = new Set(['jpg', 'png', 'webp', 'mp3', 'txt', 'md']);
+    const ALLOWED_IMPORT_ACCEPT = '.jpg,.png,.webp,.mp3,.txt,.md';
 
     function isEnabledFlag(value) {
         if (value === true || value === 1) return true;
@@ -86,33 +74,26 @@
         return ext ? ext.slice(1).toLowerCase() : '';
     }
 
-    function normalizeMime(type) {
-        return String(type || '').split(';')[0].trim().toLowerCase();
-    }
-
     function isAllowedImportFile(file) {
         const ext = getFileExt(file?.name || '');
-        if (ALLOWED_IMPORT_EXTENSIONS.has(ext)) return true;
-        const mime = normalizeMime(file?.type);
-        if (mime && ALLOWED_IMPORT_MIME_TYPES.has(mime)) return true;
-        return false;
+        return ALLOWED_IMPORT_EXTENSIONS.has(ext);
     }
 
     function unsupportedTypeMessage(name) {
         const safeName = String(name || 'file');
-        if (isZh()) {
-            return `不支持的文件类型，已跳过：${safeName}（仅支持 txt/doc/docx/ppt/pptx/xlsx/xls/pdf/png/jpg/jpeg）`;
-        }
-        return `Unsupported file type skipped: ${safeName} (allowed: txt, doc, docx, ppt, pptx, xlsx, xls, pdf, png, jpg, jpeg)`;
+        const allowed = 'jpg/png/webp/mp3/txt/md';
+        return isZh()
+            ? `不支持的文件类型，已跳过：${safeName}（仅支持 ${allowed}）`
+            : `Unsupported file type skipped: ${safeName} (allowed: ${allowed})`;
     }
 
     function uniqueNameIn(folder, desiredName) {
         const { base, ext } = splitExt(desiredName);
-        const exists = (n) => (folder.children || []).some((c) => c && c.name === n);
+        const exists = (n) => (folder.children || []).some((c) => c && String(c.name || '').toLowerCase() === String(n).toLowerCase());
         if (!exists(desiredName)) return desiredName;
-        let i = 2;
-        while (exists(`${base} (${i})${ext}`)) i++;
-        return `${base} (${i})${ext}`;
+        let i = 1;
+        while (exists(`${base}（${i}）${ext}`)) i++;
+        return `${base}（${i}）${ext}`;
     }
 
     function isProbablyText(file) {
@@ -121,6 +102,17 @@
         const name = String(file?.name || '');
         const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
         return ['txt', 'md', 'json', 'js', 'ts', 'css', 'html', 'htm', 'xml', 'csv', 'log', 'yml', 'yaml'].includes(ext);
+    }
+
+    function isImageImportFile(file) {
+        return ['png', 'jpg', 'webp'].includes(getFileExt(file?.name || ''));
+    }
+
+    function imageMimeForFile(file) {
+        const ext = getFileExt(file?.name || '');
+        if (ext === 'jpg') return 'image/jpeg';
+        if (ext === 'webp') return 'image/webp';
+        return 'image/png';
     }
 
     function readFile(file, { onProgress, onReader } = {}) {
@@ -362,18 +354,77 @@
                         task.progressEl.setValue(0);
                         this._refreshOverall();
 
-                        const result = await readFile(task.file, {
-                            onReader: (reader) => { this._activeReader = reader; },
-                            onProgress: (loaded, total) => {
-                                task.bytesLoaded = loaded;
-                                const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
-                                task.progressEl.setValue(pct);
-                                this._refreshOverall();
+                        let result = null;
+                        let cachedImage = null;
+                        let cachedAudio = null;
+                        const importNodeId = `file-${Date.now()}-${rand()}`;
+                        const shouldCacheImage = isImageImportFile(task.file)
+                            && window.PhotosDataStore
+                            && typeof PhotosDataStore.storeLocalImage === 'function';
+                        if (shouldCacheImage) {
+                            const cacheKey = await PhotosDataStore.storeLocalImage(importNodeId, task.file, {
+                                mime: task.file.type || imageMimeForFile(task.file),
+                                name: task.file.name,
+                                size: task.file.size,
+                                lastModified: task.file.lastModified
+                            });
+                            const thumb = typeof PhotosDataStore.cachedThumbForId === 'function'
+                                ? PhotosDataStore.cachedThumbForId(importNodeId)
+                                : '';
+                            cachedImage = { nodeId: importNodeId, cacheKey, thumb };
+                            task.bytesLoaded = task.bytesTotal;
+                            task.progressEl.setValue(100);
+                            this._refreshOverall();
+                        } else if (getFileExt(task.file?.name || '') === 'mp3'
+                            && typeof MediaApp !== 'undefined'
+                            && typeof MediaApp.withMediaStore === 'function') {
+                            const mediaRecordId = `fs-${importNodeId}`;
+                            try {
+                                await MediaApp.withMediaStore('readwrite', (store) => {
+                                    store.put({
+                                        id: mediaRecordId,
+                                        file: task.file,
+                                        name: task.file.name,
+                                        mimeType: task.file.type || 'audio/mpeg',
+                                        lastModified: task.file.lastModified || Date.now()
+                                    });
+                                });
+                                cachedAudio = { nodeId: importNodeId, mediaRecordId };
+                            } catch (_) {
+                                result = await readFile(task.file, {
+                                    onReader: (reader) => { this._activeReader = reader; },
+                                    onProgress: (loaded, total) => {
+                                        task.bytesLoaded = loaded;
+                                        const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
+                                        task.progressEl.setValue(pct);
+                                        this._refreshOverall();
+                                    }
+                                });
+                                this._activeReader = null;
                             }
-                        });
-                        this._activeReader = null;
+                            task.bytesLoaded = task.bytesTotal;
+                            task.progressEl.setValue(100);
+                            this._refreshOverall();
+                        } else {
+                            result = await readFile(task.file, {
+                                onReader: (reader) => { this._activeReader = reader; },
+                                onProgress: (loaded, total) => {
+                                    task.bytesLoaded = loaded;
+                                    const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
+                                    task.progressEl.setValue(pct);
+                                    this._refreshOverall();
+                                }
+                            });
+                            this._activeReader = null;
+                        }
 
                         if (this._cancelled) {
+                            if (cachedImage && window.PhotosDataStore && typeof PhotosDataStore.removeLocalImageCache === 'function') {
+                                PhotosDataStore.removeLocalImageCache(cachedImage.nodeId);
+                            }
+                            if (cachedAudio && typeof MediaApp !== 'undefined' && typeof MediaApp.withMediaStore === 'function') {
+                                MediaApp.withMediaStore('readwrite', (store) => store.delete(cachedAudio.mediaRecordId)).catch(() => {});
+                            }
                             this._setTaskStatus(task, 'cancelled');
                             this._refreshOverall();
                             continue;
@@ -390,13 +441,17 @@
 
                         const isText = isProbablyText(task.file);
                         const node = {
-                            id: `file-${Date.now()}-${rand()}`,
+                            id: cachedImage?.nodeId || cachedAudio?.nodeId || importNodeId,
                             name: finalName,
                             type: 'file',
-                            content: typeof result === 'string' ? result : '',
+                            content: cachedImage ? cachedImage.cacheKey : (cachedAudio ? cachedAudio.mediaRecordId : (typeof result === 'string' ? result : '')),
+                            ...(cachedImage ? { cacheKey: cachedImage.cacheKey, cacheId: cachedImage.nodeId } : {}),
+                            ...(cachedImage && cachedImage.thumb ? { thumb: cachedImage.thumb } : {}),
+                            ...(cachedAudio ? { mediaRecordId: cachedAudio.mediaRecordId } : {}),
                             size: Number(task.file.size || 0),
-                            mime: String(task.file.type || (isText ? 'text/plain' : 'application/octet-stream')),
-                            encoding: isText ? 'text' : 'dataurl',
+                            mime: String(task.file.type || (cachedImage ? imageMimeForFile(task.file) : (cachedAudio ? 'audio/mpeg' : (isText ? 'text/plain' : 'application/octet-stream')))),
+                            encoding: cachedImage ? 'photos-local-cache' : (cachedAudio ? 'media-local-cache' : (isText ? 'text' : 'dataurl')),
+                            source: (cachedImage || cachedAudio) ? 'external-import' : undefined,
                             created: nowIso(),
                             modified: nowIso()
                         };

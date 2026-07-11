@@ -18,6 +18,9 @@ const WindowManager = {
     RESTORE_DURATION_MS: 520,
     MAXIMIZE_TOGGLE_DURATION_MS: 550,
     CLOSE_DURATION_MS: 250,
+    TOMBSTONE_FREEZE_DELAY_MS: 60 * 1000,
+    TOMBSTONE_FREEZE_MIN_MS: 3 * 1000,
+    TOMBSTONE_FREEZE_MAX_MS: 10 * 60 * 1000,
     UNSNAP_RESTORE_BLEND_MS: 240,
     TOP_MAXIMIZE_DWELL_MS: 1500,
     TASKBAR_ICON_FEEDBACK_MS: 280,
@@ -41,14 +44,16 @@ const WindowManager = {
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
-        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 400, height: 550, minHeight: 550, component: 'CalculatorApp' },
-        notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 700, height: 500, component: 'NotesApp' },
+        tips: { titleKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', width: 1120, height: 720, minWidth: 760, minHeight: 520, component: 'TipsApp' },
+        calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
+        notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 920, height: 640, minWidth: 560, minHeight: 420, component: 'NotesApp' },
         browser: { titleKey: 'browser.title', icon: 'Theme/Icon/App_icon/browser.png', width: 1000, height: 700, component: 'BrowserApp' },
-        clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/system_clock.png', width: 900, height: 650, component: 'ClockApp' },
+        clock: { titleKey: 'clock.title', icon: 'Theme/Icon/App_icon/clock.png', width: 900, height: 650, component: 'ClockApp' },
         weather: { titleKey: 'weather.title', icon: 'Theme/Icon/App_icon/weather.png', width: 920, height: 640, component: 'WeatherApp' },
         appshop: { titleKey: 'appshop.title', icon: 'Theme/Icon/App_icon/app_gallery.png', width: 1000, height: 700, component: 'AppShop' },
-        photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/gallery.png', width: 1000, height: 700, component: 'PhotosApp' },
-        media: { titleKey: 'media.title', icon: 'Theme/Icon/App_icon/system_music.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' }
+        camera: { titleKey: 'camera.title', icon: 'Theme/Icon/App_icon/camera.png', width: 1100, height: 720, minWidth: 760, minHeight: 520, component: 'CameraApp' },
+        photos: { titleKey: 'photos.title', icon: 'Theme/Icon/App_icon/photos.png', width: 1000, height: 700, component: 'PhotosApp' },
+        media: { titleKey: 'media.title', icon: 'Theme/Icon/App_icon/media.png', width: 980, height: 640, minWidth: 640, minHeight: 360, component: 'MediaApp' }
     },
 
     // 获取应用配置 - Get application configuration
@@ -60,6 +65,8 @@ const WindowManager = {
 
     init() {
         this.container = document.getElementById('windows-container');
+        this._bindDesktopInactivityListener();
+
         State.on('languageChange', () => {
             this.windows.forEach(w => {
                 const cfg = this.getAppConfig(w.appId);
@@ -76,6 +83,15 @@ const WindowManager = {
             }
             if (updates.windowEdgeSnapEnabled === false) {
                 this._hideDragSnapHint(true);
+            }
+            if (
+                Object.prototype.hasOwnProperty.call(updates, 'tombstoneBackgroundEnabled') ||
+                Object.prototype.hasOwnProperty.call(updates, 'tombstoneFreezeDelayMs')
+            ) {
+                this._syncTombstoneSetting();
+            }
+            if (Object.prototype.hasOwnProperty.call(updates, 'tombstoneDimFrozenAppsEnabled')) {
+                this._syncTombstoneAppearance();
             }
         });
         this._initTaskbarAutoHide();
@@ -273,6 +289,170 @@ const WindowManager = {
         return State.settings.enableAnimation !== false;
     },
 
+    _isTombstoneBackgroundEnabled() {
+        return !!(typeof State !== 'undefined' && State.settings && State.settings.tombstoneBackgroundEnabled === true);
+    },
+
+    _shouldDimFrozenWindows() {
+        return !(typeof State !== 'undefined' && State.settings && State.settings.tombstoneDimFrozenAppsEnabled === false);
+    },
+
+    _getTombstoneFreezeDelayMs() {
+        const value = (typeof State !== 'undefined' && State.settings)
+            ? Number(State.settings.tombstoneFreezeDelayMs)
+            : this.TOMBSTONE_FREEZE_DELAY_MS;
+        const fallback = this.TOMBSTONE_FREEZE_DELAY_MS;
+        const resolved = Number.isFinite(value) ? value : fallback;
+        return Math.max(this.TOMBSTONE_FREEZE_MIN_MS, Math.min(this.TOMBSTONE_FREEZE_MAX_MS, Math.round(resolved)));
+    },
+
+    _getWindowComponent(windowData) {
+        if (!windowData || !windowData.appId) return null;
+        const config = this.appConfigs[windowData.appId];
+        return config && config.component ? globalThis[config.component] : null;
+    },
+
+    _isPWAWindow(windowData) {
+        if (!windowData || !windowData.appId) return false;
+        if (typeof PWALoader !== 'undefined' && PWALoader.apps && PWALoader.apps[windowData.appId]) return true;
+        const config = this.appConfigs[windowData.appId];
+        return !!(config && /^PWA_/i.test(String(config.component || '')));
+    },
+
+    _clearTombstoneTimer(windowData) {
+        if (!windowData || !windowData._tombstoneTimer) return;
+        clearTimeout(windowData._tombstoneTimer);
+        windowData._tombstoneTimer = null;
+    },
+
+    _setTombstoneClasses(windowData, frozen) {
+        if (!windowData || !windowData.element) return;
+        const el = windowData.element;
+        el.classList.toggle('window-frozen', frozen);
+        el.classList.toggle('window-pwa-frozen', frozen && this._isPWAWindow(windowData));
+        el.classList.toggle(
+            'taskview-window-frozen',
+            frozen && document.body.classList.contains('in-taskview') && this._shouldDimFrozenWindows()
+        );
+        if (frozen) {
+            el.dataset.windowFrozen = 'true';
+        } else {
+            delete el.dataset.windowFrozen;
+            el.classList.remove('taskview-window-frozen');
+        }
+
+        el.querySelectorAll('iframe').forEach((frame) => {
+            if (frozen) {
+                frame.dataset.fluentFrozen = 'true';
+            } else {
+                delete frame.dataset.fluentFrozen;
+            }
+        });
+    },
+
+    _syncTombstoneAppearance() {
+        const inTaskView = document.body && document.body.classList.contains('in-taskview');
+        const shouldDim = this._shouldDimFrozenWindows();
+        this.windows.forEach((windowData) => {
+            if (!windowData || !windowData.element) return;
+            windowData.element.classList.toggle(
+                'taskview-window-frozen',
+                windowData.isFrozen === true && inTaskView && shouldDim
+            );
+        });
+    },
+
+    _freezeWindow(windowData) {
+        if (!windowData || !windowData.element || windowData.isFrozen === true) return;
+        if (!this._isTombstoneBackgroundEnabled()) return;
+        if (windowData.isMinimized !== true || windowData.isRestoring || windowData.element.classList.contains('closing')) return;
+
+        this._clearTombstoneTimer(windowData);
+        windowData.isFrozen = true;
+        windowData.frozenAt = Date.now();
+        this._setTombstoneClasses(windowData, true);
+
+        const component = this._getWindowComponent(windowData);
+        if (component && typeof component.onTombstoneFreeze === 'function') {
+            try {
+                component.onTombstoneFreeze(windowData);
+            } catch (err) {
+                console.warn('[WindowManager] Tombstone freeze hook failed:', err);
+            }
+        }
+
+        try {
+            windowData.element.dispatchEvent(new CustomEvent('fluent-window-freeze', {
+                detail: { appId: windowData.appId, windowId: windowData.id, isPWA: this._isPWAWindow(windowData) }
+            }));
+        } catch (_) {
+            // CustomEvent can fail in unusual embedded contexts; freezing state is already applied.
+        }
+    },
+
+    _restoreWindowFromTombstone(windowData) {
+        if (!windowData) return;
+        this._clearTombstoneTimer(windowData);
+        if (windowData.isFrozen !== true) return;
+
+        windowData.isFrozen = false;
+        windowData.frozenAt = null;
+        this._setTombstoneClasses(windowData, false);
+
+        const component = this._getWindowComponent(windowData);
+        if (component && typeof component.onTombstoneRestore === 'function') {
+            try {
+                component.onTombstoneRestore(windowData);
+            } catch (err) {
+                console.warn('[WindowManager] Tombstone restore hook failed:', err);
+            }
+        }
+
+        if (windowData.element) {
+            try {
+                windowData.element.dispatchEvent(new CustomEvent('fluent-window-restore-from-freeze', {
+                    detail: { appId: windowData.appId, windowId: windowData.id, isPWA: this._isPWAWindow(windowData) }
+                }));
+            } catch (_) {
+                // State restoration has already happened.
+            }
+        }
+    },
+
+    _scheduleTombstoneFreeze(windowData) {
+        if (!windowData || !windowData.element) return;
+        this._clearTombstoneTimer(windowData);
+        if (!this._isTombstoneBackgroundEnabled()) {
+            this._restoreWindowFromTombstone(windowData);
+            return;
+        }
+        if (windowData.isMinimized !== true || windowData.isRestoring || windowData.element.classList.contains('closing')) return;
+
+        const minimizedAt = Number(windowData.minimizedAt || Date.now());
+        const elapsed = Math.max(0, Date.now() - minimizedAt);
+        const delay = Math.max(0, this._getTombstoneFreezeDelayMs() - elapsed);
+        windowData._tombstoneTimer = setTimeout(() => {
+            windowData._tombstoneTimer = null;
+            this._freezeWindow(windowData);
+        }, delay);
+    },
+
+    _syncTombstoneSetting() {
+        if (!this._isTombstoneBackgroundEnabled()) {
+            this.windows.forEach((windowData) => {
+                this._clearTombstoneTimer(windowData);
+                this._restoreWindowFromTombstone(windowData);
+            });
+            return;
+        }
+
+        this.windows.forEach((windowData) => {
+            if (windowData && windowData.isMinimized === true) {
+                this._scheduleTombstoneFreeze(windowData);
+            }
+        });
+    },
+
     _playTaskbarDockFeedback(appId) {
         if (!appId || !this._isAnimationEnabled()) return;
         const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
@@ -291,6 +471,122 @@ const WindowManager = {
         }, this.TASKBAR_ICON_FEEDBACK_MS);
     },
 
+    _clearTaskbarIndicatorMotion(appId) {
+        if (!appId) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
+        if (!taskbarBtn) return;
+        if (taskbarBtn._indicatorMotionTimer) {
+            clearTimeout(taskbarBtn._indicatorMotionTimer);
+            taskbarBtn._indicatorMotionTimer = null;
+        }
+        taskbarBtn.classList.remove('taskbar-indicator-sync', 'taskbar-indicator-minimizing', 'taskbar-indicator-restoring');
+        taskbarBtn.style.removeProperty('--taskbar-indicator-duration');
+        taskbarBtn.style.removeProperty('--taskbar-indicator-ease');
+    },
+
+    _startTaskbarIndicatorMotion(windowData, mode, duration, easing) {
+        if (!windowData || !windowData.appId || duration <= 0) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${windowData.appId}"]`);
+        if (!taskbarBtn) return;
+
+        this._clearTaskbarIndicatorMotion(windowData.appId);
+        taskbarBtn.style.setProperty('--taskbar-indicator-duration', `${duration}ms`);
+        taskbarBtn.style.setProperty('--taskbar-indicator-ease', easing);
+        taskbarBtn.classList.add('taskbar-indicator-sync', `taskbar-indicator-${mode}`);
+
+        taskbarBtn._indicatorMotionTimer = setTimeout(() => {
+            this._clearTaskbarIndicatorMotion(windowData.appId);
+        }, duration + 40);
+    },
+
+    _setTaskbarIndicatorForWindow(windowData, forceActive = false) {
+        if (!windowData || !windowData.appId) return;
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${windowData.appId}"]`);
+        if (!taskbarBtn) return;
+
+        const isVisible = windowData.element && windowData.element.style.display !== 'none' && !windowData.element.classList.contains('closing');
+        const isInactive = windowData.element?.classList.contains('window-inactive') === true;
+        const isMinimized = windowData.isMinimized === true || windowData.element?.style.display === 'none';
+        const isActive = forceActive && isVisible && !isMinimized && !windowData.isMinimizing && !isInactive;
+        taskbarBtn.classList.toggle('taskbar-app-active', isActive);
+        taskbarBtn.classList.toggle('taskbar-app-minimized', isMinimized);
+        taskbarBtn.classList.toggle('running', isVisible);
+    },
+
+    _syncTaskbarAppState(appId) {
+        const taskbarBtn = document.querySelector(`.taskbar-app[data-app-id="${appId}"]`);
+        if (!taskbarBtn) return;
+        const windowData = this.windows.find((w) => w.appId === appId && w.element && !w.element.classList.contains('closing'));
+        const isRunning = !!windowData;
+        const isMinimized = !!windowData && (windowData.isMinimized === true || windowData.element?.style.display === 'none');
+        const isActive = !!windowData && !isMinimized && !windowData.isMinimizing && !windowData.element.classList.contains('window-inactive');
+
+        taskbarBtn.classList.toggle('running', isRunning || isMinimized);
+        taskbarBtn.classList.toggle('taskbar-app-minimized', isMinimized);
+        taskbarBtn.classList.toggle('taskbar-app-active', isActive);
+    },
+
+    _syncAllTaskbarAppStates() {
+        const ids = new Set([
+            ...Array.from(State.runningApps || []),
+            ...this.windows.map((w) => w && w.appId).filter(Boolean)
+        ]);
+        ids.forEach((appId) => this._syncTaskbarAppState(appId));
+    },
+
+    getAppWindow(appId) {
+        return this.windows.find((w) =>
+            w &&
+            w.appId === appId &&
+            w.element &&
+            !w.element.classList.contains('closing')
+        ) || null;
+    },
+
+    _setActiveWindow(windowId = null) {
+        this.activeWindowId = windowId;
+        this.windows.forEach((w) => {
+            if (!w || !w.element) return;
+            const isActive = !!windowId && w.id === windowId && !w.isMinimized && !w.isMinimizing;
+            w.element.classList.toggle('window-inactive', !isActive && !w.isMinimized && !w.isMinimizing && !w.element.classList.contains('closing'));
+        });
+    },
+
+    _playWindowFocusMotion(windowData, motionClass) {
+        if (!windowData || !windowData.element || !this._isAnimationEnabled()) return;
+        const el = windowData.element;
+        el.classList.remove('window-focus-pop', 'window-focus-dip');
+        void el.offsetWidth;
+        el.classList.add(motionClass);
+        clearTimeout(windowData._focusMotionTimer);
+        windowData._focusMotionTimer = setTimeout(() => {
+            el.classList.remove('window-focus-pop', 'window-focus-dip');
+            windowData._focusMotionTimer = null;
+        }, 340);
+    },
+
+    _playFocusTransitionMotion(nextWindowData, previousWindowData, forceMotion = false) {
+        if (!this._isAnimationEnabled()) return;
+        if (previousWindowData && previousWindowData !== nextWindowData) {
+            this._playWindowFocusMotion(previousWindowData, 'window-focus-dip');
+        }
+        if (forceMotion || (previousWindowData && previousWindowData !== nextWindowData)) {
+            this._playWindowFocusMotion(nextWindowData, 'window-focus-pop');
+        }
+    },
+
+    _bindDesktopInactivityListener() {
+        if (this._desktopInactivityBound || typeof document === 'undefined') return;
+        this._desktopInactivityBound = true;
+        document.addEventListener('pointerdown', (event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target && target.closest('.window')) return;
+            if (target && target.closest('.taskbar')) return;
+            this._setActiveWindow(null);
+            this._syncAllTaskbarAppStates();
+        }, true);
+    },
+
     _effectiveDuration(duration) {
         if (!this._isAnimationEnabled()) return 0;
         return Math.max(0, Math.round(duration || 0));
@@ -306,10 +602,19 @@ const WindowManager = {
             clearTimeout(windowData._restoreTimer);
             windowData._restoreTimer = null;
         }
+        if (windowData._focusMotionTimer) {
+            clearTimeout(windowData._focusMotionTimer);
+            windowData._focusMotionTimer = null;
+        }
         if (windowData._dockFeedbackTimer) {
             clearTimeout(windowData._dockFeedbackTimer);
             windowData._dockFeedbackTimer = null;
         }
+        this._clearTombstoneTimer(windowData);
+        if (windowData.element) {
+            windowData.element.classList.remove('window-focus-pop', 'window-focus-dip');
+        }
+        this._clearTaskbarIndicatorMotion(windowData.appId);
     },
 
     _captureWindowVisualState(windowData) {
@@ -370,7 +675,12 @@ const WindowManager = {
         windowData.isMinimized = true;
         windowData.isMinimizing = false;
         windowData.isRestoring = false;
+        windowData.minimizedAt = Date.now();
         this.updateMaximizedWallpaperEffect();
+        this._syncWidgetDimState();
+        this._syncAllTaskbarAppStates();
+        this._setTaskbarIndicatorForWindow(windowData, false);
+        this._scheduleTombstoneFreeze(windowData);
     },
 
     _finalizeRestore(windowData) {
@@ -387,12 +697,18 @@ const WindowManager = {
         windowData.isMinimized = false;
         windowData.isRestoring = false;
         windowData.isMinimizing = false;
+        windowData.minimizedAt = null;
+        this._restoreWindowFromTombstone(windowData);
+        this._setTaskbarIndicatorForWindow(windowData, true);
+        this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
     },
 
     _startMinimizeAnimation(windowData, fromInterruptedRestore = false) {
         if (!windowData || !windowData.element || windowData.isMinimized) return;
         const el = windowData.element;
         this._clearWindowMotionTimers(windowData);
+        this._restoreWindowFromTombstone(windowData);
         const wasMaximized = windowData.isMaximized === true;
 
         if (fromInterruptedRestore) {
@@ -435,8 +751,13 @@ const WindowManager = {
             return;
         }
 
+        const minimizeEase = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
         const opacityDuration = Math.round(duration * 0.56);
-        el.style.transition = `transform ${duration}ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+        // 小组件恢复正常的过渡与最小化动画同时启动、同节奏
+        this._syncWidgetDimState(duration, minimizeEase);
+        el.style.transition = `transform ${duration}ms ${minimizeEase}, opacity ${opacityDuration}ms cubic-bezier(0.4, 0, 1, 1)`;
+        this._startTaskbarIndicatorMotion(windowData, 'minimizing', duration, minimizeEase);
+        this._setTaskbarIndicatorForWindow(windowData, false);
 
         requestAnimationFrame(() => {
             if (!windowData.isMinimizing) return;
@@ -460,6 +781,7 @@ const WindowManager = {
         if (!windowData || !windowData.element) return;
         const el = windowData.element;
         this._clearWindowMotionTimers(windowData);
+        this._restoreWindowFromTombstone(windowData);
 
         const fromHidden = windowData.isMinimized || el.style.display === 'none';
         if (fromHidden) {
@@ -495,20 +817,24 @@ const WindowManager = {
         const duration = this._effectiveDuration(this.RESTORE_DURATION_MS);
         if (duration <= 0) {
             this._finalizeRestore(windowData);
-            this.focusWindow(windowData.id);
+            this.focusWindow(windowData.id, { suppressMotion: true });
             this.updateMaximizedWallpaperEffect();
             return;
         }
 
+        const restoreEase = 'cubic-bezier(0.16, 1, 0.3, 1)';
         const opacityDuration = Math.round(duration * 0.68);
-        el.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1), opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        // 小组件退避的过渡与恢复动画同时启动、同节奏
+        this._syncWidgetDimState(duration, restoreEase);
+        el.style.transition = `transform ${duration}ms ${restoreEase}, opacity ${opacityDuration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        this._startTaskbarIndicatorMotion(windowData, 'restoring', duration, restoreEase);
         requestAnimationFrame(() => {
             if (!windowData.isRestoring) return;
             el.style.transform = '';
             el.style.opacity = '1';
         });
 
-        this.focusWindow(windowData.id);
+        this.focusWindow(windowData.id, { suppressMotion: true });
         this.updateMaximizedWallpaperEffect();
 
         windowData._restoreTimer = setTimeout(() => {
@@ -896,6 +1222,15 @@ const WindowManager = {
 
     openApp(appId, data = null) {
 
+        if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId)) {
+            FluentUI.Toast({
+                title: t('start.ctx.app-repairing'),
+                message: t('start.ctx.app-repairing-msg'),
+                type: 'warning'
+            });
+            return false;
+        }
+
         const config = this.getAppConfig(appId);
         if (!config) {
             console.warn(`App ${appId} not configured`);
@@ -911,10 +1246,16 @@ const WindowManager = {
             State.recordAppUsage(appId);
         }
 
+        if (config.openMode === 'external' && config.url) {
+            window.open(config.url, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
         // 检查是否已经打开该应用窗口 - Check if app window already exists
-        const existingWindow = this.windows.find(w => w.appId === appId);
+        const existingWindow = this.getAppWindow(appId);
         if (existingWindow) {
             this.focusWindow(existingWindow.id);
+            this._syncTaskbarAppState(appId);
             
             if (data && config.component && globalThis[config.component]) {
                 if (data.fileId && globalThis[config.component].loadFile) {
@@ -943,6 +1284,9 @@ const WindowManager = {
             isMinimizing: false,
             isRestoring: false,
             isMaximized: false,
+            isFrozen: false,
+            minimizedAt: null,
+            frozenAt: null,
             snapLayout: initialBounds.snapLayout || null,
             lastNormalBounds: initialLastNormalBounds
         });
@@ -950,18 +1294,25 @@ const WindowManager = {
         this.container.appendChild(windowElement);
         
         State.addRunningApp(appId);
+        this._syncTaskbarAppState(appId);
+        // 小组件退避过渡与窗口打开动画（250ms）同步
+        this._syncWidgetDimState(this._effectiveDuration(250), 'cubic-bezier(0.4, 0, 0.2, 1)');
 
         
         if (config.component && globalThis[config.component]) {
-            globalThis[config.component].init(windowId);
+            const component = globalThis[config.component];
+            // Components may consume their initial navigation data during init so
+            // their first paint is already on the requested page.
+            const initialData = component.handlesInitialOpenData === true ? data : undefined;
+            const initialDataHandled = component.init(windowId, initialData) === true;
             
-            if (data && data.fileId && globalThis[config.component].loadFile) {
+            if (!initialDataHandled && data && data.fileId && component.loadFile) {
                 setTimeout(() => {
-                    globalThis[config.component].loadFile(data.fileId);
+                    component.loadFile(data.fileId);
                 }, 0);
-            } else if (data && globalThis[config.component].openData) {
+            } else if (!initialDataHandled && data && component.openData) {
                 setTimeout(() => {
-                    globalThis[config.component].openData(data);
+                    component.openData(data);
                 }, 0);
             }
         } else {
@@ -1243,7 +1594,13 @@ const WindowManager = {
         });
 
         // 最小化按钮 - Minimize button
-        minimizeBtn.addEventListener('click', () => {
+        minimizeBtn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        minimizeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             this._hideSnapMenu(windowElement, true);
             this.minimizeWindow(windowElement.id);
         });
@@ -1411,22 +1768,43 @@ const WindowManager = {
         document.addEventListener('pointercancel', finalizeResize);
     },
 
-    focusWindow(windowId) {
+    focusWindow(windowId, options = {}) {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData) return;
 
         if (windowData.isMinimizing) {
             this._startRestoreAnimation(windowData, true);
+            this._syncWidgetDimState();
             return;
         }
 
         if (windowData.isMinimized) {
             this._startRestoreAnimation(windowData, false);
+            this._syncWidgetDimState();
             return;
         }
 
-        this._syncZIndexCounter();
-        windowData.element.style.zIndex = ++this.zIndexCounter;
+        const previousActiveId = this.activeWindowId;
+        const previousWindowData = previousActiveId
+            ? this.windows.find(w => w && w.id === previousActiveId)
+            : null;
+        const forceMotion = options && options.forceMotion === true;
+        const suppressMotion = options && options.suppressMotion === true;
+        const alreadyActive = previousActiveId === windowId &&
+            windowData.element &&
+            !windowData.element.classList.contains('window-inactive');
+
+        if (!alreadyActive) {
+            this._syncZIndexCounter();
+            windowData.element.style.zIndex = ++this.zIndexCounter;
+        }
+        this._setActiveWindow(windowId);
+        this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
+        this._setTaskbarIndicatorForWindow(windowData, true);
+        if (!suppressMotion && (forceMotion || (previousActiveId && previousActiveId !== windowId))) {
+            this._playFocusTransitionMotion(windowData, previousWindowData, forceMotion);
+        }
 
         if (typeof Fingo !== 'undefined' && Fingo && Fingo.isOpen && typeof Fingo._ensurePanelForeground === 'function') {
             Fingo._ensurePanelForeground();
@@ -1437,11 +1815,15 @@ const WindowManager = {
         const windowData = this.windows.find(w => w.id === windowId);
         if (!windowData || windowData.isMinimized || windowData.isMinimizing) return;
         this._startMinimizeAnimation(windowData, windowData.isRestoring);
+        this._syncWidgetDimState();
     },
 
     toggleWindow(appId) {
-        const windowData = this.windows.find(w => w.appId === appId);
-        if (!windowData) return;
+        const windowData = this.getAppWindow(appId);
+        if (!windowData) {
+            this.openApp(appId);
+            return;
+        }
 
         if (windowData.isMinimizing) {
             this._startRestoreAnimation(windowData, true);
@@ -1458,6 +1840,8 @@ const WindowManager = {
         } else {
             this._startMinimizeAnimation(windowData, false);
         }
+        this._syncAllTaskbarAppStates();
+        this._setTaskbarIndicatorForWindow(windowData, !windowData.isMinimized);
     },
     toggleMaximize(windowId) {
         const windowData = this.windows.find(w => w.id === windowId);
@@ -1523,9 +1907,34 @@ const WindowManager = {
             
             // 更新壁纸效果 - Update wallpaper effect
             this.updateMaximizedWallpaperEffect();
+            this._setActiveWindow(windowId);
+            this._syncAllTaskbarAppStates();
         }
     },
     
+    /**
+     * 同步「前台是否有可见窗口」的 body 状态类。
+     * 桌面小组件据此切换为半透明磨砂 + 灰字的退避样式。
+     *
+     * 可选传入 durationMs / ease：把小组件退避过渡的时长与缓动
+     * 写入 CSS 变量，使其与触发它的窗口动画（打开 / 关闭 /
+     * 最小化 / 恢复）实时同步。
+     */
+    _syncWidgetDimState(durationMs, ease) {
+        const hasForeground = this.windows.some(w =>
+            !w.isMinimized &&
+            !w.isMinimizing &&
+            w.element &&
+            !w.element.classList.contains('closing') &&
+            w.element.style.display !== 'none'
+        );
+        if (typeof durationMs === 'number') {
+            document.body.style.setProperty('--widget-dim-duration', `${Math.max(0, durationMs)}ms`);
+            document.body.style.setProperty('--widget-dim-ease', ease || 'ease');
+        }
+        document.body.classList.toggle('has-foreground-window', hasForeground);
+    },
+
     // 更新最大化窗口的壁纸效果 - Update wallpaper effect for maximized windows
     updateMaximizedWallpaperEffect() {
         const hasMaximized = this.windows.some(w =>
@@ -1537,6 +1946,8 @@ const WindowManager = {
             w.element.style.display !== 'none'
         );
         const taskbar = this._getTaskbarElement();
+        this._syncAllTaskbarAppStates();
+        this._syncWidgetDimState();
         
         if (hasMaximized) {
             this._setFullscreenUnmaximizeSync(false);
@@ -1560,11 +1971,26 @@ const WindowManager = {
                 taskbar.classList.remove('hidden');
             }
         }
+        this._syncAllTaskbarAppStates();
     },
 
-    closeWindow(windowId) {
+    requestCloseWindow(windowId) {
+        return new Promise((resolve) => {
+            const existing = this.windows.find(w => w.id === windowId);
+            if (!existing) {
+                resolve(true);
+                return;
+            }
+            this.closeWindow(windowId, { onClosed: resolve });
+        });
+    },
+
+    closeWindow(windowId, options = {}) {
         const windowData = this.windows.find(w => w.id === windowId);
-        if (!windowData) return;
+        if (!windowData) {
+            options.onClosed?.(true);
+            return;
+        }
         this._hideSnapMenu(windowData.element, true);
         this._hideDragSnapHint(true);
         this._persistWindowBounds(windowData);
@@ -1583,6 +2009,8 @@ const WindowManager = {
             windowData.element.style.opacity = '';
             windowData.element.classList.add('closing');
             this._setFullscreenCloseSync(shouldSyncFullscreenClose && closeDuration > 0, closeDuration);
+            // 小组件恢复正常的过渡与窗口关闭动画（250ms）同步
+            this._syncWidgetDimState(closeDuration, 'cubic-bezier(0.4, 0, 1, 1)');
             // Start wallpaper/taskbar transition together with the close motion.
             this.updateMaximizedWallpaperEffect();
             setTimeout(() => {
@@ -1592,8 +2020,19 @@ const WindowManager = {
                 if (!hasOtherWindows) {
                     State.removeRunningApp(windowData.appId);
                 }
+                if (this.activeWindowId === windowId) {
+                    this.activeWindowId = null;
+                    const nextWindow = this.windows.slice().reverse().find((w) => w.element && !w.isMinimized && !w.element.classList.contains('closing'));
+                    if (nextWindow) {
+                        this.focusWindow(nextWindow.id);
+                    } else {
+                        this._setActiveWindow(null);
+                    }
+                }
                 // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
+                this._syncAllTaskbarAppStates();
+                options.onClosed?.(true);
             }, closeDuration);
         };
 
@@ -1605,11 +2044,20 @@ const WindowManager = {
             if (component && typeof component.beforeClose === 'function') {
                 const result = component.beforeClose();
                 if (result && typeof result.then === 'function') {
-                    result.then((ok) => { if (ok === false) return; proceedClose(); })
+                    result.then((ok) => {
+                        if (ok === false) {
+                            options.onClosed?.(false);
+                            return;
+                        }
+                        proceedClose();
+                    })
                           .catch(() => proceedClose());
                     return; // 等待用户确认 - Wait for user confirmation
                 }
-                if (result === false) return; // 用户取消关闭 - User cancelled close
+                if (result === false) {
+                    options.onClosed?.(false);
+                    return;
+                } // 用户取消关闭 - User cancelled close
             }
         }catch (e) {
             console.warn('beforeClose 执行失败，继续关闭窗口 - beforeClose failed, continue closing', e);
@@ -1642,4 +2090,3 @@ const WindowManager = {
         return this._getMinimizeDockPoint();
     }
 };
-

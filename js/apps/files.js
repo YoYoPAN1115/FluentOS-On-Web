@@ -13,6 +13,7 @@ const FilesApp = {
     ],
     windowId: null,
     container: null,
+    frame: null,
     currentPath: ['root'],
     currentNode: null,
     history: [],
@@ -71,10 +72,60 @@ const FilesApp = {
         };
         State.on('settingsChange', this._settingsHandler);
 
+        this._photosCacheHandler = () => {
+            if (!this.container || this.isSearching) return;
+            clearTimeout(this._photosCacheTimer);
+            this._photosCacheTimer = setTimeout(() => {
+                this._photosCacheTimer = null;
+                if (!this.container || this.isSearching) return;
+                this.renderFileList();
+            }, 80);
+        };
+        window.addEventListener('photos-cache-ready', this._photosCacheHandler);
+
         // 如果有传入文件ID，导航到该位置
         if (data.fileId) {
             setTimeout(() => this.navigateToId(data.fileId), 100);
         }
+    },
+
+    beforeClose() {
+        if (this._keyHandler) {
+            document.removeEventListener('keydown', this._keyHandler);
+            this._keyHandler = null;
+        }
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+        const ctxMenu = document.getElementById(`${this.windowId}-files-context-menu`);
+        if (ctxMenu && ctxMenu.parentElement === document.body) {
+            ctxMenu.remove();
+        }
+        if (this._photosCacheHandler) {
+            window.removeEventListener('photos-cache-ready', this._photosCacheHandler);
+            this._photosCacheHandler = null;
+        }
+        clearTimeout(this._photosCacheTimer);
+        this._photosCacheTimer = null;
+        this.container = null;
+        this.windowId = null;
+        return true;
+    },
+
+    getQuickAccessItems() {
+        return [
+            { id: 'desktop', label: t('files.desktop'), icon: 'Folder' },
+            { id: 'documents', label: t('files.documents'), icon: 'File' },
+            { id: 'pictures', label: t('files.pictures'), icon: 'Image' },
+            { id: 'downloads', label: t('files.downloads'), icon: 'Download' },
+            { id: 'recycle', label: t('files.recycle'), icon: 'Trash' }
+        ];
+    },
+
+    getCurrentQuickAccessId() {
+        const quickAccessIds = this.getQuickAccessItems().map(item => item.id);
+        return this.currentPath.find(id => quickAccessIds.includes(id)) || null;
     },
 
     render() {
@@ -82,12 +133,38 @@ const FilesApp = {
             console.error('[FilesApp] render: 容器不存在');
             return;
         }
-        
+
         this.container.innerHTML = '';
-        
+        if (this.frame && typeof this.frame.destroy === 'function') {
+            this.frame.destroy();
+            this.frame = null;
+        }
+
+        if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
+            console.error('[FilesApp] FluentWindow framework is not loaded');
+            return;
+        }
+
+        this.frame = FluentWindow.mount({
+            container: this.container,
+            items: this.getQuickAccessItems(),
+            activeId: this.getCurrentQuickAccessId(),
+            onNavigate: (id, pageEl) => {
+                pageEl.classList.add('files-fw-page');
+                this.renderContentPage(pageEl);
+                if (id && id !== this.getCurrentQuickAccessId()) {
+                    this.navigateToId(id);
+                }
+            }
+        });
+    },
+
+    renderContentPage(pageEl) {
+        pageEl.innerHTML = '';
+
         const app = document.createElement('div');
-        app.className = 'files-app';
-        
+        app.className = 'files-app files-fw-app';
+
         // 使用 FluentUI.NavigationBar 创建工具栏
         const searchBox = FluentUI.SearchBox({
             placeholder: t('files.search'),
@@ -128,37 +205,11 @@ const FilesApp = {
         });
         toolbar.className = 'files-toolbar fluent-navbar';
         app.appendChild(toolbar);
-        
+
         // 主区域
         const main = document.createElement('div');
-        main.className = 'files-main';
-        
-        // 使用 FluentUI.Sidebar 创建侧边栏
-        const sidebar = FluentUI.Sidebar({
-            sections: [{
-                title: t('files.quick-access'),
-                items: [
-                    { id: 'desktop', label: t('files.desktop'), icon: 'Folder' },
-                    { id: 'documents', label: t('files.documents'), icon: 'File' },
-                    { id: 'pictures', label: t('files.pictures'), icon: 'Image' },
-                    { id: 'downloads', label: t('files.downloads'), icon: 'Download' },
-                    // 回收站固定在最后
-                    { id: 'recycle', label: t('files.recycle'), icon: 'Trash' }
-                ]
-            }],
-            activeItem: this.currentPath[this.currentPath.length - 1],
-            onItemClick: (id) => this.navigateToId(id)
-        });
-        sidebar.style.position = 'relative';
-        
-        // V2模式下在侧边栏底部添加项目计数
-        const sidebarCount = document.createElement('div');
-        sidebarCount.className = 'files-sidebar-count';
-        sidebarCount.id = 'files-sidebar-count';
-        sidebar.appendChild(sidebarCount);
-        
-        main.appendChild(sidebar);
-        
+        main.className = 'files-main files-fw-main';
+
         // 内容区域
         const content = document.createElement('div');
         content.className = 'files-content';
@@ -179,8 +230,8 @@ const FilesApp = {
         ctxMenu.className = 'context-menu hidden';
         ctxMenu.id = `${this.windowId}-files-context-menu`;
         app.appendChild(ctxMenu);
-        
-        this.container.appendChild(app);
+
+        pageEl.appendChild(app);
 
         this.addStyles();
         this.createSelectionBox();
@@ -201,8 +252,8 @@ const FilesApp = {
         this.selectionBox.className = 'files-selection-box';
         this.selectionBox.style.cssText = `
             position: absolute;
-            border: 2px solid rgba(0, 120, 212, 0.8);
-            background: rgba(0, 120, 212, 0.1);
+            border: 2px solid rgba(var(--accent-rgb, 0, 120, 212), 0.8);
+            background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
             pointer-events: none;
             display: none;
             z-index: 1000;
@@ -237,58 +288,47 @@ const FilesApp = {
             .files-search input { flex: 1; border: none; background: none; font-size: 13px; outline: none; }
             .files-search:focus-within { box-shadow: 0 0 0 2px var(--accent); background: var(--bg-tertiary); }
             .files-main { flex: 1; display: flex; overflow: hidden; }
-            .files-sidebar { width: 200px; border-right: 1px solid var(--border-color); padding: 12px 8px; overflow-y: auto; background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(20px) saturate(180%); }
-            .dark-mode .files-sidebar { background: rgba(32, 32, 32, 0.5); }
-            .blur-disabled .files-sidebar { backdrop-filter: none; background: rgba(255, 255, 255, 0.95); }
-            .dark-mode.blur-disabled .files-sidebar { background: rgba(32, 32, 32, 0.95); }
-            .sidebar-section { margin-bottom: 16px; }
-            .sidebar-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 8px 12px; }
-            .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; transition: background var(--transition-fast); }
-            .sidebar-item:hover { background: rgba(0, 0, 0, 0.05); }
-            .sidebar-item img { width: 16px; height: 16px; }
-            .sidebar-item span { font-size: 13px; }
-            .files-sidebar-count { display: none; }
-            body.fluent-v2 .files-sidebar-count { display: block; }
             .files-content { flex: 1; overflow-y: auto; padding: 16px; position: relative; }
             .files-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; }
             .file-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px; border-radius: var(--radius-md); cursor: pointer; transition: background var(--transition-fast); }
             .file-item:hover { background: rgba(0, 0, 0, 0.05); }
             .file-item.selected { background: var(--accent); color: white; }
             .file-item img { width: 48px; height: 48px; }
+            .file-item-image-preview { width: 64px !important; height: 64px !important; border-radius: 12px; object-fit: cover; box-shadow: 0 8px 22px rgba(0,0,0,0.14); background: rgba(0,0,0,0.08); }
+            .file-item.selected .file-item-image-preview { box-shadow: 0 8px 22px rgba(0,0,0,0.22); }
             .file-item span { font-size: 13px; text-align: center; word-break: break-word; }
             .files-statusbar { padding: 8px 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary); background: var(--bg-tertiary); }
             .dark-mode .toolbar-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .breadcrumb-item:hover { background: rgba(255, 255, 255, 0.1); }
-            .dark-mode .sidebar-item:hover { background: rgba(255, 255, 255, 0.1); }
             .dark-mode .file-item:hover { background: rgba(255, 255, 255, 0.1); }
             
             /* V2 新版外观选中样式 - 圆角浅蓝高亮 */
             body.fluent-v2 .file-item.selected { 
-                background: rgba(0, 120, 212, 0.25) !important; 
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.25) !important;
                 color: inherit !important;
                 border-radius: 12px !important;
             }
             body.fluent-v2 .file-item.selected:hover { 
-                background: rgba(0, 120, 212, 0.35) !important; 
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.35) !important;
             }
             body.fluent-v2.dark-mode .file-item.selected { 
-                background: rgba(100, 180, 255, 0.3) !important; 
+                background: rgba(var(--accent-rgb, 100, 180, 255), 0.3) !important;
                 color: inherit !important;
             }
             body.fluent-v2.dark-mode .file-item.selected:hover { 
-                background: rgba(100, 180, 255, 0.4) !important; 
+                background: rgba(var(--accent-rgb, 100, 180, 255), 0.4) !important;
             }
             
             /* 拖拽放置区域样式 */
             .files-content.drag-over {
-                background: rgba(0, 120, 212, 0.1);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
                 border: 2px dashed var(--accent);
                 border-radius: 8px;
             }
 
             /* 文件夹条目作为放置目标 */
             .file-item.drag-over {
-                background: rgba(0, 120, 212, 0.12);
+                background: rgba(var(--accent-rgb, 0, 120, 212), 0.12);
                 outline: 2px dashed var(--accent);
                 outline-offset: 2px;
             }
@@ -308,14 +348,6 @@ const FilesApp = {
         // 后退/前进
         document.getElementById('files-back')?.addEventListener('click', () => this.goBack());
         document.getElementById('files-forward')?.addEventListener('click', () => this.goForward());
-
-        // 侧边栏项目
-        this.container.querySelectorAll('.sidebar-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.id;
-                this.navigateToId(id);
-            });
-        });
 
         // 将右键菜单移到 body，避免在窗口 transform/overflow 下错位或被裁剪
         const externalMenu = document.getElementById(`${this.windowId}-files-context-menu`);
@@ -830,7 +862,7 @@ const FilesApp = {
         FluentUI.InputDialog({
             title: t('files.rename-title'),
             placeholder: t('files.rename-placeholder'),
-            defaultValue: node.name,
+            defaultValue: node.type === 'file' ? splitFileExt(node.name).base : node.name,
             validateFn: (value) => {
                 if (!value) return t('files.rename-empty');
                 if (value.includes('/') || value.includes('\\')) return t('files.rename-invalid');
@@ -843,6 +875,14 @@ const FilesApp = {
                 }
 
                 const oldParts = splitFileExt(node.name);
+                if (oldParts.hasExt) {
+                    const oldSuffix = `.${oldParts.ext}`;
+                    let visibleName = String(newName || '').trim();
+                    if (visibleName.toLowerCase().endsWith(oldSuffix.toLowerCase())) {
+                        visibleName = visibleName.slice(0, -oldSuffix.length);
+                    }
+                    newName = `${visibleName || oldParts.base}${oldSuffix}`;
+                }
                 const newParts = splitFileExt(newName);
                 const isExecutableExt = (ext) => this.EXECUTABLE_EXTENSIONS.includes(String(ext || '').toLowerCase());
 
@@ -899,7 +939,78 @@ const FilesApp = {
         });
     },
 
-    moveToRecycle(id) {
+    collectFileIdsForNodes(nodeIds) {
+        const fileIds = new Set();
+        const visit = (node) => {
+            if (!node) return;
+            if (node.type === 'file') fileIds.add(node.id);
+            if (Array.isArray(node.children)) node.children.forEach(visit);
+        };
+        Array.from(nodeIds || []).forEach((id) => visit(State.findNode(id)));
+        return [...fileIds];
+    },
+
+    getOpenFileBlockers(nodeIds) {
+        if (typeof WindowManager === 'undefined') return [];
+        const fileIds = this.collectFileIdsForNodes(nodeIds);
+        if (!fileIds.length) return [];
+        return (WindowManager.windows || []).filter((windowData) => {
+            if (!windowData || !windowData.element || windowData.element.classList.contains('closing')) return false;
+            const config = WindowManager.appConfigs?.[windowData.appId];
+            const component = config?.component ? globalThis[config.component] : null;
+            return component && typeof component.isFileOpen === 'function'
+                && fileIds.some((fileId) => component.isFileOpen(fileId));
+        }).map((windowData) => ({
+            windowData,
+            component: globalThis[WindowManager.appConfigs?.[windowData.appId]?.component],
+            appName: WindowManager.getAppConfig(windowData.appId)?.title || windowData.appId,
+            fileIds
+        }));
+    },
+
+    async ensureNodesCanBeDeleted(nodeIds) {
+        const blockers = this.getOpenFileBlockers(nodeIds);
+        if (!blockers.length) return true;
+        const fileIds = this.collectFileIdsForNodes(nodeIds);
+        const fileNames = fileIds
+            .map((id) => State.findNode(id)?.name)
+            .filter(Boolean);
+        const shownNames = fileNames.length > 2
+            ? `${fileNames.slice(0, 2).join('、')} 等 ${fileNames.length} 个文件`
+            : fileNames.join('、');
+        const appNames = [...new Set(blockers.map((item) => item.appName))].join('、');
+        const escapeDialogText = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+
+        const choice = await new Promise((resolve) => {
+            FluentUI.Dialog({
+                type: 'warning',
+                title: t('files.in-use-title'),
+                content: t('files.in-use-content', {
+                    name: escapeDialogText(shownNames),
+                    apps: escapeDialogText(appNames)
+                }),
+                buttons: [
+                    { text: t('cancel'), variant: 'secondary', value: 'cancel' },
+                    { text: t('files.close-delete'), variant: 'danger', value: 'close-delete' }
+                ],
+                onClose: resolve
+            });
+        });
+        if (choice !== 'close-delete') return false;
+
+        const results = await Promise.all(blockers.map(({ windowData }) =>
+            WindowManager.requestCloseWindow(windowData.id)
+        ));
+        if (results.some((result) => result === false)) return false;
+        blockers.forEach(({ component }) => {
+            if (typeof component?.releaseFiles === 'function') component.releaseFiles(fileIds);
+        });
+        return true;
+    },
+
+    async moveToRecycle(id) {
         const parent = this.currentNode;
         if (!parent || !parent.children) return;
 
@@ -907,6 +1018,7 @@ const FilesApp = {
         if (parent.id === 'root' && this.SYSTEM_ROOT_FOLDERS.includes(id)) {
             return;
         }
+        if (!await this.ensureNodesCanBeDeleted([id])) return;
 
         const idx = parent.children.findIndex(c => c.id === id);
         if (idx === -1) return;
@@ -951,9 +1063,10 @@ const FilesApp = {
         this.renderFileList();
     },
 
-    deleteNodePermanent(id) {
+    async deleteNodePermanent(id) {
         const recycle = State.findNode('recycle');
         if (!recycle || !recycle.children) return;
+        if (!await this.ensureNodesCanBeDeleted([id])) return;
         const idx = recycle.children.findIndex(c => c.id === id);
         if (idx === -1) return;
         recycle.children.splice(idx, 1);
@@ -966,14 +1079,16 @@ const FilesApp = {
         this.renderFileList();
     },
 
-    deleteSelectedPermanent() {
+    async deleteSelectedPermanent() {
         if (this.selectedItems.length === 0) return;
         
         const recycle = State.findNode('recycle');
         if (!recycle || !recycle.children) return;
         
-        const count = this.selectedItems.length;
-        const selectedSet = new Set(this.selectedItems);
+        const selectedIds = this.selectedItems.map((item) => item.dataset.id).filter(Boolean);
+        if (!await this.ensureNodesCanBeDeleted(selectedIds)) return;
+        const count = selectedIds.length;
+        const selectedSet = new Set(selectedIds);
         
         // 使用 filter 删除所有选中的文件
         recycle.children = recycle.children.filter(c => !selectedSet.has(c.id));
@@ -1102,26 +1217,63 @@ const FilesApp = {
     },
 
     updateSidebarActive() {
-        // 更新侧边栏选中状态
-        const sidebar = this.container.querySelector('.fluent-sidebar');
-        if (!sidebar) return;
-        
         // 获取当前路径中的快速访问项目ID
-        const quickAccessIds = ['desktop', 'documents', 'pictures', 'downloads', 'recycle'];
-        const currentId = this.currentPath.find(id => quickAccessIds.includes(id));
-        
+        const currentId = this.getCurrentQuickAccessId();
+        if (this.frame) {
+            this.frame.activeId = currentId;
+        }
+
         // 移除所有 active 状态
-        sidebar.querySelectorAll('.fluent-sidebar-item').forEach(item => {
-            item.classList.remove('active');
+        this.container.querySelectorAll('.fw-nav-item').forEach(item => {
+            const isActive = !!currentId && item.dataset.id === currentId;
+            item.classList.toggle('active', isActive);
+            const icon = item.querySelector('.fw-nav-icon-symbol');
+            if (icon && icon.dataset.iconName && typeof FluentWindow !== 'undefined' && FluentWindow._iconPath) {
+                const iconPath = FluentWindow._iconPath(icon.dataset.iconName, isActive ? 'fill' : 'stroke');
+                icon.style.setProperty(
+                    '--fw-icon-url',
+                    `url("${iconPath}")`
+                );
+                const fallbackImg = item.querySelector('.fw-nav-icon-img');
+                if (fallbackImg) fallbackImg.src = iconPath;
+            }
         });
-        
-        // 添加当前项目的 active 状态
-        if (currentId) {
-            const activeItem = sidebar.querySelector(`.fluent-sidebar-item[data-id="${currentId}"]`);
-            if (activeItem) {
-                activeItem.classList.add('active');
+    },
+
+    isImageNode(node) {
+        if (window.PhotosDataStore && typeof PhotosDataStore.isImageNode === 'function') {
+            return PhotosDataStore.isImageNode(node);
+        }
+        if (!node || node.type !== 'file') return false;
+        const mime = String(node.mime || '').toLowerCase();
+        if (mime.startsWith('image/')) return true;
+        return node.encoding === 'dataurl' && /^data:image\//i.test(String(node.content || ''));
+    },
+
+    getImagePreviewSrc(node) {
+        if (window.PhotosDataStore && typeof PhotosDataStore.peekImageSrc === 'function') {
+            return PhotosDataStore.peekImageSrc(node);
+        }
+        if (window.PhotosDataStore && typeof PhotosDataStore.resolveImageSrc === 'function') {
+            return PhotosDataStore.resolveImageSrc(node, new Set(), { load: false });
+        }
+        if (!node || node.type !== 'file') return '';
+        if (/^data:image\//i.test(String(node.content || ''))) return node.content;
+        if (/^https?:\/\//i.test(String(node.url || node.content || ''))) return node.url || node.content;
+        return '';
+    },
+
+    renderFileIconHTML(node) {
+        if (this.isImageNode(node)) {
+            const preview = this.getImagePreviewSrc(node);
+            if (preview) {
+                return `<img class="file-item-image-preview" src="${preview}" alt="${node.name}">`;
             }
         }
+        const icon = node.type === 'folder'
+            ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
+            : 'Theme/Icon/Symbol_icon/stroke/File.svg';
+        return `<img src="${icon}" alt="${node.name}">`;
     },
 
     renderFileList() {
@@ -1181,12 +1333,8 @@ const FilesApp = {
             item.dataset.id = node.id;
             item.draggable = true;
             
-            const icon = node.type === 'folder' 
-                ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
-                : 'Theme/Icon/Symbol_icon/stroke/File.svg';
-
             item.innerHTML = `
-                <img src="${icon}" alt="${node.name}">
+                ${this.renderFileIconHTML(node)}
                 <span>${node.name}</span>
             `;
             
@@ -1207,6 +1355,16 @@ const FilesApp = {
                     type: node.type,
                     source: 'files'
                 }));
+                if (window.Desktop && typeof Desktop.setFileDragImage === 'function') {
+                    Desktop.setFileDragImage(
+                        e.dataTransfer,
+                        node,
+                        draggingIds.length,
+                        item.querySelector('img'),
+                        e.clientX,
+                        e.clientY
+                    );
+                }
                 draggingIds.forEach((id) => {
                     const itemEl = filesList.querySelector(`.file-item[data-id="${id}"]`);
                     if (itemEl) itemEl.classList.add('dragging');
@@ -1261,11 +1419,6 @@ const FilesApp = {
         const status = document.getElementById('files-status');
         if (status) {
             status.textContent = t('files.items', {count});
-        }
-        // V2模式下更新侧边栏计数
-        const sidebarCount = document.getElementById('files-sidebar-count');
-        if (sidebarCount) {
-            sidebarCount.textContent = t('files.items', {count});
         }
     },
     
@@ -1389,9 +1542,22 @@ const FilesApp = {
     openNodeWithDefaultApp(node) {
         if (!node || node.type !== 'file' || typeof WindowManager === 'undefined') return false;
 
-        // Office 应用已下线，所有文件统一使用记事本打开
-        WindowManager.openApp('notes', { fileId: node.id });
-        return true;
+        if (this.isImageNode(node)) {
+            WindowManager.openApp('photos', { fileId: node.id });
+            return true;
+        }
+
+        // Route imported file types to their system default Apps.
+        const ext = String(node.name || '').split('.').pop().toLowerCase();
+        if (ext === 'mp3') {
+            WindowManager.openApp('media', { fileId: node.id });
+            return true;
+        }
+        if (ext === 'txt' || ext === 'md') {
+            WindowManager.openApp('notes', { fileId: node.id });
+            return true;
+        }
+        return false;
     },
     
     // 选择相关方法
@@ -1637,10 +1803,10 @@ const FilesApp = {
     },
     
     bindKeyboardEvents() {
-        document.addEventListener('keydown', (e) => {
+        if (this._keyHandler) return;
+        this._keyHandler = (e) => {
             // 检查当前窗口是否是文件App
-            const activeWindow = document.querySelector('.window:not(.minimized)');
-            if (!activeWindow || !activeWindow.id.includes(this.windowId)) return;
+            if (!this.windowId || WindowManager.activeWindowId !== this.windowId) return;
 
             const target = e.target;
             const isEditableTarget = target && (
@@ -1698,11 +1864,13 @@ const FilesApp = {
                 e.preventDefault();
                 this.pasteFromClipboard();
             }
-        });
+        };
+        document.addEventListener('keydown', this._keyHandler);
     },
     
-    deleteSelectedItems() {
+    async deleteSelectedItems() {
         if (this.selectedItems.length === 0) return;
+        const selectedIds = this.selectedItems.map((item) => item.dataset.id).filter(Boolean);
         
         // 根级系统文件夹不允许删除
         if (this.currentNode && this.currentNode.id === 'root') {
@@ -1720,11 +1888,11 @@ const FilesApp = {
             return;
         }
         
-        const count = this.selectedItems.length;
+        if (!await this.ensureNodesCanBeDeleted(selectedIds)) return;
+        const count = selectedIds.length;
         
         // 移动所有选中的项到回收站
-        this.selectedItems.forEach(item => {
-            const nodeId = item.dataset.id;
+        selectedIds.forEach(nodeId => {
             const node = State.findNode(nodeId);
             if (!node) return;
             
@@ -1826,15 +1994,12 @@ const FilesApp = {
             item.className = 'file-item';
             item.dataset.id = nodeId;
             
-            const icon = nodeType === 'folder' 
-                ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
-                : 'Theme/Icon/Symbol_icon/stroke/File.svg';
             const nameNode = State.findNode(nodeId);
             const displayName = nameNode ? nameNode.name : nodeId;
             const location = pathToText(path.slice(0, -1));
 
             item.innerHTML = `
-                <img src="${icon}" alt="${displayName}">
+                ${this.renderFileIconHTML(nameNode || { id: nodeId, name: displayName, type: nodeType })}
                 <span>${displayName}</span>
                 <small style="opacity:.7; font-size:11px; margin-top:-4px;">${location}</small>
             `;

@@ -34,6 +34,10 @@ const StartMenu = {
 
         // 监听文件系统变化，实时刷新推荐
         State.on('fsChange', () => this.renderRecent());
+        window.addEventListener('photos-cache-ready', () => {
+            if (typeof this.renderRecentFiles === 'function') this.renderRecentFiles();
+            else this.renderRecent();
+        });
         // 记事本保存等会更新 modified 时间
         State.on('notificationAdd', () => this.renderRecent());
         
@@ -48,20 +52,10 @@ const StartMenu = {
     
     // 更新应用修复状态
     updateAppRepairState(appId, isRepairing) {
-        const appEl = this.element.querySelector(`.start-app[data-app-id="${appId}"]`);
-        if (appEl) {
-            if (isRepairing) {
-                appEl.classList.add('repairing');
-                appEl.style.opacity = '0.4';
-                appEl.style.filter = 'grayscale(100%)';
-                appEl.style.pointerEvents = 'none';
-            } else {
-                appEl.classList.remove('repairing');
-                appEl.style.opacity = '';
-                appEl.style.filter = '';
-                appEl.style.pointerEvents = '';
-            }
-        }
+        this.element.querySelectorAll(`.start-app[data-app-id="${appId}"], .start-all-app-row[data-app-id="${appId}"]`).forEach(appEl => {
+            appEl.classList.toggle('repairing', isRepairing);
+            appEl.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
+        });
     },
     
     updateLanguage() {
@@ -126,6 +120,9 @@ const StartMenu = {
             const appElement = document.createElement('div');
             appElement.className = 'start-app';
             appElement.dataset.appId = app.id;
+            const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
+            appElement.classList.toggle('repairing', repairing);
+            appElement.setAttribute('aria-disabled', repairing ? 'true' : 'false');
             const name = Desktop.getAppName(app);
             appElement.innerHTML = `
                 <img src="${app.icon}" alt="${name}">
@@ -185,31 +182,37 @@ const StartMenu = {
             alipay: 'Z',
             amap: 'G',
             appshop: 'A',
+            audiobook: 'T',
             'baidu-netdisk': 'B',
             bilibili: 'B',
             browser: 'L',
             calculator: 'J',
+            camera: 'X',
             clock: 'S',
             coolapk: 'K',
-            dingding: 'D',
             douyu: 'D',
             'ele-me': 'E',
             files: 'W',
+            geekfa: 'J',
             jd: 'J',
+            jiazhaoba: 'J',
+            kimi: 'K',
             media: 'D',
             meituan: 'M',
             'netease-music': 'W',
             notes: 'J',
-            pdd: 'P',
+            photopea: 'P',
             photos: 'Z',
             'qq-mail': 'Q',
             'qq-music': 'Q',
             settings: 'S',
+            'snake-classic': 'J',
+            solitaire: 'J',
             taobao: 'T',
-            'tencent-video': 'T',
             weather: 'T',
             wecom: 'Q',
-            weibo: 'W'
+            weibo: 'W',
+            whiteboard: 'B'
         };
         if (idInitials[app.id]) return idInitials[app.id];
         const name = Desktop.getAppName(app).trim();
@@ -391,13 +394,14 @@ const StartMenu = {
         return apps.map(app => {
             const name = Desktop.getAppName(app);
             const group = this.getAppGroupKey(app);
+            const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
             const header = grouped && group !== lastGroup
                 ? `<div class="start-app-group">${group}</div>`
                 : '';
             lastGroup = group;
             return `
                 ${header}
-                <div class="start-all-app-row start-app" data-app-id="${app.id}">
+                <div class="start-all-app-row start-app${repairing ? ' repairing' : ''}" data-app-id="${app.id}" aria-disabled="${repairing ? 'true' : 'false'}">
                     <img src="${app.icon}" alt="${name}">
                     <span>${name}</span>
                 </div>
@@ -405,9 +409,29 @@ const StartMenu = {
         }).join('');
     },
 
+    openAppAndClose(appId, data = null) {
+        if (!appId) return false;
+        if (typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId)) {
+            FluentUI.Toast({
+                title: t('start.ctx.app-repairing'),
+                message: t('start.ctx.app-repairing-msg'),
+                type: 'warning'
+            });
+            return false;
+        }
+        WindowManager.openApp(appId, data);
+        this.close();
+        return true;
+    },
     bindEvents() {
+        // 应用图标拖拽 → 固定到桌面（覆盖固定区与全部应用列表）
+        this.element.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
+        // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
+        this.element.addEventListener('dragstart', (e) => e.preventDefault());
+
         // 应用点击
         this.appsGrid.addEventListener('click', (e) => {
+            if (this._appDragging) return; // 拖拽结束后的 click 不触发打开
             const appEl = e.target.closest('.start-app');
             if (appEl) {
                 const appId = appEl.dataset.appId;
@@ -423,8 +447,7 @@ const StartMenu = {
                 }
                 
                 // 直接打开应用（PWA 应用已注册到 WindowManager）
-                WindowManager.openApp(appId);
-                this.close();
+                this.openAppAndClose(appId);
             }
         });
 
@@ -517,6 +540,7 @@ const StartMenu = {
 
         // 点击外部关闭
         this.element.addEventListener('click', (e) => {
+            if (this._appDragging) return; // 拖拽结束后的 click 不触发打开
             const appEl = e.target.closest('.start-all-app-row');
             if (!appEl || this.appsGrid.contains(appEl)) return;
             const appId = appEl.dataset.appId;
@@ -528,8 +552,7 @@ const StartMenu = {
                 });
                 return;
             }
-            WindowManager.openApp(appId);
-            this.close();
+            this.openAppAndClose(appId);
         });
 
         this.element.addEventListener('contextmenu', (e) => {
@@ -572,9 +595,9 @@ const StartMenu = {
                 if (node.type === 'file') {
                     if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
                         const opened = FilesApp.openNodeWithDefaultApp(node);
-                        if (!opened) WindowManager.openApp('notes', { fileId: id });
+                        if (!opened) this.openAppAndClose('notes', { fileId: id });
                     } else {
-                        WindowManager.openApp('notes', { fileId: id });
+                        this.openAppAndClose('notes', { fileId: id });
                     }
                     this.close();
                 } else if (node.type === 'folder') {
@@ -593,14 +616,14 @@ const StartMenu = {
 
     renderRecent() {
         if (!this.recentContainer) return;
-        const list = RecentFiles.getRecentFiles();
+        const list = RecentFiles.getRecentFiles().slice(0, 4);
         if (!list || list.length === 0) {
             this.recentContainer.innerHTML = `<div style="color: var(--text-tertiary); padding: 12px 0;">${t('notification.empty')}</div>`;
             return;
         }
         this.recentContainer.innerHTML = list.map(f => `
             <div class="recent-item" data-id="${f.id}" title="${f.path}" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;cursor:pointer;">
-                <img src="${f.icon}" alt="" style="width:18px;height:18px;opacity:0.9;">
+                <img src="${f.preview || f.icon}" alt="" class="${f.preview ? 'recent-item-thumb' : ''}" style="width:18px;height:18px;opacity:0.9;">
                 <div style="display:flex;flex-direction:column;gap:2px;">
                     <span style="font-size:13px;">${f.name}</span>
                     <span style="font-size:11px;color:var(--text-tertiary);">${RecentFiles.formatTime(f.modified)}</span>
@@ -653,9 +676,9 @@ const StartMenu = {
                     if (node.type === 'file') {
                         if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
                             const opened = FilesApp.openNodeWithDefaultApp(node);
-                            if (!opened) WindowManager.openApp('notes', { fileId: id });
+                            if (!opened) this.openAppAndClose('notes', { fileId: id });
                         } else {
-                            WindowManager.openApp('notes', { fileId: id });
+                            this.openAppAndClose('notes', { fileId: id });
                         }
                         this.close();
                     } else if (node.type === 'folder') {
@@ -733,6 +756,58 @@ const StartMenu = {
                     break;
             }
         };
+    },
+
+    /**
+     * 开始菜单 App 图标的拖拽：超过阈值后菜单自动收起、
+     * 幽灵图标跟随鼠标，松手落在桌面区域时创建桌面快捷方式。
+     */
+    _onAppPointerDown(e) {
+        if (typeof e.button === 'number' && e.button !== 0) return;
+        const appEl = e.target.closest('.start-app');
+        if (!appEl || !appEl.dataset.appId) return;
+        // 阻止图标 img / 文字的原生拖拽与选区拖拽（click 不受影响）
+        e.preventDefault();
+        const appId = appEl.dataset.appId;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        let ghost = null;
+        let dragging = false;
+
+        const onMove = (ev) => {
+            if (!dragging) {
+                if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 10) return;
+                dragging = true;
+                this._appDragging = true;
+                // 收起开始菜单，露出桌面便于放置
+                this.close();
+                const app = Desktop.apps.find(a => a.id === appId);
+                ghost = document.createElement('div');
+                ghost.className = 'taskbar-drag-ghost';
+                ghost.innerHTML = `<img src="${app ? app.icon : ''}" alt="">`;
+                document.body.appendChild(ghost);
+            }
+            ghost.style.left = `${ev.clientX}px`;
+            ghost.style.top = `${ev.clientY}px`;
+            ghost.classList.toggle('droppable', Taskbar._isDesktopDropPoint(ev.clientX, ev.clientY));
+        };
+
+        const onUp = (ev) => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
+            if (!dragging) return;
+            if (ghost) ghost.remove();
+            if (ev.type === 'pointerup' && Taskbar._isDesktopDropPoint(ev.clientX, ev.clientY)) {
+                Desktop.addAppShortcut(appId);
+            }
+            // click 事件在 pointerup 之后同步派发，再之后才轮到定时器
+            setTimeout(() => { this._appDragging = false; }, 0);
+        };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
     },
 
     toggle() {
@@ -868,7 +943,7 @@ const StartMenu = {
     },
 
     // 系统内置应用列表（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'photos', 'media'],
+    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
     
     showAppContextMenu(event, appId) {
         const app = Desktop.apps.find(a => a.id === appId);
@@ -985,14 +1060,7 @@ const StartMenu = {
     handleAppContextMenuAction(action, appId) {
         switch (action) {
             case 'open':
-                // 检查是否是 PWA 应用
-                const appInfo = Desktop.apps.find(a => a.id === appId);
-                if (appInfo && appInfo.isPWA && appInfo.url) {
-                    WindowManager.openApp(appId);
-                } else {
-                    WindowManager.openApp(appId);
-                }
-                this.close();
+                this.openAppAndClose(appId);
                 break;
             case 'pin-start':
                 this.pinToStart(appId);

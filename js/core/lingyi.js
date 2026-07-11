@@ -14,6 +14,13 @@ const LingYi = {
     // 状态
     enabled: false,
     initialized: false,
+    debug: false,
+
+    log(...args) {
+        const debugEnabled = this.debug === true ||
+            (typeof State !== 'undefined' && State.settings && State.settings.debugModeEnabled === true);
+        if (debugEnabled) console.log(...args);
+    },
     
     // MediaPipe Hands 实例
     hands: null,
@@ -118,7 +125,7 @@ const LingYi = {
     async init() {
         if (this.initialized) return;
         
-        console.log('[LingYi] 初始化灵翼交互系统...');
+        this.log('[LingYi] 初始化灵翼交互系统...');
         
         // 创建必要的 DOM 元素
         this.createElements();
@@ -127,7 +134,7 @@ const LingYi = {
         try {
             await this.loadMediaPipe();
             this.initialized = true;
-            console.log('[LingYi] 初始化完成');
+            this.log('[LingYi] 初始化完成');
         } catch (error) {
             console.error('[LingYi] 初始化失败:', error);
             throw error;
@@ -283,7 +290,7 @@ const LingYi = {
         
         if (this.enabled) return;
         
-        console.log('[LingYi] 启动手势识别...');
+        this.log('[LingYi] 启动手势识别...');
         
         try {
             // 启动摄像头
@@ -310,7 +317,7 @@ const LingYi = {
             // 触发状态更新
             State.updateSettings({ lingyiEnabled: true });
             
-            console.log('[LingYi] 手势识别已启动');
+            this.log('[LingYi] 手势识别已启动');
             
         } catch (error) {
             console.error('[LingYi] 启动失败:', error);
@@ -329,7 +336,7 @@ const LingYi = {
     stop() {
         if (!this.enabled) return;
         
-        console.log('[LingYi] 停止手势识别...');
+        this.log('[LingYi] 停止手势识别...');
         
         // 停止摄像头
         if (this.camera) {
@@ -352,7 +359,7 @@ const LingYi = {
         // 触发状态更新
         State.updateSettings({ lingyiEnabled: false });
         
-        console.log('[LingYi] 手势识别已停止');
+        this.log('[LingYi] 手势识别已停止');
     },
     
     /**
@@ -743,7 +750,7 @@ const LingYi = {
      * 握拳开始 - 开始拖动置顶窗口
      */
     onFistStart() {
-        console.log('[LingYi] 握拳开始 - 准备拖动窗口');
+        this.log('[LingYi] 握拳开始 - 准备拖动窗口');
 
         // 找到当前置顶的窗口（z-index 最高的非最小化窗口）
         const windows = document.querySelectorAll('.window:not(.minimized):not(.closing)');
@@ -813,7 +820,7 @@ const LingYi = {
      * 握拳结束 - 停止拖动窗口
      */
     onFistEnd() {
-        console.log('[LingYi] 握拳结束 - 停止拖动窗口');
+        this.log('[LingYi] 握拳结束 - 停止拖动窗口');
 
         if (this.fistDragState.targetWindow) {
             this.fistDragState.targetWindow.classList.remove('fist-dragging');
@@ -835,7 +842,7 @@ const LingYi = {
      * 捏合开始（左键单击）
      */
     onPinchStart() {
-        console.log('[LingYi] 捏合开始 (左键)');
+        this.log('[LingYi] 捏合开始 (左键)');
         
         // 触发波纹效果
         this.showRipple();
@@ -869,7 +876,7 @@ const LingYi = {
      * 捏合结束
      */
     onPinchEnd() {
-        console.log('[LingYi] 捏合结束');
+        this.log('[LingYi] 捏合结束');
         
         // 结束窗口调节
         if (this.resizeState.isResizing) {
@@ -881,7 +888,7 @@ const LingYi = {
      * 三指闭合开始（右键单击）
      */
     onThreeFingerStart() {
-        console.log('[LingYi] 三指闭合 (右键)');
+        this.log('[LingYi] 三指闭合 (右键)');
         
         // 触发不同颜色的波纹效果
         this.showRipple('right');
@@ -965,7 +972,7 @@ const LingYi = {
      * @param {string} button - 'left' 或 'right'
      */
     triggerClick(element, button = 'left') {
-        console.log('[LingYi] 触发点击:', element, button);
+        this.log('[LingYi] 触发点击:', element, button);
         
         if (button === 'left') {
             // 创建并分发左键点击事件
@@ -1005,7 +1012,7 @@ const LingYi = {
         const win = this.resizeState.targetWindow;
         if (!win) return;
         
-        console.log('[LingYi] 开始调节窗口大小');
+        this.log('[LingYi] 开始调节窗口大小');
         
         this.resizeState.isResizing = true;
         this.resizeState.startPos = { ...this.gesture.smoothPos };
@@ -1090,7 +1097,7 @@ const LingYi = {
         
         this.cursorElement.classList.remove('active-resize');
         
-        console.log('[LingYi] 窗口调节结束');
+        this.log('[LingYi] 窗口调节结束');
     },
     
     /**
