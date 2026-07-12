@@ -13,10 +13,12 @@ const ClockApp = {
     timerRemaining: 0,
     timerTotal: 0,
     timerInterval: null,
+    timerEndTime: null,
     
     // 秒表状态
     stopwatchTime: 0,
     stopwatchInterval: null,
+    stopwatchStartedAt: null,
     stopwatchLaps: [],
     
     // 世界时钟城市列表
@@ -265,10 +267,11 @@ const ClockApp = {
     },
 
     renderTimer() {
-        const hours = Math.floor(this.timerRemaining / 3600);
-        const minutes = Math.floor((this.timerRemaining % 3600) / 60);
-        const seconds = this.timerRemaining % 60;
-        const progress = this.timerTotal > 0 ? ((this.timerTotal - this.timerRemaining) / this.timerTotal) * 100 : 0;
+        const remaining = Math.max(0, Number.isFinite(this.timerRemaining) ? this.timerRemaining : 0);
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        const progress = this.timerTotal > 0 ? Math.min(100, Math.max(0, ((this.timerTotal - remaining) / this.timerTotal) * 100)) : 0;
 
         return `
             <div class="timer-display">${this.formatTime(hours, minutes, seconds)}</div>
@@ -323,8 +326,9 @@ const ClockApp = {
     },
 
     renderStopwatch() {
-        const ms = this.stopwatchTime % 1000;
-        const totalSeconds = Math.floor(this.stopwatchTime / 1000);
+        const elapsed = Math.max(0, Number.isFinite(this.stopwatchTime) ? this.stopwatchTime : 0);
+        const ms = elapsed % 1000;
+        const totalSeconds = Math.floor(elapsed / 1000);
         const seconds = totalSeconds % 60;
         const minutes = Math.floor(totalSeconds / 60) % 60;
         const hours = Math.floor(totalSeconds / 3600);
@@ -591,27 +595,38 @@ const ClockApp = {
 
     // 倒计时方法
     startTimer() {
+        if (this.timerInterval !== null) return;
         this.clearTimerNotification();
-        if (this.timerRemaining === 0) {
-            const hours = parseInt(document.getElementById('timer-hours').value) || 0;
-            const minutes = parseInt(document.getElementById('timer-minutes').value) || 0;
-            const seconds = parseInt(document.getElementById('timer-seconds').value) || 0;
+        this.timerRemaining = Math.max(0, Number.isFinite(this.timerRemaining) ? this.timerRemaining : 0);
+        if (this.timerRemaining <= 0) {
+            const getInputValue = (id, max) => {
+                const value = Number.parseInt(this.container?.querySelector(`#${id}`)?.value, 10);
+                return Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : 0;
+            };
+            const hours = getInputValue('timer-hours', 23);
+            const minutes = getInputValue('timer-minutes', 59);
+            const seconds = getInputValue('timer-seconds', 59);
             
             this.timerRemaining = hours * 3600 + minutes * 60 + seconds;
             this.timerTotal = this.timerRemaining;
             
-            if (this.timerRemaining === 0) return;
+            if (this.timerRemaining <= 0) return;
         }
-        
+
+        this.timerRemaining = Math.max(0, this.timerRemaining);
+        this.timerEndTime = Date.now() + this.timerRemaining * 1000;
         this.timerInterval = setInterval(() => {
-            this.timerRemaining--;
+            this.timerRemaining = Math.max(0, Math.ceil((this.timerEndTime - Date.now()) / 1000));
             this.updateTimerDisplay();
-            
-            if (this.timerRemaining <= 0) {
-                this.pauseTimer();
+
+            if (this.timerRemaining === 0) {
+                clearInterval(this.timerInterval);
+                this.timerInterval = null;
+                this.timerEndTime = null;
+                this.render();
                 this.timerCompleted();
             }
-        }, 1000);
+        }, 250);
         
         this.render();
     },
@@ -619,12 +634,17 @@ const ClockApp = {
     pauseTimer() {
         clearInterval(this.timerInterval);
         this.timerInterval = null;
+        if (this.timerEndTime !== null) {
+            this.timerRemaining = Math.max(0, Math.ceil((this.timerEndTime - Date.now()) / 1000));
+        }
+        this.timerEndTime = null;
         this.render();
     },
 
     resetTimer() {
         clearInterval(this.timerInterval);
         this.timerInterval = null;
+        this.timerEndTime = null;
         this.timerRemaining = 0;
         this.timerTotal = 0;
         this.clearTimerNotification();
@@ -632,13 +652,14 @@ const ClockApp = {
     },
 
     updateTimerDisplay() {
-        const hours = Math.floor(this.timerRemaining / 3600);
-        const minutes = Math.floor((this.timerRemaining % 3600) / 60);
-        const seconds = this.timerRemaining % 60;
-        const progress = this.timerTotal > 0 ? ((this.timerTotal - this.timerRemaining) / this.timerTotal) * 100 : 0;
+        const remaining = Math.max(0, Number.isFinite(this.timerRemaining) ? this.timerRemaining : 0);
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        const progress = this.timerTotal > 0 ? Math.min(100, Math.max(0, ((this.timerTotal - remaining) / this.timerTotal) * 100)) : 0;
         
-        const display = document.querySelector('.timer-display');
-        const progressBar = document.querySelector('.timer-progress-bar');
+        const display = this.container?.querySelector('.timer-display');
+        const progressBar = this.container?.querySelector('.timer-progress-bar');
         
         if (display) display.textContent = this.formatTime(hours, minutes, seconds);
         if (progressBar) progressBar.style.width = progress + '%';
@@ -668,9 +689,11 @@ const ClockApp = {
 
     // 秒表方法
     startStopwatch() {
-        if (this.stopwatchInterval) return;
+        if (this.stopwatchInterval !== null) return;
+        this.stopwatchTime = Math.max(0, Number.isFinite(this.stopwatchTime) ? this.stopwatchTime : 0);
+        this.stopwatchStartedAt = Date.now() - this.stopwatchTime;
         this.stopwatchInterval = setInterval(() => {
-            this.stopwatchTime += 10;
+            this.stopwatchTime = Math.max(0, Date.now() - this.stopwatchStartedAt);
             this.updateStopwatchDisplay();
         }, 10);
         this.render();
@@ -679,12 +702,17 @@ const ClockApp = {
     pauseStopwatch() {
         clearInterval(this.stopwatchInterval);
         this.stopwatchInterval = null;
+        if (this.stopwatchStartedAt !== null) {
+            this.stopwatchTime = Math.max(0, Date.now() - this.stopwatchStartedAt);
+        }
+        this.stopwatchStartedAt = null;
         this.render();
     },
 
     resetStopwatch() {
         clearInterval(this.stopwatchInterval);
         this.stopwatchInterval = null;
+        this.stopwatchStartedAt = null;
         this.stopwatchTime = 0;
         this.stopwatchLaps = [];
         this.render();
@@ -702,7 +730,7 @@ const ClockApp = {
         const minutes = Math.floor(totalSeconds / 60) % 60;
         const hours = Math.floor(totalSeconds / 3600);
         
-        const display = document.querySelector('.stopwatch-display');
+        const display = this.container?.querySelector('.stopwatch-display');
         if (display) {
             display.textContent = `${this.formatTime(hours, minutes, seconds)}.${String(Math.floor(ms / 10)).padStart(2, '0')}`;
         }
@@ -1026,6 +1054,7 @@ const ClockApp = {
     },
 
     formatStopwatchTime(ms) {
+        ms = Math.max(0, Number.isFinite(ms) ? ms : 0);
         const totalSeconds = Math.floor(ms / 1000);
         const seconds = totalSeconds % 60;
         const minutes = Math.floor(totalSeconds / 60) % 60;

@@ -11,9 +11,12 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-12', version: '2.1.0712', commits: [
+            { hash: 'local', title: '紧急修复计时器的意外奔溃BUG' }
+        ] },
         { date: '2026-07-10', version: '2.0.260710', commits: [
-            { hash: 'local', title: '大幅度提升系统稳定性，对多媒体、照片、小组件等多项功能和App针对性优化，并完善了从外部导入文件的逻辑，优化了桌面交互动画，修复了再某些情况下壁纸会丢失的BUG' },
-            { hash: 'local', title: '完成系统版本号发布前最后的迭代，补充了更新日志的细节' }
+            { hash: '5ea6284', title: '大幅度提升系统稳定性，对多媒体、照片、小组件等多项功能和App针对性优化，并完善了从外部导入文件的逻辑，优化了桌面交互动画，修复了再某些情况下壁纸会丢失的BUG' },
+            { hash: 'd1f013d', title: '完成系统版本号发布前最后的迭代，补充了更新日志的细节' }
         ] },
         { date: '2026-07-06', version: '2.0.260706', commits: [
             { hash: '112ae34', title: '优化 OOBE 视觉效果，新增“大功告成”完成页、交互式粒子动画与非线性桌面过渡' },
