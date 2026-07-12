@@ -311,20 +311,18 @@ const BootScreen = {
             'Theme/Picture/Fluent-3.jpg',
             'Theme/Picture/Fluent-4.jpg',
             'Theme/Picture/Fluent-5.png',
-            'Theme/Picture/Fluent-6.jpg',
-            'Theme/Picture/Fluent-7.png',
-            'Theme/Picture/Fluent-8.png'
+            'Theme/Picture/Fluent-6.jpg'
         ]);
 
         const profileAvatarDefaults = [
-            'Theme/Profile_img/UserAva.png',
+            'Theme/Profile_img/UserAva.jpg',
             ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
         ];
         const normalizedUserAvatar = (typeof State !== 'undefined' && typeof State.normalizeUserAvatar === 'function')
             ? State.normalizeUserAvatar(settings.userAvatar)
-            : (settings.userAvatar || 'Theme/Profile_img/UserAva.png');
+            : (settings.userAvatar || 'Theme/Profile_img/UserAva.jpg');
         const avatars = this._uniqAssets([
-            normalizedUserAvatar || 'Theme/Profile_img/UserAva.png',
+            normalizedUserAvatar || 'Theme/Profile_img/UserAva.jpg',
             ...profileAvatarDefaults
         ]);
 
@@ -365,8 +363,8 @@ const BootScreen = {
             `Theme/Preload/OOBE/wallpapers/Fluent-${i + 1}.jpg`
         );
         const avatars = [
-            'Theme/Preload/OOBE/avatars/UserAva.jpg',
-            ...Array.from({ length: 10 }, (_, i) => `Theme/Preload/OOBE/avatars/${i + 1}.jpg`)
+            'Theme/Profile_img/UserAva.jpg',
+            ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
         ];
         const illustrations = this._uniqAssets(
             Array.from(document.querySelectorAll('img[src^="Theme/illustrations/"]'))
@@ -401,8 +399,30 @@ const BootScreen = {
     },
 
     getOobeAvatarPreview(src) {
-        const match = String(src || '').match(/^Theme\/Profile_img\/(UserAva|[1-9]|10)\.(?:png|jpe?g)$/i);
-        return match ? `Theme/Preload/OOBE/avatars/${match[1]}.jpg` : src;
+        return src;
+    },
+
+    _buildTipsImageAssets() {
+        return this._uniqAssets([
+            'Theme/Preload/Tips/wallpaper.png',
+            'Theme/Preload/Tips/theme.png',
+            'Theme/Preload/Tips/accent.png',
+            'Theme/Preload/Tips/profile.png',
+            'Theme/Preload/Tips/password.png',
+            'Theme/Preload/Tips/snap.png',
+            'Theme/Preload/Tips/new_features/widgets.png',
+            'Theme/Preload/Tips/new_features/new_icons.png',
+            'Theme/Preload/Tips/new_features/design.png',
+            'Theme/Preload/Tips/new_features/app_shop.png',
+            'Theme/Preload/Tips/new_features/productivity.png',
+            'Theme/Preload/Tips/new_features/weather.png',
+            'Theme/Preload/Tips/new_features/quick_note.png',
+            'Theme/Preload/Tips/new_features/notes_example.png',
+            'Theme/Preload/Tips/new_features/camera.png',
+            'Theme/Preload/Tips/new_features/photo.png',
+            'Theme/Preload/Tips/new_features/music.png',
+            'Theme/Preload/Tips/new_features/playing_music.png'
+        ]);
     },
 
     _buildOobeDeferredAssets() {
@@ -416,10 +436,10 @@ const BootScreen = {
         return {
             desktopWallpapers: pack.desktopWallpapers,
             icons: pack.icons.filter((src) => !essentialIcons.has(src)),
-            aiScripts
+            aiScripts,
+            tipsImages: this._buildTipsImageAssets()
         };
     },
-
     async _getResourceCache() {
         if (!('caches' in window)) return null;
         if (!this._assetCache) {
@@ -768,8 +788,12 @@ const BootScreen = {
         await this._preloadOobeSupplementalResources();
         await this._preloadGroup(pack.icons, 8);             // OOBE 中继续加载其余图标
         await this._preloadGroup(pack.aiScripts, 2);         // OOBE 中缓存 AI 组件脚本
-    },
 
+        // Tips follows every higher-priority OOBE resource immediately. Cache and
+        // decode the images now so opening Tips never waits for its first render.
+        await this._preloadGroup(pack.tipsImages, 6);
+        await this._warmRenderGroup(pack.tipsImages, 3);
+    },
     fadeToLock() {
         const shouldGoOobe = typeof OOBE !== 'undefined'
             && typeof OOBE.shouldShowOnFirstLaunch === 'function'

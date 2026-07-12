@@ -1504,7 +1504,7 @@ const ResourceMonitor = {
 };
 
 window.FluentOS = {
-    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.1.0712',
+    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.1.260712',
     State,
     Storage,
     notify,

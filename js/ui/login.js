@@ -94,7 +94,7 @@ const LoginScreen = {
         const fallbackEmail = (I18n && typeof I18n.t === 'function') ? I18n.t('login.email') : 'owner@sample.com';
         const name = String(State?.settings?.userName || '').trim() || fallbackName;
         const email = String(State?.settings?.userEmail || '').trim() || fallbackEmail;
-        const avatar = String(State?.settings?.userAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+        const avatar = String(State?.settings?.userAvatar || '').trim() || 'Theme/Profile_img/UserAva.jpg';
         return { name, email, avatar };
     },
 
@@ -105,7 +105,7 @@ const LoginScreen = {
         if (this.avatarElement) {
             this.avatarElement.onerror = () => {
                 this.avatarElement.onerror = null;
-                this.avatarElement.src = 'Theme/Profile_img/UserAva.png';
+                this.avatarElement.src = 'Theme/Profile_img/UserAva.jpg';
             };
             this.avatarElement.src = profile.avatar;
         }

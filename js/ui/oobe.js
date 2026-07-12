@@ -35,7 +35,7 @@ const OOBE = {
     selectedFingoMode: 'local',
     selectedUserName: '',
     selectedUserEmail: '',
-    selectedUserAvatar: 'Theme/Profile_img/UserAva.png',
+    selectedUserAvatar: 'Theme/Profile_img/UserAva.jpg',
     wallpaperHighResPromises: new Map(),
     selectedWallpaperHighResPromise: null,
     avatarThumbCache: null,
@@ -792,7 +792,7 @@ const OOBE = {
 
     _getUserAvatarOptions() {
         return [
-            'Theme/Profile_img/UserAva.png',
+            'Theme/Profile_img/UserAva.jpg',
             ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
         ];
     },
@@ -939,7 +939,7 @@ const OOBE = {
 
     _syncLockPreviewProfile() {
         const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
-        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.jpg';
         const previewAvatarSrc = this._getAvatarThumbSrc(avatar, avatar);
         const name = String(this.selectedUserName || '').trim() || fallbackName;
         const email = String(this.selectedUserEmail || '').trim() || fallbackEmail;
@@ -953,7 +953,7 @@ const OOBE = {
         this.element.querySelectorAll('.oobe-lock-preview-avatar').forEach((img) => {
             img.onerror = () => {
                 img.onerror = null;
-                img.src = 'Theme/Profile_img/UserAva.png';
+                img.src = 'Theme/Profile_img/UserAva.jpg';
             };
             img.src = previewAvatarSrc;
         });
@@ -1471,7 +1471,7 @@ const OOBE = {
 
         if (this.userAvatarResetBtnEl) {
             this.userAvatarResetBtnEl.addEventListener('click', () => {
-                this.selectedUserAvatar = 'Theme/Profile_img/UserAva.png';
+                this.selectedUserAvatar = 'Theme/Profile_img/UserAva.jpg';
                 this._renderUserAvatarGrid();
                 this._syncLockPreviewProfile();
             });
@@ -2210,7 +2210,7 @@ const OOBE = {
         const { fallbackName, fallbackEmail } = this._getProfileFallbacks();
         const name = String(this.selectedUserName || '').trim();
         const email = String(this.selectedUserEmail || '').trim();
-        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.png';
+        const avatar = String(this.selectedUserAvatar || '').trim() || 'Theme/Profile_img/UserAva.jpg';
 
         const updates = {
             theme: this.selectedTheme,

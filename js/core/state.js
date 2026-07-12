@@ -162,7 +162,7 @@ const State = {
     },
 
     getDefaultUserAvatar() {
-        return 'Theme/Profile_img/UserAva.png';
+        return 'Theme/Profile_img/UserAva.jpg';
     },
 
     getBuiltInUserAvatars() {
@@ -196,10 +196,13 @@ const State = {
 
         if (
             lower === 'userava.png'
+            || lower === 'userava.jpg'
             || lower === 'theme/icon/userava.png'
             || lower === 'icon/userava.png'
             || lower === 'profile_img/userava.png'
             || lower === 'theme/profile_img/userava.png'
+            || lower === 'profile_img/userava.jpg'
+            || lower === 'theme/profile_img/userava.jpg'
         ) {
             return fallback;
         }

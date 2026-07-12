@@ -146,7 +146,7 @@ const Storage = {
                 pin: '1234',
                 userName: 'Owner',
                 userEmail: 'owner@sample.com',
-                userAvatar: 'Theme/Profile_img/UserAva.png',
+                userAvatar: 'Theme/Profile_img/UserAva.jpg',
                 language: 'zh',
                 volume: 50,
                 brightness: 100,

@@ -11,8 +11,9 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
-        { date: '2026-07-12', version: '2.1.0712', commits: [
-            { hash: 'local', title: '紧急修复计时器的意外奔溃BUG' }
+        { date: '2026-07-12', version: '2.1.260712', commits: [
+            { hash: 'local', title: '完成对系统瘦身优化工作，删除大量不必要的重复组件' },
+            { hash: '6decb2e', title: '紧急修复计时器的意外奔溃BUG' }
         ] },
         { date: '2026-07-10', version: '2.0.260710', commits: [
             { hash: '5ea6284', title: '大幅度提升系统稳定性，对多媒体、照片、小组件等多项功能和App针对性优化，并完善了从外部导入文件的逻辑，优化了桌面交互动画，修复了再某些情况下壁纸会丢失的BUG' },
@@ -2595,7 +2596,7 @@ const SettingsApp = {
     
     getUserAvatarOptions() {
         return [
-            'Theme/Profile_img/UserAva.png',
+            'Theme/Profile_img/UserAva.jpg',
             ...Array.from({ length: 10 }, (_, i) => `Theme/Profile_img/${i + 1}.jpg`)
         ];
     },
@@ -2869,7 +2870,7 @@ const SettingsApp = {
             text: t('settings.user.restore-avatar'),
             variant: 'secondary',
             onClick: () => {
-                State.updateSettings({ userAvatar: 'Theme/Profile_img/UserAva.png' });
+                State.updateSettings({ userAvatar: 'Theme/Profile_img/UserAva.jpg' });
                 this.addRecentSetting(
                     t('settings.user.recent-avatar'),
                     t('settings.user.recent-avatar-default'),
