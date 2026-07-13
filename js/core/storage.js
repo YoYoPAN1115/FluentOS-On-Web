@@ -120,6 +120,134 @@ const Storage = {
         }
     },
 
+    async _closeKnownDatabaseConnections() {
+        const stores = [globalThis.WallpaperStore, globalThis.PhotosDataStore].filter(Boolean);
+        await Promise.all(stores.map(async (store) => {
+            try {
+                const db = await store._dbPromise;
+                if (db && typeof db.close === 'function') db.close();
+            } catch (_) {}
+            store._dbPromise = null;
+        }));
+        try {
+            globalThis.WallpaperStore?._objectUrls?.forEach?.((url) => URL.revokeObjectURL(url));
+            globalThis.WallpaperStore?._objectUrls?.clear?.();
+            globalThis.PhotosDataStore?._blobUrls?.forEach?.((url) => URL.revokeObjectURL(url));
+            globalThis.PhotosDataStore?._blobUrls?.clear?.();
+        } catch (_) {}
+    },
+
+    _deleteDatabase(name) {
+        return new Promise((resolve, reject) => {
+            if (!name || typeof indexedDB === 'undefined') {
+                resolve();
+                return;
+            }
+            let settled = false;
+            const finish = (error = null) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                if (error) reject(error);
+                else resolve();
+            };
+            const timeout = setTimeout(() => finish(new Error(`indexeddb_delete_timeout:${name}`)), 5000);
+            try {
+                const request = indexedDB.deleteDatabase(name);
+                request.onsuccess = () => finish();
+                request.onerror = () => finish(request.error || new Error(`indexeddb_delete_failed:${name}`));
+                request.onblocked = () => {
+                    console.warn(`[Storage] IndexedDB deletion is blocked: ${name}`);
+                };
+            } catch (error) {
+                finish(error);
+            }
+        });
+    },
+
+    async _clearOriginFileSystem() {
+        if (!navigator.storage?.getDirectory) return;
+        const root = await navigator.storage.getDirectory();
+        const names = [];
+        for await (const [name] of root.entries()) names.push(name);
+        await Promise.all(names.map((name) => root.removeEntry(name, { recursive: true })));
+    },
+
+    _clearAccessibleCookies() {
+        if (typeof document === 'undefined' || !document.cookie) return;
+        document.cookie.split(';').forEach((item) => {
+            const name = item.split('=')[0]?.trim();
+            if (!name) return;
+            document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+        });
+    },
+
+    // 彻底删除当前 FluentOS 源下的所有用户数据，而不是只重置设置。
+    async clearAllUserData() {
+        const failures = [];
+        const attempt = async (label, action) => {
+            try {
+                await action();
+            } catch (error) {
+                failures.push({ label, error });
+                console.error(`[Storage] Failed to clear ${label}`, error);
+            }
+        };
+
+        await attempt('service workers', async () => {
+            if (!navigator.serviceWorker?.getRegistrations) return;
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            const results = await Promise.all(registrations.map((registration) => registration.unregister()));
+            if (results.some((result) => result === false)) throw new Error('service_worker_unregister_failed');
+        });
+
+        await this._closeKnownDatabaseConnections();
+
+        await attempt('Cache Storage', async () => {
+            if (typeof caches === 'undefined') return;
+            const names = await caches.keys();
+            const results = await Promise.all(names.map((name) => caches.delete(name)));
+            if (results.some((result) => result === false)) throw new Error('cache_delete_failed');
+        });
+
+        await attempt('origin private file system', () => this._clearOriginFileSystem());
+
+        await attempt('IndexedDB', async () => {
+            if (typeof indexedDB === 'undefined') return;
+            const names = new Set(['FluentOSWallpaperCache', 'fluentos.photos.cache.v1', 'FluentOSMediaLibrary']);
+            if (typeof indexedDB.databases === 'function') {
+                const databases = await indexedDB.databases();
+                (databases || []).forEach((database) => {
+                    if (database?.name) names.add(database.name);
+                });
+            }
+            await Promise.all(Array.from(names).map((name) => this._deleteDatabase(name)));
+        });
+
+        // 如果二进制/缓存数据未能完全删除，不要制造“已经重置”的假象。
+        if (failures.length) {
+            const error = new Error('user_data_clear_incomplete');
+            error.failures = failures;
+            throw error;
+        }
+
+        try { sessionStorage.clear(); } catch (error) { failures.push({ label: 'sessionStorage', error }); }
+        try { this._clearAccessibleCookies(); } catch (error) { failures.push({ label: 'cookies', error }); }
+
+        if (failures.length) {
+            const error = new Error('user_data_clear_incomplete');
+            error.failures = failures;
+            throw error;
+        }
+        try { localStorage.clear(); } catch (error) { failures.push({ label: 'localStorage', error }); }
+        if (failures.length) {
+            const error = new Error('user_data_clear_incomplete');
+            error.failures = failures;
+            throw error;
+        }
+        return true;
+    },
+
     // 初始化默认设置
     initDefaults() {
         // 默认设置

@@ -21,6 +21,7 @@ const Desktop = {
         { id: 'files', nameKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png' },
         { id: 'settings', nameKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png' },
         { id: 'process-manager', nameKey: 'processManager.title', icon: 'Theme/Icon/App_icon/Taskmgr.png', isNative: true, isPWA: false },
+        { id: 'terminal', nameKey: 'terminal.title', icon: 'Theme/Icon/App_icon/terminal.png', isNative: true, isPWA: false },
         { id: 'tips', nameKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', isNative: true, isPWA: false },
         { id: 'calculator', nameKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png' },
         { id: 'notes', nameKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png' },

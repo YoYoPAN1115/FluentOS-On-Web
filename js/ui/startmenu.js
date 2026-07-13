@@ -6,6 +6,7 @@ const StartMenu = {
     appsGrid: null,
     searchInput: null,
     powerBtn: null,
+    fullscreenBtn: null,
     powerMenu: null,
     isOpen: false,
     recentContainer: null,
@@ -18,6 +19,7 @@ const StartMenu = {
         this.appsGrid = document.getElementById('start-apps-grid');
         this.searchInput = document.getElementById('start-search-input');
         this.powerBtn = document.getElementById('power-btn');
+        this.fullscreenBtn = document.getElementById('fullscreen-btn');
         this.powerMenu = document.getElementById('power-menu');
         this.powerLogoutMenu = document.getElementById('power-logout-menu');
         this.recentContainer = document.getElementById('start-recent-items');
@@ -26,6 +28,7 @@ const StartMenu = {
         this.bindEvents();
         this.updateLanguage();
         this.renderRecent();
+        this.syncFullscreenButton();
         
         // 监听语言切换
         State.on('languageChange', () => {
@@ -102,6 +105,8 @@ const StartMenu = {
         const logoutText = document.getElementById('power-logout-text');
         if (logoutText) logoutText.textContent = t('start.power.logout');
 
+        this.syncFullscreenButton();
+
         this.renderApps();
     },
 
@@ -164,67 +169,84 @@ const StartMenu = {
     },
 
     getAllAppsSorted() {
-        const collator = new Intl.Collator(I18n.currentLang === 'en' ? 'en-US' : 'zh-CN', {
+        const isEnglish = I18n.currentLang === 'en';
+        const collator = new Intl.Collator(isEnglish ? 'en-US' : 'zh-CN-u-co-pinyin', {
             numeric: true,
             sensitivity: 'base'
         });
         return (Desktop.apps || [])
             .slice()
             .sort((a, b) => {
-                const groupCompare = collator.compare(this.getAppGroupKey(a), this.getAppGroupKey(b));
+                const groupA = this.getAppGroupKey(a);
+                const groupB = this.getAppGroupKey(b);
+                if (groupA === '#' && groupB !== '#') return 1;
+                if (groupB === '#' && groupA !== '#') return -1;
+                const groupCompare = collator.compare(groupA, groupB);
                 if (groupCompare !== 0) return groupCompare;
-                return collator.compare(Desktop.getAppName(a), Desktop.getAppName(b));
+                const nameCompare = collator.compare(this.getAppSortName(a), this.getAppSortName(b));
+                if (nameCompare !== 0) return nameCompare;
+                return String(a.id || '').localeCompare(String(b.id || ''), 'en-US', { sensitivity: 'base' });
             });
     },
 
+    getAppSortName(app) {
+        const displayName = String(Desktop.getAppName(app) || app.id || '').trim();
+        if (I18n.currentLang !== 'en') return displayName;
+
+        const translatedName = app.nameKey
+            ? String(I18n.translations?.en?.[app.nameKey] || '').trim()
+            : '';
+        if (translatedName) return translatedName;
+        if (/^[A-Za-z0-9]/.test(displayName)) return displayName;
+
+        // Some third-party catalog entries currently have only a Chinese display
+        // name. Their stable ASCII app id provides deterministic English sorting.
+        return String(app.id || displayName).replace(/[-_]+/g, ' ').trim();
+    },
+
     getAppGroupKey(app) {
-        const idInitials = {
-            alipay: 'Z',
-            amap: 'G',
-            appshop: 'A',
-            audiobook: 'T',
-            'baidu-netdisk': 'B',
-            bilibili: 'B',
-            browser: 'L',
-            calculator: 'J',
-            camera: 'X',
-            clock: 'S',
-            coolapk: 'K',
-            douyu: 'D',
-            'ele-me': 'E',
-            files: 'W',
-            geekfa: 'J',
-            jd: 'J',
-            jiazhaoba: 'J',
-            kimi: 'K',
-            media: 'D',
-            meituan: 'M',
-            'netease-music': 'W',
-            notes: 'J',
-            photopea: 'P',
-            photos: 'Z',
-            'qq-mail': 'Q',
-            'qq-music': 'Q',
-            settings: 'S',
-            'snake-classic': 'J',
-            solitaire: 'J',
-            taobao: 'T',
-            weather: 'T',
-            wecom: 'Q',
-            weibo: 'W',
-            whiteboard: 'B'
+        if (I18n.currentLang === 'en') {
+            const englishName = this.getAppSortName(app);
+            const initial = englishName.match(/^[A-Za-z]/);
+            return initial ? initial[0].toUpperCase() : '#';
+        }
+
+        // Pinyin initials for every built-in and current catalog application.
+        // Keep overrides for brands whose ASCII id does not match the Chinese
+        // display name (for example alipay -> 支付宝 -> Z).
+        const pinyinInitialById = {
+            files:'W', settings:'S', 'process-manager':'J', terminal:'Z', tips:'T',
+            calculator:'J', notes:'J', browser:'L', clock:'S', weather:'T', appshop:'A',
+            camera:'X', photos:'Z', media:'D', office:'O', 'shimo-office':'S',
+            'qq-mail':'Q', didaqingdan:'D', canva:'C', chatgpt:'C', deepseek:'D', qwen:'Q', kimi:'K',
+            baidu:'B', 'baidu-netdisk':'B', youdaofanyi:'Y', coolapk:'K', bilibili:'B',
+            youku:'Y', douyin:'D', douyu:'D', 'qq-music':'Q', 'kugou-music':'K',
+            'netease-music':'W', weibo:'W', taobao:'T', jd:'J', xianyu:'X',
+            'taobao-shangou':'T', alipay:'Z', meituan:'M', 'ele-me':'E', didi:'D',
+            amap:'G', 'baidu-map':'B', chinadaily:'C', itzhijia:'I', pengpai:'P',
+            whiteboard:'B', audiobook:'T', solitaire:'J', jiazhaoba:'J', 'traffic-12123':'J',
+            zujuan:'Z', metool:'M', 'video-editor':'S', 'techie-delight':'T', geekfa:'J',
+            'snake-classic':'J', photopea:'P', yangshipin:'Y', 'pdf-tools':'P', todo:'M',
+            translator:'M', weread:'W', 'douban-book':'D', poem:'G', health:'D', wecom:'Q'
         };
-        if (idInitials[app.id]) return idInitials[app.id];
-        const name = Desktop.getAppName(app).trim();
-        const latin = name.match(/[A-Za-z]/);
+        if (pinyinInitialById[app.id]) return pinyinInitialById[app.id];
+
+        const name = String(Desktop.getAppName(app) || '').trim();
+        const latin = name.match(/^[A-Za-z]/);
         if (latin) return latin[0].toUpperCase();
         const pinyinInitials = {
             '哔': 'B', '百': 'B', '浏': 'L', '文': 'W', '设': 'S', '计': 'J', '记': 'J',
             '时': 'S', '天': 'T', '照': 'Z', '多': 'D', '网': 'W', '腾': 'T', '斗': 'D',
             '微': 'W', '淘': 'T', '京': 'J', '拼': 'P', '支': 'Z', '美': 'M', '饿': 'E',
-            '高': 'G', '钉': 'D', '企': 'Q', '酷': 'K'
+            '高': 'G', '钉': 'D', '企': 'Q', '酷': 'K', '终': 'Z', '进': 'J', '提': 'T',
+            '相': 'X', '石': 'S', '滴': 'D', '有': 'Y', '优': 'Y', '抖': 'D', '闲': 'X',
+            '澎': 'P', '白': 'B', '听': 'T', '极': 'J', '驾': 'J', '交': 'J', '组': 'Z',
+            '视': 'S', '经': 'J', '央': 'Y', '豆': 'D', '古': 'G', '丁': 'D'
         };
-        return pinyinInitials[name[0]] || '#';
+        if (pinyinInitials[name[0]]) return pinyinInitials[name[0]];
+
+        const idInitial = String(app.id || '').match(/^[A-Za-z]/);
+        return idInitial ? idInitial[0].toUpperCase() : '#';
     },
 
     ensureAllAppsView() {
@@ -492,6 +514,16 @@ const StartMenu = {
             this.togglePowerLogoutMenu();
         });
 
+        // 浏览器网页全屏切换
+        this.fullscreenBtn?.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await this.toggleDocumentFullscreen();
+        });
+        ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach((eventName) => {
+            document.addEventListener(eventName, () => this.syncFullscreenButton());
+        });
+
         // 电源菜单项（左键菜单）
         this.powerMenu.addEventListener('click', (e) => {
             const item = e.target.closest('.power-menu-item');
@@ -611,6 +643,50 @@ const StartMenu = {
                     this.close();
                 }
             });
+        }
+    },
+
+    isDocumentFullscreen() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    },
+
+    syncFullscreenButton() {
+        if (!this.fullscreenBtn) return;
+        const active = this.isDocumentFullscreen();
+        const label = t(active ? 'start.fullscreen.exit' : 'start.fullscreen.enter');
+        const icon = this.fullscreenBtn.querySelector('img');
+        if (icon) {
+            icon.src = `Theme/Icon/Symbol_icon/stroke/${active ? 'Minimize' : 'Maximize'}.svg`;
+            icon.alt = label;
+        }
+        this.fullscreenBtn.title = label;
+        this.fullscreenBtn.setAttribute('aria-label', label);
+        const root = document.documentElement;
+        const canEnter = !!(root?.requestFullscreen || root?.webkitRequestFullscreen || root?.mozRequestFullScreen || root?.msRequestFullscreen);
+        this.fullscreenBtn.disabled = !active && !canEnter;
+    },
+
+    async toggleDocumentFullscreen() {
+        try {
+            if (this.isDocumentFullscreen()) {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+                if (typeof exit !== 'function') throw new Error('fullscreen_exit_unsupported');
+                await Promise.resolve(exit.call(document));
+            } else {
+                const root = document.documentElement;
+                const enter = root?.requestFullscreen || root?.webkitRequestFullscreen || root?.mozRequestFullScreen || root?.msRequestFullscreen;
+                if (typeof enter !== 'function') throw new Error('fullscreen_enter_unsupported');
+                await Promise.resolve(enter.call(root));
+            }
+        } catch (error) {
+            console.warn('[StartMenu] Failed to toggle fullscreen', error);
+            FluentUI.Toast({
+                title: t('start.fullscreen.title'),
+                message: t('start.fullscreen.failed'),
+                type: 'warning'
+            });
+        } finally {
+            this.syncFullscreenButton();
         }
     },
 
@@ -944,7 +1020,7 @@ const StartMenu = {
     },
 
     // 系统内置应用列表（不可卸载）
-    systemApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
+    systemApps: ['files', 'settings', 'terminal', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
     
     showAppContextMenu(event, appId) {
         const app = Desktop.apps.find(a => a.id === appId);

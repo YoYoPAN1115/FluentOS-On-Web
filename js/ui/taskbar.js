@@ -81,6 +81,7 @@ const Taskbar = {
         const runAction = (action) => {
             this.hideStartContextMenus();
             switch (action) {
+                case 'terminal':
                 case 'process-manager':
                 case 'settings':
                 case 'files':
@@ -105,6 +106,7 @@ const Taskbar = {
             id: 'start-button-context-menu',
             className: 'context-menu start-button-context-menu',
             items: [
+                { id: 'terminal', label: t('terminal.title'), icon: 'Terminal', onClick: () => runAction('terminal') },
                 { id: 'process-manager', label: t('processManager.title'), icon: 'Checklist Note', onClick: () => runAction('process-manager') },
                 { id: 'settings', label: t('settings.title'), icon: 'Settings', onClick: () => runAction('settings') },
                 { id: 'files', label: t('files.title'), icon: 'Folder', onClick: () => runAction('files') },

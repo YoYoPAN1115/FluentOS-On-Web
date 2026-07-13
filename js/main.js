@@ -1507,7 +1507,7 @@ const ResourceMonitor = {
 };
 
 window.FluentOS = {
-    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.1.260712',
+    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.1.260713',
     State,
     Storage,
     notify,
@@ -1532,9 +1532,9 @@ window.FluentOS = {
     
     // 调试工具
     debug: {
-        clearStorage: () => {
+        clearStorage: async () => {
             if (confirm('确定要清空所有数据吗？这将重置系统到初始状态。')) {
-                Storage.clear();
+                await Storage.clearAllUserData();
                 location.reload();
             }
         },

@@ -506,7 +506,7 @@ const ProcessManagerApp = {
         style.id = 'process-manager-styles';
         style.textContent = `
             .process-manager-card { overflow: hidden; }
-            .process-manager-page { height: 100%; min-height: 0; overflow: auto; padding: 28px 28px 108px; box-sizing: border-box; }
+            .process-manager-page { height: 100%; min-height: 0; overflow: auto; padding: 28px 28px 152px; box-sizing: border-box; }
             .process-manager-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
             .process-manager-header h1 { margin: 0 0 6px; font-size: 27px; font-weight: 600; color: var(--text-primary); }
             .process-manager-header p { margin: 0; color: var(--text-secondary); font-size: 13px; }
@@ -553,9 +553,11 @@ const ProcessManagerApp = {
             .process-pid { font-variant-numeric: tabular-nums; }
             .process-shared-memory { white-space: nowrap; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
             .process-table-body > .fluent-empty { padding: 54px 20px; }
-            .process-task-footer { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; display: flex; justify-content: flex-end; min-height: 92px; box-sizing: border-box; padding: 38px 28px 14px; pointer-events: none; background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #fff 46%, #fff 100%); }
-            .dark-mode .process-task-footer { background: linear-gradient(to bottom, rgba(0, 0, 0, 0), #000 46%, #000 100%); }
-            .process-task-footer > * { pointer-events: auto; }
+            .process-task-footer { position: absolute; inset: auto 0 0; z-index: 8; display: flex; justify-content: flex-end; align-items: flex-end; width: 100%; height: 136px; max-width: none; margin: 0; box-sizing: border-box; padding: 0 28px 14px; overflow: hidden; pointer-events: none; background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .45) 24%, rgba(255, 255, 255, .9) 48%, #fff 66%, #fff 100%); }
+            .process-task-footer::after { content: ''; position: absolute; inset: auto 0 0; height: 64px; z-index: 0; background: #fff; pointer-events: none; }
+            .dark-mode .process-task-footer { background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, .45) 24%, rgba(0, 0, 0, .9) 48%, #000 66%, #000 100%); }
+            .dark-mode .process-task-footer::after { background: #000; }
+            .process-task-footer > * { position: relative; z-index: 1; pointer-events: auto; }
             .process-end-task-button { min-width: 116px; color: var(--text-secondary); }
             .process-end-task-button.can-end:not(:disabled) { color: #fff; background: var(--accent); border-color: var(--accent); }
             .process-end-task-button.can-end:not(:disabled):hover { filter: brightness(1.08); }
@@ -565,11 +567,11 @@ const ProcessManagerApp = {
             .process-settings-section .fluent-setting-item { border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-secondary); }
             .process-settings-section .fluent-select-wrapper { min-width: 130px; }
             @media (max-width: 820px) {
-                .process-manager-page { padding: 20px 20px 108px; }
+                .process-manager-page { padding: 20px 20px 152px; }
                 .process-table { overflow-x: auto; }
                 .process-table-head, .process-row { min-width: 620px; }
                 .process-memory-metrics { grid-template-columns: 1fr; }
-                .process-task-footer { padding: 38px 20px 14px; }
+                .process-task-footer { padding: 0 20px 14px; }
             }
         `;
         document.head.appendChild(style);

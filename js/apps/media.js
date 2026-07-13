@@ -1165,6 +1165,8 @@ const MediaApp = {
                 mimeType: item.mimeType || item.file.type || '',
                 lastModified: item.lastModified || item.file.lastModified || Date.now()
             });
+        }).then(() => {
+            if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
         }).catch(() => {});
     },
 
@@ -1174,6 +1176,18 @@ const MediaApp = {
             request.onsuccess = () => resolve(request.result || null);
             request.onerror = () => reject(request.error);
         }));
+    },
+
+    async deleteStoredMedia(id) {
+        if (!id) return true;
+        try {
+            await this.withMediaStore('readwrite', (store) => store.delete(id));
+            if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
+            return true;
+        } catch (error) {
+            console.warn('[MediaApp] Failed to delete stored media payload', error);
+            return false;
+        }
     },
 
     async readAllStoredMedia() {
@@ -1749,18 +1763,27 @@ const MediaApp = {
             media.removeAttribute('src');
             media.load();
         }
+        let ownedRecordIds = [];
+        try {
+            const records = await this.readAllStoredMedia();
+            ownedRecordIds = records
+                .map(record => String(record?.id || ''))
+                .filter(id => id && !id.startsWith('fs-'));
+            const deleted = await Promise.all(ownedRecordIds.map(id => this.deleteStoredMedia(id)));
+            if (deleted.some(result => result === false)) throw new Error('media_payload_delete_failed');
+        } catch (error) {
+            console.error('[MediaApp] Failed to clear media library payloads', error);
+            return false;
+        }
         this.revokeObjectUrls();
         this.library = [];
         this.currentIndex = -1;
         this.playerExpanded = false;
         try { localStorage.removeItem(this.mediaStorageKey); } catch (_) {}
         try { localStorage.removeItem(this.playbackStorageKey); } catch (_) {}
-        try {
-            await this.withMediaStore('readwrite', (store) => {
-                if (typeof store.clear === 'function') store.clear();
-            });
-        } catch (_) {}
+        if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
         this.render();
+        return true;
     },
 
     async collectDirectoryFiles(directoryHandle) {

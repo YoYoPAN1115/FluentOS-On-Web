@@ -1217,6 +1217,7 @@ const State = {
         this.fs = newFS;
         const saved = Storage.set(Storage.keys.FS, this.fs);
         this.emit('fsChange', newFS);
+        if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
         return saved;
     },
 

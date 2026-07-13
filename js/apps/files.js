@@ -1069,6 +1069,14 @@ const FilesApp = {
         if (!await this.ensureNodesCanBeDeleted([id])) return;
         const idx = recycle.children.findIndex(c => c.id === id);
         if (idx === -1) return;
+        const node = recycle.children[idx];
+        try {
+            if (globalThis.FluentOSStorage) await FluentOSStorage.purgeNodes([node]);
+        } catch (error) {
+            console.error('[FilesApp] Failed to permanently delete payload', error);
+            FluentUI.Toast({ title: t('files.recycle'), message: I18n.currentLang === 'en' ? 'The local payload could not be deleted. The file was kept.' : '无法删除浏览器本地数据，文件已保留。', type: 'error' });
+            return;
+        }
         recycle.children.splice(idx, 1);
         State.updateFS(State.fs);
         
@@ -1089,6 +1097,14 @@ const FilesApp = {
         if (!await this.ensureNodesCanBeDeleted(selectedIds)) return;
         const count = selectedIds.length;
         const selectedSet = new Set(selectedIds);
+        const selectedNodes = recycle.children.filter(c => selectedSet.has(c.id));
+        try {
+            if (globalThis.FluentOSStorage) await FluentOSStorage.purgeNodes(selectedNodes);
+        } catch (error) {
+            console.error('[FilesApp] Failed to permanently delete selected payloads', error);
+            FluentUI.Toast({ title: t('files.recycle'), message: I18n.currentLang === 'en' ? 'Some local payloads could not be deleted. The files were kept.' : '部分浏览器本地数据无法删除，文件已保留。', type: 'error' });
+            return;
+        }
         
         // 使用 filter 删除所有选中的文件
         recycle.children = recycle.children.filter(c => !selectedSet.has(c.id));
@@ -1131,9 +1147,19 @@ const FilesApp = {
         this.renderFileList();
     },
 
-    emptyRecycle() {
+    async emptyRecycle() {
         const recycle = State.findNode('recycle');
         if (!recycle) return;
+        const nodes = [...(recycle.children || [])];
+        if (!nodes.length) return;
+        if (!await this.ensureNodesCanBeDeleted(nodes.map(node => node.id))) return;
+        try {
+            if (globalThis.FluentOSStorage) await FluentOSStorage.purgeNodes(nodes);
+        } catch (error) {
+            console.error('[FilesApp] Failed to empty recycle bin payloads', error);
+            FluentUI.Toast({ title: t('files.recycle'), message: I18n.currentLang === 'en' ? 'The recycle bin could not be emptied because local data deletion failed.' : '浏览器本地数据删除失败，无法清空回收站。', type: 'error' });
+            return;
+        }
         recycle.children = [];
         State.updateFS(State.fs);
         

@@ -467,10 +467,15 @@
                 if (key) localStorage.removeItem(key);
             } catch (_) {}
             try {
-                if (!id) return;
+                if (!id) return true;
                 const db = await this.openImageDB();
                 await this.idbRequest(db.transaction(PHOTO_IDB_STORE, 'readwrite').objectStore(PHOTO_IDB_STORE).delete(id));
-            } catch (_) {}
+                if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
+                return true;
+            } catch (error) {
+                console.warn('[PhotosDataStore] Failed to delete local image payload', error);
+                return false;
+            }
         },
 
         enqueueLocalThumbLoad(id, node) {
@@ -1088,7 +1093,7 @@
             return removed;
         },
 
-        clearImportedPhotos() {
+        async clearImportedPhotos() {
             this.ensureLibraryFolders();
             const removedNodes = [];
             const foldersToClean = new Set();
@@ -1101,11 +1106,14 @@
             const removedIds = new Set(removedNodes.map(node => node && node.id).filter(Boolean));
             const removedCount = removedIds.size;
 
-            foldersToClean.forEach(folder => {
-                folder.children = (folder.children || []).filter(node => !removedIds.has(node && node.id));
-            });
-
             if (removedIds.size) {
+                const deleted = await Promise.all(removedNodes.map(node => this.removeLocalImageCache(node)));
+                if (deleted.some(result => result === false)) {
+                    throw new Error('photos_payload_delete_failed');
+                }
+                foldersToClean.forEach(folder => {
+                    folder.children = (folder.children || []).filter(node => !removedIds.has(node && node.id));
+                });
                 this.walkFS((node) => {
                     if (!node || node.type !== 'folder' || !Array.isArray(node.children)) return;
                     node.children = node.children.filter(child => {
@@ -1113,20 +1121,21 @@
                         return !removedIds.has(child.refId || child.content);
                     });
                 });
-                removedNodes.forEach(node => this.removeLocalImageCache(node));
                 this.persistFS();
                 this.renderWidgets();
                 if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
                     window.dispatchEvent(new CustomEvent('photos-library-change', { detail: { removedIds: Array.from(removedIds) } }));
                 }
             }
+            if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
             return removedCount;
         },
 
         isClearableLocalPhotoNode(node) {
             if (!node || node.type !== 'file' || !this.isImageNode(node)) return false;
-            if (node.source === 'photos-local' || node.source === 'external-import') return true;
-            return node.encoding === 'photos-local-cache' || (node.encoding === 'dataurl' && /^data:image\//i.test(String(node.content || '')));
+            if (node.source === 'external-import') return false;
+            if (node.source === 'photos-local') return true;
+            return node.encoding === 'photos-local-cache' && this.isNodeInPhotosLocalFolders(node.id);
         },
 
         getWidgetImage(source) {
@@ -1789,10 +1798,15 @@
         },
 
         confirmClearImported() {
-            const run = () => {
-                PhotosDataStore.clearImportedPhotos();
-                this.toast(this.tr('cleared'), 'success');
-                if (this.frame) this.frame.refresh();
+            const run = async () => {
+                try {
+                    await PhotosDataStore.clearImportedPhotos();
+                    this.toast(this.tr('cleared'), 'success');
+                    if (this.frame) this.frame.refresh();
+                } catch (error) {
+                    console.error('[PhotosApp] Failed to clear imported photos', error);
+                    this.toast(this.tr('importFailed'), 'error');
+                }
             };
             if (window.FluentUI && FluentUI.Dialog) {
                 FluentUI.Dialog({

@@ -72,6 +72,12 @@
     gap: 4px;
 }
 
+.start-power {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .start-footer-btn {
     display: flex;
     align-items: center;
@@ -92,6 +98,36 @@
 
 .dark-mode .start-footer-btn:hover {
     background: rgba(255, 255, 255, 0.1);
+}
+
+/* Keep the Start-button shortcut menus on the same acrylic material as the
+   desktop context menu. Fluent V2 otherwise makes these menus too transparent. */
+body .start-button-context-menu,
+body .start-button-power-menu {
+    background: var(--bg-secondary) !important;
+    background-image: none !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-xl) !important;
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%) !important;
+}
+
+body.fluent-v2.material-gaussian:not(.blur-disabled) .start-button-context-menu,
+body.fluent-v2.material-gaussian:not(.blur-disabled) .start-button-power-menu {
+    backdrop-filter: blur(var(--blur-lg)) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(150%) !important;
+}
+
+body.blur-disabled .start-button-context-menu,
+body.blur-disabled .start-button-power-menu {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body.dark-mode.blur-disabled .start-button-context-menu,
+body.dark-mode.blur-disabled .start-button-power-menu {
+    background: rgba(32, 32, 32, 0.95) !important;
 }
 
 .start-footer-btn img {

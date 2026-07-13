@@ -11,6 +11,9 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-13', version: '2.1.260713', commits: [
+            { hash: '2ab5cdc', title: '进一步完成系统瘦身优化工作，更新了文件导入模块，引入全新进程管理 App' }
+        ] },
         { date: '2026-07-12', version: '2.1.260712', commits: [
             { hash: 'local', title: '完成对系统瘦身优化工作，删除大量不必要的重复组件' },
             { hash: '6decb2e', title: '紧急修复计时器的意外奔溃BUG' }
@@ -124,9 +127,6 @@ const SettingsApp = {
         return pages;
     },
     
-    // 应用大小缓存（随机生成一次后保持不变）
-    appSizes: {},
-    
     // 正在修复中的应用
     repairingApps: [],
     _fingoModeAnimating: false,
@@ -137,16 +137,11 @@ const SettingsApp = {
     _avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
     _avatarPlaceholderSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
     
-    // 获取应用大小
+    // 获取应用包大小（字节）。静态文件数据由构建期清单提供。
     getAppSize(appId, isPWA = false) {
-        if (!this.appSizes[appId]) {
-            if (isPWA) {
-                this.appSizes[appId] = Math.floor(Math.random() * 11) + 5; // 5-15 MB
-            } else {
-                this.appSizes[appId] = Math.floor(Math.random() * 51) + 30; // 30-80 MB
-            }
-        }
-        return this.appSizes[appId];
+        const app = typeof Desktop !== 'undefined' ? Desktop.apps.find(item => item.id === appId) : null;
+        if (!app || !globalThis.FluentOSStorage) return 0;
+        return FluentOSStorage.getAppSize({ ...app, isPWA: isPWA === true || app.isPWA === true });
     },
 
     init(windowId, initialData = null) {
@@ -193,6 +188,13 @@ const SettingsApp = {
                 this.render();
             }
         }, { key: 'SettingsApp.appUsageChange' });
+
+        if (this._storageChangeHandler) window.removeEventListener('fluentos-storage-change', this._storageChangeHandler);
+        this._storageChangeHandler = () => {
+            if (!this._isMounted()) return;
+            if (this.currentPage === 'applications' || this.currentPage === 'app-detail') this.refreshCurrentPage();
+        };
+        window.addEventListener('fluentos-storage-change', this._storageChangeHandler);
 
         State.on('fingoApiKeyReady', () => {
             if (this._isMounted() && this.currentPage === 'fingo') {
@@ -269,7 +271,7 @@ const SettingsApp = {
             name: Desktop.getAppName(desktopApp),
             icon: desktopApp.icon,
             isPWA,
-            size: this.getAppSize(desktopApp.id, isPWA),
+            sizeBytes: this.getAppSize(desktopApp.id, isPWA),
             desc: isPWA
                 ? ((typeof PWALoader !== 'undefined' && PWALoader.apps[desktopApp.id]?.description) || t('settings.app-desc-default'))
                 : this.getAppDescription(desktopApp.id)
@@ -277,6 +279,10 @@ const SettingsApp = {
     },
 
     beforeClose() {
+        if (this._storageChangeHandler) {
+            window.removeEventListener('fluentos-storage-change', this._storageChangeHandler);
+            this._storageChangeHandler = null;
+        }
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
             this.frame = null;
@@ -905,10 +911,10 @@ const SettingsApp = {
                 height: 100%;
             }
             
-            .storage-bar-fill.system {
-                background: linear-gradient(90deg, #868e96, #adb5bd) !important;
-                height: 100%;
-            }
+            .storage-bar-fill.core { background: #68768a !important; height: 100%; }
+            .storage-bar-fill.resources { background: #5b8def !important; height: 100%; }
+            .storage-bar-fill.other { background: #f2b134 !important; height: 100%; }
+            .storage-bar-fill.overhead { background: #9b6bd3 !important; height: 100%; }
             
             body.fluent-v2 .storage-bar-wrapper {
                 background: #d3d3d3 !important;
@@ -920,7 +926,8 @@ const SettingsApp = {
             
             .storage-legend {
                 display: flex;
-                gap: 24px;
+                gap: 10px 18px;
+                flex-wrap: wrap;
                 font-size: 12px;
                 color: var(--text-secondary);
             }
@@ -929,6 +936,11 @@ const SettingsApp = {
                 display: flex;
                 align-items: center;
                 gap: 8px;
+            }
+
+            .storage-legend-item strong {
+                color: var(--text-primary);
+                font-weight: 600;
             }
             
             .legend-dot {
@@ -942,7 +954,10 @@ const SettingsApp = {
             }
             
             .legend-dot-apps { background-color: #ff6b6b !important; }
-            .legend-dot-system { background-color: #868e96 !important; }
+            .legend-dot-core { background-color: #68768a !important; }
+            .legend-dot-resources { background-color: #5b8def !important; }
+            .legend-dot-other { background-color: #f2b134 !important; }
+            .legend-dot-overhead { background-color: #9b6bd3 !important; }
             .legend-dot-available {
                 background-color: #d3d3d3 !important;
                 border: 1px solid var(--border-color);
@@ -1379,19 +1394,38 @@ const SettingsApp = {
                 color: var(--text-primary);
             }
             
-            .app-action-card {
-                justify-content: center;
+            .settings-static-card,
+            .settings-static-card:hover,
+            body.fluent-v2 .settings-static-card:hover,
+            body.fluent-v2.dark-mode .settings-static-card:hover {
+                opacity: 1 !important;
+                visibility: visible !important;
+                transform: none !important;
+                color: var(--text-primary) !important;
             }
-            
-            .app-action-content {
+
+            body.fluent-v2 .settings-content .settings-static-card:hover {
+                background-color: var(--fluent-card-bg-light, rgba(255, 255, 255, 0.55)) !important;
+                background-image: none !important;
+            }
+
+            body.fluent-v2.dark-mode .settings-content .settings-static-card:hover {
+                background-color: var(--fluent-card-bg-dark, rgba(24, 28, 36, 0.48)) !important;
+            }
+
+            .app-action-host {
                 width: 100%;
-                text-align: center;
-                padding: 4px 0;
             }
-            
-            .app-action-text {
-                font-size: 15px;
-                font-weight: 500;
+
+            .app-detail-action {
+                width: 100%;
+                min-height: 52px;
+                justify-content: center;
+                border-radius: var(--radius-md, 12px);
+            }
+
+            .app-storage-total {
+                font-weight: 600;
             }
             
             .app-action-desc {
@@ -3018,21 +3052,37 @@ const SettingsApp = {
         });
     },
 
-    runDataClearAndReboot() {
+    async runDataClearAndReboot() {
+        if (this._dataClearRunning) return;
+        this._dataClearRunning = true;
         FluentUI.Toast({
             title: t('settings.title'),
             message: t('settings.user.data-clear-rebooting'),
             type: 'warning'
         });
 
-        if (typeof State !== 'undefined' && typeof State.restart === 'function') {
-            State.restart();
-        }
-
-        setTimeout(() => {
-            Storage.clear();
+        try {
+            if (typeof WindowManager !== 'undefined' && Array.isArray(WindowManager.windows)) {
+                WindowManager.windows.slice().forEach((windowData) => {
+                    if (windowData?.id !== this.windowId) WindowManager.closeWindow(windowData.id);
+                });
+                await new Promise(resolve => setTimeout(resolve, 120));
+            }
+            await Storage.clearAllUserData();
             window.location.reload();
-        }, 900);
+        } catch (error) {
+            this._dataClearRunning = false;
+            console.error('[SettingsApp] Full user data clear failed', error);
+            const failedAreas = (error?.failures || []).map(item => item.label).join(', ');
+            FluentUI.Toast({
+                title: t('settings.title'),
+                message: I18n.currentLang === 'en'
+                    ? `Some browser data could not be deleted${failedAreas ? `: ${failedAreas}` : ''}. Nothing was reset.`
+                    : `部分浏览器数据无法删除${failedAreas ? `：${failedAreas}` : ''}，系统未执行重置。`,
+                type: 'error',
+                duration: 8000
+            });
+        }
     },
 
     // 网络页面
@@ -3809,7 +3859,7 @@ const SettingsApp = {
                         await Desktop.updateWallpaper();
                         this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.bing-wallpaper'), 'personalization');
                         State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.bing-applied'), type: 'success' });
-                        this.render();
+                        desktopGrid.querySelectorAll('.wallpaper-item').forEach(item => item.classList.remove('selected'));
                     } else {
                         throw new Error('Invalid response');
                     }
@@ -3836,7 +3886,7 @@ const SettingsApp = {
                     await Desktop.updateWallpaper();
                     this.addRecentSetting(t('settings.desktop-wallpaper'), t('settings.custom-applied'), 'personalization');
                     State.addNotification({ title: t('settings.desktop-wallpaper'), message: t('settings.custom-applied'), type: 'success' });
-                    this.render();
+                    desktopGrid.querySelectorAll('.wallpaper-item').forEach(item => item.classList.remove('selected'));
                 } catch (error) {
                     console.error('Desktop wallpaper cache failed', error);
                     State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
@@ -3877,7 +3927,7 @@ const SettingsApp = {
                         await State.setWallpaper('lock', data.url, { sourceType: 'bing', sourceUrl: data.url });
                         if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                         State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-bing-applied'), type: 'success' });
-                        this.render();
+                        lockGrid.querySelectorAll('.wallpaper-item').forEach(item => item.classList.remove('selected'));
                     }
                 } catch (err) {
                     State.addNotification({ title: t('settings.error'), message: t('settings.lock-bing-fail'), type: 'error' });
@@ -3896,7 +3946,7 @@ const SettingsApp = {
                     await State.setWallpaper('lock', file, { sourceType: 'upload', name: file.name, mime: file.type });
                     if (LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                     State.addNotification({ title: t('settings.lock-wallpaper'), message: t('settings.lock-custom-applied'), type: 'success' });
-                    this.render();
+                    lockGrid.querySelectorAll('.wallpaper-item').forEach(item => item.classList.remove('selected'));
                 } catch (error) {
                     console.error('Lock wallpaper cache failed', error);
                     State.addNotification({ title: t('settings.error'), message: t('settings.custom-wallpaper-fail'), type: 'error' });
@@ -4461,8 +4511,9 @@ const SettingsApp = {
     // 应用排序状态
     appSortOrder: 'desc', // 'desc' 或 'asc'
     
-    // 系统应用列表（不可卸载）
-    systemAppIds: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop'],
+    // Fluent OS 应用及其中允许由用户卸载的可选应用
+    systemAppIds: ['files', 'settings', 'process-manager', 'terminal', 'tips', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
+    removableSystemAppIds: ['tips', 'camera', 'photos', 'media'],
 
     // 应用描述
     getAppDescription(appId) {
@@ -4485,75 +4536,19 @@ const SettingsApp = {
     renderApplications(container) {
         const section = document.createElement('div');
         section.className = 'settings-section';
-        
-        // 存储信息
-        const totalStorage = 10 * 1024; // 10 GB in MB
-        const systemSize = 1126; // 系统占用 1.1 GB
-        
-        // 获取系统应用列表
-        const systemApps = [
-            { id: 'files', name: t('settings.app-files'), icon: 'Theme/Icon/App_icon/files.png' },
-            { id: 'settings', name: t('settings.app-settings'), icon: 'Theme/Icon/App_icon/settings.png' },
-            { id: 'calculator', name: t('settings.app-calculator'), icon: 'Theme/Icon/App_icon/calculator.png' },
-            { id: 'notes', name: t('settings.app-notes'), icon: 'Theme/Icon/App_icon/notes.png' },
-            { id: 'browser', name: t('settings.app-browser'), icon: 'Theme/Icon/App_icon/browser.png' },
-            { id: 'clock', name: t('settings.app-clock'), icon: 'Theme/Icon/App_icon/clock.png' },
-            { id: 'weather', name: t('settings.app-weather'), icon: 'Theme/Icon/App_icon/weather.png' },
-            { id: 'appshop', name: 'App Shop', icon: 'Theme/Icon/App_icon/app_gallery.png' }
-        ];
-        
-        // 获取已安装的 App Shop 应用（实时检测）
-        const installedPWAs = State.settings.installedApps || [];
-        const pwaApps = installedPWAs.map(appId => {
-            const appConfig = typeof PWALoader !== 'undefined' ? PWALoader.apps[appId] : null;
-            if (appConfig) {
-                return { id: appId, name: appConfig.name, icon: appConfig.icon, isPWA: true, desc: appConfig.description || t('settings.app-desc-default') };
-            }
-            const shopApp = typeof AppShop !== 'undefined' ? AppShop.apps.find(app => app.id === appId) : null;
-            if (shopApp) {
-                return {
-                    id: appId,
-                    name: shopApp.titleKey ? t(shopApp.titleKey) : shopApp.name,
-                    icon: AppShop.getIconPath(shopApp.icon),
-                    isPWA: !AppShop.isNativeApp(shopApp),
-                    isNative: AppShop.isNativeApp(shopApp),
-                    desc: shopApp.desc || t('settings.app-desc-default')
-                };
-            }
-            return null;
-        }).filter(Boolean);
-        
-        // 计算所有应用大小
-        let appsSize = 0;
-        systemApps.forEach(app => {
-            appsSize += this.getAppSize(app.id, false);
-        });
-        pwaApps.forEach(app => {
-            appsSize += this.getAppSize(app.id, app.isPWA !== false);
-        });
-        
-        const usedStorage = systemSize + appsSize;
-        const appsPercent = Math.max((appsSize / totalStorage * 100), 1);
-        const systemPercent = Math.max((systemSize / totalStorage * 100), 0.5);
+        const apps = this.getStorageApps();
         
         // 存储概览卡片
         const storageCard = document.createElement('div');
-        storageCard.className = 'fluent-setting-item';
+        storageCard.className = 'fluent-setting-item settings-static-card';
         storageCard.innerHTML = `
             <div class="storage-card-content">
                 <div class="storage-header">
                     <span class="storage-title">${this.getDeviceName()}</span>
-                    <span class="storage-usage">${(usedStorage / 1024).toFixed(2)} GB / 10 GB</span>
+                    <span class="storage-usage">${t('settings.storage-calculating')}</span>
                 </div>
-                <div class="storage-bar-wrapper">
-                    <div class="storage-bar-fill apps" style="width: ${appsPercent.toFixed(1)}%"></div>
-                    <div class="storage-bar-fill system" style="width: ${systemPercent.toFixed(1)}%"></div>
-                </div>
-                <div class="storage-legend">
-                    <span class="storage-legend-item"><span class="legend-dot legend-dot-apps"></span>${t('settings.storage-apps')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot legend-dot-system"></span>${t('settings.storage-system')}</span>
-                    <span class="storage-legend-item"><span class="legend-dot legend-dot-available"></span>${t('settings.storage-available')}</span>
-                </div>
+                <div class="storage-bar-wrapper" aria-hidden="true"></div>
+                <div class="storage-legend"></div>
             </div>
         `;
         section.appendChild(storageCard);
@@ -4571,37 +4566,85 @@ const SettingsApp = {
         const appsList = document.createElement('div');
         appsList.className = 'apps-list';
         appsList.id = 'apps-list-container';
-        this.renderAppsListContent(appsList, systemApps, pwaApps);
+        this.renderAppsListContent(appsList, apps, null);
         section.appendChild(appsList);
         
         container.appendChild(section);
+
+        if (globalThis.FluentOSStorage) {
+            FluentOSStorage.analyze(apps).then((snapshot) => {
+                if (!storageCard.isConnected || this.currentPage !== 'applications') return;
+                this.renderStorageOverview(storageCard, snapshot);
+                this.renderAppsListContent(appsList, apps, snapshot);
+            }).catch((error) => {
+                console.error('[SettingsApp] Storage analysis failed', error);
+                const usage = storageCard.querySelector('.storage-usage');
+                if (usage) usage.textContent = t('settings.storage-unavailable');
+            });
+        }
         
         // 排序按钮事件
         listHeader.querySelector('#apps-sort-btn').addEventListener('click', () => {
             this.appSortOrder = this.appSortOrder === 'desc' ? 'asc' : 'desc';
             listHeader.querySelector('#apps-sort-btn').textContent = `${t('settings.sort-size')} ${this.appSortOrder === 'desc' ? '↓' : '↑'}`;
-            this.renderAppsListContent(appsList, systemApps, pwaApps);
+            this.renderAppsListContent(appsList, apps, this._lastStorageSnapshot || null);
         });
     },
-    
-    renderAppsListContent(container, systemApps, pwaApps) {
-        // 合并所有应用
-        const allApps = [
-            ...systemApps.map(app => ({ 
-                ...app, 
-                size: this.getAppSize(app.id, false), 
-                isPWA: false,
-                desc: this.getAppDescription(app.id)
-            })),
-            ...pwaApps.map(app => ({ 
-                ...app, 
-                size: this.getAppSize(app.id, app.isPWA !== false),
-                isPWA: app.isPWA !== false
-            }))
+
+    getStorageApps() {
+        const installed = new Set(State.settings.installedApps || []);
+        const desktopApps = typeof Desktop !== 'undefined' ? Desktop.apps : [];
+        return desktopApps.filter((app) => app.isPWA !== true || installed.has(app.id)).map((app) => {
+            const shopApp = typeof AppShop !== 'undefined' ? AppShop.apps.find(item => item.id === app.id) : null;
+            const pwaConfig = typeof PWALoader !== 'undefined' ? PWALoader.apps?.[app.id] : null;
+            const isPWA = app.isPWA === true;
+            return {
+                ...app,
+                name: Desktop.getAppName(app),
+                isPWA,
+                desc: isPWA
+                    ? (pwaConfig?.description || shopApp?.desc || t('settings.app-desc-default'))
+                    : this.getAppDescription(app.id)
+            };
+        });
+    },
+
+    renderStorageOverview(card, snapshot) {
+        this._lastStorageSnapshot = snapshot;
+        const categories = snapshot.categories;
+        const displayQuota = 1024 * 1024 * 1024;
+        const denominator = displayQuota;
+        const segments = [
+            ['core', t('settings.storage-core'), categories.systemCoreBytes],
+            ['resources', t('settings.storage-resources'), categories.systemResourceBytes],
+            ['apps', t('settings.storage-apps'), categories.appsBytes],
+            ['other', t('settings.storage-other'), categories.otherBytes],
+            ['overhead', t('settings.storage-overhead'), categories.browserOverheadBytes]
         ];
+        const bar = card.querySelector('.storage-bar-wrapper');
+        bar.innerHTML = segments.map(([key, label, bytes]) => {
+            const width = Math.max(0, Math.min(100, bytes / denominator * 100));
+            return `<div class="storage-bar-fill ${key}" style="width:${width.toFixed(4)}%" title="${label}"></div>`;
+        }).join('');
+        const legend = card.querySelector('.storage-legend');
+        legend.innerHTML = segments.map(([key, label]) => `
+            <span class="storage-legend-item"><span class="legend-dot legend-dot-${key}"></span><span>${label}</span></span>
+        `).join('') + `
+            <span class="storage-legend-item"><span class="legend-dot legend-dot-available"></span><span>${t('settings.storage-available')}</span></span>
+        `;
+        const usage = card.querySelector('.storage-usage');
+        usage.textContent = `${FluentOSStorage.formatBytes(snapshot.browserUsageBytes || 0)} / ${FluentOSStorage.formatBytes(displayQuota)}`;
+    },
+
+    renderAppsListContent(container, apps, snapshot) {
+        const allApps = apps.map((app) => ({
+            ...app,
+            sizeBytes: snapshot?.apps?.[app.id]?.appSizeBytes ?? (globalThis.FluentOSStorage ? FluentOSStorage.getAppSize(app) : 0),
+            dataSizeBytes: snapshot?.apps?.[app.id]?.dataSizeBytes ?? 0
+        }));
         
         // 排序
-        allApps.sort((a, b) => this.appSortOrder === 'desc' ? b.size - a.size : a.size - b.size);
+        allApps.sort((a, b) => this.appSortOrder === 'desc' ? b.sizeBytes - a.sizeBytes : a.sizeBytes - b.sizeBytes);
         
         container.innerHTML = allApps.map(app => `
             <div class="app-list-item" data-app-id="${app.id}" data-is-pwa="${app.isPWA}">
@@ -4612,7 +4655,7 @@ const SettingsApp = {
                     <div class="app-name">${app.name}</div>
                     <div class="app-meta">${t('settings.last-used', { time: this.formatAppLastUsed(app.id) })}</div>
                 </div>
-                <div class="app-size">${app.size} MB</div>
+                <div class="app-size">${globalThis.FluentOSStorage ? FluentOSStorage.formatBytes(app.sizeBytes) : '0 B'}</div>
                 <div class="app-arrow">
                     <img src="Theme/Icon/Symbol_icon/stroke/Chevron Right.svg" alt="">
                 </div>
@@ -4623,7 +4666,6 @@ const SettingsApp = {
         container.querySelectorAll('.app-list-item').forEach(item => {
             item.addEventListener('click', () => {
                 const appId = item.dataset.appId;
-                const isPWA = item.dataset.isPwa === 'true';
                 const app = allApps.find(a => a.id === appId);
                 if (app) {
                     this.showAppDetail(app);
@@ -4660,8 +4702,8 @@ const SettingsApp = {
     
     showAppDetail(app) {
         this.currentAppDetail = app;
-        this.currentPage = 'app-detail';
-        this.render();
+        // 保持同一个 FluentWindow 实例，让框架保存 applications 页的滚动位置。
+        this.navigateToPage('app-detail');
     },
     
     renderAppDetailPage(container) {
@@ -4673,7 +4715,9 @@ const SettingsApp = {
         }
         
         const isSystem = this.systemAppIds.includes(app.id);
-        const dataSize = Math.floor(Math.random() * 10) + 1; // 1-10 MB 文档与数据
+        const canUninstall = !isSystem || this.removableSystemAppIds.includes(app.id);
+        const initialSize = Number(app.sizeBytes || this.getAppSize(app.id, app.isPWA === true) || 0);
+        const initialDataSize = Number(app.dataSizeBytes || 0);
         
         const section = document.createElement('div');
         section.className = 'settings-section app-detail-page';
@@ -4689,16 +4733,20 @@ const SettingsApp = {
             // 播放滑出动画
             section.classList.add('slide-out');
             setTimeout(() => {
-                this.currentPage = 'applications';
-                this.currentAppDetail = null;
-                this.render();
+                const detailId = this.currentAppDetail?.id;
+                this.navigateToPage('applications', {
+                    delay: 420,
+                    after: () => {
+                        if (this.currentAppDetail?.id === detailId) this.currentAppDetail = null;
+                    }
+                });
             }, 280);
         });
         section.appendChild(backBtn);
         
         // 应用信息卡片
         const infoCard = document.createElement('div');
-        infoCard.className = 'fluent-setting-item app-info-card';
+        infoCard.className = 'fluent-setting-item settings-static-card app-info-card';
         infoCard.innerHTML = `
             <div class="app-detail-info-card">
                 <img src="${app.icon}" class="app-detail-icon" alt="${app.name}">
@@ -4713,17 +4761,22 @@ const SettingsApp = {
         
         // 存储信息
         const storageCard = document.createElement('div');
-        storageCard.className = 'fluent-setting-item';
+        storageCard.className = 'fluent-setting-item settings-static-card app-storage-card';
         storageCard.innerHTML = `
             <div class="app-storage-info">
                 <div class="app-storage-row">
                     <span>${t('settings.app-size')}</span>
-                    <span>${app.size} MB</span>
+                    <span data-storage-value="app">${FluentOSStorage.formatBytes(initialSize)}</span>
                 </div>
                 <div class="app-storage-divider"></div>
                 <div class="app-storage-row">
                     <span>${t('settings.app-data')}</span>
-                    <span>${dataSize} MB</span>
+                    <span data-storage-value="data">${FluentOSStorage.formatBytes(initialDataSize)}</span>
+                </div>
+                <div class="app-storage-divider"></div>
+                <div class="app-storage-row app-storage-total">
+                    <span>${t('settings.app-total')}</span>
+                    <span data-storage-value="total">${FluentOSStorage.formatBytes(initialSize + initialDataSize)}</span>
                 </div>
             </div>
         `;
@@ -4731,7 +4784,7 @@ const SettingsApp = {
         
         // 应用介绍
         const descCard = document.createElement('div');
-        descCard.className = 'fluent-setting-item';
+        descCard.className = 'fluent-setting-item settings-static-card';
         descCard.innerHTML = `
             <div class="app-desc-card">
                 <div class="app-desc-title">${t('settings.app-intro')}</div>
@@ -4740,47 +4793,34 @@ const SettingsApp = {
         `;
         section.appendChild(descCard);
         
-        // 修复按钮 - 使用卡片包装
-        const repairCard = document.createElement('div');
-        repairCard.className = 'fluent-setting-item app-action-card';
-        repairCard.innerHTML = `
-            <div class="app-action-content">
-                <span class="app-action-text">${t('settings.repair-app')}</span>
-            </div>
-        `;
-        repairCard.style.cursor = 'pointer';
-        repairCard.style.textAlign = 'center';
-        repairCard.querySelector('.app-action-text').style.color = 'var(--accent)';
-        repairCard.addEventListener('click', () => {
-            this._ensureAppClosed(app.id, app.name, t('settings.repair'), () => {
-                this.repairApp(app);
-            });
-        });
-        section.appendChild(repairCard);
+        // 修复按钮 - 使用统一 Fluent 按钮和高光系统
+        const repairHost = document.createElement('div');
+        repairHost.className = 'app-action-host';
+        repairHost.appendChild(FluentUI.Button({
+            text: t('settings.repair-app'),
+            variant: 'secondary',
+            className: 'app-detail-action app-detail-repair',
+            disabled: this.isAppRepairing(app.id),
+            onClick: () => {
+                this._ensureAppClosed(app.id, app.name, t('settings.repair'), () => this.repairApp(app));
+            }
+        }));
+        section.appendChild(repairHost);
         
         const repairDesc = document.createElement('p');
         repairDesc.className = 'app-action-desc';
         repairDesc.textContent = t('settings.repair-desc');
         section.appendChild(repairDesc);
         
-        // 卸载按钮 - 使用卡片包装
-        const uninstallCard = document.createElement('div');
-        uninstallCard.className = 'fluent-setting-item app-action-card';
-        uninstallCard.innerHTML = `
-            <div class="app-action-content">
-                <span class="app-action-text">${isSystem ? t('settings.uninstall-app') : t('settings.delete-app')}</span>
-            </div>
-        `;
-        uninstallCard.style.textAlign = 'center';
-        
-        if (isSystem) {
-            uninstallCard.style.opacity = '0.5';
-            uninstallCard.style.cursor = 'not-allowed';
-            uninstallCard.querySelector('.app-action-text').style.color = 'var(--text-tertiary)';
-        } else {
-            uninstallCard.style.cursor = 'pointer';
-            uninstallCard.querySelector('.app-action-text').style.color = '#dc3545';
-            uninstallCard.addEventListener('click', () => {
+        // 卸载按钮
+        const uninstallHost = document.createElement('div');
+        uninstallHost.className = 'app-action-host';
+        uninstallHost.appendChild(FluentUI.Button({
+            text: isSystem ? t('settings.uninstall-app') : t('settings.delete-app'),
+            variant: canUninstall ? 'danger' : 'secondary',
+            className: 'app-detail-action app-detail-uninstall',
+            disabled: !canUninstall,
+            onClick: !canUninstall ? null : () => {
                 this._ensureAppClosed(app.id, app.name, t('settings.uninstall'), () => {
                     FluentUI.Dialog({
                         title: t('settings.confirm-uninstall'),
@@ -4790,14 +4830,16 @@ const SettingsApp = {
                             { text: t('cancel'), variant: 'secondary' },
                             { text: t('settings.uninstall'), variant: 'danger', value: 'uninstall' }
                         ],
-                        onClose: (result) => {
+                        onClose: async (result) => {
                             if (result === 'uninstall') {
+                                let success = true;
                                 if (typeof AppShop !== 'undefined' && AppShop.uninstallApp) {
-                                    AppShop.uninstallApp(app.id, {
+                                    success = await AppShop.uninstallApp(app.id, {
                                         skipConfirm: true,
                                         skipRunningCheck: true
                                     });
                                 }
+                                if (success === false) return;
                                 this.currentPage = 'applications';
                                 this.currentAppDetail = null;
                                 this.render();
@@ -4805,17 +4847,30 @@ const SettingsApp = {
                         }
                     });
                 });
-            });
-        }
-        section.appendChild(uninstallCard);
+            }
+        }));
+        section.appendChild(uninstallHost);
         
         const uninstallDesc = document.createElement('p');
         uninstallDesc.className = 'app-action-desc';
-        uninstallDesc.textContent = isSystem ? t('settings.system-app-no-uninstall') : t('settings.uninstall-desc');
-        if (!isSystem) uninstallDesc.classList.add('app-action-desc-danger');
+        uninstallDesc.textContent = canUninstall ? t('settings.uninstall-desc') : t('settings.system-app-no-uninstall');
+        if (canUninstall) uninstallDesc.classList.add('app-action-desc-danger');
         section.appendChild(uninstallDesc);
         
         container.appendChild(section);
+
+        if (globalThis.FluentOSStorage) {
+            const apps = this.getStorageApps();
+            FluentOSStorage.analyze(apps).then((snapshot) => {
+                if (!storageCard.isConnected || this.currentPage !== 'app-detail' || this.currentAppDetail?.id !== app.id) return;
+                const values = snapshot.apps[app.id] || { appSizeBytes: initialSize, dataSizeBytes: 0 };
+                app.sizeBytes = values.appSizeBytes;
+                app.dataSizeBytes = values.dataSizeBytes;
+                storageCard.querySelector('[data-storage-value="app"]').textContent = FluentOSStorage.formatBytes(values.appSizeBytes);
+                storageCard.querySelector('[data-storage-value="data"]').textContent = FluentOSStorage.formatBytes(values.dataSizeBytes);
+                storageCard.querySelector('[data-storage-value="total"]').textContent = FluentOSStorage.formatBytes(values.appSizeBytes + values.dataSizeBytes);
+            }).catch(error => console.error('[SettingsApp] App storage analysis failed', error));
+        }
     },
     
     // 修复应用
@@ -4842,14 +4897,27 @@ const SettingsApp = {
         
         // 10秒后完成修复
         setTimeout(() => {
+            let repaired = true;
+            try {
+                if (app.isPWA === true && typeof AppShop !== 'undefined') {
+                    const catalogApp = AppShop.apps.find(item => item.id === app.id);
+                    if (typeof PWALoader !== 'undefined') PWALoader.unregister(app.id);
+                    repaired = !!catalogApp && AppShop.ensureAppRegistered(catalogApp) !== false;
+                } else if (typeof WindowManager !== 'undefined') {
+                    repaired = !!WindowManager.appConfigs?.[app.id];
+                }
+            } catch (error) {
+                console.error('[SettingsApp] App repair failed', error);
+                repaired = false;
+            }
             // 从修复列表移除
             this.repairingApps = this.repairingApps.filter(id => id !== app.id);
             
             // 显示修复完成通知
             FluentUI.Toast({ 
                 title: app.name, 
-                message: t('settings.app-repaired'),
-                type: 'success'
+                message: repaired ? t('settings.app-repaired') : t('settings.storage-unavailable'),
+                type: repaired ? 'success' : 'error'
             });
             
             // 触发修复完成事件
@@ -5407,7 +5475,9 @@ const SettingsApp = {
                     await State.setWallpaper('lock', wp, { sourceType: 'built-in' });
                     if (typeof LockScreen !== 'undefined' && LockScreen.updateWallpaper) await LockScreen.updateWallpaper();
                 }
-                this.render();
+                grid.querySelectorAll('.wallpaper-item').forEach(candidate => {
+                    candidate.classList.toggle('selected', candidate === item);
+                });
                 State.addNotification({ title: t('settings.personalization'), message: t('settings.wallpaper-changed', { type: type === 'desktop' ? t('settings.desktop') : t('settings.lockscreen') }), type: 'success' });
             });
             grid.appendChild(item);

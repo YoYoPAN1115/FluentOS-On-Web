@@ -2385,8 +2385,19 @@ const AppShop = {
     },
     
     // 卸载应用（内部执行，不含弹窗）
-    _doUninstall(appId) {
+    async _doUninstall(appId) {
         const app = this.apps.find(a => a.id === appId);
+        try {
+            if (globalThis.FluentOSStorage) await FluentOSStorage.purgeAppData(appId);
+        } catch (error) {
+            console.error('[AppShop] Failed to remove application data', error);
+            FluentUI.Toast({
+                title: t('appshop.uninstall'),
+                message: I18n.currentLang === 'en' ? 'Application data could not be removed. Uninstall was cancelled.' : '无法彻底删除应用数据，已取消卸载。',
+                type: 'error'
+            });
+            return false;
+        }
         const installedApps = this.getInstalledApps().filter(a => a.id !== appId);
         this.saveInstalledApps(installedApps);
 
@@ -2438,6 +2449,8 @@ const AppShop = {
             message: t('appshop.uninstalled', { name: app?.name || 'App' }),
             type: 'success'
         });
+        if (globalThis.FluentOSStorage) FluentOSStorage.invalidate();
+        return true;
     },
 
     // 卸载应用（带确认弹窗 + 运行检测）
@@ -2449,8 +2462,7 @@ const AppShop = {
 
         const doConfirmAndUninstall = () => {
             if (skipConfirm) {
-                this._doUninstall(appId);
-                return;
+                return this._doUninstall(appId);
             }
 
             FluentUI.Dialog({
@@ -2463,7 +2475,7 @@ const AppShop = {
                 ],
                 onClose: (result) => {
                     if (result === 'uninstall') {
-                        this._doUninstall(appId);
+                        void this._doUninstall(appId);
                     }
                 }
             });
@@ -2492,7 +2504,7 @@ const AppShop = {
                 }
             });
         }else {
-            doConfirmAndUninstall();
+            return doConfirmAndUninstall();
         }
     },
     
