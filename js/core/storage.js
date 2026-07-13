@@ -245,7 +245,8 @@ const Storage = {
                     { id: 'settings', x: 0, y: 1 },
                     { id: 'calculator', x: 0, y: 2 },
                     { id: 'notes', x: 0, y: 3 },
-                    { id: 'appshop', x: 0, y: 4 }
+                    { id: 'appshop', x: 0, y: 4 },
+                    { id: 'process-manager', x: 0, y: 5 }
                 ]
             });
         }

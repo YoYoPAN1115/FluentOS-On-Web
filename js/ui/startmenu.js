@@ -819,6 +819,7 @@ const StartMenu = {
     },
 
     open() {
+        if (typeof Taskbar !== 'undefined') Taskbar.hideStartContextMenus?.();
         this.element.classList.remove('hidden');
         this.element.classList.remove('closing');
         this.isOpen = true;

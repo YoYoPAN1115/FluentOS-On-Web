@@ -1019,6 +1019,33 @@ html,
     margin: 6px 0;
 }
 
+/* 开始按钮快捷菜单及电源悬浮子菜单 */
+.start-button-context-menu .has-submenu {
+    position: relative;
+}
+
+.start-button-context-menu .has-submenu > span {
+    flex: 1;
+}
+
+.start-button-context-menu .context-submenu-arrow {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+}
+
+.start-button-context-menu .submenu-open {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.dark-mode .start-button-context-menu .submenu-open {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-button-power-menu {
+    z-index: 10001;
+}
+
 /* ============ 任务栏 ============ */
 /* 任务栏层级，低于面板但高于窗口 - Taskbar z-index, below panels but above windows */
 .taskbar {

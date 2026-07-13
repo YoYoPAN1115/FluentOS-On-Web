@@ -233,6 +233,8 @@ const State = {
     ensureSettingsDefaults() {
         this.settings = this.settings || {};
         let changed = false;
+        const processManagerRegistrationVersion = Number(this.settings.processManagerRegistrationVersion || 0);
+        const needsProcessManagerRegistration = processManagerRegistrationVersion < 2;
 
         const defaults = {
             strictCspEnabled: false,
@@ -268,6 +270,7 @@ const State = {
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
+            processManagerRefreshInterval: 3000,
             startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
@@ -280,6 +283,22 @@ const State = {
                 changed = true;
             }
         });
+
+        // Keep Process Manager available on the desktop and in All Apps, but do
+        // not pin it to the Start home page by default. Version 2 reverses the
+        // automatic Start pin added by the first registration migration.
+        if (needsProcessManagerRegistration) {
+            if (processManagerRegistrationVersion === 1 && Array.isArray(this.settings.startPinnedApps)) {
+                this.settings.startPinnedApps = this.settings.startPinnedApps.filter((appId) => appId !== 'process-manager');
+            }
+            if (this.desktopLayout && Array.isArray(this.desktopLayout.icons) && !this.desktopLayout.icons.some((icon) => icon?.id === 'process-manager' || icon?.appId === 'process-manager')) {
+                const nextRow = this.desktopLayout.icons.reduce((max, icon) => Math.max(max, Number(icon?.y) || 0), -1) + 1;
+                this.desktopLayout.icons.push({ id: 'process-manager', x: 0, y: nextRow });
+                Storage.set(Storage.keys.DESKTOP_LAYOUT, this.desktopLayout);
+            }
+            this.settings.processManagerRegistrationVersion = 2;
+            changed = true;
+        }
 
         if (Array.isArray(this.settings.startPinnedApps) && this.settings.startPinnedApps.includes('settingsnew')) {
             this.settings.startPinnedApps = this.settings.startPinnedApps.filter(appId => appId !== 'settingsnew');

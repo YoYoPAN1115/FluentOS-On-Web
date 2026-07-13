@@ -44,6 +44,7 @@ const WindowManager = {
     appConfigs: {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
+        'process-manager': { titleKey: 'processManager.title', icon: 'Theme/Icon/App_icon/Taskmgr.png', width: 980, height: 660, minWidth: 680, minHeight: 480, component: 'ProcessManagerApp' },
         tips: { titleKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', width: 1120, height: 720, minWidth: 760, minHeight: 520, component: 'TipsApp' },
         calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
         notes: { titleKey: 'notes.title', icon: 'Theme/Icon/App_icon/notes.png', width: 920, height: 640, minWidth: 560, minHeight: 420, component: 'NotesApp' },

@@ -142,7 +142,19 @@
         const style = document.createElement('style');
         style.id = 'file-import-styles';
         style.textContent = `
-            .file-import-modal .fluent-modal { overflow: hidden; }
+            body .file-import-modal .fluent-modal {
+                overflow: hidden;
+                background: rgba(255, 255, 255, 0.78);
+                border: 1px solid rgba(255, 255, 255, 0.58);
+                -webkit-backdrop-filter: blur(28px) saturate(150%);
+                backdrop-filter: blur(28px) saturate(150%);
+                box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+            }
+            body.dark-mode .file-import-modal .fluent-modal {
+                background: rgba(12, 12, 12, 0.76);
+                border-color: rgba(255, 255, 255, 0.14);
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.52);
+            }
             .file-import-modal .fluent-modal-content { padding: 14px 16px 16px; }
             .file-import-wrap { display:flex; flex-direction:column; gap:12px; }
             .file-import-top { display:flex; flex-direction:column; gap:10px; }
@@ -482,6 +494,12 @@
                 }
                 if (hasError) {
                     FluentUI.Toast?.({ title: t('files.title'), message: t('files.import-failed'), type: 'warning' });
+                }
+
+                const allSucceeded = this.tasks.length > 0
+                    && this.tasks.every((task) => task.status === 'done');
+                if (allSucceeded) {
+                    this.close();
                 }
             },
 

@@ -382,6 +382,9 @@ function minimizeAllDesktopWindows() {
     return true;
 }
 
+// Public shell action used by the Start button quick menu and Alt+D.
+globalThis.FluentOSShowDesktop = minimizeAllDesktopWindows;
+
 function minimizeTopDesktopWindow() {
     const top = getDesktopWindowsSortedByZ()[0];
     if (!top || typeof WindowManager.minimizeWindow !== 'function') return false;

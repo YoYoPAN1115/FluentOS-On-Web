@@ -11,6 +11,9 @@ const Taskbar = {
     dateElement: null,
     timeInterval: null,
     contextMenu: null,
+    startContextMenu: null,
+    startPowerMenu: null,
+    _startPowerHideTimer: null,
     taskViewBtn: null,
     _taskViewIgnoreClickUntil: 0,
     _hoverPreview: null,
@@ -31,6 +34,7 @@ const Taskbar = {
         this.taskViewBtn = document.getElementById('taskview-btn');
 
         this.createContextMenu();
+        this.createStartContextMenus();
         this.renderApps();
         this.bindEvents();
         this.updateTime();
@@ -39,7 +43,10 @@ const Taskbar = {
         // 监听应用状态变化
         State.on('appStart', (appId) => this.onAppStart(appId));
         State.on('appStop', (appId) => this.onAppStop(appId));
-        State.on('languageChange', () => this.renderApps());
+        State.on('languageChange', () => {
+            this.renderApps();
+            this.createStartContextMenus();
+        });
         
         // 监听应用修复状态变化
         State.on('appRepairStart', (appId) => this.updateAppRepairState(appId, true));
@@ -62,6 +69,202 @@ const Taskbar = {
         this.contextMenu.className = 'context-menu hidden';
         this.contextMenu.id = 'taskbar-context-menu';
         document.body.appendChild(this.contextMenu);
+    },
+
+    createStartContextMenus() {
+        if (typeof FluentUI === 'undefined' || typeof FluentUI.ContextMenu !== 'function') return;
+        this.startContextMenu?.remove();
+        this.startPowerMenu?.remove();
+        this.startContextMenu = null;
+        this.startPowerMenu = null;
+
+        const runAction = (action) => {
+            this.hideStartContextMenus();
+            switch (action) {
+                case 'process-manager':
+                case 'settings':
+                case 'files':
+                    WindowManager.openApp(action);
+                    break;
+                case 'search': {
+                    if (typeof StartMenu !== 'undefined') StartMenu.open();
+                    setTimeout(() => {
+                        const input = document.getElementById('start-search-input');
+                        input?.focus();
+                        input?.select?.();
+                    }, 0);
+                    break;
+                }
+                case 'desktop':
+                    globalThis.FluentOSShowDesktop?.();
+                    break;
+            }
+        };
+
+        this.startContextMenu = FluentUI.ContextMenu({
+            id: 'start-button-context-menu',
+            className: 'context-menu start-button-context-menu',
+            items: [
+                { id: 'process-manager', label: t('processManager.title'), icon: 'Checklist Note', onClick: () => runAction('process-manager') },
+                { id: 'settings', label: t('settings.title'), icon: 'Settings', onClick: () => runAction('settings') },
+                { id: 'files', label: t('files.title'), icon: 'Folder', onClick: () => runAction('files') },
+                { id: 'search', label: t('start.quick.search'), icon: 'Search', onClick: () => runAction('search') },
+                { separator: true },
+                { id: 'power', label: t('start.quick.power'), icon: 'Shut Down' },
+                { id: 'desktop', label: t('start.quick.desktop'), icon: 'Home', onClick: () => runAction('desktop') }
+            ]
+        });
+
+        this.startPowerMenu = FluentUI.ContextMenu({
+            id: 'start-button-power-menu',
+            className: 'context-menu start-button-power-menu',
+            items: [
+                { id: 'lock', label: t('start.power.lock'), icon: 'Lock', onClick: () => this.handleStartPowerAction('lock') },
+                { id: 'logout', label: t('start.power.logout'), icon: 'Logout', onClick: () => this.handleStartPowerAction('logout') },
+                { id: 'restart', label: t('start.power.restart'), icon: 'Refresh', onClick: () => this.handleStartPowerAction('restart') },
+                { id: 'shutdown', label: t('start.power.shutdown'), icon: 'Shut Down', onClick: () => this.handleStartPowerAction('shutdown') }
+            ]
+        });
+
+        [this.startContextMenu, this.startPowerMenu].forEach((menu) => {
+            menu.setAttribute('role', 'menu');
+            menu.querySelectorAll('.fluent-context-menu-item').forEach((item) => {
+                item.classList.add('context-menu-item');
+                item.setAttribute('role', 'menuitem');
+                item.tabIndex = -1;
+            });
+            menu.querySelectorAll('.fluent-context-menu-separator').forEach((item) => item.classList.add('context-menu-separator'));
+            document.body.appendChild(menu);
+        });
+
+        const powerItem = this.startContextMenu.querySelector('[data-action="power"]');
+        if (powerItem) {
+            powerItem.classList.add('has-submenu');
+            powerItem.setAttribute('aria-haspopup', 'menu');
+            powerItem.setAttribute('aria-expanded', 'false');
+            powerItem.insertAdjacentHTML('beforeend', '<img class="context-submenu-arrow" src="Theme/Icon/Symbol_icon/stroke/Chevron Right.svg" alt="">');
+            powerItem.addEventListener('mouseenter', () => this.showStartPowerMenu());
+            powerItem.addEventListener('focusin', () => this.showStartPowerMenu());
+            powerItem.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.showStartPowerMenu();
+            });
+            powerItem.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowRight' || event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    this.showStartPowerMenu(true);
+                }
+            });
+        }
+
+        const keepPowerOpen = () => {
+            clearTimeout(this._startPowerHideTimer);
+            this._startPowerHideTimer = null;
+        };
+        this.startContextMenu.addEventListener('mouseenter', keepPowerOpen);
+        this.startPowerMenu.addEventListener('mouseenter', keepPowerOpen);
+        this.startContextMenu.addEventListener('mouseleave', () => this.scheduleHideStartPowerMenu());
+        this.startPowerMenu.addEventListener('mouseleave', () => this.scheduleHideStartPowerMenu());
+        this.bindStartMenuKeyboard(this.startContextMenu, false);
+        this.bindStartMenuKeyboard(this.startPowerMenu, true);
+    },
+
+    bindStartMenuKeyboard(menu, isSubmenu) {
+        menu?.addEventListener('keydown', (event) => {
+            const items = Array.from(menu.querySelectorAll('.fluent-context-menu-item:not(.disabled)'));
+            const current = items.indexOf(document.activeElement);
+            let next = -1;
+            if (event.key === 'ArrowDown') next = current < items.length - 1 ? current + 1 : 0;
+            else if (event.key === 'ArrowUp') next = current > 0 ? current - 1 : items.length - 1;
+            else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = items.length - 1;
+            else if (isSubmenu && event.key === 'ArrowLeft') {
+                event.preventDefault();
+                this.hideStartPowerMenu();
+                this.startContextMenu?.querySelector('[data-action="power"]')?.focus();
+                return;
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                this.hideStartContextMenus();
+                this.startBtn?.focus();
+                return;
+            }
+            if (next >= 0) {
+                event.preventDefault();
+                items[next]?.focus();
+            }
+        });
+    },
+
+    showStartContextMenu(event) {
+        if (!this.startContextMenu) return;
+        this.hideContextMenu();
+        this.hideHoverPreview(true);
+        if (typeof StartMenu !== 'undefined') StartMenu.close();
+        this.startPowerMenu?.hide();
+        this.startContextMenu.show(event.clientX, event.clientY);
+
+        const rect = this.startContextMenu.getBoundingClientRect();
+        const buttonRect = this.startBtn.getBoundingClientRect();
+        const margin = 8;
+        const left = Math.max(margin, Math.min(event.clientX, window.innerWidth - rect.width - margin));
+        const top = Math.max(margin, buttonRect.top - rect.height - margin);
+        this.startContextMenu.style.left = `${left}px`;
+        this.startContextMenu.style.top = `${top}px`;
+        this.startContextMenu.querySelector('.fluent-context-menu-item')?.focus();
+    },
+
+    showStartPowerMenu(focusFirst = false) {
+        if (!this.startContextMenu || !this.startPowerMenu || this.startContextMenu.classList.contains('hidden')) return;
+        clearTimeout(this._startPowerHideTimer);
+        const parentItem = this.startContextMenu.querySelector('[data-action="power"]');
+        if (!parentItem) return;
+
+        this.startPowerMenu.show(0, 0);
+        const parentRect = parentItem.getBoundingClientRect();
+        const menuRect = this.startPowerMenu.getBoundingClientRect();
+        const margin = 8;
+        let left = parentRect.right + 6;
+        if (left + menuRect.width > window.innerWidth - margin) left = parentRect.left - menuRect.width - 6;
+        const top = Math.max(margin, Math.min(parentRect.top, window.innerHeight - menuRect.height - margin));
+        this.startPowerMenu.style.left = `${Math.max(margin, left)}px`;
+        this.startPowerMenu.style.top = `${top}px`;
+        parentItem.classList.add('submenu-open');
+        parentItem.setAttribute('aria-expanded', 'true');
+        if (focusFirst) this.startPowerMenu.querySelector('.fluent-context-menu-item')?.focus();
+    },
+
+    scheduleHideStartPowerMenu() {
+        clearTimeout(this._startPowerHideTimer);
+        this._startPowerHideTimer = setTimeout(() => {
+            const hoveringParent = this.startContextMenu?.matches(':hover');
+            const hoveringChild = this.startPowerMenu?.matches(':hover');
+            if (hoveringParent || hoveringChild) return;
+            this.hideStartPowerMenu();
+        }, 140);
+    },
+
+    hideStartPowerMenu() {
+        clearTimeout(this._startPowerHideTimer);
+        this._startPowerHideTimer = null;
+        this.startPowerMenu?.hide();
+        const parentItem = this.startContextMenu?.querySelector('[data-action="power"]');
+        parentItem?.classList.remove('submenu-open');
+        parentItem?.setAttribute('aria-expanded', 'false');
+    },
+
+    hideStartContextMenus() {
+        this.startContextMenu?.hide();
+        this.hideStartPowerMenu();
+    },
+
+    handleStartPowerAction(action) {
+        this.hideStartContextMenus();
+        if (action === 'lock') State.lock();
+        else if (action === 'logout') State.logout();
+        else if (action === 'restart') State.restart();
+        else if (action === 'shutdown') State.shutdown();
     },
 
     renderApps() {
@@ -369,7 +572,14 @@ const Taskbar = {
         // 开始按钮
         this.startBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            this.hideStartContextMenus();
             StartMenu.toggle();
+        });
+
+        this.startBtn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showStartContextMenu(e);
         });
 
         // 应用图标拖拽 → 固定到桌面
@@ -473,7 +683,14 @@ const Taskbar = {
         // 点击外部关闭右键菜单
         document.addEventListener('click', () => {
             this.hideContextMenu();
+            this.hideStartContextMenus();
         });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.hideStartContextMenus();
+        });
+
+        window.addEventListener('resize', () => this.hideStartContextMenus());
 
         // 全局快捷键在 main.js 统一注册
     },
