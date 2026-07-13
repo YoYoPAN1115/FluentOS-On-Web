@@ -11,11 +11,12 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
-        { date: '2026-07-13', version: '2.1.260713', commits: [
+        { date: '2026-07-13', version: '2.2.260713', commits: [
+            { hash: 'local', title: '修复系统内无法彻底删除文件的严重BUG；重新调整了设置App的存储统计，改为了真实大小；引入全新终端App；进一步优化了系统体验，修复了部分视觉问题，并修复了部分场景内容滚动BUG' },
             { hash: '2ab5cdc', title: '进一步完成系统瘦身优化工作，更新了文件导入模块，引入全新进程管理 App' }
         ] },
         { date: '2026-07-12', version: '2.1.260712', commits: [
-            { hash: 'local', title: '完成对系统瘦身优化工作，删除大量不必要的重复组件' },
+            { hash: 'aaa40e2', title: '完成对系统瘦身优化工作，删除大量不必要的重复组件' },
             { hash: '6decb2e', title: '紧急修复计时器的意外奔溃BUG' }
         ] },
         { date: '2026-07-10', version: '2.0.260710', commits: [
@@ -4515,6 +4516,19 @@ const SettingsApp = {
     systemAppIds: ['files', 'settings', 'process-manager', 'terminal', 'tips', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
     removableSystemAppIds: ['tips', 'camera', 'photos', 'media'],
 
+    getAppVersion(appId) {
+        const versions = {
+            terminal: '2.0.2',
+            'process-manager': '2.0.2',
+            media: '2.1.0',
+            photos: '2.1.0',
+            files: '2.1.0',
+            settings: '2.1.0',
+            appshop: '2.1.0'
+        };
+        return versions[appId] || '2.0.1';
+    },
+
     // 应用描述
     getAppDescription(appId) {
         const descKeys = {
@@ -4752,7 +4766,7 @@ const SettingsApp = {
                 <img src="${app.icon}" class="app-detail-icon" alt="${app.name}">
                 <div class="app-detail-info">
                     <div class="app-detail-name">${app.name}</div>
-                    <div class="app-detail-version">${t('settings.version')} 1.0.0</div>
+                    <div class="app-detail-version">${t('settings.version')} ${this.getAppVersion(app.id)}</div>
                     <div class="app-detail-developer">${isSystem ? 'Fluent OS' : t('settings.third-party-dev')}</div>
                 </div>
             </div>
