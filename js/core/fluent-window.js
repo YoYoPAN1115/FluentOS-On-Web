@@ -462,7 +462,17 @@ const FluentWindow = {
         }, true);
 
         document.addEventListener('wheel', (e) => {
+            const eventTarget = e.target instanceof Element ? e.target : null;
+            const selfScrollTarget = eventTarget?.closest('[data-fw-wheel-scope="self"]');
+            if (selfScrollTarget instanceof HTMLElement) {
+                // Keep the browser's native wheel scrolling for editors. Stopping
+                // propagation here prevents FluentWindow/page bounce handlers from
+                // seeing the event without replacing the smooth native scroll path.
+                e.stopImmediatePropagation();
+                return;
+            }
             if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            if (eventTarget?.closest('[data-fw-scroll-bounce="off"]')) return;
             const el = findScrollable(e.target);
             if (!el) return;
             showScrollbar(el);

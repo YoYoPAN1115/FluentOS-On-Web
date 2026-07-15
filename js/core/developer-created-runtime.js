@@ -13,7 +13,9 @@ const DeveloperCreatedRuntime = {
         if (typeof State !== 'undefined') State.on?.('settingsChange', (updates) => {
             if (!updates) return;
             const keys = ['theme', 'accentColor', 'enableFluentV2', 'materialType', 'enableBlur', 'enableWindowBlur', 'enableButtonGlowEffect', 'blurIntensity'];
-            if (keys.some((key) => Object.prototype.hasOwnProperty.call(updates, key))) this.broadcastHostState();
+            // State emits before all theme CSS variables/classes are applied.
+            // Broadcast on the next microtask so created Apps receive the final state.
+            if (keys.some((key) => Object.prototype.hasOwnProperty.call(updates, key))) queueMicrotask(() => this.broadcastHostState());
         });
     },
 
@@ -97,27 +99,40 @@ const DeveloperCreatedRuntime = {
         return frame;
     },
 
+    _getFluentUiCss() {
+        const sheet = [...document.styleSheets].find((item) => String(item.href || '').replace(/\\/g, '/').endsWith('/css/fluent-ui.css'));
+        if (!sheet) return '';
+        try { return [...sheet.cssRules].map((rule) => rule.cssText).join('\n'); }
+        catch (_) { return ''; }
+    },
+
     buildDocument(app) {
+        const baseCss = `
+            :root{
+                color-scheme:light;--fluent-accent:#0078d4;--fluent-bg:#f3f3f3;--fluent-control:#fff;--fluent-control-hover:#f9f9f9;
+                --fluent-text:#1b1b1b;--fluent-subtle:#5d5d5d;--fluent-border:rgba(0,0,0,.16);
+                --accent:#0078d4;--accent-hover:#106ebe;--accent-rgb:0,120,212;--accent-contrast:#fff;
+                --bg-primary:#f3f3f3;--bg-secondary:rgba(255,255,255,.72);--bg-tertiary:rgba(255,255,255,.5);
+                --text-primary:#1b1b1b;--text-secondary:#5d5d5d;--text-tertiary:#767676;--border-color:rgba(0,0,0,.12);
+            }
+            :root[data-fluent-theme="dark"]{
+                color-scheme:dark;--fluent-bg:#202020;--fluent-control:#2d2d2d;--fluent-control-hover:#353535;
+                --fluent-text:#fff;--fluent-subtle:#c8c8c8;--fluent-border:rgba(255,255,255,.14);
+                --bg-primary:#202020;--bg-secondary:rgba(32,32,32,.72);--bg-tertiary:rgba(32,32,32,.5);
+                --text-primary:#fff;--text-secondary:#c8c8c8;--text-tertiary:#9d9d9d;--border-color:rgba(255,255,255,.12);
+            }
+            html,body{color:var(--text-primary);background:var(--bg-primary)}
+        `;
         const forceCss = app.forceFluentUI ? `
             :root{
                 font-family:'Segoe UI Variable','Segoe UI',system-ui,sans-serif;
-                color-scheme:light dark;
-                --fluent-accent:#0078d4;
-                --fluent-bg:#f3f3f3;--fluent-control:#fff;--fluent-control-hover:#f9f9f9;
-                --fluent-text:#1b1b1b;--fluent-subtle:#5d5d5d;--fluent-border:rgba(0,0,0,.16);
                 --fluent-shadow:0 1px 2px rgba(0,0,0,.08);
-                --accent:#0078d4;--accent-hover:#106ebe;--accent-rgb:0,120,212;
-                --bg-primary:#f3f3f3;--bg-secondary:rgba(255,255,255,.72);--bg-tertiary:rgba(255,255,255,.5);
-                --text-primary:#1b1b1b;--text-secondary:#5d5d5d;--text-tertiary:#767676;--border-color:rgba(0,0,0,.12);
                 --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--transition-fast:.15s ease-out;--transition-normal:.25s ease-out;
                 --shadow-sm:0 1px 2px rgba(0,0,0,.08);--shadow-md:0 4px 12px rgba(0,0,0,.12);--shadow-lg:0 12px 30px rgba(0,0,0,.18);
                 --v2-blur:40px;--v2-blur-light:20px;
             }
             :root[data-fluent-theme="dark"]{
-                color-scheme:dark;--fluent-bg:#202020;--fluent-control:#2d2d2d;--fluent-control-hover:#353535;
-                --fluent-text:#fff;--fluent-subtle:#c8c8c8;--fluent-border:rgba(255,255,255,.14);--fluent-shadow:0 1px 2px rgba(0,0,0,.3);
-                --accent:#60cdff;--accent-hover:#4db8e8;--bg-primary:#202020;--bg-secondary:rgba(32,32,32,.72);--bg-tertiary:rgba(32,32,32,.5);
-                --text-primary:#fff;--text-secondary:#c8c8c8;--text-tertiary:#9d9d9d;--border-color:rgba(255,255,255,.12);
+                --fluent-shadow:0 1px 2px rgba(0,0,0,.3);
             }
             *,*::before,*::after{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--fluent-text) 38%,transparent) transparent}
             *::-webkit-scrollbar{width:6px;height:6px}
@@ -125,6 +140,29 @@ const DeveloperCreatedRuntime = {
             *::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--fluent-text) 38%,transparent);border-radius:999px}
             *::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--fluent-text) 55%,transparent)}
             html,body{margin:0;color:var(--fluent-text);background:var(--fluent-bg);font-family:inherit}
+            body.fluent-v2 button.fluent-btn{
+                color:var(--accent)!important;-webkit-text-fill-color:var(--accent)!important;
+                background-clip:border-box!important;-webkit-background-clip:border-box!important;background-image:none!important;
+            }
+            body.fluent-v2 button.fluent-btn:hover,body.fluent-v2 button.fluent-btn:focus-visible{
+                color:var(--accent-hover)!important;-webkit-text-fill-color:var(--accent-hover)!important;
+            }
+            body.fluent-v2 button.fluent-btn-primary{
+                color:var(--accent-contrast)!important;-webkit-text-fill-color:var(--accent-contrast)!important;background:var(--accent)!important;
+            }
+            body.fluent-v2 button.fluent-btn-primary:hover,body.fluent-v2 button.fluent-btn-primary:focus-visible{
+                color:var(--accent-contrast)!important;-webkit-text-fill-color:var(--accent-contrast)!important;background:var(--accent-hover)!important;
+            }
+            body.fluent-v2 .fluent-runtime-input-wrapper{
+                min-height:40px!important;border-radius:10px!important;padding:0 12px!important;
+                background:var(--fluent-control)!important;border:1px solid var(--fluent-border)!important;
+            }
+            body.fluent-v2 .fluent-runtime-input-wrapper::before{border-radius:10px!important}
+            body.fluent-v2 .fluent-runtime-input-wrapper:focus-within{
+                border-color:var(--accent)!important;box-shadow:0 0 0 2px rgba(var(--accent-rgb,0,120,212),.2)!important;
+            }
+            body.fluent-v2 .fluent-runtime-textarea-wrapper{border-radius:10px!important;padding:10px 12px!important}
+            body.fluent-v2 .fluent-runtime-input-wrapper .fluent-input{min-height:0!important;padding:9px 0!important;border-radius:0!important}
             .fluent-runtime-input-wrapper{width:100%;min-width:0}
             .fluent-runtime-textarea-wrapper{align-items:stretch;padding:8px 12px}
             .fluent-runtime-textarea-wrapper textarea.fluent-input{width:100%;min-height:90px;padding:0;resize:vertical}
@@ -158,7 +196,7 @@ const DeveloperCreatedRuntime = {
             const resolveTargets=target=>typeof target==='string'?[...document.querySelectorAll(target)]:(target instanceof Element?[target]:(target&&typeof target.length==='number'?[...target].filter(item=>item instanceof Element):[]));
             const highlightButton=(target,enabled=true)=>{const items=resolveTargets(target).filter(item=>item.matches('button,[role="button"]'));items.forEach(item=>{item.classList.add('fluent-btn','fluent-btn-medium');item.classList.toggle('fluent-btn-primary',enabled);item.classList.toggle('fluent-btn-secondary',!enabled)});return items.length};
             const enableButtonGlow=(target,enabled=true)=>{const items=resolveTargets(target).filter(item=>item.matches('button,[role="button"],a[href]'));items.forEach(item=>{item.classList.toggle('button-glow-disabled',!enabled);if(!enabled||item.dataset.fluentGlowReady==='true')return;item.dataset.fluentGlowReady='true';item.classList.add('button-glow-target');const edge=document.createElement('span');edge.className='button-edge-glow';edge.setAttribute('aria-hidden','true');item.appendChild(edge);item.addEventListener('pointermove',event=>{const rect=item.getBoundingClientRect();item.style.setProperty('--button-glow-x',event.clientX-rect.left+'px');item.style.setProperty('--button-glow-y',event.clientY-rect.top+'px');item.classList.add('button-glow-hover')});item.addEventListener('pointerleave',()=>item.classList.remove('button-glow-hover'));item.addEventListener('pointerdown',event=>{if(event.button!==0)return;const rect=item.getBoundingClientRect(),size=Math.max(rect.width,rect.height)*2.25,ripple=document.createElement('span');ripple.className='button-glow-ripple';ripple.style.cssText='width:'+size+'px;height:'+size+'px;left:'+(event.clientX-rect.left)+'px;top:'+(event.clientY-rect.top)+'px';item.appendChild(ripple);ripple.addEventListener('animationend',()=>ripple.remove(),{once:true})})});return items.length};
-            window.FluentOS={call(method,args={}){return new Promise((resolve,reject)=>{const id='api-'+(++seq);pending.set(id,{resolve,reject});parent.postMessage({type:'fluentos:api',id,method,args},'*');setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(new Error('API request timed out'))}},5000)})},
+            window.FluentOS={call(method,args={}){return new Promise((resolve,reject)=>{const id='api-'+(++seq),timeout=String(method).startsWith('network.')?20000:5000;pending.set(id,{resolve,reject});parent.postMessage({type:'fluentos:api',id,method,args},'*');setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(new Error('API request timed out'))}},timeout)})},
             notify(title,message,type='info'){return this.call('notification.show',{title,message,type})},
             get state(){return {...hostState}},getTheme(){return this.call('system.theme')},getThemeMode(){return this.call('system.themeMode')},getAccentColor(){return this.call('system.accentColor')},getSystemState(){return this.call('system.state')},getLanguage(){return this.call('system.language')},isWindowBlurEnabled(){return this.call('system.windowBlurEnabled')},
             storage:{get:key=>FluentOS.call('storage.get',{key}),set:(key,value)=>FluentOS.call('storage.set',{key,value}),remove:key=>FluentOS.call('storage.remove',{key})},
@@ -169,18 +207,21 @@ const DeveloperCreatedRuntime = {
             window:{setTitle:title=>FluentOS.call('window.setTitle',{title}),setSize:(width,height)=>FluentOS.call('window.setSize',{width,height})},
             files:{listText:(folder='documents')=>FluentOS.call('files.listText',{folder}),readText:id=>FluentOS.call('files.readText',{id}),writeText:(id,content)=>FluentOS.call('files.writeText',{id,content}),createText:(name,content='')=>FluentOS.call('files.createText',{name,content})},
             desktop:{addShortcut:()=>FluentOS.call('desktop.addShortcut'),removeShortcut:()=>FluentOS.call('desktop.removeShortcut')},
+            network:{request:(url,options={})=>FluentOS.call('network.request',{url,options}),loadImage:url=>FluentOS.call('network.loadImage',{url})},
             ui:{highlightButton,enableButtonGlow}};
-            addEventListener('message',e=>{const m=e.data||{};if(m.type==='fluentos:api-result'&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.ok?p.resolve(m.value):p.reject(new Error(m.error||'API failed'))}if(m.type==='fluentos:host-state'){hostState={...hostState,...m.payload};const root=document.documentElement,body=document.body,dark=hostState.isDark===true,blur=Math.max(10,Math.min(70,Number(hostState.blurIntensity)||40));root.dataset.fluentTheme=hostState.theme||'light';root.style.setProperty('--fluent-accent',hostState.accentColor||'#0078d4');root.style.setProperty('--accent',hostState.accentColor||'#0078d4');root.style.setProperty('--accent-hover',hostState.accentColor||'#106ebe');root.style.setProperty('--accent-rgb',(hostState.accentRgb||[0,120,212]).join(','));root.style.setProperty('--bg-tertiary',dark?'rgba(32,32,32,.5)':'rgba(255,255,255,.5)');root.style.setProperty('--text-primary',dark?'#fff':'#1b1b1b');root.style.setProperty('--border-color',dark?'rgba(255,255,255,.12)':'rgba(0,0,0,.12)');root.style.setProperty('--radius-sm','8px');root.style.setProperty('--transition-fast','.15s ease-out');root.style.setProperty('--v2-blur',blur+'px');root.style.setProperty('--v2-blur-light',Math.max(8,Math.round(blur*.5))+'px');root.lang=hostState.language||'zh';body.classList.toggle('dark-mode',dark);body.classList.toggle('fluent-v2',forceUI&&hostState.fluentV2!==false);body.classList.toggle('blur-disabled',hostState.blurEnabled===false);body.classList.toggle('window-blur-enabled',hostState.windowBlurEnabled===true);body.classList.toggle('window-blur-disabled',hostState.windowBlurEnabled!==true);body.classList.toggle('button-glow-enabled',hostState.buttonGlowEnabled!==false);body.classList.toggle('material-mica',hostState.material==='mica');body.classList.toggle('material-gaussian',hostState.material!=='mica');dispatchEvent(new CustomEvent('fluentosstatechange',{detail:{...hostState}}))}});
+            addEventListener('message',e=>{const m=e.data||{};if(m.type==='fluentos:api-result'&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.ok?p.resolve(m.value):p.reject(new Error(m.error||'API failed'))}if(m.type==='fluentos:host-state'){hostState={...hostState,...m.payload};const root=document.documentElement,body=document.body,dark=hostState.isDark===true,blur=Math.max(10,Math.min(70,Number(hostState.blurIntensity)||40)),accent=hostState.accentColor||'#0078d4';root.dataset.fluentTheme=hostState.theme||'light';root.style.setProperty('--fluent-accent',accent);root.style.setProperty('--accent',accent);root.style.setProperty('--accent-hover',hostState.accentHover||accent);root.style.setProperty('--accent-rgb',(hostState.accentRgb||[0,120,212]).join(','));root.style.setProperty('--accent-contrast',hostState.accentContrast||'#fff');root.style.setProperty('--fluent-bg',dark?'#202020':'#f3f3f3');root.style.setProperty('--fluent-control',dark?'#2d2d2d':'#fff');root.style.setProperty('--fluent-control-hover',dark?'#353535':'#f9f9f9');root.style.setProperty('--fluent-text',dark?'#fff':'#1b1b1b');root.style.setProperty('--fluent-subtle',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--bg-primary',dark?'#202020':'#f3f3f3');root.style.setProperty('--bg-secondary',dark?'rgba(32,32,32,.72)':'rgba(255,255,255,.72)');root.style.setProperty('--bg-tertiary',dark?'rgba(32,32,32,.5)':'rgba(255,255,255,.5)');root.style.setProperty('--text-primary',dark?'#fff':'#1b1b1b');root.style.setProperty('--text-secondary',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--text-tertiary',dark?'#9d9d9d':'#767676');root.style.setProperty('--border-color',dark?'rgba(255,255,255,.12)':'rgba(0,0,0,.12)');root.style.setProperty('--radius-sm','8px');root.style.setProperty('--transition-fast','.15s ease-out');root.style.setProperty('--v2-blur',blur+'px');root.style.setProperty('--v2-blur-light',Math.max(8,Math.round(blur*.5))+'px');root.lang=hostState.language||'zh';body.classList.toggle('dark-mode',dark);body.classList.toggle('fluent-v2',forceUI&&hostState.fluentV2!==false);body.classList.toggle('blur-disabled',hostState.blurEnabled===false);body.classList.toggle('window-blur-enabled',hostState.windowBlurEnabled===true);body.classList.toggle('window-blur-disabled',hostState.windowBlurEnabled!==true);body.classList.toggle('button-glow-enabled',hostState.buttonGlowEnabled!==false);body.classList.toggle('material-mica',hostState.material==='mica');body.classList.toggle('material-gaussian',hostState.material!=='mica');dispatchEvent(new CustomEvent('fluentosstatechange',{detail:{...hostState}}))}});
             addEventListener('error',e=>parent.postMessage({type:'fluentos:runtime-error',message:e.message},'*'));
             addEventListener('unhandledrejection',e=>parent.postMessage({type:'fluentos:runtime-error',message:String(e.reason||'Unhandled promise rejection')},'*'));
             addEventListener('pointerdown',()=>parent.postMessage({type:'fluentos:focus-request'},'*'),true);
             parent.postMessage({type:'fluentos:ready'},'*');
             })();
         `;
-        const fluentStylesheet = '<link rel="stylesheet" href="css/fluent-ui.css">';
+        const fluentStylesheet = app.forceFluentUI ? `<style>${this._getFluentUiCss().replace(/<\/style/gi, '<\\/style')}</style>` : '';
+        const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'";
         const safeJs = String(app.js || '').replace(/<\/script/gi, '<\\/script');
+        const safeCss = String(app.css || '').replace(/<\/style/gi, '<\\/style');
         const html = String(app.html || '<main><h1>Hello, FluentOS!</h1></main>');
-        return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${app.css || ''}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>${safeJs}<\/script></body></html>`;
+        return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${baseCss}</style><style>${safeCss}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>${safeJs}<\/script></body></html>`;
     },
 
     escapeHtml(value) {
@@ -189,7 +230,10 @@ const DeveloperCreatedRuntime = {
 
     getHostState(windowId = null) {
         const isDark = document.body.classList.contains('dark-mode');
-        const accentColor = State.settings.accentColor || '#0078d4';
+        const rootStyle = getComputedStyle(document.documentElement);
+        const accentColor = rootStyle.getPropertyValue('--accent').trim() || State.settings.accentColor || '#0078d4';
+        const accentHover = rootStyle.getPropertyValue('--accent-hover').trim() || accentColor;
+        const accentContrast = rootStyle.getPropertyValue('--accent-contrast').trim() || '#ffffff';
         const hex = String(accentColor).replace('#', '');
         const normalizedHex = hex.length === 3 ? hex.split('').map((part) => part + part).join('') : hex;
         const accentRgb = /^[0-9a-f]{6}$/i.test(normalizedHex)
@@ -201,6 +245,8 @@ const DeveloperCreatedRuntime = {
             isDark,
             language: typeof I18n !== 'undefined' ? I18n.currentLang : 'zh',
             accentColor,
+            accentHover,
+            accentContrast,
             accentRgb,
             fluentV2: State.settings.enableFluentV2 !== false,
             material: State.settings.materialType || 'gaussian',
@@ -217,7 +263,7 @@ const DeveloperCreatedRuntime = {
     },
 
     broadcastHostState() {
-        this.frames.forEach((registration, target) => this._send(target, { type: 'fluentos:host-state', payload: this.getHostState() }));
+        this.frames.forEach((registration, target) => this._send(target, { type: 'fluentos:host-state', payload: this.getHostState(registration.windowId) }));
     },
 
     async _onMessage(event) {
@@ -229,7 +275,7 @@ const DeveloperCreatedRuntime = {
             return;
         }
         if (message.type === 'fluentos:focus-request') {
-            WindowManager.focusWindow?.(registration.windowId, { suppressMotion: true });
+            WindowManager.focusWindow?.(registration.windowId);
             return;
         }
         if (message.type === 'fluentos:runtime-error') {
@@ -243,6 +289,118 @@ const DeveloperCreatedRuntime = {
         try { value = await this._invokeApi(registration, message.method, message.args || {}); }
         catch (reason) { ok = false; error = reason?.message || String(reason); }
         this._send(event.source, { type: 'fluentos:api-result', id: message.id, ok, value, error });
+    },
+
+    _networkUrl(app, group, value) {
+        let url;
+        try { url = new URL(String(value || '')); }
+        catch (_) { throw new Error('A valid HTTPS URL is required'); }
+        if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) {
+            throw new Error('Only credential-free HTTPS URLs on the default port are allowed');
+        }
+        const network = DeveloperCenterStore.normalizeNetworkConfig(app.network);
+        const allowed = group === 'image' ? network.image : network.connect;
+        if (!allowed.includes(url.hostname.toLowerCase().replace(/\.$/, ''))) {
+            throw new Error(`Domain is not in this App's ${group} allowlist`);
+        }
+        return url;
+    },
+
+    async _readLimitedResponse(response, maxBytes) {
+        const declared = Number(response.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > maxBytes) throw new Error('Network response is too large');
+        if (!response.body?.getReader) {
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            if (bytes.byteLength > maxBytes) throw new Error('Network response is too large');
+            return bytes;
+        }
+        const reader = response.body.getReader();
+        const chunks = [];
+        let length = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                length += value.byteLength;
+                if (length > maxBytes) throw new Error('Network response is too large');
+                chunks.push(value);
+            }
+        } catch (error) {
+            try { await reader.cancel(); } catch (_) {}
+            throw error;
+        }
+        const output = new Uint8Array(length);
+        let offset = 0;
+        chunks.forEach((chunk) => { output.set(chunk, offset); offset += chunk.byteLength; });
+        return output;
+    },
+
+    _bytesToDataUrl(bytes, mime) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(reader.error || new Error('Could not decode the image response'));
+            reader.readAsDataURL(new Blob([bytes], { type: mime }));
+        });
+    },
+
+    async _networkRequest(app, args) {
+        const url = this._networkUrl(app, 'connect', args.url);
+        const input = args.options && typeof args.options === 'object' ? args.options : {};
+        const method = String(input.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('Unsupported network method');
+        const headers = new Headers();
+        const blockedHeader = /^(?:cookie|host|origin|referer|connection|content-length|proxy-|sec-)/i;
+        Object.entries(input.headers && typeof input.headers === 'object' ? input.headers : {}).forEach(([name, value]) => {
+            if (blockedHeader.test(name)) throw new Error(`Request header is not allowed: ${name}`);
+            const text = String(value);
+            if (name.length > 80 || text.length > 4096) throw new Error('Request header is too large');
+            headers.set(name, text);
+        });
+        let body;
+        if (input.body !== undefined && input.body !== null) {
+            if (method === 'GET' || method === 'HEAD') throw new Error(`${method} requests cannot contain a body`);
+            body = typeof input.body === 'string' ? input.body : JSON.stringify(input.body);
+            if (new TextEncoder().encode(body).byteLength > 512 * 1024) throw new Error('Network request body is too large');
+            if (typeof input.body !== 'string' && !headers.has('content-type')) headers.set('content-type', 'application/json');
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await fetch(url.href, {
+                method, headers, body, mode: 'cors', credentials: 'omit', cache: 'no-store',
+                redirect: 'error', referrerPolicy: 'no-referrer', signal: controller.signal
+            });
+            // Redirects are disabled; this is a second invariant check for browser differences.
+            this._networkUrl(app, 'connect', response.url || url.href);
+            const bytes = method === 'HEAD' ? new Uint8Array() : await this._readLimitedResponse(response, 2 * 1024 * 1024);
+            return {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText,
+                url: response.url || url.href,
+                headers: Object.fromEntries(response.headers.entries()),
+                body: new TextDecoder().decode(bytes)
+            };
+        } finally { clearTimeout(timeout); }
+    },
+
+    async _networkImage(app, args) {
+        const url = this._networkUrl(app, 'image', args.url);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await fetch(url.href, {
+                method: 'GET', headers: { Accept: 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon' },
+                mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
+                referrerPolicy: 'no-referrer', signal: controller.signal
+            });
+            this._networkUrl(app, 'image', response.url || url.href);
+            if (!response.ok) throw new Error(`Image request failed with status ${response.status}`);
+            const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+            if (!/^image\/(?:png|jpeg|gif|webp|avif|bmp|x-icon)$/.test(mime)) throw new Error('The response is not a supported raster image');
+            return this._bytesToDataUrl(await this._readLimitedResponse(response, 5 * 1024 * 1024), mime);
+        } finally { clearTimeout(timeout); }
     },
 
     async _invokeApi(registration, method, args) {
@@ -402,6 +560,12 @@ const DeveloperCreatedRuntime = {
                 requirePermission('desktop.manage');
                 Desktop.removeAppShortcut(app.id);
                 return true;
+            case 'network.request':
+                requirePermission('network.request');
+                return this._networkRequest(app, args);
+            case 'network.loadImage':
+                requirePermission('network.image');
+                return this._networkImage(app, args);
             default: throw new Error('API is not permitted');
         }
     },

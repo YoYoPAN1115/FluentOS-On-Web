@@ -12,9 +12,12 @@ const DeveloperCenterStore = {
         'window.manage',
         'files.readText',
         'files.writeText',
-        'desktop.manage'
+        'desktop.manage',
+        'network.request',
+        'network.image'
     ],
     DEFAULT_FAVORITES: ['json', 'base64', 'url', 'timestamp', 'hash', 'qrcode'],
+    DEFAULT_EDITOR_APPEARANCE: Object.freeze({ fontFamily: 'Cascadia Code, Consolas, monospace', fontSize: 13 }),
     db: null,
     _ready: null,
 
@@ -105,6 +108,39 @@ const DeveloperCenterStore = {
         return `${prefix}-${random}`;
     },
 
+    normalizeNetworkDomains(values) {
+        const input = Array.isArray(values) ? values : String(values || '').split(/[\s,;]+/);
+        const domains = [];
+        input.forEach((value) => {
+            const raw = String(value || '').trim().toLowerCase().replace(/\.$/, '');
+            if (!raw) return;
+            if (raw.length > 253 || raw.includes('/') || raw.includes(':') || raw.includes('@')) {
+                throw new Error(`Invalid network domain: ${raw}`);
+            }
+            let hostname = '';
+            try { hostname = new URL(`https://${raw}/`).hostname.toLowerCase().replace(/\.$/, ''); }
+            catch (_) { throw new Error(`Invalid network domain: ${raw}`); }
+            const isIp = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':');
+            const isPrivate = !hostname.includes('.') || hostname === 'localhost' || hostname.endsWith('.localhost') ||
+                ['.local', '.internal', '.lan', '.home'].some((suffix) => hostname.endsWith(suffix)) ||
+                /^(?:0|10|127|169\.254|192\.168)\./.test(hostname) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(hostname);
+            if (hostname !== raw || isIp || isPrivate || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostname)) {
+                throw new Error(`Unsafe network domain: ${raw}`);
+            }
+            if (!domains.includes(hostname)) domains.push(hostname);
+        });
+        if (domains.length > 20) throw new Error('A network allowlist can contain at most 20 domains');
+        return domains;
+    },
+
+    normalizeNetworkConfig(network) {
+        const value = network && typeof network === 'object' ? network : {};
+        return {
+            connect: this.normalizeNetworkDomains(value.connect),
+            image: this.normalizeNetworkDomains(value.image)
+        };
+    },
+
     async saveProject(project) {
         const now = new Date().toISOString();
         const existing = project.id ? await this.get('projects', project.id) : null;
@@ -144,6 +180,27 @@ const DeveloperCenterStore = {
 
     async resetFavorites() {
         return this.setFavorites(this.DEFAULT_FAVORITES);
+    },
+
+    normalizeEditorAppearance(value) {
+        const input = value && typeof value === 'object' ? value : {};
+        const rawFont = String(input.fontFamily || this.DEFAULT_EDITOR_APPEARANCE.fontFamily).trim();
+        const fontFamily = rawFont && rawFont.length <= 120 && !/[;{}<>]/.test(rawFont)
+            ? rawFont
+            : this.DEFAULT_EDITOR_APPEARANCE.fontFamily;
+        const fontSize = Math.max(11, Math.min(24, Math.round(Number(input.fontSize) || this.DEFAULT_EDITOR_APPEARANCE.fontSize)));
+        return { fontFamily, fontSize };
+    },
+
+    async getEditorAppearance() {
+        const item = await this.get('preferences', 'editorAppearance');
+        return this.normalizeEditorAppearance(item?.value);
+    },
+
+    async setEditorAppearance(value) {
+        const appearance = this.normalizeEditorAppearance(value);
+        await this.put('preferences', { key: 'editorAppearance', value: appearance });
+        return appearance;
     },
 
     async nameExists(name, excludeProjectId = null) {
@@ -271,6 +328,7 @@ const DeveloperCenterStore = {
             forceFluentUI: app.forceFluentUI === true,
             permissions: [...new Set(Array.isArray(app.permissions) ? app.permissions : [])]
                 .filter((permission) => this.SUPPORTED_PERMISSIONS.includes(permission)),
+            network: this.normalizeNetworkConfig(app.network),
             iconFile: icon.startsWith('data:') ? 'icon.txt' : null,
             iconPath: icon.startsWith('data:') ? null : icon,
             exportedAt: new Date().toISOString()
@@ -299,6 +357,11 @@ const DeveloperCenterStore = {
             throw new Error('The package requests an unknown permission');
         }
         if (manifest.type === 'pwa' && permissions.length) throw new Error('PWA packages cannot request FluentOS bridge permissions');
+        const network = this.normalizeNetworkConfig(manifest.network);
+        if (network.connect.length > 0 && !permissions.includes('network.request')) throw new Error('network.request is required for network.connect domains');
+        if (network.image.length > 0 && !permissions.includes('network.image')) throw new Error('network.image is required for network.image domains');
+        if (permissions.includes('network.request') && network.connect.length === 0) throw new Error('network.request requires at least one network.connect domain');
+        if (permissions.includes('network.image') && network.image.length === 0) throw new Error('network.image requires at least one network.image domain');
         const icon = manifest.iconFile && entries[manifest.iconFile]
             ? new TextDecoder().decode(entries[manifest.iconFile])
             : (manifest.iconPath || 'Theme/Icon/App_icon/created_app.png');
@@ -311,7 +374,8 @@ const DeveloperCenterStore = {
             css: entries['app/styles.css'] ? new TextDecoder().decode(entries['app/styles.css']) : '',
             js: entries['app/main.js'] ? new TextDecoder().decode(entries['app/main.js']) : '',
             forceFluentUI: manifest.forceFluentUI === true,
-            permissions
+            permissions,
+            network
         };
     },
 

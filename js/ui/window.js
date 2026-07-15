@@ -123,7 +123,7 @@ const WindowManager = {
         shield.onpointerdown = (event) => {
             event.preventDefault();
             event.stopPropagation();
-            this.focusWindow(windowId, { suppressMotion: true });
+            this.focusWindow(windowId);
         };
     },
 
@@ -135,7 +135,7 @@ const WindowManager = {
                 const frame = document.activeElement;
                 if (!(frame instanceof HTMLIFrameElement)) return;
                 const windowId = this._embeddedFrameWindows.get(frame);
-                if (windowId) this.focusWindow(windowId, { suppressMotion: true });
+                if (windowId) this.focusWindow(windowId);
             }, 0);
         }, true);
     },
@@ -598,23 +598,23 @@ const WindowManager = {
     _playWindowFocusMotion(windowData, motionClass) {
         if (!windowData || !windowData.element || !this._isAnimationEnabled()) return;
         const el = windowData.element;
-        el.classList.remove('window-focus-pop', 'window-focus-dip');
+        el.classList.remove('window-focus-enter', 'window-focus-leave');
         void el.offsetWidth;
         el.classList.add(motionClass);
         clearTimeout(windowData._focusMotionTimer);
         windowData._focusMotionTimer = setTimeout(() => {
-            el.classList.remove('window-focus-pop', 'window-focus-dip');
+            el.classList.remove('window-focus-enter', 'window-focus-leave');
             windowData._focusMotionTimer = null;
-        }, 340);
+        }, 180);
     },
 
     _playFocusTransitionMotion(nextWindowData, previousWindowData, forceMotion = false) {
         if (!this._isAnimationEnabled()) return;
         if (previousWindowData && previousWindowData !== nextWindowData) {
-            this._playWindowFocusMotion(previousWindowData, 'window-focus-dip');
+            this._playWindowFocusMotion(previousWindowData, 'window-focus-leave');
         }
         if (forceMotion || (previousWindowData && previousWindowData !== nextWindowData)) {
-            this._playWindowFocusMotion(nextWindowData, 'window-focus-pop');
+            this._playWindowFocusMotion(nextWindowData, 'window-focus-enter');
         }
     },
 
@@ -625,8 +625,14 @@ const WindowManager = {
             const target = event.target instanceof Element ? event.target : null;
             if (target && target.closest('.window')) return;
             if (target && target.closest('.taskbar')) return;
+            const previousWindowData = this.activeWindowId
+                ? this.windows.find((windowData) => windowData && windowData.id === this.activeWindowId)
+                : null;
             this._setActiveWindow(null);
             this._syncAllTaskbarAppStates();
+            if (previousWindowData && !previousWindowData.isMinimized && !previousWindowData.isMinimizing) {
+                this._playWindowFocusMotion(previousWindowData, 'window-focus-leave');
+            }
         }, true);
     },
 
@@ -655,7 +661,7 @@ const WindowManager = {
         }
         this._clearTombstoneTimer(windowData);
         if (windowData.element) {
-            windowData.element.classList.remove('window-focus-pop', 'window-focus-dip');
+            windowData.element.classList.remove('window-focus-enter', 'window-focus-leave');
         }
         this._clearTaskbarIndicatorMotion(windowData.appId);
     },
@@ -1432,6 +1438,8 @@ const WindowManager = {
         let isDragging = false;
         let dragPointerId = null;
         let dragMoved = false;
+        let dragStartClientX = 0;
+        let dragStartClientY = 0;
         let currentX;
         let currentY;
         let initialX;
@@ -1478,6 +1486,8 @@ const WindowManager = {
             isDragging = true;
             dragPointerId = e.pointerId;
             dragMoved = false;
+            dragStartClientX = e.clientX;
+            dragStartClientY = e.clientY;
             dragOffsetX = e.clientX - windowElement.offsetLeft;
             dragOffsetY = e.clientY - windowElement.offsetTop;
             initialX = dragOffsetX;
@@ -1485,9 +1495,6 @@ const WindowManager = {
             dragStartedFromSnap = !!(windowData && windowData.snapLayout);
             dragUnsnapped = false;
             
-            // 禁用过渡以实现平滑拖动 - Disable transition for smooth drag
-            windowElement.style.transition = 'none';
-
             if (typeof titlebar.setPointerCapture === 'function') {
                 try {
                     titlebar.setPointerCapture(e.pointerId);
@@ -1496,13 +1503,25 @@ const WindowManager = {
                 }
             }
             
-            this.focusWindow(windowElement.id);
             e.preventDefault();
         });
 
         document.addEventListener('pointermove', (e) => {
             if (!isDragging) return;
             if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
+
+            if (!dragMoved) {
+                const dragDistance = Math.hypot(e.clientX - dragStartClientX, e.clientY - dragStartClientY);
+                if (dragDistance < 3) return;
+                dragMoved = true;
+                windowElement.style.transition = 'none';
+                windowElement.classList.remove('window-focus-enter', 'window-focus-leave');
+                const focusWindowData = this._getWindowData(windowElement.id);
+                if (focusWindowData?._focusMotionTimer) {
+                    clearTimeout(focusWindowData._focusMotionTimer);
+                    focusWindowData._focusMotionTimer = null;
+                }
+            }
             
             e.preventDefault();
 
@@ -1554,7 +1573,6 @@ const WindowManager = {
 
             currentX = e.clientX - initialX;
             currentY = e.clientY - initialY;
-            dragMoved = true;
 
             const clamped = this._clampWindowBounds({
                 left: currentX,

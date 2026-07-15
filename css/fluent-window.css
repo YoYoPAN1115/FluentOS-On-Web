@@ -55,6 +55,14 @@ body.dark-mode.window-blur-disabled .window.fw-host,
     background: rgba(34, 34, 34, 0.72) !important;
 }
 
+/* FluentWindow's host radius must not override the fullscreen window state.
+   Keeping this rule beside the host material also lets the normal window
+   transition animate all four corners cleanly to zero. */
+body .window.fw-host.maximized {
+    --fw-window-radius: 0px;
+    border-radius: 0 !important;
+}
+
 /* 全局模糊与窗口模糊同时关闭时，主窗口退化为无模糊的不透明卡片。 */
 body.blur-disabled.window-blur-disabled .window,
 body.blur-disabled.window-blur-disabled .window.fw-host[data-app-id] {

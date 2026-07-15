@@ -1,6 +1,6 @@
 /** FluentOS Developer Center (BETA). */
 const DeveloperCenterApp = {
-    VERSION: '0.9.0 BETA',
+    VERSION: '0.9.2 BETA',
     windowId: null,
     container: null,
     frame: null,
@@ -12,6 +12,7 @@ const DeveloperCenterApp = {
     _validationRun: 0,
     _renderSequence: 0,
     _pendingPackageProjectId: null,
+    _editorAppearance: { fontFamily: 'Cascadia Code, Consolas, monospace', fontSize: 13 },
 
     TEXT: {
         zh: {
@@ -92,7 +93,9 @@ const DeveloperCenterApp = {
         { id: 'window.manage', titleZh: '管理当前窗口', titleEn: 'Manage this window', descZh: '允许修改此 App 的窗口标题和尺寸。', descEn: 'Change this App window title and size.' },
         { id: 'files.readText', titleZh: '读取文本文件', titleEn: 'Read text files', descZh: '按文件 ID 读取不超过 512 KB 的本地文本文件。', descEn: 'Read local text files up to 512 KB by file ID.' },
         { id: 'files.writeText', titleZh: '写入文本文件', titleEn: 'Write text files', descZh: '修改文本文件，或在“文档”中创建安全的文本文件。', descEn: 'Update text files or create safe text files in Documents.' },
-        { id: 'desktop.manage', titleZh: '管理桌面快捷方式', titleEn: 'Manage desktop shortcut', descZh: '仅允许添加或移除此 App 自己的桌面快捷方式。', descEn: 'Add or remove only this App\'s own desktop shortcut.' }
+        { id: 'desktop.manage', titleZh: '管理桌面快捷方式', titleEn: 'Manage desktop shortcut', descZh: '仅允许添加或移除此 App 自己的桌面快捷方式。', descEn: 'Add or remove only this App\'s own desktop shortcut.' },
+        { id: 'network.request', titleZh: '请求网络 API', titleEn: 'Request network APIs', descZh: '仅允许经 FluentOS.network.request 访问 App 声明的 API 域名。', descEn: 'Access only declared API domains through FluentOS.network.request.' },
+        { id: 'network.image', titleZh: '加载网络图片', titleEn: 'Load network images', descZh: '仅允许经 FluentOS.network.loadImage 加载 App 声明域名上的图片。', descEn: 'Load images only from declared domains through FluentOS.network.loadImage.' }
     ],
 
     text(key) {
@@ -133,6 +136,8 @@ const DeveloperCenterApp = {
         this._pendingPackageProjectId = null;
         if (!this.container) return false;
         await DeveloperCenterStore.init();
+        this._editorAppearance = await DeveloperCenterStore.getEditorAppearance();
+        this.applyEditorAppearance();
         this.mountFrame();
         this._dataListener = () => this.renderCurrentPage();
         window.addEventListener('developer-center-data-change', this._dataListener);
@@ -196,6 +201,13 @@ const DeveloperCenterApp = {
                 }
             }
         });
+    },
+
+    applyEditorAppearance(root = this.container) {
+        if (!root) return;
+        const appearance = DeveloperCenterStore.normalizeEditorAppearance(this._editorAppearance);
+        root.style.setProperty('--dc-code-font', appearance.fontFamily);
+        root.style.setProperty('--dc-code-size', `${appearance.fontSize}px`);
     },
 
     renderCurrentPage() {
@@ -351,7 +363,8 @@ const DeveloperCenterApp = {
                     css: type === 'professional' ? 'main { padding: 32px; }' : '',
                     js: type === 'professional' ? "document.querySelector('#hello')?.addEventListener('click', () => {\n  FluentOS.notify('Hello', 'Your App is running!', 'success');\n});" : '',
                     forceFluentUI: type === 'professional',
-                    permissions: []
+                    permissions: [],
+                    network: { connect: [], image: [] }
                 });
                 this.openProject(project.id);
             }
@@ -438,15 +451,18 @@ const DeveloperCenterApp = {
                 <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary" data-action="upload-icon">${this.text('upload')}</button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>
                 <div class="dc-toggle-host" data-toggle="force"></div>
                 <div class="dc-permission-picker" data-permission-picker></div>
+                <div class="dc-field"><label>${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Allowed API domains' : '允许请求的 API 域名'}</label><input class="dc-input" data-network="connect" placeholder="api.example.com, api2.example.com" value="${this.esc((project.network?.connect || []).join(', '))}"><span class="dc-note">${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Used only by network.request; exact HTTPS hostnames, separated by commas.' : '仅供 network.request 使用；填写精确 HTTPS 主机名，用逗号分隔。'}</span></div>
+                <div class="dc-field"><label>${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Allowed image domains' : '允许加载图片的域名'}</label><input class="dc-input" data-network="image" placeholder="cdn.example.com" value="${this.esc((project.network?.image || []).join(', '))}"><span class="dc-note">${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Used only by network.loadImage; exact HTTPS hostnames, separated by commas.' : '仅供 network.loadImage 使用；填写精确 HTTPS 主机名，用逗号分隔。'}</span></div>
             </div>
             <div class="dc-code-stack">
-                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('html')}</label></div><textarea class="dc-textarea dc-code-html" data-field="html" spellcheck="false"></textarea></div>
-                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('css')}</label></div><textarea class="dc-textarea" data-field="css" spellcheck="false"></textarea></div>
-                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('js')}</label></div><textarea class="dc-textarea" data-field="js" spellcheck="false"></textarea></div>
+                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('html')}</label></div><textarea class="dc-textarea dc-code-html" data-field="html" data-language="html" spellcheck="false"></textarea></div>
+                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('css')}</label></div><textarea class="dc-textarea" data-field="css" data-language="css" spellcheck="false"></textarea></div>
+                <div class="dc-code-field"><div class="dc-code-head"><label>${this.text('js')}</label></div><textarea class="dc-textarea" data-field="js" data-language="js" spellcheck="false"></textarea></div>
             </div>`;
         layout.querySelector('[data-field="html"]').value = project.html || '';
         layout.querySelector('[data-field="css"]').value = project.css || '';
         layout.querySelector('[data-field="js"]').value = project.js || '';
+        layout.querySelectorAll('.dc-textarea[data-language]').forEach((textarea) => this.enhanceCodeEditor(textarea));
         page.appendChild(layout);
         this.bindIconPicker(layout, project);
         this.mountToggle(layout.querySelector('[data-toggle="force"]'), this.text('forceFluent'), this.text('forceFluentDesc'), project.forceFluentUI === true, (value) => { project.forceFluentUI = value; });
@@ -457,6 +473,89 @@ const DeveloperCenterApp = {
             this.button(this.text('saveDraft'), 'secondary', () => this.saveEditorProject(page, project, false), 'Save Floppy'),
             this.button(this.text('package'), 'primary', () => this.saveEditorProject(page, project, true), 'Dashboard Check')
         ]);
+    },
+
+    highlightCode(source, language) {
+        const value = String(source || '');
+        const patterns = {
+            html: /<!--[\s\S]*?-->|<!DOCTYPE[^>]*>|<\/?[A-Za-z][^>]*>|&(?:#\d+|#x[\da-f]+|[A-Za-z][\w-]*);/gi,
+            css: /\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|#[\da-f]{3,8}\b|@[\w-]+|--[\w-]+|[-\w]+(?=\s*:)|(?:\d*\.)?\d+(?:px|rem|em|vh|vw|%|s|ms|deg)?\b|[.#]?[A-Za-z_-][\w-]*(?=\s*\{)/gi,
+            js: /\/\*[\s\S]*?\*\/|\/\/[^\n]*|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|from|function|get|if|import|in|instanceof|let|new|of|return|set|static|super|switch|this|throw|try|typeof|var|void|while|with|yield)\b|\b(?:true|false|null|undefined|NaN|Infinity)\b|\b(?:\d*\.)?\d+(?:e[+-]?\d+)?\b|\b[A-Za-z_$][\w$]*(?=\s*\()/g
+        };
+        const pattern = patterns[language] || patterns.js;
+        let output = '';
+        let cursor = 0;
+        let match;
+        while ((match = pattern.exec(value))) {
+            output += this.esc(value.slice(cursor, match.index));
+            const token = match[0];
+            let type = 'keyword';
+            if (/^(?:\/\*|\/\/|<!--)/.test(token)) type = 'comment';
+            else if (/^["'`]/.test(token)) type = 'string';
+            else if (language === 'html' && /^</.test(token)) type = /^<!/.test(token) ? 'comment' : 'tag';
+            else if (language === 'html' && /^&/.test(token)) type = 'entity';
+            else if (language === 'css' && /^#/.test(token)) type = 'color';
+            else if (language === 'css' && /^@/.test(token)) type = 'at-rule';
+            else if (language === 'css' && /^(?:--|[-\w]+$)/.test(token) && value.slice(pattern.lastIndex).match(/^\s*:/)) type = 'property';
+            else if (/^(?:\d|\.\d)/.test(token)) type = 'number';
+            else if (language === 'js' && /^[A-Za-z_$]/.test(token) && value.slice(pattern.lastIndex).match(/^\s*\(/)) type = 'function';
+            output += `<span class="dc-token-${type}">${this.esc(token)}</span>`;
+            cursor = pattern.lastIndex;
+        }
+        return output + this.esc(value.slice(cursor));
+    },
+
+    enhanceCodeEditor(textarea) {
+        if (!(textarea instanceof HTMLTextAreaElement) || textarea.dataset.codeEditorReady === 'true') return;
+        textarea.dataset.codeEditorReady = 'true';
+        textarea.dataset.fwWheelScope = 'self';
+        textarea.wrap = 'off';
+        const language = textarea.dataset.language || 'js';
+        const editor = document.createElement('div');
+        editor.className = `dc-code-editor dc-code-editor-${language}`;
+        editor.dataset.fwScrollBounce = 'off';
+        const highlight = document.createElement('pre');
+        highlight.className = 'dc-code-highlight';
+        highlight.setAttribute('aria-hidden', 'true');
+        const code = document.createElement('code');
+        highlight.appendChild(code);
+        const gutter = document.createElement('pre');
+        gutter.className = 'dc-code-gutter';
+        gutter.setAttribute('aria-hidden', 'true');
+        const lineNumbers = document.createElement('span');
+        gutter.appendChild(lineNumbers);
+        textarea.before(editor);
+        editor.append(highlight, gutter, textarea);
+
+        const render = () => {
+            code.innerHTML = `${this.highlightCode(textarea.value, language)}\n`;
+            const count = Math.max(1, textarea.value.split('\n').length);
+            lineNumbers.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
+        };
+        const syncScroll = () => {
+            code.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+            lineNumbers.style.transform = `translateY(${-textarea.scrollTop}px)`;
+        };
+        let scrollSyncFrame = 0;
+        const scheduleScrollSync = () => {
+            if (scrollSyncFrame) return;
+            scrollSyncFrame = requestAnimationFrame(() => {
+                scrollSyncFrame = 0;
+                syncScroll();
+            });
+        };
+        textarea.addEventListener('input', render);
+        textarea.addEventListener('scroll', scheduleScrollSync, { passive: true });
+        textarea.addEventListener('keydown', (event) => {
+            if (event.key !== 'Tab') return;
+            event.preventDefault();
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            textarea.setRangeText('  ', start, end, 'end');
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        render();
+        syncScroll();
     },
 
     mountToggle(host, title, description, checked, onChange) {
@@ -501,12 +600,18 @@ const DeveloperCenterApp = {
         next.permissions = [...page.querySelectorAll('[data-permission]:checked')]
             .map((input) => input.dataset.permission)
             .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
+        next.network = DeveloperCenterStore.normalizeNetworkConfig({
+            connect: page.querySelector('[data-network="connect"]')?.value || '',
+            image: page.querySelector('[data-network="image"]')?.value || ''
+        });
         delete next.fluentWindows;
         return next;
     },
 
     async saveEditorProject(page, project, packageAfter) {
-        const next = this.collectEditor(page, project);
+        let next;
+        try { next = this.collectEditor(page, project); }
+        catch (error) { this.toast(error.message || 'Invalid network allowlist', 'error'); return; }
         if (!this.isValidName(next.name, 60) || !this.isValidName(next.title || next.name, 80) || await DeveloperCenterStore.nameExists(next.name, project.id)) { this.toast(this.text('invalidName'), 'error'); return; }
         if (next.type === 'pwa') {
             try { next.url = new URL(next.url).href; } catch (_) { this.toast('Please enter a valid URL', 'error'); return; }
@@ -518,11 +623,13 @@ const DeveloperCenterApp = {
     },
 
     previewProfessional(page, project) {
-        const app = this.collectEditor(page, project);
+        let app;
+        try { app = this.collectEditor(page, project); }
+        catch (error) { this.toast(error.message || 'Invalid network allowlist', 'error'); return; }
         DeveloperCreatedRuntime.openPreview(app);
     },
 
-    showApiDocs() {
+    apiDocsContent() {
         const content = `<div class="dc-api-docs">
             <div class="dc-api-row"><code>await FluentOS.notify(title, message, type)</code><span>Show an info, success, warning, or error notification.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getTheme()</code><span>Read mode, isDark, accentColor, accentRgb, FluentUI version mode, material, language, and window ID.</span><button type="button" data-copy-api>Copy</button></div>
@@ -536,10 +643,14 @@ const DeveloperCenterApp = {
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.system.setTheme('dark') / toggleTheme()</code><span>Permission: system.theme.write. Change the global FluentOS theme.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.window.setTitle(title) / setSize(width, height)</code><span>Permission: window.manage. Manage only this App's window.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.files.listText('documents') / readText(id) / writeText(id, content) / createText(name, content)</code><span>Permissions: files.readText / files.writeText. List only Documents, Downloads, or Desktop; text content is limited to 512 KB and new files go to Documents.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row dc-api-privileged"><code>await FluentOS.desktop.addShortcut() / removeShortcut()</code><span>Permission: desktop.manage. Manage only this App's own desktop shortcut.</span><button type="button" data-copy-api>Copy</button></div></div>`;
-        const ref = FluentUI.Dialog({ title: this.text('apiDocs'), content, buttons: [{ text: this.text('confirm'), variant: 'primary' }] });
-        ref.dialog.classList.add('dc-api-dialog');
-        ref.dialog.querySelectorAll('[data-copy-api]').forEach((button) => {
+            <div class="dc-api-row dc-api-privileged"><code>await FluentOS.desktop.addShortcut() / removeShortcut()</code><span>Permission: desktop.manage. Manage only this App's own desktop shortcut.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row dc-api-privileged"><code>await FluentOS.network.request(url, options)</code><span>Permission: network.request. Request only an exact HTTPS hostname declared in manifest.network.connect. Returns status, headers, and a size-limited text body.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row dc-api-privileged"><code>const src = await FluentOS.network.loadImage(url)</code><span>Permission: network.image. Loads a supported raster image only from manifest.network.image and returns a safe data URL for img.src.</span><button type="button" data-copy-api>Copy</button></div></div>`;
+        return content;
+    },
+
+    bindApiDocs(root) {
+        root.querySelectorAll('[data-copy-api]').forEach((button) => {
             const copyLabel = typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Copy API' : '复制 API';
             button.innerHTML = `<img src="${this.icon('Copy')}" alt="">`;
             button.title = copyLabel;
@@ -561,6 +672,17 @@ const DeveloperCenterApp = {
             setTimeout(() => { button.classList.remove('is-copied'); button.title = copyLabel; }, 900);
             });
         });
+    },
+
+    showApiDocs() {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        WindowManager.appConfigs['developer-center-api-docs'] = {
+            title: english ? 'API Reference' : 'API 参考文档',
+            icon: 'Theme/Icon/App_icon/developer_center.png',
+            width: 860, height: 700, minWidth: 560, minHeight: 420,
+            component: 'DeveloperCenterApiDocsApp'
+        };
+        WindowManager.openApp('developer-center-api-docs');
     },
 
     async startValidation(page, project, options = {}) {
@@ -717,7 +839,14 @@ const DeveloperCenterApp = {
         update('apis', 'running');
         const apiRules = [
             { regex: /\bfetch\s*\(/, name: 'fetch' }, { regex: /\bXMLHttpRequest\b/, name: 'XMLHttpRequest' },
-            { regex: /\bWebSocket\b/, name: 'WebSocket' }, { regex: /\bindexedDB\b/, name: 'indexedDB' },
+            { regex: /\bWebSocket\b/, name: 'WebSocket' }, { regex: /\bEventSource\b/, name: 'EventSource' },
+            { regex: /navigator\s*\.\s*sendBeacon\s*\(/, name: 'navigator.sendBeacon' },
+            { regex: /<\s*img\b[^>]*\bsrc\s*=\s*["']?\s*https?:\/\//i, name: 'remote img src' },
+            { regex: /<\s*iframe\b[^>]*\bsrc\s*=\s*["']?\s*https?:\/\//i, name: 'remote iframe src' },
+            { regex: /<\s*script\b[^>]*\bsrc\s*=\s*["']?\s*https?:\/\//i, name: 'remote script src' },
+            { regex: /<\s*link\b[^>]*\bhref\s*=\s*["']?\s*https?:\/\//i, name: 'remote link href' },
+            { regex: /(?:url\s*\(\s*|@import\s+)["']?\s*https?:\/\//i, name: 'remote CSS URL' },
+            { regex: /\bindexedDB\b/, name: 'indexedDB' },
             { regex: /\blocalStorage\b|\bsessionStorage\b/, name: 'direct browser storage' },
             { regex: /navigator\s*\.\s*(?:geolocation|mediaDevices|usb|serial|bluetooth)/, name: 'privileged navigator API' }
         ];
@@ -728,13 +857,26 @@ const DeveloperCenterApp = {
             { regex: /FluentOS\s*\.\s*window\s*\.\s*(?:setTitle|setSize)\s*\(/, permission: 'window.manage' },
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:listText|readText)\s*\(/, permission: 'files.readText' },
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:writeText|createText)\s*\(/, permission: 'files.writeText' },
-            { regex: /FluentOS\s*\.\s*desktop\s*\.\s*(?:addShortcut|removeShortcut)\s*\(/, permission: 'desktop.manage' }
+            { regex: /FluentOS\s*\.\s*desktop\s*\.\s*(?:addShortcut|removeShortcut)\s*\(/, permission: 'desktop.manage' },
+            { regex: /FluentOS\s*\.\s*network\s*\.\s*request\s*\(/, permission: 'network.request' },
+            { regex: /FluentOS\s*\.\s*network\s*\.\s*loadImage\s*\(/, permission: 'network.image' }
         ];
         const missingPermission = permissionRules.find((rule) => rule.regex.test(source) && !declaredPermissions.has(rule.permission));
         const unsupported = apiRules.find((rule) => rule.regex.test(source));
+        let networkProblem = '';
+        try {
+            const network = DeveloperCenterStore.normalizeNetworkConfig(project.network);
+            project.network = network;
+            if (network.connect.length > 0 && !declaredPermissions.has('network.request')) networkProblem = 'Declare network.request for network.connect domains';
+            else if (network.image.length > 0 && !declaredPermissions.has('network.image')) networkProblem = 'Declare network.image for network.image domains';
+            else if (declaredPermissions.has('network.request') && network.connect.length === 0) networkProblem = 'network.request requires at least one network.connect domain';
+            else if (declaredPermissions.has('network.image') && network.image.length === 0) networkProblem = 'network.image requires at least one network.image domain';
+        } catch (error) { networkProblem = error.message || 'Invalid network allowlist'; }
         const apiProblem = invalidPermission
             ? `Unknown requested permission: ${invalidPermission}`
-            : missingPermission
+            : networkProblem
+                ? networkProblem
+                : missingPermission
                 ? `Declare permission before using this API: ${missingPermission.permission}`
                 : unsupported
                     ? `Use the FluentOS API instead of ${unsupported.name}`
@@ -795,12 +937,14 @@ const DeveloperCenterApp = {
         const permissions = [...new Set(Array.isArray(app.permissions) ? app.permissions : [])]
             .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
         app.permissions = permissions;
+        const network = DeveloperCenterStore.normalizeNetworkConfig(app.network);
+        app.network = network;
         if (!permissions.length) return Promise.resolve(true);
         const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
         const content = `<div class="dc-permission-request"><p>${english ? 'This App passed its safety checks and requests the following additional permissions:' : '此 App 已通过安全检查，并请求以下附加权限：'}</p>${permissions.map((permission) => {
             const info = this.permissionInfo(permission);
             return `<div class="dc-permission-request-row"><strong>${this.esc(info.title)}</strong><span>${this.esc(info.description)}</span><code>${this.esc(permission)}</code></div>`;
-        }).join('')}<p class="dc-note">${english ? 'Permissions are enforced again for every API call at runtime.' : '运行时会对每一次 API 调用再次校验权限。'}</p></div>`;
+        }).join('')}${network.connect.length ? `<div class="dc-permission-request-row"><strong>${english ? 'Allowed API request domains' : '允许请求 API'}</strong><code>${network.connect.map((domain) => this.esc(domain)).join('<br>')}</code></div>` : ''}${network.image.length ? `<div class="dc-permission-request-row"><strong>${english ? 'Allowed image domains' : '允许加载图片'}</strong><code>${network.image.map((domain) => this.esc(domain)).join('<br>')}</code></div>` : ''}${network.connect.length || network.image.length ? `<p class="dc-note">${english ? 'This App cannot access any other domain. Direct browser networking is blocked.' : '此 App 无法访问其他域名，且浏览器直接联网方式已被阻止。'}</p>` : ''}<p class="dc-note">${english ? 'Permissions are enforced again for every API call at runtime.' : '运行时会对每一次 API 调用再次校验权限。'}</p></div>`;
         return new Promise((resolve) => FluentUI.Dialog({
             type: 'warning',
             title: english ? 'App permission request' : 'App 权限请求',
@@ -827,7 +971,8 @@ const DeveloperCenterApp = {
             css: imported.css,
             js: imported.js,
             forceFluentUI: imported.forceFluentUI === true,
-            permissions: imported.permissions || []
+            permissions: imported.permissions || [],
+            network: DeveloperCenterStore.normalizeNetworkConfig(imported.network)
         });
         imported.projectId = project.id;
         const app = await DeveloperCenterStore.saveApp(imported);
@@ -1309,6 +1454,19 @@ const DeveloperCenterApp = {
         return message.slice(-degree);
     },
 
+    getEditorFontOptions() {
+        return [
+            { value: 'Cascadia Code, Consolas, monospace', label: 'Cascadia Code' },
+            { value: 'Consolas, monospace', label: 'Consolas' },
+            { value: '"Courier New", monospace', label: 'Courier New' },
+            { value: '"Segoe UI", system-ui, sans-serif', label: 'Segoe UI' },
+            { value: 'Arial, sans-serif', label: 'Arial' },
+            { value: '"Microsoft YaHei", "微软雅黑", sans-serif', label: '微软雅黑' },
+            { value: 'SimSun, "宋体", serif', label: '宋体' },
+            { value: 'KaiTi, "楷体", serif', label: '楷体' }
+        ];
+    },
+
     async renderSettings(page) {
         const renderToken = page.dataset.dcRenderToken;
         page.className = 'fw-page dc-page';
@@ -1321,6 +1479,38 @@ const DeveloperCenterApp = {
         stats.className = 'dc-settings-stats';
         stats.innerHTML = `<div class="dc-card dc-stat"><strong>${projects.length}</strong><span>${this.text('projects')}</span></div><div class="dc-card dc-stat"><strong>${apps.length}</strong><span>${this.text('packagedApps')}</span></div><div class="dc-card dc-stat"><strong>${this.formatBytes(bytes)}</strong><span>${this.text('storage')}</span></div>`;
         page.appendChild(stats);
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const editorSettings = document.createElement('section');
+        editorSettings.className = 'dc-card dc-editor-settings';
+        editorSettings.innerHTML = `
+            <div class="dc-editor-settings-copy"><strong>${english ? 'Code editor appearance' : '代码编辑器外观'}</strong><span>${english ? 'Customize the font used by HTML, CSS, and JavaScript editors.' : '自定义 HTML、CSS 和 JavaScript 编辑器使用的字体。'}</span></div>
+            <label class="dc-field"><span class="dc-field-label">${english ? 'System font' : '系统字体'}</span><span class="dc-editor-font-host" data-editor-font-host></span></label>
+            <label class="dc-field"><span class="dc-field-label">${english ? 'Font size' : '字体大小'}</span><input class="dc-input" data-editor-size type="number" min="11" max="24" step="1" value="${this._editorAppearance.fontSize}"></label>
+            <pre class="dc-editor-settings-preview"><code>const FluentOS = { theme: 'accent' };</code></pre>`;
+        page.appendChild(editorSettings);
+        const fontHost = editorSettings.querySelector('[data-editor-font-host]');
+        const sizeInput = editorSettings.querySelector('[data-editor-size]');
+        const updateAppearance = (changes = {}) => {
+            this._editorAppearance = DeveloperCenterStore.normalizeEditorAppearance({
+                ...this._editorAppearance,
+                fontSize: sizeInput.value,
+                ...changes
+            });
+            this.applyEditorAppearance();
+        };
+        const persistAppearance = async (changes = {}) => {
+            updateAppearance(changes);
+            this._editorAppearance = await DeveloperCenterStore.setEditorAppearance(this._editorAppearance);
+            this.applyEditorAppearance();
+        };
+        fontHost.appendChild(FluentUI.Select({
+            options: this.getEditorFontOptions(),
+            value: this._editorAppearance.fontFamily,
+            className: 'dc-editor-font-select',
+            onChange: (fontFamily) => persistAppearance({ fontFamily })
+        }));
+        sizeInput.addEventListener('input', () => updateAppearance());
+        sizeInput.addEventListener('change', () => persistAppearance());
         const actions = document.createElement('div');
         actions.className = 'dc-form';
         const action = (title, description, buttonText, danger, callback) => {
@@ -1354,6 +1544,40 @@ const DeveloperCenterApp = {
             buttons: [{ text: this.text('cancel'), variant: 'secondary', value: false }, { text: this.text('confirm'), variant: 'danger', value: true }],
             onClose: (value) => { if (value) callback(); }
         });
+    }
+};
+
+const DeveloperCenterApiDocsApp = {
+    windowId: null,
+    container: null,
+
+    init(windowId) {
+        this.windowId = windowId;
+        this.container = document.getElementById(windowId)?.querySelector('.window-content') || null;
+        if (!this.container) return false;
+        this.container.classList.add('dc-api-window-content');
+        this.render();
+        State.on('languageChange', () => this.render(), { key: 'DeveloperCenterApiDocsApp.language' });
+        return true;
+    },
+
+    render() {
+        if (!this.container) return;
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const title = english ? 'API Reference' : 'API 参考文档';
+        const subtitle = english ? 'FluentOS APIs available to sandboxed professional Apps.' : '专业 App 在沙箱中可使用的 FluentOS API。';
+        const titleElement = document.getElementById(this.windowId)?.querySelector('.window-title');
+        if (titleElement) titleElement.textContent = title;
+        this.container.innerHTML = `<main class="dc-api-window-page"><header class="dc-heading"><div><h1>${DeveloperCenterApp.esc(title)}</h1><p>${DeveloperCenterApp.esc(subtitle)}</p></div></header>${DeveloperCenterApp.apiDocsContent()}</main>`;
+        DeveloperCenterApp.bindApiDocs(this.container);
+    },
+
+    beforeClose() {
+        State.off?.('languageChange', 'DeveloperCenterApiDocsApp.language');
+        this.container?.classList.remove('dc-api-window-content');
+        this.container = null;
+        this.windowId = null;
+        return true;
     }
 };
 
@@ -1402,4 +1626,5 @@ const DeveloperCenterController = {
 };
 
 window.DeveloperCenterApp = DeveloperCenterApp;
+window.DeveloperCenterApiDocsApp = DeveloperCenterApiDocsApp;
 window.DeveloperCenterController = DeveloperCenterController;
