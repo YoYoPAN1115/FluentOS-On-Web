@@ -217,11 +217,17 @@ const DeveloperCreatedRuntime = {
             })();
         `;
         const fluentStylesheet = app.forceFluentUI ? `<style>${this._getFluentUiCss().replace(/<\/style/gi, '<\\/style')}</style>` : '';
-        const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'";
+        let allowedImageSources = '';
+        try {
+            allowedImageSources = DeveloperCenterStore.normalizeNetworkConfig(app.network).image
+                .map((hostname) => ` https://${hostname}`)
+                .join('');
+        } catch (_) {}
+        const csp = `default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:${allowedImageSources}; font-src 'self' data:; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
         const safeJs = String(app.js || '').replace(/<\/script/gi, '<\\/script');
         const safeCss = String(app.css || '').replace(/<\/style/gi, '<\\/style');
         const html = String(app.html || '<main><h1>Hello, FluentOS!</h1></main>');
-        return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${baseCss}</style><style>${safeCss}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>${safeJs}<\/script></body></html>`;
+        return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${baseCss}</style><style>${safeCss}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>${safeJs}<\/script></body></html>`;
     },
 
     escapeHtml(value) {
@@ -344,6 +350,26 @@ const DeveloperCreatedRuntime = {
         });
     },
 
+    _probeImageUrl(href) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            let settled = false;
+            const finish = (error) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                image.onload = null;
+                image.onerror = null;
+                error ? reject(error) : resolve(true);
+            };
+            const timeout = setTimeout(() => finish(new Error('Image request timed out')), 4000);
+            image.referrerPolicy = 'no-referrer';
+            image.onload = () => finish();
+            image.onerror = () => finish(new Error('Image could not be loaded'));
+            image.src = href;
+        });
+    },
+
     async _networkRequest(app, args) {
         const url = this._networkUrl(app, 'connect', args.url);
         const input = args.options && typeof args.options === 'object' ? args.options : {};
@@ -389,18 +415,26 @@ const DeveloperCreatedRuntime = {
         const url = this._networkUrl(app, 'image', args.url);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
+        let response;
         try {
-            const response = await fetch(url.href, {
+            response = await fetch(url.href, {
                 method: 'GET', headers: { Accept: 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp,image/x-icon' },
                 mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error',
                 referrerPolicy: 'no-referrer', signal: controller.signal
             });
-            this._networkUrl(app, 'image', response.url || url.href);
-            if (!response.ok) throw new Error(`Image request failed with status ${response.status}`);
-            const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-            if (!/^image\/(?:png|jpeg|gif|webp|avif|bmp|x-icon)$/.test(mime)) throw new Error('The response is not a supported raster image');
-            return this._bytesToDataUrl(await this._readLimitedResponse(response, 5 * 1024 * 1024), mime);
+        } catch (error) {
+            if (controller.signal.aborted) throw new Error('Image request timed out');
+            // A normal <img> request does not require the server to opt into
+            // CORS. The frame CSP still restricts this fallback to the exact
+            // allowlisted HTTPS hosts and prevents cross-domain redirects.
+            await this._probeImageUrl(url.href);
+            return url.href;
         } finally { clearTimeout(timeout); }
+        this._networkUrl(app, 'image', response.url || url.href);
+        if (!response.ok) throw new Error(`Image request failed with status ${response.status}`);
+        const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+        if (!/^image\/(?:png|jpeg|gif|webp|avif|bmp|x-icon)$/.test(mime)) throw new Error('The response is not a supported raster image');
+        return this._bytesToDataUrl(await this._readLimitedResponse(response, 5 * 1024 * 1024), mime);
     },
 
     async _invokeApi(registration, method, args) {

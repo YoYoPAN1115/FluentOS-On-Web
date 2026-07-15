@@ -645,7 +645,7 @@ const DeveloperCenterApp = {
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.files.listText('documents') / readText(id) / writeText(id, content) / createText(name, content)</code><span>Permissions: files.readText / files.writeText. List only Documents, Downloads, or Desktop; text content is limited to 512 KB and new files go to Documents.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.desktop.addShortcut() / removeShortcut()</code><span>Permission: desktop.manage. Manage only this App's own desktop shortcut.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.network.request(url, options)</code><span>Permission: network.request. Request only an exact HTTPS hostname declared in manifest.network.connect. Returns status, headers, and a size-limited text body.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row dc-api-privileged"><code>const src = await FluentOS.network.loadImage(url)</code><span>Permission: network.image. Loads a supported raster image only from manifest.network.image and returns a safe data URL for img.src.</span><button type="button" data-copy-api>Copy</button></div></div>`;
+            <div class="dc-api-row dc-api-privileged"><code>const src = await FluentOS.network.loadImage(url)</code><span>Permission: network.image. Loads a size-limited raster image from manifest.network.image; hosts without CORS use a CSP-restricted URL fallback for img.src.</span><button type="button" data-copy-api>Copy</button></div></div>`;
         return content;
     },
 
