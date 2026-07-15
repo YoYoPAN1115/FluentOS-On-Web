@@ -266,7 +266,7 @@ const State = {
             quickWindowSwitchEnabled: true,
             tombstoneBackgroundEnabled: true,
             tombstoneFreezeDelayMs: 60 * 1000,
-            tombstoneDimFrozenAppsEnabled: true,
+            tombstoneDimFrozenAppsEnabled: false,
             windowEdgeSnapEnabled: true,
             windowHoverSnapEnabled: true,
             windowTopMaximizeEnabled: false,
@@ -274,6 +274,7 @@ const State = {
             startPinnedApps: ['files', 'settings', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
             developerModeUnlocked: false,
             debugModeEnabled: false,
+            hideDeveloperCenter: true,
             windowBoundsMemory: {}
         };
 

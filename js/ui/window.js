@@ -29,6 +29,8 @@ const WindowManager = {
     _taskbarHideAnimTimer: null,
     _fullscreenUnmaximizeSyncTimer: null,
     _fullscreenCloseSyncTimer: null,
+    _embeddedFrameFocusBound: false,
+    _embeddedFrameWindows: new WeakMap(),
     SNAP_LAYOUTS: [
         { id: 'left-half', previewClass: 'preview-left-half', size: 'large' },
         { id: 'right-half', previewClass: 'preview-right-half', size: 'large' },
@@ -45,6 +47,7 @@ const WindowManager = {
         files: { titleKey: 'files.title', icon: 'Theme/Icon/App_icon/files.png', width: 900, height: 600, component: 'FilesApp' },
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
         'process-manager': { titleKey: 'processManager.title', icon: 'Theme/Icon/App_icon/Taskmgr.png', width: 980, height: 660, minWidth: 680, minHeight: 480, component: 'ProcessManagerApp' },
+        'developer-center': { titleKey: 'developerCenter.title', icon: 'Theme/Icon/App_icon/developer_center.png', width: 1120, height: 720, minWidth: 720, minHeight: 520, component: 'DeveloperCenterApp' },
         terminal: { titleKey: 'terminal.title', icon: 'Theme/Icon/App_icon/terminal.png', width: 900, height: 600, minWidth: 560, minHeight: 360, component: 'TerminalApp' },
         tips: { titleKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', width: 1120, height: 720, minWidth: 760, minHeight: 520, component: 'TipsApp' },
         calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
@@ -68,6 +71,7 @@ const WindowManager = {
     init() {
         this.container = document.getElementById('windows-container');
         this._bindDesktopInactivityListener();
+        this._bindEmbeddedFrameFocusListener();
 
         State.on('languageChange', () => {
             this.windows.forEach(w => {
@@ -97,6 +101,43 @@ const WindowManager = {
             }
         });
         this._initTaskbarAutoHide();
+    },
+
+    /**
+     * iframe pointer events do not bubble into the host document. Browsers do,
+     * however, move document.activeElement to the iframe and blur the host
+     * window. Use that transition to keep embedded Apps in the normal z-order
+     * focus path, including cross-origin PWAs.
+     */
+    bindEmbeddedFrameFocus(frame, windowId) {
+        if (!(frame instanceof HTMLIFrameElement) || !windowId) return;
+        this._embeddedFrameWindows.set(frame, windowId);
+        this._bindEmbeddedFrameFocusListener();
+        let shield = frame.parentElement?.querySelector(':scope > .embedded-frame-focus-shield');
+        if (!shield) {
+            shield = document.createElement('div');
+            shield.className = 'embedded-frame-focus-shield';
+            shield.setAttribute('aria-hidden', 'true');
+            frame.insertAdjacentElement('afterend', shield);
+        }
+        shield.onpointerdown = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.focusWindow(windowId, { suppressMotion: true });
+        };
+    },
+
+    _bindEmbeddedFrameFocusListener() {
+        if (this._embeddedFrameFocusBound || typeof window === 'undefined') return;
+        this._embeddedFrameFocusBound = true;
+        window.addEventListener('blur', () => {
+            setTimeout(() => {
+                const frame = document.activeElement;
+                if (!(frame instanceof HTMLIFrameElement)) return;
+                const windowId = this._embeddedFrameWindows.get(frame);
+                if (windowId) this.focusWindow(windowId, { suppressMotion: true });
+            }, 0);
+        }, true);
     },
 
     _isEdgeSnapEnabled() {

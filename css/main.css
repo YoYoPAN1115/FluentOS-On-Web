@@ -3541,6 +3541,21 @@ body.fluent-v2 .appshop-category-tab {
     background: white;
 }
 
+/* Capture the first click on an inactive embedded App. Cross-origin iframe
+   pointer events cannot bubble to WindowManager, so this transparent surface
+   restores normal simulated-window focus without inspecting iframe content. */
+.embedded-frame-focus-shield {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: transparent;
+}
+
+.window-inactive .embedded-frame-focus-shield {
+    pointer-events: auto;
+}
+
 .pwa-frozen-surface {
     position: absolute;
     inset: 0;

@@ -175,6 +175,8 @@ const PWALoader = {
                         ></iframe>
                     </div>
                 `;
+                const frame = this.getFrame();
+                WindowManager.bindEmbeddedFrameFocus?.(frame, this.windowId);
             }
         };
         

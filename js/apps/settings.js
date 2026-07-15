@@ -11,8 +11,11 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-15', version: '2.3.260715', commits: [
+            { hash: 'local', title: '修复大量已知BUG，新增全新开发者中心(BETA)App，需要在实验室中启用。注意：当前App仍然处于开发中，可能存在大量未知问题，请谨慎使用。' }
+        ] },
         { date: '2026-07-13', version: '2.2.260713', commits: [
-            { hash: 'local', title: '修复系统内无法彻底删除文件的严重BUG；重新调整了设置App的存储统计，改为了真实大小；引入全新终端App；进一步优化了系统体验，修复了部分视觉问题，并修复了部分场景内容滚动BUG' },
+            { hash: 'dca9cc5', title: '修复系统内无法彻底删除文件的严重BUG；重新调整了设置App的存储统计，改为了真实大小；引入全新终端App；进一步优化了系统体验，修复了部分视觉问题，并修复了部分场景内容滚动BUG' },
             { hash: '2ab5cdc', title: '进一步完成系统瘦身优化工作，更新了文件导入模块，引入全新进程管理 App' }
         ] },
         { date: '2026-07-12', version: '2.1.260712', commits: [
@@ -4198,6 +4201,24 @@ const SettingsApp = {
         `;
         notice.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(255, 180, 0, 0.1); border-radius: var(--radius-md); margin-bottom: 16px;';
         section.appendChild(notice);
+
+        // 开发者中心仍处于 BETA，其显示入口归入实验室管理。
+        section.appendChild(FluentUI.SettingItem({
+            label: t('settings.hide-developer-center'),
+            description: t('settings.hide-developer-center-desc'),
+            control: FluentUI.Toggle({
+                checked: State.settings.hideDeveloperCenter !== false,
+                onChange: (value) => {
+                    State.updateSettings({ hideDeveloperCenter: value });
+                    this.addRecentSetting(t('settings.hide-developer-center'), value ? t('settings.on') : t('settings.off'), 'lab');
+                    State.addNotification({
+                        title: t('settings.lab-title'),
+                        message: value ? t('settings.developer-center-hidden') : t('settings.developer-center-visible'),
+                        type: 'info'
+                    });
+                }
+            })
+        }));
         
         // 外部文件导入（拖拽/上传）开关
         section.appendChild(FluentUI.SettingItem({
@@ -4513,13 +4534,14 @@ const SettingsApp = {
     appSortOrder: 'desc', // 'desc' 或 'asc'
     
     // Fluent OS 应用及其中允许由用户卸载的可选应用
-    systemAppIds: ['files', 'settings', 'process-manager', 'terminal', 'tips', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
+    systemAppIds: ['files', 'settings', 'process-manager', 'developer-center', 'terminal', 'tips', 'calculator', 'notes', 'browser', 'clock', 'weather', 'appshop', 'camera', 'photos', 'media'],
     removableSystemAppIds: ['tips', 'camera', 'photos', 'media'],
 
     getAppVersion(appId) {
         const versions = {
             terminal: '2.0.2',
             'process-manager': '2.0.2',
+            'developer-center': '0.9.0 BETA',
             media: '2.1.0',
             photos: '2.1.0',
             files: '2.1.0',
@@ -5248,7 +5270,7 @@ const SettingsApp = {
             label: t('settings.tombstone-dim-frozen-apps'),
             description: t('settings.tombstone-dim-frozen-apps-desc'),
             control: FluentUI.Toggle({
-                checked: State.settings.tombstoneDimFrozenAppsEnabled !== false,
+                checked: State.settings.tombstoneDimFrozenAppsEnabled === true,
                 onChange: (v) => {
                     State.updateSettings({ tombstoneDimFrozenAppsEnabled: v });
                     this.addRecentSetting(t('settings.tombstone-dim-frozen-apps'), v ? t('settings.on') : t('settings.off'), 'developer');

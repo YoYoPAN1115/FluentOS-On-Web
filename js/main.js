@@ -217,6 +217,7 @@ function initModules() {
     NotificationCenter.init();
     if (typeof ClockReminderService !== 'undefined') { ClockReminderService.init(); }
     WindowManager.init();
+    if (typeof DeveloperCenterController !== 'undefined') { DeveloperCenterController.init(); }
     if (typeof FavoriteSites !== 'undefined') { FavoriteSites.init(); }
     if (typeof TaskView !== 'undefined') { TaskView.init(); }
     if (typeof Widgets !== 'undefined') { Widgets.init(); }
@@ -1507,7 +1508,7 @@ const ResourceMonitor = {
 };
 
 window.FluentOS = {
-    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.2.260713',
+    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.3.260715',
     State,
     Storage,
     notify,

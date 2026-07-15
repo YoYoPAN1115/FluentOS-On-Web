@@ -215,7 +215,7 @@ const StartMenu = {
         // Keep overrides for brands whose ASCII id does not match the Chinese
         // display name (for example alipay -> 支付宝 -> Z).
         const pinyinInitialById = {
-            files:'W', settings:'S', 'process-manager':'J', terminal:'Z', tips:'T',
+            files:'W', settings:'S', 'process-manager':'J', 'developer-center':'K', terminal:'Z', tips:'T',
             calculator:'J', notes:'J', browser:'L', clock:'S', weather:'T', appshop:'A',
             camera:'X', photos:'Z', media:'D', office:'O', 'shimo-office':'S',
             'qq-mail':'Q', didaqingdan:'D', canva:'C', chatgpt:'C', deepseek:'D', qwen:'Q', kimi:'K',
