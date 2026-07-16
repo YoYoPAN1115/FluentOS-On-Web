@@ -4,10 +4,12 @@
 const StartMenu = {
     element: null,
     appsGrid: null,
+    searchContainer: null,
     searchInput: null,
     powerBtn: null,
     fullscreenBtn: null,
     powerMenu: null,
+    powerLogoutMenu: null,
     isOpen: false,
     recentContainer: null,
     currentView: 'home',
@@ -17,6 +19,7 @@ const StartMenu = {
     init() {
         this.element = document.getElementById('start-menu');
         this.appsGrid = document.getElementById('start-apps-grid');
+        this.searchContainer = this.element?.querySelector('.start-search') || null;
         this.searchInput = document.getElementById('start-search-input');
         this.powerBtn = document.getElementById('power-btn');
         this.fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -24,38 +27,35 @@ const StartMenu = {
         this.powerLogoutMenu = document.getElementById('power-logout-menu');
         this.recentContainer = document.getElementById('start-recent-items');
 
-        this.renderApps();
         this.bindEvents();
         this.updateLanguage();
         this.renderRecent();
         this.syncFullscreenButton();
-        
-        // 监听语言切换
-        State.on('languageChange', () => {
-            this.updateLanguage();
-        });
 
-        // 监听文件系统变化，实时刷新推荐
-        State.on('fsChange', () => this.renderRecent());
-        window.addEventListener('photos-cache-ready', () => {
-            if (typeof this.renderRecentFiles === 'function') this.renderRecentFiles();
-            else this.renderRecent();
-        });
-        // 记事本保存等会更新 modified 时间
-        State.on('notificationAdd', () => this.renderRecent());
-        
-        // 监听应用修复状态变化
-        State.on('appRepairStart', (appId) => {
-            this.updateAppRepairState(appId, true);
-        });
-        State.on('appRepairEnd', (appId) => {
-            this.updateAppRepairState(appId, false);
-        });
+        this.bindStateEvents();
+    },
+
+    bindStateEvents() {
+        if (this._stateEventsBound) return;
+        this._stateEventsBound = true;
+
+        State.on('languageChange', () => this.updateLanguage());
+
+        // 文件系统、图片预览缓存或 modified 时间变化时刷新推荐。
+        const refreshRecent = () => this.renderRecent();
+        State.on('fsChange', refreshRecent);
+        State.on('notificationAdd', refreshRecent);
+        window.addEventListener('photos-cache-ready', refreshRecent);
+
+        State.on('appRepairStart', (appId) => this.updateAppRepairState(appId, true));
+        State.on('appRepairEnd', (appId) => this.updateAppRepairState(appId, false));
     },
     
     // 更新应用修复状态
     updateAppRepairState(appId, isRepairing) {
-        this.element.querySelectorAll(`.start-app[data-app-id="${appId}"], .start-all-app-row[data-app-id="${appId}"]`).forEach(appEl => {
+        if (!this.element) return;
+        this.element.querySelectorAll('.start-app, .start-all-app-row').forEach(appEl => {
+            if (appEl.dataset.appId !== String(appId)) return;
             appEl.classList.toggle('repairing', isRepairing);
             appEl.setAttribute('aria-disabled', isRepairing ? 'true' : 'false');
         });
@@ -111,12 +111,18 @@ const StartMenu = {
     },
 
     renderApps() {
-        this.appsGrid.innerHTML = '';
+        if (!this.appsGrid) return;
+        this.appsGrid.replaceChildren();
         const pinnedApps = this.getStartPinnedApps()
             .map(appId => Desktop.apps.find(app => app.id === appId))
             .filter(Boolean);
         if (pinnedApps.length === 0) {
-            this.appsGrid.innerHTML = `<div class="start-empty">${t('start.pinned-empty')}</div>`;
+            const empty = document.createElement('div');
+            empty.className = 'start-empty';
+            empty.textContent = t('start.pinned-empty');
+            this.appsGrid.appendChild(empty);
+            if (this.currentView === 'allApps') this.renderAllApps();
+            if (this.isSearchMode) this.renderSearchResults(this.searchInput?.value || '');
             return;
         }
         
@@ -128,11 +134,13 @@ const StartMenu = {
             const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
             appElement.classList.toggle('repairing', repairing);
             appElement.setAttribute('aria-disabled', repairing ? 'true' : 'false');
-            const name = Desktop.getAppName(app);
-            appElement.innerHTML = `
-                <img src="${app.icon}" alt="${name}">
-                <span>${name}</span>
-            `;
+            const name = String(Desktop.getAppName(app) || app.id || '');
+            const icon = document.createElement('img');
+            icon.src = String(app.icon || '');
+            icon.alt = name;
+            const label = document.createElement('span');
+            label.textContent = name;
+            appElement.append(icon, label);
             this.appsGrid.appendChild(appElement);
         });
         if (this.currentView === 'allApps') this.renderAllApps();
@@ -299,11 +307,7 @@ const StartMenu = {
         this.getHomeSections().forEach(section => section.classList.remove('hidden'));
         this.element.classList.remove('start-all-apps-mode', 'start-search-mode');
         this.renderApps();
-        if (typeof this.renderRecentFiles === 'function') {
-            this.renderRecentFiles();
-        } else {
-            this.renderRecent();
-        }
+        this.renderRecent();
         setTimeout(() => {
             if (this.currentView !== 'home') return;
             allAppsView.classList.add('hidden');
@@ -348,7 +352,7 @@ const StartMenu = {
         const list = this.ensureAllAppsView().querySelector('#start-all-apps-list');
         if (!list) return;
         const scrollTop = list.scrollTop;
-        list.innerHTML = this.renderAppList(this.getAllAppsSorted(), true);
+        list.replaceChildren(this.renderAppList(this.getAllAppsSorted(), true));
         list.scrollTop = resetScroll ? 0 : scrollTop;
         if (this.currentView === 'allApps') this.syncAllAppsListHeight();
     },
@@ -359,10 +363,10 @@ const StartMenu = {
         if (!list) return;
         const q = String(query || '').trim().toLowerCase();
         const apps = this.getAllAppsSorted().filter(app => {
-            const name = Desktop.getAppName(app).toLowerCase();
+            const name = String(Desktop.getAppName(app) || '').toLowerCase();
             return !q || name.includes(q) || String(app.id || '').toLowerCase().includes(q);
         });
-        list.innerHTML = this.renderAppList(apps, false);
+        list.replaceChildren(this.renderAppList(apps, false));
     },
 
     syncStartMenuHomeHeight() {
@@ -409,26 +413,42 @@ const StartMenu = {
     },
 
     renderAppList(apps, grouped = true) {
+        const fragment = document.createDocumentFragment();
         if (!apps || apps.length === 0) {
-            return `<div class="start-empty">${t('start.no-results')}</div>`;
+            const empty = document.createElement('div');
+            empty.className = 'start-empty';
+            empty.textContent = t('start.no-results');
+            fragment.appendChild(empty);
+            return fragment;
         }
         let lastGroup = '';
-        return apps.map(app => {
-            const name = Desktop.getAppName(app);
+        apps.forEach(app => {
+            const name = String(Desktop.getAppName(app) || app.id || '');
             const group = this.getAppGroupKey(app);
             const repairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(app.id);
-            const header = grouped && group !== lastGroup
-                ? `<div class="start-app-group">${group}</div>`
-                : '';
+            if (grouped && group !== lastGroup) {
+                const header = document.createElement('div');
+                header.className = 'start-app-group';
+                header.textContent = group;
+                fragment.appendChild(header);
+            }
             lastGroup = group;
-            return `
-                ${header}
-                <div class="start-all-app-row start-app${repairing ? ' repairing' : ''}" data-app-id="${app.id}" aria-disabled="${repairing ? 'true' : 'false'}">
-                    <img src="${app.icon}" alt="${name}">
-                    <span>${name}</span>
-                </div>
-            `;
-        }).join('');
+
+            const row = document.createElement('div');
+            row.className = 'start-all-app-row start-app';
+            row.classList.toggle('repairing', repairing);
+            row.dataset.appId = String(app.id || '');
+            row.setAttribute('aria-disabled', repairing ? 'true' : 'false');
+
+            const icon = document.createElement('img');
+            icon.src = String(app.icon || '');
+            icon.alt = name;
+            const label = document.createElement('span');
+            label.textContent = name;
+            row.append(icon, label);
+            fragment.appendChild(row);
+        });
+        return fragment;
     },
 
     openAppAndClose(appId, data = null) {
@@ -446,6 +466,9 @@ const StartMenu = {
         return true;
     },
     bindEvents() {
+        if (this._eventsBound) return;
+        this._eventsBound = true;
+
         // 应用图标拖拽 → 固定到桌面（覆盖固定区与全部应用列表）
         this.element.addEventListener('pointerdown', (e) => this._onAppPointerDown(e));
         // 禁止浏览器原生拖拽（原生拖拽会触发 pointercancel，打断指针拖拽）
@@ -570,9 +593,31 @@ const StartMenu = {
             this._altStartArmed = false;
         });
 
-        // 点击外部关闭
+        // 菜单内使用统一委托处理快捷入口和动态生成的全部应用项。
         this.element.addEventListener('click', (e) => {
             if (this._appDragging) return; // 拖拽结束后的 click 不触发打开
+
+            const shortcut = e.target.closest('#pictures-folder-btn, #downloads-folder-btn, #all-apps-btn, #more-recent-btn');
+            if (shortcut) {
+                switch (shortcut.id) {
+                    case 'pictures-folder-btn':
+                        this.openFolder('pictures');
+                        this.close();
+                        break;
+                    case 'downloads-folder-btn':
+                        this.openFolder('downloads');
+                        this.close();
+                        break;
+                    case 'all-apps-btn':
+                        this.showAllAppsView();
+                        break;
+                    case 'more-recent-btn':
+                        this.showAllRecentFiles();
+                        break;
+                }
+                return;
+            }
+
             const appEl = e.target.closest('.start-all-app-row');
             if (!appEl || this.appsGrid.contains(appEl)) return;
             const appId = appEl.dataset.appId;
@@ -621,27 +666,8 @@ const StartMenu = {
             this.recentContainer.addEventListener('click', (e) => {
                 const item = e.target.closest('.recent-item');
                 if (!item) return;
-                const id = item.dataset.id || item.dataset.fileId; // 兼容
-                const node = State.findNode(id);
-                if (!node) return;
-                if (node.type === 'file') {
-                    if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
-                        const opened = FilesApp.openNodeWithDefaultApp(node);
-                        if (!opened) this.openAppAndClose('notes', { fileId: id });
-                    } else {
-                        this.openAppAndClose('notes', { fileId: id });
-                    }
-                    this.close();
-                } else if (node.type === 'folder') {
-                    // 打开文件夹
-                    WindowManager.openApp('files');
-                    setTimeout(() => {
-                        if (typeof FilesApp !== 'undefined' && FilesApp.navigateToId) {
-                            FilesApp.navigateToId(id);
-                        }
-                    }, 100);
-                    this.close();
-                }
+                this.openRecentFile(item.dataset.id, item.dataset.filePath);
+                this.close();
             });
         }
     },
@@ -690,22 +716,100 @@ const StartMenu = {
         }
     },
 
+    openFolder(folderId) {
+        const targetId = String(folderId || '');
+        WindowManager.openApp('files');
+
+        setTimeout(() => {
+            const node = typeof State.findNode === 'function' ? State.findNode(targetId) : null;
+            if (node?.type === 'folder' &&
+                typeof FilesApp !== 'undefined' &&
+                typeof FilesApp.navigateToId === 'function') {
+                FilesApp.navigateToId(targetId);
+                return;
+            }
+
+            if (typeof State.addNotification === 'function') {
+                State.addNotification({
+                    title: t('files.title'),
+                    message: targetId,
+                    type: 'info'
+                });
+            }
+        }, 120);
+    },
+
+    openRecentFile(fileId, filePath = '') {
+        const id = String(fileId || '');
+        const node = id && typeof State.findNode === 'function' ? State.findNode(id) : null;
+
+        if (node?.type === 'file') {
+            if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
+                const opened = FilesApp.openNodeWithDefaultApp(node);
+                if (opened) return;
+            }
+            WindowManager.openApp('notes', { fileId: id });
+            return;
+        }
+
+        if (node?.type === 'folder') {
+            this.openFolder(id);
+            return;
+        }
+
+        const normalizedPath = String(filePath || '').toLowerCase();
+        if (/\.(?:txt|html?|md)$/.test(normalizedPath)) {
+            WindowManager.openApp('notes', { fileId: id });
+        } else {
+            WindowManager.openApp('files');
+        }
+    },
+
+    showAllRecentFiles() {
+        WindowManager.openApp('files');
+        this.close();
+    },
+
     renderRecent() {
         if (!this.recentContainer) return;
         const list = RecentFiles.getRecentFiles().slice(0, 4);
+        this.recentContainer.replaceChildren();
         if (!list || list.length === 0) {
-            this.recentContainer.innerHTML = `<div style="color: var(--text-tertiary); padding: 12px 0;">${t('notification.empty')}</div>`;
+            const empty = document.createElement('div');
+            empty.className = 'start-empty';
+            empty.textContent = t('notification.empty');
+            this.recentContainer.appendChild(empty);
             return;
         }
-        this.recentContainer.innerHTML = list.map(f => `
-            <div class="recent-item" data-id="${f.id}" title="${f.path}" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;cursor:pointer;">
-                <img src="${f.preview || f.icon}" alt="" class="${f.preview ? 'recent-item-thumb' : ''}" style="width:18px;height:18px;opacity:0.9;">
-                <div style="display:flex;flex-direction:column;gap:2px;">
-                    <span style="font-size:13px;">${f.name}</span>
-                    <span style="font-size:11px;color:var(--text-tertiary);">${RecentFiles.formatTime(f.modified)}</span>
-                </div>
-            </div>
-        `).join('');
+
+        const fragment = document.createDocumentFragment();
+        list.forEach(file => {
+            const item = document.createElement('div');
+            item.className = 'recent-item';
+            item.dataset.id = String(file.id || '');
+            item.dataset.filePath = String(file.path || '');
+            item.title = String(file.path || '');
+
+            const preview = String(file.preview || file.icon || '');
+            const icon = document.createElement('img');
+            icon.className = 'recent-item-icon';
+            icon.src = preview;
+            icon.alt = '';
+            if (file.preview) icon.classList.add('recent-item-thumb');
+
+            const info = document.createElement('div');
+            info.className = 'recent-item-info';
+            const name = document.createElement('div');
+            name.className = 'recent-item-name';
+            name.textContent = String(file.name || '');
+            const time = document.createElement('div');
+            time.className = 'recent-item-time';
+            time.textContent = String(RecentFiles.formatTime(file.modified) || '');
+            info.append(name, time);
+            item.append(icon, info);
+            fragment.appendChild(item);
+        });
+        this.recentContainer.appendChild(fragment);
     },
 
     showRecentContextMenu(x, y, id) {
@@ -748,24 +852,8 @@ const StartMenu = {
             
             switch (action) {
                 case 'open':
-                    // 打开文件或文件夹（真正打开目标而不是固定欢迎页）
-                    if (node.type === 'file') {
-                        if (typeof FilesApp !== 'undefined' && typeof FilesApp.openNodeWithDefaultApp === 'function') {
-                            const opened = FilesApp.openNodeWithDefaultApp(node);
-                            if (!opened) this.openAppAndClose('notes', { fileId: id });
-                        } else {
-                            this.openAppAndClose('notes', { fileId: id });
-                        }
-                        this.close();
-                    } else if (node.type === 'folder') {
-                        WindowManager.openApp('files');
-                        setTimeout(() => {
-                            if (typeof FilesApp !== 'undefined' && FilesApp.navigateToId) {
-                                FilesApp.navigateToId(id);
-                            }
-                        }, 100);
-                        this.close();
-                    }
+                    this.openRecentFile(id, node.path || node.name || '');
+                    this.close();
                     break;
                 case 'reveal-in-folder':
                     // 在文件资源管理器中定位该文件/文件夹
@@ -860,7 +948,10 @@ const StartMenu = {
                 const app = Desktop.apps.find(a => a.id === appId);
                 ghost = document.createElement('div');
                 ghost.className = 'taskbar-drag-ghost';
-                ghost.innerHTML = `<img src="${app ? app.icon : ''}" alt="">`;
+                const icon = document.createElement('img');
+                icon.src = String(app?.icon || '');
+                icon.alt = '';
+                ghost.appendChild(icon);
                 document.body.appendChild(ghost);
             }
             ghost.style.left = `${ev.clientX}px`;
@@ -1029,7 +1120,6 @@ const StartMenu = {
         const isTaskbarPinned = (State.settings.pinnedApps || []).includes(appId);
         const isStartPinned = this.isStartPinned(appId);
         const isSystemApp = this.systemApps.includes(appId);
-        const isPWA = app.isPWA === true;
         const isRepairing = typeof SettingsApp !== 'undefined' && SettingsApp.isAppRepairing(appId);
 
         // 创建右键菜单
@@ -1041,87 +1131,78 @@ const StartMenu = {
             document.body.appendChild(contextMenu);
         }
 
-        // 如果应用正在修复，所有选项都禁用
-        const disabledClass = isRepairing ? ' disabled' : '';
-        
-        let menuHTML = `
-            <div class="context-menu-item${disabledClass}" data-action="open" data-app-id="${appId}">
-                <img src="Theme/Icon/Symbol_icon/stroke/Folder Open.svg" alt="">
-                <span>${isRepairing ? t('start.ctx.repairing') : t('start.ctx.open')}</span>
-            </div>
-        `;
+        const createItem = (action, iconName, label, disabled = false, filled = false) => {
+            const item = document.createElement('div');
+            item.className = 'context-menu-item';
+            item.classList.toggle('disabled', disabled);
+            item.dataset.action = action;
+            item.dataset.appId = String(appId);
 
-        if (isStartPinned) {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="unpin-start" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/fill/Pin.svg" alt="">
-                    <span>${t('start.ctx.unpin-start')}</span>
-                </div>
-            `;
-        } else {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="pin-start" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Pin.svg" alt="">
-                    <span>${t('start.ctx.pin-start')}</span>
-                </div>
-            `;
-        }
-        
-        // 分隔线
-        menuHTML += `<div class="context-menu-separator"></div>`;
-        
-        if (isTaskbarPinned) {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="unpin-taskbar" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/fill/Pin.svg" alt="">
-                    <span>${t('start.ctx.unpin-taskbar')}</span>
-                </div>
-            `;
-        } else {
-            menuHTML += `
-                <div class="context-menu-item${disabledClass}" data-action="pin-taskbar" data-app-id="${appId}">
-                    <img src="Theme/Icon/Symbol_icon/stroke/Pin.svg" alt="">
-                    <span>${t('start.ctx.pin-taskbar')}</span>
-                </div>
-            `;
-        }
+            const icon = document.createElement('img');
+            icon.src = `Theme/Icon/Symbol_icon/${filled ? 'fill' : 'stroke'}/${iconName}.svg`;
+            icon.alt = '';
+            const text = document.createElement('span');
+            text.textContent = label;
+            item.append(icon, text);
+            return item;
+        };
+        const separator = () => {
+            const element = document.createElement('div');
+            element.className = 'context-menu-separator';
+            return element;
+        };
 
-        const uninstallDisabled = (isSystemApp || isRepairing) ? ' disabled' : '';
-        menuHTML += `
-            <div class="context-menu-item${disabledClass}" data-action="settings" data-app-id="${appId}">
-                <img src="Theme/Icon/Symbol_icon/stroke/Settings.svg" alt="">
-                <span>${t('start.ctx.app-settings')}</span>
-            </div>
-            <div class="context-menu-item${uninstallDisabled}" data-action="uninstall" data-app-id="${appId}">
-                <img src="Theme/Icon/Symbol_icon/stroke/Trash.svg" alt="">
-                <span>${t('start.ctx.uninstall')}</span>
-            </div>
-        `;
-
-        contextMenu.innerHTML = menuHTML;
+        contextMenu.replaceChildren(
+            createItem('open', 'Folder Open', isRepairing ? t('start.ctx.repairing') : t('start.ctx.open'), isRepairing),
+            createItem(
+                isStartPinned ? 'unpin-start' : 'pin-start',
+                'Pin',
+                t(isStartPinned ? 'start.ctx.unpin-start' : 'start.ctx.pin-start'),
+                isRepairing,
+                isStartPinned
+            ),
+            separator(),
+            createItem(
+                isTaskbarPinned ? 'unpin-taskbar' : 'pin-taskbar',
+                'Pin',
+                t(isTaskbarPinned ? 'start.ctx.unpin-taskbar' : 'start.ctx.pin-taskbar'),
+                isRepairing,
+                isTaskbarPinned
+            ),
+            createItem('settings', 'Settings', t('start.ctx.app-settings'), isRepairing),
+            createItem('uninstall', 'Trash', t('start.ctx.uninstall'), isSystemApp || isRepairing)
+        );
         contextMenu.style.left = `${event.clientX}px`;
         contextMenu.style.top = `${event.clientY}px`;
         contextMenu.classList.remove('hidden');
 
-        // 绑定菜单项点击事件
-        contextMenu.querySelectorAll('.context-menu-item:not(.disabled)').forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const action = item.dataset.action;
-                const targetAppId = item.dataset.appId;
-                this.handleAppContextMenuAction(action, targetAppId);
-                contextMenu.classList.add('hidden');
-            });
-        });
+        contextMenu.onclick = (e) => {
+            const item = e.target.closest('.context-menu-item:not(.disabled)');
+            if (!item) return;
+            e.stopPropagation();
+            this.handleAppContextMenuAction(item.dataset.action, item.dataset.appId);
+            contextMenu.classList.add('hidden');
+        };
 
         // 点击外部关闭菜单
+        if (this._appContextOutsideClickHandler) {
+            document.removeEventListener('click', this._appContextOutsideClickHandler);
+        }
         const closeMenu = (e) => {
             if (!contextMenu.contains(e.target)) {
                 contextMenu.classList.add('hidden');
                 document.removeEventListener('click', closeMenu);
+                if (this._appContextOutsideClickHandler === closeMenu) {
+                    this._appContextOutsideClickHandler = null;
+                }
             }
         };
-        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        this._appContextOutsideClickHandler = closeMenu;
+        setTimeout(() => {
+            if (this._appContextOutsideClickHandler === closeMenu) {
+                document.addEventListener('click', closeMenu);
+            }
+        }, 0);
     },
 
     openAppSettings(appId) {

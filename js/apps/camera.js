@@ -18,6 +18,7 @@ const CameraApp = {
     recordStartedAt: 0,
     recordTimer: null,
     keydownHandler: null,
+    _cameraRequestId: 0,
 
     init(windowId) {
         this.windowId = windowId;
@@ -221,7 +222,8 @@ const CameraApp = {
 
         try {
             this.stopCamera(false);
-            this.stream = await navigator.mediaDevices.getUserMedia({
+            const requestId = this._cameraRequestId;
+            const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: this.facingMode,
                     width: { ideal: 1920 },
@@ -229,6 +231,12 @@ const CameraApp = {
                 },
                 audio: false
             });
+
+            if (requestId !== this._cameraRequestId || !this.container?.isConnected) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+            }
+            this.stream = stream;
 
             const video = this.container.querySelector('.camera-video');
             if (!video) {
@@ -239,6 +247,7 @@ const CameraApp = {
             await video.play();
             this.setCameraActive(true);
         } catch (error) {
+            if (!this.container?.isConnected) return;
             console.error('[Camera] start failed:', error);
             this.showCameraError();
         }
@@ -254,6 +263,7 @@ const CameraApp = {
     },
 
     stopCamera(clearCaptures = false) {
+        this._cameraRequestId += 1;
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();
         }
@@ -728,11 +738,18 @@ const CameraApp = {
             document.removeEventListener('keydown', this.keydownHandler);
             this.keydownHandler = null;
         }
+        const viewerVideo = this.container?.querySelector('.camera-main-video');
+        if (viewerVideo) {
+            viewerVideo.pause();
+            viewerVideo.removeAttribute('src');
+        }
         this.stopCamera(true);
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
             this.frame = null;
         }
+        this.container = null;
+        this.windowId = null;
         return true;
     },
 

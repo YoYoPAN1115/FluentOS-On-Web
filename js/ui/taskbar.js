@@ -314,7 +314,15 @@ const Taskbar = {
     },
 
     renderAppButton(appId) {
-        const app = Desktop.apps.find(a => a.id === appId);
+        const desktopApp = Desktop.apps.find(a => a.id === appId);
+        const runtimeConfig = !desktopApp && typeof WindowManager !== 'undefined'
+            ? WindowManager.getAppConfig?.(appId)
+            : null;
+        const app = desktopApp || (runtimeConfig ? {
+            id: appId,
+            name: runtimeConfig.title || appId,
+            icon: runtimeConfig.icon || 'Theme/Icon/App_icon/created_app.png'
+        } : null);
         if (!app) return;
 
         // 检查是否已存在

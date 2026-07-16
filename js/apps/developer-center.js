@@ -12,6 +12,7 @@ const DeveloperCenterApp = {
     _validationRun: 0,
     _renderSequence: 0,
     _pendingPackageProjectId: null,
+    _secondaryNavigationTimer: null,
     _editorAppearance: { fontFamily: 'Cascadia Code, Consolas, monospace', fontSize: 13 },
 
     TEXT: {
@@ -94,6 +95,8 @@ const DeveloperCenterApp = {
         { id: 'files.readText', titleZh: '读取文本文件', titleEn: 'Read text files', descZh: '按文件 ID 读取不超过 512 KB 的本地文本文件。', descEn: 'Read local text files up to 512 KB by file ID.' },
         { id: 'files.writeText', titleZh: '写入文本文件', titleEn: 'Write text files', descZh: '修改文本文件，或在“文档”中创建安全的文本文件。', descEn: 'Update text files or create safe text files in Documents.' },
         { id: 'desktop.manage', titleZh: '管理桌面快捷方式', titleEn: 'Manage desktop shortcut', descZh: '仅允许添加或移除此 App 自己的桌面快捷方式。', descEn: 'Add or remove only this App\'s own desktop shortcut.' },
+        { id: 'clipboard.read', titleZh: '读取剪贴板', titleEn: 'Read clipboard', descZh: '在浏览器允许时读取当前剪贴板文本。', descEn: 'Read clipboard text when the browser allows it.' },
+        { id: 'clipboard.write', titleZh: '写入剪贴板', titleEn: 'Write clipboard', descZh: '在浏览器允许时替换当前剪贴板文本。', descEn: 'Replace clipboard text when the browser allows it.' },
         { id: 'network.request', titleZh: '请求网络 API', titleEn: 'Request network APIs', descZh: '仅允许经 FluentOS.network.request 访问 App 声明的 API 域名。', descEn: 'Access only declared API domains through FluentOS.network.request.' },
         { id: 'network.image', titleZh: '加载网络图片', titleEn: 'Load network images', descZh: '仅允许经 FluentOS.network.loadImage 加载 App 声明域名上的图片。', descEn: 'Load images only from declared domains through FluentOS.network.loadImage.' }
     ],
@@ -146,6 +149,8 @@ const DeveloperCenterApp = {
 
     beforeClose() {
         this._validationRun += 1;
+        if (this._secondaryNavigationTimer) clearTimeout(this._secondaryNavigationTimer);
+        this._secondaryNavigationTimer = null;
         if (this._dataListener) window.removeEventListener('developer-center-data-change', this._dataListener);
         this._dataListener = null;
         this.closeContextMenu();
@@ -212,7 +217,36 @@ const DeveloperCenterApp = {
 
     renderCurrentPage() {
         const page = this.frame?.pageEl;
-        if (page && !this.activeProjectId) this.renderPage(page, this.activePage);
+        if (page && !this.activeProjectId && !this.activeToolId) this.renderPage(page, this.activePage);
+    },
+
+    _secondaryTransitionDuration() {
+        if (typeof State !== 'undefined' && State.settings?.enableAnimation === false) return 0;
+        if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 0;
+        return 240;
+    },
+
+    _afterSecondaryExit(callback) {
+        if (typeof callback !== 'function') return;
+        if (this._secondaryNavigationTimer) {
+            clearTimeout(this._secondaryNavigationTimer);
+            this._secondaryNavigationTimer = null;
+        }
+        const page = this.frame?.pageEl;
+        if (!page?.classList.contains('dc-secondary-page')) {
+            callback();
+            return;
+        }
+        page.classList.add('dc-secondary-page-exit');
+        page.parentElement?.querySelector(':scope > .dc-action-footer')?.classList.add('dc-secondary-page-exit');
+        this._secondaryNavigationTimer = setTimeout(() => {
+            this._secondaryNavigationTimer = null;
+            callback();
+        }, this._secondaryTransitionDuration());
+    },
+
+    _markSecondaryPage(page) {
+        page?.classList.add('dc-secondary-page');
     },
 
     renderPage(page, id) {
@@ -286,11 +320,12 @@ const DeveloperCenterApp = {
     },
 
     navigate(id) {
-        this.activePage = id;
-        this.activeProjectId = null;
-        this.activeToolId = null;
-        if (this.frame?.activeId === id) this.frame.refresh?.();
-        else this.frame?.navigate?.(id, { preserveScroll: false });
+        this._afterSecondaryExit(() => {
+            this.activePage = id;
+            this.activeProjectId = null;
+            this.activeToolId = null;
+            this.frame?.navigate?.(id, { preserveScroll: false, force: this.frame?.activeId === id });
+        });
     },
 
     createToolCard(tool, onHome = false) {
@@ -374,25 +409,22 @@ const DeveloperCenterApp = {
     async openProject(projectId) {
         const project = await DeveloperCenterStore.get('projects', projectId);
         if (!project || !this.frame?.pageEl) return;
-        this.activePage = 'build';
-        this.activeProjectId = project.id;
-        if (this.frame.activeId !== 'build') {
-            this.frame.navigate('build', { preserveScroll: false });
-        } else if (project.type === 'pwa') this.renderPwaEditor(this.frame.pageEl, project);
-        else this.renderProfessionalEditor(this.frame.pageEl, project);
+        this._afterSecondaryExit(() => {
+            this.activePage = 'build';
+            this.activeProjectId = project.id;
+            this.frame.navigate('build', { preserveScroll: false, force: this.frame.activeId === 'build' });
+        });
     },
 
     packageProject(project) {
         if (!project || !this.frame?.pageEl) return;
         this.closeContextMenu();
-        this.activePage = 'build';
-        this.activeProjectId = project.id;
-        if (this.frame.activeId !== 'build') {
+        this._afterSecondaryExit(() => {
+            this.activePage = 'build';
+            this.activeProjectId = project.id;
             this._pendingPackageProjectId = project.id;
-            this.frame.navigate('build', { preserveScroll: false });
-        } else {
-            this.startValidation(this.frame.pageEl, project);
-        }
+            this.frame.navigate('build', { preserveScroll: false, force: this.frame.activeId === 'build' });
+        });
     },
 
     confirmDeleteProject(project) {
@@ -416,6 +448,7 @@ const DeveloperCenterApp = {
         page.parentElement?.querySelector(':scope > .dc-action-footer')?.remove();
         const footer = document.createElement('div');
         footer.className = 'dc-action-footer';
+        if (page.classList.contains('dc-secondary-page')) footer.classList.add('dc-secondary-page');
         buttons.forEach((button) => footer.appendChild(button));
         page.parentElement?.appendChild(footer);
     },
@@ -423,7 +456,9 @@ const DeveloperCenterApp = {
     renderPwaEditor(page, project) {
         page.innerHTML = '';
         page.className = 'fw-page dc-page';
-        page.appendChild(this.heading(this.text('pwa'), project.name));
+        this._markSecondaryPage(page);
+        const back = this.button(this.text('build'), 'secondary', () => this.navigate('build'), 'Arrow Left');
+        page.appendChild(this.heading(this.text('pwa'), project.name, back));
         const form = document.createElement('div');
         form.className = 'dc-form';
         form.innerHTML = `
@@ -441,7 +476,9 @@ const DeveloperCenterApp = {
     renderProfessionalEditor(page, project) {
         page.innerHTML = '';
         page.className = 'fw-page dc-page';
-        page.appendChild(this.heading(this.text('professional'), project.name));
+        this._markSecondaryPage(page);
+        const back = this.button(this.text('build'), 'secondary', () => this.navigate('build'), 'Arrow Left');
+        page.appendChild(this.heading(this.text('professional'), project.name, back));
         const layout = document.createElement('div');
         layout.className = 'dc-editor-layout';
         layout.innerHTML = `
@@ -618,7 +655,7 @@ const DeveloperCenterApp = {
         }
         const saved = await DeveloperCenterStore.saveProject(next);
         Object.assign(project, saved);
-        if (packageAfter) this.startValidation(page, saved);
+        if (packageAfter) this.packageProject(saved);
         else { this.toast(this.text('saved')); this.activeProjectId = null; this.navigate('build'); }
     },
 
@@ -632,12 +669,14 @@ const DeveloperCenterApp = {
     apiDocsContent() {
         const content = `<div class="dc-api-docs">
             <div class="dc-api-row"><code>await FluentOS.notify(title, message, type)</code><span>Show an info, success, warning, or error notification.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row"><code>await FluentOS.alert(title, message) / confirm(title, message)</code><span>Show a host-rendered system dialog. confirm() resolves to true or false.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row"><code>await FluentOS.dialog({ title, message, type, buttons })</code><span>Show a custom dialog with up to three text-only buttons and resolve to the selected button value.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getTheme()</code><span>Read mode, isDark, accentColor, accentRgb, FluentUI version mode, material, language, and window ID.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getThemeMode() / getAccentColor() / getLanguage()</code><span>Read individual theme values. FluentOS.state contains the latest synchronously cached system state.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.isWindowBlurEnabled()</code><span>Read whether window blur is currently effective. The same value is available as FluentOS.state.windowBlurEnabled.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row"><code>await FluentOS.storage.get(key) / set(key, value) / remove(key)</code><span>Use private, size-limited storage for this App.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row"><code>await FluentOS.storage.get(key) / set(key, value) / remove(key)</code><span>Use private storage for this App: 100 KiB per JSON value, 128 keys, and 512 KiB total UTF-8 data.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.openApp(id) / openExternal(httpsUrl)</code><span>Open an allowed system App or a secure external link.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row"><code>await FluentOS.clipboard.read() / write(text)</code><span>Read or write the clipboard when browser permission allows it.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row dc-api-privileged"><code>await FluentOS.clipboard.read() / write(text)</code><span>Permissions: clipboard.read / clipboard.write. Read or write text when browser permission also allows it.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getWindowInfo()</code><span>Read this App window's title, size, and maximized state.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>FluentOS.ui.highlightButton('#save', true) / enableButtonGlow('#save', true)</code><span>Apply the Fluent primary-button appearance or system pointer highlight feedback to matching controls.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.system.setTheme('dark') / toggleTheme()</code><span>Permission: system.theme.write. Change the global FluentOS theme.</span><button type="button" data-copy-api>Copy</button></div>
@@ -645,7 +684,7 @@ const DeveloperCenterApp = {
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.files.listText('documents') / readText(id) / writeText(id, content) / createText(name, content)</code><span>Permissions: files.readText / files.writeText. List only Documents, Downloads, or Desktop; text content is limited to 512 KB and new files go to Documents.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.desktop.addShortcut() / removeShortcut()</code><span>Permission: desktop.manage. Manage only this App's own desktop shortcut.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.network.request(url, options)</code><span>Permission: network.request. Request only an exact HTTPS hostname declared in manifest.network.connect. Returns status, headers, and a size-limited text body.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row dc-api-privileged"><code>const src = await FluentOS.network.loadImage(url)</code><span>Permission: network.image. Loads a size-limited raster image from manifest.network.image; hosts without CORS use a CSP-restricted URL fallback for img.src.</span><button type="button" data-copy-api>Copy</button></div></div>`;
+            <div class="dc-api-row dc-api-privileged"><code>const src = await FluentOS.network.loadImage(url)</code><span>Permission: network.image. Loads a size-limited raster image from manifest.network.image; if CORS blocks fetch, it returns the allowlisted URL for CSP-restricted img.src without a host-side probe.</span><button type="button" data-copy-api>Copy</button></div></div>`;
         return content;
     },
 
@@ -690,6 +729,7 @@ const DeveloperCenterApp = {
         const runId = ++this._validationRun;
         page.innerHTML = '';
         page.className = 'fw-page dc-page';
+        this._markSecondaryPage(page);
         page.appendChild(this.heading(this.text('validating'), this.text('validationDesc')));
         const checks = project.type === 'pwa'
             ? [
@@ -848,7 +888,7 @@ const DeveloperCenterApp = {
             { regex: /(?:url\s*\(\s*|@import\s+)["']?\s*https?:\/\//i, name: 'remote CSS URL' },
             { regex: /\bindexedDB\b/, name: 'indexedDB' },
             { regex: /\blocalStorage\b|\bsessionStorage\b/, name: 'direct browser storage' },
-            { regex: /navigator\s*\.\s*(?:geolocation|mediaDevices|usb|serial|bluetooth)/, name: 'privileged navigator API' }
+            { regex: /navigator\s*\.\s*(?:clipboard|geolocation|mediaDevices|usb|serial|bluetooth)/, name: 'privileged navigator API' }
         ];
         const declaredPermissions = new Set(Array.isArray(project.permissions) ? project.permissions : []);
         const invalidPermission = [...declaredPermissions].find((permission) => !DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
@@ -858,6 +898,10 @@ const DeveloperCenterApp = {
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:listText|readText)\s*\(/, permission: 'files.readText' },
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:writeText|createText)\s*\(/, permission: 'files.writeText' },
             { regex: /FluentOS\s*\.\s*desktop\s*\.\s*(?:addShortcut|removeShortcut)\s*\(/, permission: 'desktop.manage' },
+            { regex: /FluentOS\s*\.\s*clipboard\s*\.\s*read\s*\(/, permission: 'clipboard.read' },
+            { regex: /FluentOS\s*\.\s*call\s*\(\s*['"]clipboard\.read['"]/, permission: 'clipboard.read' },
+            { regex: /FluentOS\s*\.\s*clipboard\s*\.\s*write\s*\(/, permission: 'clipboard.write' },
+            { regex: /FluentOS\s*\.\s*call\s*\(\s*['"]clipboard\.write['"]/, permission: 'clipboard.write' },
             { regex: /FluentOS\s*\.\s*network\s*\.\s*request\s*\(/, permission: 'network.request' },
             { regex: /FluentOS\s*\.\s*network\s*\.\s*loadImage\s*\(/, permission: 'network.image' }
         ];
@@ -891,27 +935,39 @@ const DeveloperCenterApp = {
 
     probeProfessional(project, runId) {
         return new Promise((resolve) => {
-            const frame = document.createElement('iframe');
-            frame.sandbox = 'allow-scripts';
-            frame.style.cssText = 'position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:-10px;top:-10px';
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:-10px;top:-10px;overflow:hidden';
+            let frame = null;
+            let timer = null;
             let done = false;
             const finish = (ok, detail) => {
                 if (done) return;
                 done = true;
-                window.removeEventListener('message', onMessage);
                 clearTimeout(timer);
-                frame.remove();
+                if (frame?.contentWindow) DeveloperCreatedRuntime._releaseFrame(frame.contentWindow);
+                container.remove();
                 resolve({ ok: runId === this._validationRun && ok, detail });
             };
-            const onMessage = (event) => {
-                if (event.source !== frame.contentWindow || event.data?.type !== 'fluentos:runtime-error') return;
-                finish(false, String(event.data.message || 'Severe runtime error'));
-            };
-            window.addEventListener('message', onMessage);
-            frame.addEventListener('load', () => setTimeout(() => finish(true, 'App started in the isolated sandbox'), 700), { once: true });
-            const timer = setTimeout(() => finish(false, 'Sandbox startup timed out'), 3500);
-            document.body.appendChild(frame);
-            frame.srcdoc = DeveloperCreatedRuntime.buildDocument(project);
+            document.body.appendChild(container);
+            try {
+                frame = DeveloperCreatedRuntime.mountAppFrame(
+                    container,
+                    project,
+                    `developer-center-validation-${runId}`,
+                    this.windowId,
+                    {
+                        readOnly: true,
+                        onRuntimeError: (message) => {
+                            if (!String(message).includes('This validation session permits read-only FluentOS APIs only')) finish(false, message);
+                        }
+                    }
+                );
+                frame.addEventListener('load', () => setTimeout(() => finish(true, 'App started in the isolated read-only sandbox'), 700), { once: true });
+            } catch (error) {
+                finish(false, error.message || 'Sandbox startup failed');
+                return;
+            }
+            timer = setTimeout(() => finish(false, 'Sandbox startup timed out'), 3500);
         });
     },
 
@@ -1193,19 +1249,18 @@ const DeveloperCenterApp = {
     },
 
     openTool(toolId) {
-        this.activePage = 'tools';
-        this.activeToolId = toolId;
-        if (this.frame?.activeId !== 'tools') {
-            this.frame?.navigate?.('tools', { preserveScroll: false });
-            return;
-        }
-        this.renderToolDetail(this.frame?.pageEl, toolId);
+        this._afterSecondaryExit(() => {
+            this.activePage = 'tools';
+            this.activeToolId = toolId;
+            this.frame?.navigate?.('tools', { preserveScroll: false, force: this.frame?.activeId === 'tools' });
+        });
     },
 
     renderToolDetail(page, toolId) {
         if (!page) return;
         page.innerHTML = '';
         page.className = 'fw-page dc-page dc-page-simple';
+        this._markSecondaryPage(page);
         const tool = this.TOOLS.find((item) => item.id === toolId);
         const back = this.button(this.text('tools'), 'secondary', () => this.navigate('tools'), 'Arrow Left');
         page.appendChild(this.heading(this.text(tool?.title || toolId), typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? tool?.descEn : tool?.descZh, back));

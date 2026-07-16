@@ -351,6 +351,7 @@ const WindowManager = {
 
     _getWindowComponent(windowData) {
         if (!windowData || !windowData.appId) return null;
+        if (windowData.component) return windowData.component;
         const config = this.appConfigs[windowData.appId];
         return config && config.component ? globalThis[config.component] : null;
     },
@@ -605,7 +606,7 @@ const WindowManager = {
         windowData._focusMotionTimer = setTimeout(() => {
             el.classList.remove('window-focus-enter', 'window-focus-leave');
             windowData._focusMotionTimer = null;
-        }, 180);
+        }, 120);
     },
 
     _playFocusTransitionMotion(nextWindowData, previousWindowData, forceMotion = false) {
@@ -1305,12 +1306,13 @@ const WindowManager = {
         if (existingWindow) {
             this.focusWindow(existingWindow.id);
             this._syncTaskbarAppState(appId);
-            
-            if (data && config.component && globalThis[config.component]) {
-                if (data.fileId && globalThis[config.component].loadFile) {
-                    globalThis[config.component].loadFile(data.fileId);
-                } else if (globalThis[config.component].openData) {
-                    globalThis[config.component].openData(data);
+
+            const existingComponent = this._getWindowComponent(existingWindow);
+            if (data && existingComponent) {
+                if (data.fileId && existingComponent.loadFile) {
+                    existingComponent.loadFile(data.fileId);
+                } else if (existingComponent.openData) {
+                    existingComponent.openData(data);
                 }
             }
             return;
@@ -1324,11 +1326,12 @@ const WindowManager = {
         const initialLastNormalBounds = initialBounds.lastNormalBounds
             ? this._clampWindowBounds(initialBounds.lastNormalBounds, appId)
             : (initialBounds.snapLayout ? null : this._clampWindowBounds(initialBounds, appId));
-        
-        this.windows.push({
+        const component = config.component ? globalThis[config.component] : null;
+        const windowData = {
             id: windowId,
             appId: appId,
             element: windowElement,
+            component,
             isMinimized: false,
             isMinimizing: false,
             isRestoring: false,
@@ -1338,7 +1341,8 @@ const WindowManager = {
             frozenAt: null,
             snapLayout: initialBounds.snapLayout || null,
             lastNormalBounds: initialLastNormalBounds
-        });
+        };
+        this.windows.push(windowData);
 
         this.container.appendChild(windowElement);
         
@@ -1348,8 +1352,7 @@ const WindowManager = {
         this._syncWidgetDimState(this._effectiveDuration(250), 'cubic-bezier(0.4, 0, 0.2, 1)');
 
         
-        if (config.component && globalThis[config.component]) {
-            const component = globalThis[config.component];
+        if (component) {
             // Components may consume their initial navigation data during init so
             // their first paint is already on the requested page.
             const initialData = component.handlesInitialOpenData === true ? data : undefined;
@@ -1583,6 +1586,9 @@ const WindowManager = {
             
             windowElement.style.left = `${clamped.left}px`;
             windowElement.style.top = `${clamped.top}px`;
+            if (typeof FluentWindow !== 'undefined' && typeof FluentWindow.refreshGlobalScrollbars === 'function') {
+                FluentWindow.refreshGlobalScrollbars(windowElement);
+            }
 
             const edgeLayout = this._getEdgeSnapLayout(e.clientX, e.clientY, clamped.top);
             if (edgeLayout) {
@@ -1800,6 +1806,9 @@ const WindowManager = {
             windowElement.style.height = `${newHeight}px`;
             windowElement.style.left = `${newLeft}px`;
             windowElement.style.top = `${newTop}px`;
+            if (typeof FluentWindow !== 'undefined' && typeof FluentWindow.refreshGlobalScrollbars === 'function') {
+                FluentWindow.refreshGlobalScrollbars(windowElement);
+            }
         });
 
         const finalizeResize = (e) => {
@@ -2052,11 +2061,34 @@ const WindowManager = {
             options.onClosed?.(true);
             return;
         }
+        if (!Array.isArray(windowData._closeCallbacks)) {
+            windowData._closeCallbacks = [];
+        }
+        if (typeof options.onClosed === 'function') {
+            windowData._closeCallbacks.push(options.onClosed);
+        }
+        if (windowData._closeState) return;
+        windowData._closeState = 'checking';
+
+        const finishCloseAttempt = (closed) => {
+            const callbacks = windowData._closeCallbacks.splice(0);
+            if (!closed) windowData._closeState = null;
+            callbacks.forEach((callback) => {
+                try {
+                    callback(closed);
+                } catch (error) {
+                    console.warn('Window close callback failed', error);
+                }
+            });
+        };
+
         this._hideSnapMenu(windowData.element, true);
         this._hideDragSnapHint(true);
         this._persistWindowBounds(windowData);
 
         const proceedClose = () => {
+            if (windowData._closeState === 'closing') return;
+            windowData._closeState = 'closing';
             const closeDuration = this._effectiveDuration(this.CLOSE_DURATION_MS);
             const shouldSyncFullscreenClose = windowData.isMaximized === true;
             this._clearWindowMotionTimers(windowData);
@@ -2093,7 +2125,7 @@ const WindowManager = {
                 // 延迟更新壁纸效果 - Update wallpaper effect after animation
                 this.updateMaximizedWallpaperEffect();
                 this._syncAllTaskbarAppStates();
-                options.onClosed?.(true);
+                finishCloseAttempt(true);
             }, closeDuration);
         };
 
@@ -2101,13 +2133,13 @@ const WindowManager = {
         try {
             const appId = windowData.appId;
             const config = this.appConfigs[appId]; // raw config ok here, only need component
-            const component = config && globalThis[config.component];
+            const component = windowData.component || (config && globalThis[config.component]);
             if (component && typeof component.beforeClose === 'function') {
                 const result = component.beforeClose();
                 if (result && typeof result.then === 'function') {
                     result.then((ok) => {
                         if (ok === false) {
-                            options.onClosed?.(false);
+                            finishCloseAttempt(false);
                             return;
                         }
                         proceedClose();
@@ -2116,7 +2148,7 @@ const WindowManager = {
                     return; // 等待用户确认 - Wait for user confirmation
                 }
                 if (result === false) {
-                    options.onClosed?.(false);
+                    finishCloseAttempt(false);
                     return;
                 } // 用户取消关闭 - User cancelled close
             }

@@ -9,6 +9,7 @@ const Desktop = {
     selectedIcon: null,
     selectedIcons: [], // 多选图标数组
     contextSelectionIds: [],
+    _appShortcutDeleteDialog: null,
     
     // 框选相关
     isSelecting: false,
@@ -907,6 +908,13 @@ const Desktop = {
             .filter(Boolean);
         const selectedIds = [...new Set(Array.isArray(ids) && ids.length ? ids : liveIds)];
         if (selectedIds.length === 0) return;
+        if (selectedIds.length === 1) {
+            const selectedNode = State.findNode(selectedIds[0]);
+            if (selectedNode?.type === 'app') {
+                this.confirmDeleteAppShortcut(selectedNode);
+                return;
+            }
+        }
         if (typeof FilesApp !== 'undefined' && typeof FilesApp.ensureNodesCanBeDeleted === 'function') {
             if (!await FilesApp.ensureNodesCanBeDeleted(selectedIds)) return;
         }
@@ -1006,6 +1014,7 @@ const Desktop = {
 
     /** 右键删除 App 快捷方式：系统全局弹窗选择「从桌面删除 / 卸载 / 取消」 */
     confirmDeleteAppShortcut(node) {
+        if (!node || this._appShortcutDeleteDialog) return;
         const app = this.apps.find(a => a.id === node.appId);
         const name = app ? this.getAppName(app) : node.name;
         // 系统应用不可卸载（与开始菜单右键菜单的限制保持一致）
@@ -1021,7 +1030,7 @@ const Desktop = {
             buttons.push({ text: t('desktop.appdel.uninstall'), variant: 'danger', value: 'uninstall' });
         }
 
-        FluentUI.Dialog({
+        this._appShortcutDeleteDialog = FluentUI.Dialog({
             type: 'warning',
             title: t('desktop.appdel.title'),
             content: canUninstall
@@ -1029,6 +1038,7 @@ const Desktop = {
                 : t('desktop.appdel.content-sys', { name }),
             buttons,
             onClose: (result) => {
+                this._appShortcutDeleteDialog = null;
                 if (result === 'remove') {
                     // 仅从桌面移除：直接挪到回收站，无二次提示
                     this.moveDesktopNodeToRecycle(node.id);

@@ -8,6 +8,7 @@ const TipsApp = {
     activeSection: 'getting-started',
     activeStep: 0,
     activeFeature: 0,
+    _unsubscribeLanguage: null,
 
     copy: {
         zh: {
@@ -74,6 +75,13 @@ const TipsApp = {
         return this.copy[I18n?.currentLang === 'en' ? 'en' : 'zh'];
     },
 
+    getGettingStartedImageSources() {
+        return [...new Set(Object.values(this.copy)
+            .flatMap((locale) => Array.isArray(locale?.tutorials) ? locale.tutorials : [])
+            .map((item) => item?.image)
+            .filter(Boolean))];
+    },
+
     init(windowId) {
         this.windowId = windowId;
         this.container = document.getElementById(`${windowId}-content`);
@@ -81,7 +89,8 @@ const TipsApp = {
         this.activeStep = 0;
         this.activeFeature = 0;
         this.mount();
-        State.on('languageChange', () => {
+        this._unsubscribeLanguage?.();
+        this._unsubscribeLanguage = State.on('languageChange', () => {
             if (this.container?.isConnected) this.mount();
         }, { key: 'TipsApp.languageChange' });
     },
@@ -167,6 +176,8 @@ const TipsApp = {
     },
 
     beforeClose() {
+        this._unsubscribeLanguage?.();
+        this._unsubscribeLanguage = null;
         if (this.frame) this.frame.destroy();
         this.frame = null;
         this.container?.classList.remove('tips-window-content');

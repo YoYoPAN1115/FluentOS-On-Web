@@ -1999,8 +1999,7 @@ body.fluent-v2 .app-list-item,
 body.fluent-v2 .appshop-app-card,
 body.fluent-v2 .appshop-category-card,
 body.fluent-v2 .appshop-featured-card:not(.large),
-body.fluent-v2 .worldclock-card,
-body.fluent-v2 .browser-search-card {
+body.fluent-v2 .worldclock-card {
     background-color: var(--fluent-card-bg-light) !important;
     background-image: none !important;
     border-color: var(--fluent-card-border-light) !important;
@@ -2015,8 +2014,7 @@ body.fluent-v2 .app-list-item:hover,
 body.fluent-v2 .appshop-app-card:hover,
 body.fluent-v2 .appshop-category-card:hover,
 body.fluent-v2 .appshop-featured-card:not(.large):hover,
-body.fluent-v2 .worldclock-card:hover,
-body.fluent-v2 .browser-search-card:hover {
+body.fluent-v2 .worldclock-card:hover {
     background-color: var(--fluent-card-bg-light-hover) !important;
 }
 
@@ -2031,8 +2029,7 @@ body.fluent-v2.dark-mode .app-list-item,
 body.fluent-v2.dark-mode .appshop-app-card,
 body.fluent-v2.dark-mode .appshop-category-card,
 body.fluent-v2.dark-mode .appshop-featured-card:not(.large),
-body.fluent-v2.dark-mode .worldclock-card,
-body.fluent-v2.dark-mode .browser-search-card {
+body.fluent-v2.dark-mode .worldclock-card {
     background-color: var(--fluent-card-bg-dark) !important;
     background-image: none !important;
     border-color: var(--fluent-card-border-dark) !important;
@@ -2047,7 +2044,6 @@ body.fluent-v2.dark-mode .app-list-item:hover,
 body.fluent-v2.dark-mode .appshop-app-card:hover,
 body.fluent-v2.dark-mode .appshop-category-card:hover,
 body.fluent-v2.dark-mode .appshop-featured-card:not(.large):hover,
-body.fluent-v2.dark-mode .worldclock-card:hover,
-body.fluent-v2.dark-mode .browser-search-card:hover {
+body.fluent-v2.dark-mode .worldclock-card:hover {
     background-color: var(--fluent-card-bg-dark-hover) !important;
 }

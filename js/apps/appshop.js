@@ -20,205 +20,11 @@ const AppShop = {
     _searchComposing: false,
     _iconColorCache: new Map(),
     _iconColorPending: new Map(),
+    _stateUnsubscribers: [],
+    _storyKeydownHandler: null,
     
     // 应用数据（可从应用商店安装）
-    apps: [
-        // 音乐类
-        { 
-            id: 'netease-music', 
-            name: '网易云音乐', 
-            category: 'music', 
-            icon: 'wangyiyun_music.png',
-            developer: 'NetEase', 
-            rating: 4.7, 
-            downloads: '5亿+', 
-            featured: true,
-            banner: true,
-            isPWA: true,
-            url: 'https://music.163.com/',
-            themeColor: '#e60026',
-            desc: '网易云音乐是一款专注于发现与分享的音乐产品，依托专业音乐人、DJ、好友推荐及社交功能，为用户打造全新的音乐生活。'
-        },
-        { 
-            id: 'qq-music', 
-            name: 'QQ音乐', 
-            category: 'music', 
-            icon: 'qqmusic.png',
-            developer: 'Tencent', 
-            rating: 4.6, 
-            downloads: '8亿+', 
-            featured: true,
-            isPWA: true,
-            url: 'https://y.qq.com/',
-            themeColor: '#31c27c',
-            desc: 'QQ音乐是腾讯公司推出的网络音乐服务产品，拥有海量正版音乐资源，支持在线收听、下载等服务。'
-        },
-        // 视频类
-        { 
-            id: 'bilibili', 
-            name: '哔哩哔哩', 
-            category: 'video', 
-            icon: 'bilibili.png',
-            developer: 'Bilibili', 
-            rating: 4.6, 
-            downloads: '3亿+', 
-            featured: true,
-            isPWA: true,
-            url: 'https://www.bilibili.com/',
-            themeColor: '#fb7299',
-            desc: '哔哩哔哩是中国年轻人高度聚集的文化社区和视频平台，提供动画、番剧、游戏、科技等丰富内容。'
-        },
-        { 
-            id: 'douyu', 
-            name: '斗鱼直播', 
-            category: 'video', 
-            icon: 'douyuzhibo.png',
-            developer: 'Douyu', 
-            rating: 4.3, 
-            downloads: '1亿+',
-            isPWA: true,
-            url: 'https://www.douyu.com/',
-            themeColor: '#ff5d23',
-            desc: '斗鱼直播是一家弹幕式直播分享网站，提供游戏、娱乐、户外等各类直播内容。'
-        },
-        // 社交类
-        { 
-            id: 'weibo', 
-            name: '微博', 
-            category: 'social', 
-            icon: 'WB.png',
-            developer: 'Sina', 
-            rating: 4.4, 
-            downloads: '5亿+',
-            isPWA: true,
-            url: 'https://weibo.com/',
-            themeColor: '#e6162d',
-            desc: '微博是一个基于用户关系的社交媒体平台，用户可以发布文字、图片、视频等内容与他人互动。'
-        },
-        { 
-            id: 'qq-mail', 
-            name: 'QQ邮箱', 
-            category: 'office', 
-            icon: 'email.png',
-            developer: 'Tencent', 
-            rating: 4.5, 
-            downloads: '3亿+',
-            featured: true,
-            isPWA: true,
-            url: 'https://mail.qq.com/',
-            themeColor: '#1e90ff',
-            desc: 'QQ邮箱是腾讯公司推出的免费邮箱服务，提供超大附件、日历、记事本等功能。'
-        },
-        // 购物类
-        { 
-            id: 'taobao', 
-            name: '淘宝', 
-            category: 'shopping', 
-            icon: 'taobao.png',
-            developer: 'Alibaba', 
-            rating: 4.5, 
-            downloads: '10亿+',
-            isPWA: true,
-            url: 'https://www.taobao.com/',
-            themeColor: '#ff5000',
-            desc: '淘宝网是中国最大的网络零售平台，拥有数亿注册用户和数千万卖家，商品种类齐全。'
-        },
-        { 
-            id: 'jd', 
-            name: '京东', 
-            category: 'shopping', 
-            icon: 'jingdong.png',
-            developer: 'JD.com', 
-            rating: 4.6, 
-            downloads: '5亿+',
-            isPWA: true,
-            url: 'https://www.jd.com/',
-            themeColor: '#e2231a',
-            desc: '京东是中国自营式电商企业，提供正品行货、当日达等优质服务。'
-        },
-        // 工具类
-        { 
-            id: 'baidu-netdisk', 
-            name: '百度网盘', 
-            category: 'tools', 
-            icon: 'baidudisk.png',
-            developer: 'Baidu', 
-            rating: 4.2, 
-            downloads: '3亿+',
-            isPWA: true,
-            url: 'https://pan.baidu.com/',
-            themeColor: '#06a7ff',
-            desc: '百度网盘是百度推出的云存储服务，提供文件存储、同步、分享等功能。'
-        },
-        { 
-            id: 'alipay', 
-            name: '支付宝', 
-            category: 'tools', 
-            icon: 'zhifubao.png',
-            developer: 'Ant Group', 
-            rating: 4.7, 
-            downloads: '10亿+',
-            isPWA: true,
-            url: 'https://www.alipay.com/',
-            themeColor: '#1677ff',
-            desc: '支付宝是全球领先的独立第三方支付平台，致力于为用户提供安全快捷的电子支付服务。'
-        },
-        // 外卖
-        { 
-            id: 'meituan', 
-            name: '美团', 
-            category: 'lifestyle', 
-            icon: 'meituan.png',
-            developer: 'Meituan', 
-            rating: 4.5, 
-            downloads: '5亿+',
-            isPWA: true,
-            url: 'https://www.meituan.com/',
-            themeColor: '#ffc300',
-            desc: '美团是中国领先的生活服务电子商务平台，提供外卖、酒店、电影票等服务。'
-        },
-        { 
-            id: 'ele-me', 
-            name: '饿了么', 
-            category: 'lifestyle', 
-            icon: 'meituan.png',
-            developer: 'Alibaba', 
-            rating: 4.4, 
-            downloads: '3亿+',
-            isPWA: true,
-            url: 'https://www.ele.me/',
-            themeColor: '#0097ff',
-            desc: '饿了么是中国专业的本地生活平台，提供外卖、商超、鲜花等即时配送服务。'
-        },
-        // 地图
-        { 
-            id: 'amap', 
-            name: '高德地图', 
-            category: 'tools', 
-            icon: 'gaode.png',
-            developer: 'Alibaba', 
-            rating: 4.6, 
-            downloads: '8亿+',
-            isPWA: true,
-            url: 'https://www.amap.com/',
-            themeColor: '#0091ff',
-            desc: '高德地图是中国领先的数字地图内容、导航和位置服务提供商。'
-        },
-        // 阅读
-        { 
-            id: 'coolapk', 
-            name: '酷安', 
-            category: 'tools', 
-            icon: 'kuan.png',
-            developer: 'Coolapk', 
-            rating: 4.5, 
-            downloads: '5000万+',
-            isPWA: true,
-            url: 'https://www.coolapk.com/',
-            themeColor: '#11b566',
-            desc: '酷安是一个以分享优质应用、游戏和数码消费体验为主的社区。'
-        }
-    ],
+    apps: [],
 
     iconRenames: {
         system_clock: 'clock.png',
@@ -2080,11 +1886,14 @@ const AppShop = {
         this.render();
         
         // 监听语言和主题变化
-        State.on('languageChange', () => this.updateAppsList());
-        State.on('settingsChange', (updates) => {
+        this._stateUnsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
+        this._stateUnsubscribers.push(State.on('languageChange', () => {
+            if (this.container?.isConnected) this.updateAppsList();
+        }));
+        this._stateUnsubscribers.push(State.on('settingsChange', (updates) => {
             if (!updates || !Object.prototype.hasOwnProperty.call(updates, 'appShopFeaturePreviewIndex')) return;
-            this.updateAppsList();
-        });
+            if (this.container?.isConnected) this.updateAppsList();
+        }));
     },
 
     beforeClose() {
@@ -2093,6 +1902,10 @@ const AppShop = {
             this._searchInputTimer = null;
         }
         this._searchComposing = false;
+        if (this._storyKeydownHandler) {
+            document.removeEventListener('keydown', this._storyKeydownHandler);
+            this._storyKeydownHandler = null;
+        }
         if (this._contentScrollRestoreRaf) {
             cancelAnimationFrame(this._contentScrollRestoreRaf);
             this._contentScrollRestoreRaf = null;
@@ -2101,6 +1914,7 @@ const AppShop = {
             this.frame.destroy();
             this.frame = null;
         }
+        this._stateUnsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
         this.container = null;
         this.windowId = null;
         return true;
@@ -2740,6 +2554,10 @@ const AppShop = {
             overlay.classList.remove('show');
             restoreSource();
             if (overlay.isConnected) overlay.remove();
+            if (this._storyKeydownHandler === onKeyDown) {
+                document.removeEventListener('keydown', onKeyDown);
+                this._storyKeydownHandler = null;
+            }
             requestAnimationFrame(() => this.flushDeferredPreviewRender());
         };
         const close = () => {
@@ -2785,6 +2603,10 @@ const AppShop = {
             document.removeEventListener('keydown', onKeyDown);
             close();
         };
+        if (this._storyKeydownHandler) {
+            document.removeEventListener('keydown', this._storyKeydownHandler);
+        }
+        this._storyKeydownHandler = onKeyDown;
         document.addEventListener('keydown', onKeyDown);
         const closeAndCleanup = () => {
             document.removeEventListener('keydown', onKeyDown);

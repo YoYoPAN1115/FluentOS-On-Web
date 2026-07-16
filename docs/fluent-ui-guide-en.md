@@ -185,7 +185,7 @@ The callback receives a number. Avoid expensive work on every high-frequency inp
 FluentUI.SegmentedControl({
     segments: [
         { id: 'grid', label: t('grid'), icon: 'Dashboard' },
-        { id: 'list', label: t('list'), icon: 'Menu' }
+        { id: 'list', label: t('list'), icon: 'Checklist Note' }
     ],
     activeSegment: 'grid',
     size: 'medium',
@@ -220,7 +220,7 @@ FluentUI.ToolBar({
     items: [
         { id: 'new', icon: 'Add', title: t('new') },
         { divider: true },
-        { id: 'delete', icon: 'Delete', title: t('delete'), disabled: !this.selection }
+        { id: 'delete', icon: 'Trash', title: t('delete'), disabled: !this.selection }
     ],
     onItemClick: (id, item) => this.handleTool(id)
 });
@@ -331,7 +331,7 @@ const menu = FluentUI.ContextMenu({
     items: [
         { id: 'open', label: t('open'), icon: 'Folder Open', onClick: () => this.open() },
         { separator: true },
-        { id: 'delete', label: t('delete'), icon: 'Delete', onClick: () => this.remove() }
+        { id: 'delete', label: t('delete'), icon: 'Trash', onClick: () => this.remove() }
     ]
 });
 document.body.appendChild(menu);

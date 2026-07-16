@@ -29,6 +29,19 @@ const FilesApp = {
     // 搜索相关
     isSearching: false,
     searchTimer: null,
+
+    // 生命周期相关
+    _lifecycleController: null,
+    _viewController: null,
+    _listController: null,
+    _breadcrumbController: null,
+    _stateUnsubscribers: [],
+    _timeouts: new Set(),
+    _viewTimeouts: new Set(),
+    _contextMenu: null,
+    _boundViewRoot: null,
+    _isClosing: false,
+    _renderGeneration: 0,
     
     // 剪贴板相关
     clipboard: {
@@ -36,33 +49,120 @@ const FilesApp = {
         action: null    // 'copy' 或 'cut'
     },
 
+    _scheduleTimeout(callback, delay, viewScoped = false) {
+        const timerId = setTimeout(() => {
+            this._timeouts.delete(timerId);
+            this._viewTimeouts.delete(timerId);
+            callback();
+        }, delay);
+        this._timeouts.add(timerId);
+        if (viewScoped) this._viewTimeouts.add(timerId);
+        return timerId;
+    },
+
+    _cancelTimeout(timerId) {
+        if (timerId === null || timerId === undefined) return;
+        clearTimeout(timerId);
+        this._timeouts.delete(timerId);
+        this._viewTimeouts.delete(timerId);
+    },
+
+    _clearViewTimeouts() {
+        this._viewTimeouts.forEach((timerId) => {
+            clearTimeout(timerId);
+            this._timeouts.delete(timerId);
+        });
+        this._viewTimeouts.clear();
+        this.searchTimer = null;
+    },
+
+    _clearAllTimeouts() {
+        this._timeouts.forEach((timerId) => clearTimeout(timerId));
+        this._timeouts.clear();
+        this._viewTimeouts.clear();
+        this.searchTimer = null;
+        this._photosCacheTimer = null;
+    },
+
+    _subscribeState(event, handler) {
+        const unsubscribe = State.on(event, handler);
+        if (typeof unsubscribe === 'function') {
+            this._stateUnsubscribers.push(unsubscribe);
+        }
+    },
+
+    _unsubscribeState() {
+        this._stateUnsubscribers.splice(0).forEach((unsubscribe) => {
+            try {
+                unsubscribe();
+            } catch (error) {
+                console.error('[FilesApp] Failed to unsubscribe state listener', error);
+            }
+        });
+    },
+
+    _removeContextMenu() {
+        if (this._contextMenu) this._contextMenu.remove();
+        if (this.windowId) {
+            const menuId = `${this.windowId}-files-context-menu`;
+            document.querySelectorAll('.context-menu').forEach((menu) => {
+                if (menu.id === menuId) menu.remove();
+            });
+        }
+        this._contextMenu = null;
+        this.contextTargetId = null;
+    },
+
+    _disposeView() {
+        this._viewController?.abort();
+        this._listController?.abort();
+        this._breadcrumbController?.abort();
+        this._viewController = null;
+        this._listController = null;
+        this._breadcrumbController = null;
+        this._boundViewRoot = null;
+        this._clearViewTimeouts();
+        this._removeContextMenu();
+        if (this.selectionBox) this.selectionBox.remove();
+        this.selectionBox = null;
+        this.selectedItems = [];
+        this.isSelecting = false;
+        this.justFinishedSelecting = false;
+        this.isSearching = false;
+    },
+
     init(windowId, data = {}) {
+        // FilesApp 是单例；重复初始化前先释放上一次窗口的全部资源。
+        this.beforeClose();
         this.windowId = windowId || `window-${Date.now()}`;
         this.container = document.getElementById(`${this.windowId}-content`);
         
         // 确保容器存在
         if (!this.container) {
             console.error('[FilesApp] 找不到容器元素:', `${this.windowId}-content`);
+            this.windowId = null;
             return;
         }
         
         // 确保文件系统已初始化
         if (!State.fs || !State.fs.root) {
             console.error('[FilesApp] 文件系统未初始化');
+            this.container = null;
+            this.windowId = null;
             return;
         }
+
+        this._isClosing = false;
+        this._lifecycleController = new AbortController();
         
         this.currentNode = State.fs.root;
         this.currentPath = ['root'];
         this.history = [['root']];
         this.historyIndex = 0;
         
-        this.render();
-        this.addStylesOnce();
-
         // 监听语言切换
-        this._langHandler = () => { this.render(); this.bindEvents(); };
-        State.on('languageChange', this._langHandler);
+        this._langHandler = () => this.render();
+        this._subscribeState('languageChange', this._langHandler);
 
         // 监听实验室开关变化：动态显示/隐藏“上传”按钮与外部拖拽导入
         this._settingsHandler = (updates) => {
@@ -70,44 +170,69 @@ const FilesApp = {
                 this.render();
             }
         };
-        State.on('settingsChange', this._settingsHandler);
+        this._subscribeState('settingsChange', this._settingsHandler);
+
+        this._fsChangeHandler = () => {
+            if (!this.container) return;
+            const currentId = this.currentPath[this.currentPath.length - 1];
+            const node = State.findNode(currentId);
+            if (node) {
+                this.currentNode = node;
+                this.renderFileList();
+                this.updateBreadcrumb();
+            }
+        };
+        this._subscribeState('fsChange', this._fsChangeHandler);
 
         this._photosCacheHandler = () => {
             if (!this.container || this.isSearching) return;
-            clearTimeout(this._photosCacheTimer);
-            this._photosCacheTimer = setTimeout(() => {
+            this._cancelTimeout(this._photosCacheTimer);
+            this._photosCacheTimer = this._scheduleTimeout(() => {
                 this._photosCacheTimer = null;
                 if (!this.container || this.isSearching) return;
                 this.renderFileList();
             }, 80);
         };
-        window.addEventListener('photos-cache-ready', this._photosCacheHandler);
+        window.addEventListener('photos-cache-ready', this._photosCacheHandler, {
+            signal: this._lifecycleController.signal
+        });
+
+        this.bindKeyboardEvents();
+        this.render();
+        this.addStylesOnce();
 
         // 如果有传入文件ID，导航到该位置
         if (data.fileId) {
-            setTimeout(() => this.navigateToId(data.fileId), 100);
+            this._scheduleTimeout(() => {
+                if (this.container) this.navigateToId(data.fileId);
+            }, 100);
         }
     },
 
     beforeClose() {
+        this._isClosing = true;
+        this._renderGeneration += 1;
+        this._disposeView();
+        this._unsubscribeState();
         if (this._keyHandler) {
             document.removeEventListener('keydown', this._keyHandler);
             this._keyHandler = null;
         }
+        this._lifecycleController?.abort();
+        this._lifecycleController = null;
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
-            this.frame = null;
         }
-        const ctxMenu = document.getElementById(`${this.windowId}-files-context-menu`);
-        if (ctxMenu && ctxMenu.parentElement === document.body) {
-            ctxMenu.remove();
-        }
+        this.frame = null;
         if (this._photosCacheHandler) {
             window.removeEventListener('photos-cache-ready', this._photosCacheHandler);
-            this._photosCacheHandler = null;
         }
-        clearTimeout(this._photosCacheTimer);
-        this._photosCacheTimer = null;
+        this._photosCacheHandler = null;
+        this._langHandler = null;
+        this._settingsHandler = null;
+        this._fsChangeHandler = null;
+        this._clearAllTimeouts();
+        this.currentNode = null;
         this.container = null;
         this.windowId = null;
         return true;
@@ -129,27 +254,35 @@ const FilesApp = {
     },
 
     render() {
+        if (this._isClosing) return;
         if (!this.container) {
             console.error('[FilesApp] render: 容器不存在');
             return;
         }
 
-        this.container.innerHTML = '';
+        this._disposeView();
         if (this.frame && typeof this.frame.destroy === 'function') {
             this.frame.destroy();
             this.frame = null;
         }
+        this.container.innerHTML = '';
 
         if (typeof FluentWindow === 'undefined' || typeof FluentWindow.mount !== 'function') {
             console.error('[FilesApp] FluentWindow framework is not loaded');
             return;
         }
 
+        const renderGeneration = ++this._renderGeneration;
         this.frame = FluentWindow.mount({
             container: this.container,
             items: this.getQuickAccessItems(),
             activeId: this.getCurrentQuickAccessId(),
             onNavigate: (id, pageEl) => {
+                if (
+                    this._isClosing ||
+                    renderGeneration !== this._renderGeneration ||
+                    !this.container?.contains(pageEl)
+                ) return;
                 pageEl.classList.add('files-fw-page');
                 this.renderContentPage(pageEl);
                 if (id && id !== this.getCurrentQuickAccessId()) {
@@ -160,6 +293,9 @@ const FilesApp = {
     },
 
     renderContentPage(pageEl) {
+        if (this._isClosing || !pageEl || !this.container?.contains(pageEl)) return;
+        this._disposeView();
+        this._viewController = new AbortController();
         pageEl.innerHTML = '';
 
         const app = document.createElement('div');
@@ -229,6 +365,7 @@ const FilesApp = {
         const ctxMenu = document.createElement('div');
         ctxMenu.className = 'context-menu hidden';
         ctxMenu.id = `${this.windowId}-files-context-menu`;
+        this._contextMenu = ctxMenu;
         app.appendChild(ctxMenu);
 
         pageEl.appendChild(app);
@@ -345,24 +482,28 @@ const FilesApp = {
     },
 
     bindEvents() {
-        // 后退/前进
-        document.getElementById('files-back')?.addEventListener('click', () => this.goBack());
-        document.getElementById('files-forward')?.addEventListener('click', () => this.goForward());
-
-        // 将右键菜单移到 body，避免在窗口 transform/overflow 下错位或被裁剪
-        const externalMenu = document.getElementById(`${this.windowId}-files-context-menu`);
-        if (externalMenu && externalMenu.parentElement !== document.body) {
-            document.body.appendChild(externalMenu);
+        if (!this.container) return;
+        if (!this._viewController || this._viewController.signal.aborted) {
+            this._viewController = new AbortController();
+            this._boundViewRoot = null;
         }
-
-        // 文件列表
+        const signal = this._viewController.signal;
+        const listenerOptions = { signal };
         const filesList = this.container.querySelector('#files-list');
         const filesContent = this.container.querySelector('#files-content');
         const filesApp = this.container.querySelector('.files-app');
-        if (!filesList || !filesContent || !filesApp) {
+        const menu = this._contextMenu;
+        if (!filesList || !filesContent || !filesApp || !menu) {
             console.error('[FilesApp] bindEvents: core elements not found');
             return;
         }
+
+        // 同一视图只绑定一次；重渲染会先 abort 旧视图控制器。
+        if (this._boundViewRoot === filesApp) return;
+        this._boundViewRoot = filesApp;
+
+        // 将右键菜单移到 body，避免在窗口 transform/overflow 下错位或被裁剪。
+        if (menu.parentElement !== document.body) document.body.appendChild(menu);
         
         // 框选功能
         filesContent.addEventListener('mousedown', (e) => {
@@ -383,10 +524,10 @@ const FilesApp = {
             this.selectionBox.style.width = '0px';
             this.selectionBox.style.height = '0px';
             this.selectionBox.style.display = 'block';
-        });
+        }, listenerOptions);
         
         filesContent.addEventListener('mousemove', (e) => {
-            if (!this.isSelecting) return;
+            if (!this.isSelecting || !this.selectionBox) return;
             
             const rect = filesContent.getBoundingClientRect();
             const currentX = e.clientX - rect.left + filesContent.scrollLeft;
@@ -403,21 +544,21 @@ const FilesApp = {
             this.selectionBox.style.height = height + 'px';
             
             this.updateFileSelection();
-        });
+        }, listenerOptions);
         
         // 绑定到 document 确保总能捕获 mouseup
         document.addEventListener('mouseup', () => {
             if (this.isSelecting) {
                 this.justFinishedSelecting = true;
                 this.isSelecting = false;
-                this.selectionBox.style.display = 'none';
+                if (this.selectionBox) this.selectionBox.style.display = 'none';
                 
                 // 延迟重置标记（给用户足够时间）
-                setTimeout(() => {
+                this._scheduleTimeout(() => {
                     this.justFinishedSelecting = false;
-                }, 100);
+                }, 100, true);
             }
-        });
+        }, listenerOptions);
         
         // 文件项点击
         filesList.addEventListener('click', (e) => {
@@ -435,7 +576,7 @@ const FilesApp = {
                     this.selectItem(item);
                 }
             }
-        });
+        }, listenerOptions);
         
         filesList.addEventListener('dblclick', (e) => {
             const item = e.target.closest('.file-item');
@@ -448,13 +589,10 @@ const FilesApp = {
                     this.openFile(node);
                 }
             }
-        });
-        
-        // 键盘Delete键
-        this.bindKeyboardEvents();
+        }, listenerOptions);
         
         // 拖拽接收
-        this.bindDragDropEvents(filesApp, filesContent);
+        this.bindDragDropEvents(filesApp, filesContent, signal);
 
         // 文件列表右键（单个项）
         filesList.addEventListener('contextmenu', (e) => {
@@ -463,7 +601,7 @@ const FilesApp = {
             e.preventDefault();
             this.contextTargetId = item.dataset.id;
             this.showContextMenu(e.clientX, e.clientY, true);
-        });
+        }, listenerOptions);
 
         // 内容区域空白处右键（目录级）
         filesContent.addEventListener('contextmenu', (e) => {
@@ -471,11 +609,10 @@ const FilesApp = {
             e.preventDefault();
             this.contextTargetId = null;
             this.showContextMenu(e.clientX, e.clientY, false);
-        });
+        }, listenerOptions);
 
         // 右键菜单动作
-        const menu = document.getElementById(`${this.windowId}-files-context-menu`);
-        document.addEventListener('click', () => menu.classList.add('hidden'));
+        document.addEventListener('click', () => menu.classList.add('hidden'), listenerOptions);
         menu.addEventListener('click', (e) => {
             const item = e.target.closest('.context-menu-item');
             if (!item) return;
@@ -486,33 +623,23 @@ const FilesApp = {
             const action = item.dataset.action;
             this.handleContextAction(action);
             menu.classList.add('hidden');
-        });
+        }, listenerOptions);
 
         // 搜索
-        const searchInput = document.getElementById('files-search-input');
+        const searchInput = this.container.querySelector('#files-search-input');
         searchInput?.addEventListener('input', (e) => {
             const query = e.target.value || '';
-            clearTimeout(this.searchTimer);
+            this._cancelTimeout(this.searchTimer);
             // 简单防抖，保证实时但不抖动
-            this.searchTimer = setTimeout(() => {
+            this.searchTimer = this._scheduleTimeout(() => {
+                this.searchTimer = null;
                 this.handleSearch(query.trim());
-            }, 120);
-        });
-
-        // 订阅文件系统变化，保持视图同步
-        State.on('fsChange', () => {
-            const currentId = this.currentPath[this.currentPath.length - 1];
-            const node = State.findNode(currentId);
-            if (node) {
-                this.currentNode = node;
-                this.renderFileList();
-                this.updateBreadcrumb();
-            }
-        });
+            }, 120, true);
+        }, listenerOptions);
     },
 
     showContextMenu(x, y, hasTarget) {
-        const menu = document.getElementById(`${this.windowId}-files-context-menu`);
+        const menu = this._contextMenu;
         if (!menu) return;
         const filesList = this.container ? this.container.querySelector('#files-list') : null;
         const totalItems = filesList ? filesList.querySelectorAll('.file-item').length : 0;
@@ -1211,8 +1338,17 @@ const FilesApp = {
     },
 
     updateBreadcrumb() {
-        const breadcrumb = document.getElementById('files-breadcrumb');
+        this._breadcrumbController?.abort();
+        this._breadcrumbController = null;
+        const breadcrumb = this.container?.querySelector('#files-breadcrumb');
         if (!breadcrumb) return;
+
+        if (this._viewController && !this._viewController.signal.aborted) {
+            this._breadcrumbController = new AbortController();
+        }
+        const listenerOptions = this._breadcrumbController
+            ? { signal: this._breadcrumbController.signal }
+            : undefined;
 
         breadcrumb.innerHTML = '';
         
@@ -1237,12 +1373,13 @@ const FilesApp = {
                 this.renderFileList();
                 this.updateBreadcrumb();
                 this.updateSidebarActive();
-            });
+            }, listenerOptions);
             breadcrumb.appendChild(item);
         });
     },
 
     updateSidebarActive() {
+        if (!this.container) return;
         // 获取当前路径中的快速访问项目ID
         const currentId = this.getCurrentQuickAccessId();
         if (this.frame) {
@@ -1303,11 +1440,23 @@ const FilesApp = {
     },
 
     renderFileList() {
-        const filesList = document.getElementById('files-list');
+        this._listController?.abort();
+        this._listController = null;
+        this.selectedItems = [];
+        this.contextTargetId = null;
+        this._contextMenu?.classList.add('hidden');
+        const filesList = this.container?.querySelector('#files-list');
         if (!filesList) {
             console.error('[FilesApp] files-list 元素不存在');
             return;
         }
+
+        if (this._viewController && !this._viewController.signal.aborted) {
+            this._listController = new AbortController();
+        }
+        const listenerOptions = this._listController
+            ? { signal: this._listController.signal }
+            : undefined;
 
         filesList.innerHTML = '';
 
@@ -1395,7 +1544,7 @@ const FilesApp = {
                     const itemEl = filesList.querySelector(`.file-item[data-id="${id}"]`);
                     if (itemEl) itemEl.classList.add('dragging');
                 });
-            });
+            }, listenerOptions);
             
             item.addEventListener('dragend', () => {
                 draggingIds.forEach((id) => {
@@ -1403,7 +1552,7 @@ const FilesApp = {
                     if (itemEl) itemEl.classList.remove('dragging');
                 });
                 draggingIds = [node.id];
-            });
+            }, listenerOptions);
 
             // Lab: allow dropping external OS files onto a folder item
             if (node.type === 'folder') {
@@ -1415,10 +1564,10 @@ const FilesApp = {
                     e.stopPropagation();
                     e.dataTransfer.dropEffect = 'copy';
                     item.classList.add('drag-over');
-                });
+                }, listenerOptions);
                 item.addEventListener('dragleave', (e) => {
                     if (!item.contains(e.relatedTarget)) item.classList.remove('drag-over');
-                });
+                }, listenerOptions);
                 item.addEventListener('drop', (e) => {
                     if (!externalEnabled()) return;
                     const files = getExternalFiles(e.dataTransfer);
@@ -1431,8 +1580,8 @@ const FilesApp = {
                     } catch (err) {
                         console.error('[FilesApp] 外部文件拖入目录失败:', err);
                     }
-                });
-                item.addEventListener('dragend', () => item.classList.remove('drag-over'));
+                }, listenerOptions);
+                item.addEventListener('dragend', () => item.classList.remove('drag-over'), listenerOptions);
             }
 
             filesList.appendChild(item);
@@ -1442,7 +1591,7 @@ const FilesApp = {
     },
 
     updateStatus(count) {
-        const status = document.getElementById('files-status');
+        const status = this.container?.querySelector('#files-status');
         if (status) {
             status.textContent = t('files.items', {count});
         }
@@ -1491,26 +1640,28 @@ const FilesApp = {
             this.currentPath = path;
         }
         
-            this.currentNode = node;
+        this.currentNode = node;
         
         // 更新历史
         this.history = this.history.slice(0, this.historyIndex + 1);
         this.history.push([...this.currentPath]);
         this.historyIndex++;
         
-            this.renderFileList();
-            this.updateBreadcrumb();
-            this.updateSidebarActive();
-            // 若需要高亮某个子项
-            if (highlightChildId) {
-                setTimeout(() => {
-                    const el = this.container.querySelector(`.file-item[data-id="${highlightChildId}"]`);
-                    if (el) {
-                        el.classList.add('pulse-highlight');
-                        el.scrollIntoView({ block: 'center' });
-                        setTimeout(() => el.classList.remove('pulse-highlight'), 1200);
-                    }
-                }, 50);
+        this.renderFileList();
+        this.updateBreadcrumb();
+        this.updateSidebarActive();
+        // 若需要高亮某个子项
+        if (highlightChildId) {
+            this._scheduleTimeout(() => {
+                const el = this.container?.querySelector(`.file-item[data-id="${highlightChildId}"]`);
+                if (el) {
+                    el.classList.add('pulse-highlight');
+                    el.scrollIntoView({ block: 'center' });
+                    this._scheduleTimeout(() => {
+                        if (el.isConnected) el.classList.remove('pulse-highlight');
+                    }, 1200, true);
+                }
+            }, 50, true);
         }
     },
 
@@ -1530,9 +1681,6 @@ const FilesApp = {
             this.historyIndex--;
             this.currentPath = [...this.history[this.historyIndex]];
             this.currentNode = State.findNode(this.currentPath[this.currentPath.length - 1]);
-            this.renderFileList();
-            this.updateBreadcrumb();
-            this.updateSidebarActive();
             this.render();
         }
     },
@@ -1542,9 +1690,6 @@ const FilesApp = {
             this.historyIndex++;
             this.currentPath = [...this.history[this.historyIndex]];
             this.currentNode = State.findNode(this.currentPath[this.currentPath.length - 1]);
-            this.renderFileList();
-            this.updateBreadcrumb();
-            this.updateSidebarActive();
             this.render();
         }
     },
@@ -1604,7 +1749,7 @@ const FilesApp = {
     },
     
     deselectAllItems() {
-        const filesList = document.getElementById('files-list');
+        const filesList = this.container?.querySelector('#files-list');
         if (filesList) {
             filesList.querySelectorAll('.file-item').forEach(item => {
                 item.classList.remove('selected');
@@ -1614,7 +1759,7 @@ const FilesApp = {
     },
 
     selectAllItems() {
-        const filesList = document.getElementById('files-list');
+        const filesList = this.container?.querySelector('#files-list');
         if (!filesList) return;
         const items = Array.from(filesList.querySelectorAll('.file-item'));
         if (items.length === 0) return;
@@ -1623,11 +1768,12 @@ const FilesApp = {
     },
     
     updateFileSelection() {
+        if (!this.selectionBox || !this.container) return;
         const boxRect = this.selectionBox.getBoundingClientRect();
-        const filesContent = document.getElementById('files-content');
+        const filesContent = this.container.querySelector('#files-content');
+        const filesList = this.container.querySelector('#files-list');
+        if (!filesContent || !filesList) return;
         const contentRect = filesContent.getBoundingClientRect();
-        
-        const filesList = document.getElementById('files-list');
         const items = filesList.querySelectorAll('.file-item');
         
         items.forEach(item => {
@@ -1661,8 +1807,9 @@ const FilesApp = {
         });
     },
     
-    bindDragDropEvents(dropZone, highlightTarget = dropZone) {
+    bindDragDropEvents(dropZone, highlightTarget = dropZone, signal = this._viewController?.signal) {
         const highlightEl = highlightTarget || dropZone;
+        const listenerOptions = signal ? { signal } : undefined;
         const hasFluentPayload = (dataTransfer) => {
             if (!dataTransfer || !dataTransfer.types) return false;
             const types = Array.from(dataTransfer.types).map((v) => String(v || ''));
@@ -1721,13 +1868,13 @@ const FilesApp = {
             e.stopPropagation();
             e.dataTransfer.dropEffect = external ? 'copy' : 'move';
             highlightEl.classList.add('drag-over');
-        });
+        }, listenerOptions);
         
         dropZone.addEventListener('dragleave', (e) => {
             if (!dropZone.contains(e.relatedTarget)) {
                 highlightEl.classList.remove('drag-over');
             }
-        });
+        }, listenerOptions);
         
         dropZone.addEventListener('drop', (e) => {
             const internal = hasFluentPayload(e.dataTransfer);
@@ -1752,11 +1899,11 @@ const FilesApp = {
             const data = parseDropData(e.dataTransfer);
             if (!data || (!data.id && !(Array.isArray(data.ids) && data.ids.length > 0))) return;
             this.handleFileDrop(data);
-        });
+        }, listenerOptions);
 
         dropZone.addEventListener('dragend', () => {
             highlightEl.classList.remove('drag-over');
-        });
+        }, listenerOptions);
     },
     
     handleFileDrop(data) {
@@ -1891,7 +2038,8 @@ const FilesApp = {
                 this.pasteFromClipboard();
             }
         };
-        document.addEventListener('keydown', this._keyHandler);
+        const signal = this._lifecycleController?.signal;
+        document.addEventListener('keydown', this._keyHandler, signal ? { signal } : undefined);
     },
     
     async deleteSelectedItems() {
@@ -1994,7 +2142,12 @@ const FilesApp = {
 
     // 渲染搜索结果（平铺列表，展示路径）
     renderSearchResults(results) {
-        const filesList = document.getElementById('files-list');
+        this._listController?.abort();
+        this._listController = null;
+        this.selectedItems = [];
+        this.contextTargetId = null;
+        this._contextMenu?.classList.add('hidden');
+        const filesList = this.container?.querySelector('#files-list');
         if (!filesList) return;
         filesList.innerHTML = '';
 

@@ -13,6 +13,8 @@ const DeveloperCenterStore = {
         'files.readText',
         'files.writeText',
         'desktop.manage',
+        'clipboard.read',
+        'clipboard.write',
         'network.request',
         'network.image'
     ],

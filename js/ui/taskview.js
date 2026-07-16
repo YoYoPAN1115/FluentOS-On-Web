@@ -8,6 +8,8 @@ const TaskView = {
     autoTimer: null,
     settleTimer: null,
     cycleToken: 0,
+    suspendedActiveWindowId: null,
+    foregroundStateSuspended: false,
     ENTER_DURATION_MS: 460,
     EXIT_DURATION_MS: 420,
 
@@ -120,7 +122,112 @@ const TaskView = {
             ? computed.transform
             : (el.style.transform || 'none');
         const opacity = computed.opacity || (el.style.opacity || '1');
-        return { transform, opacity };
+        const transformOrigin = computed.transformOrigin || el.style.transformOrigin || '0px 0px';
+        return { transform, opacity, transformOrigin };
+    },
+
+    _cancelConflictingWindowMotion(windowData) {
+        if (!windowData || !windowData.element) return;
+
+        if (windowData._focusMotionTimer) {
+            clearTimeout(windowData._focusMotionTimer);
+            windowData._focusMotionTimer = null;
+        }
+
+        // CSS animations override inline transforms. Let Task View take sole
+        // ownership before capturing bounds or applying its preview transform.
+        windowData.element.classList.remove('opening', 'window-focus-enter', 'window-focus-leave');
+    },
+
+    _suspendForegroundWindowState() {
+        if (this.foregroundStateSuspended || typeof WindowManager === 'undefined') return;
+
+        this.suspendedActiveWindowId = WindowManager.activeWindowId || null;
+        this.foregroundStateSuspended = true;
+        if (typeof WindowManager._setActiveWindow === 'function') {
+            WindowManager._setActiveWindow(null);
+        } else {
+            (WindowManager.windows || []).forEach((windowData) => {
+                if (!windowData || !windowData.element || windowData.isMinimized || windowData.isMinimizing) return;
+                windowData.element.classList.add('window-inactive');
+            });
+            WindowManager.activeWindowId = null;
+        }
+        if (typeof WindowManager._syncAllTaskbarAppStates === 'function') {
+            WindowManager._syncAllTaskbarAppStates();
+        }
+    },
+
+    _restoreForegroundWindowState(preferredWindowId = null) {
+        if (!this.foregroundStateSuspended || typeof WindowManager === 'undefined') return;
+
+        const requestedId = preferredWindowId || this.suspendedActiveWindowId;
+        const requestedWindow = (WindowManager.windows || []).find((windowData) =>
+            windowData &&
+            windowData.id === requestedId &&
+            windowData.element &&
+            !windowData.isMinimized &&
+            !windowData.isMinimizing &&
+            !windowData.element.classList.contains('closing')
+        );
+        const activeWindowId = requestedWindow ? requestedWindow.id : null;
+
+        if (typeof WindowManager._setActiveWindow === 'function') {
+            WindowManager._setActiveWindow(activeWindowId);
+        } else {
+            WindowManager.activeWindowId = activeWindowId;
+            (WindowManager.windows || []).forEach((windowData) => {
+                if (!windowData || !windowData.element) return;
+                const isActive = !!activeWindowId && windowData.id === activeWindowId;
+                windowData.element.classList.toggle(
+                    'window-inactive',
+                    !isActive && !windowData.isMinimized && !windowData.isMinimizing
+                );
+            });
+        }
+        if (typeof WindowManager._syncAllTaskbarAppStates === 'function') {
+            WindowManager._syncAllTaskbarAppStates();
+        }
+
+        this.suspendedActiveWindowId = null;
+        this.foregroundStateSuspended = false;
+    },
+
+    _rebaseTransformToTopLeft(transform, transformOrigin) {
+        if (!transform || transform === 'none') return '';
+
+        const originParts = String(transformOrigin || '')
+            .trim()
+            .split(/\s+/)
+            .map((value) => Number.parseFloat(value));
+        const ox = Number.isFinite(originParts[0]) ? originParts[0] : 0;
+        const oy = Number.isFinite(originParts[1]) ? originParts[1] : 0;
+        const oz = Number.isFinite(originParts[2]) ? originParts[2] : 0;
+        const format = (value) => Number(Number(value).toFixed(6));
+
+        const matrix2d = String(transform).match(/^matrix\(([^)]+)\)$/);
+        if (matrix2d) {
+            const values = matrix2d[1].split(',').map((value) => Number.parseFloat(value));
+            if (values.length === 6 && values.every(Number.isFinite)) {
+                const [a, b, c, d, e, f] = values;
+                const rebasedE = e + ox - (a * ox) - (c * oy);
+                const rebasedF = f + oy - (b * ox) - (d * oy);
+                return `matrix(${[a, b, c, d, rebasedE, rebasedF].map(format).join(', ')})`;
+            }
+        }
+
+        const matrix3d = String(transform).match(/^matrix3d\(([^)]+)\)$/);
+        if (matrix3d) {
+            const values = matrix3d[1].split(',').map((value) => Number.parseFloat(value));
+            if (values.length === 16 && values.every(Number.isFinite)) {
+                values[12] += ox - (values[0] * ox) - (values[4] * oy) - (values[8] * oz);
+                values[13] += oy - (values[1] * ox) - (values[5] * oy) - (values[9] * oz);
+                values[14] += oz - (values[2] * ox) - (values[6] * oy) - (values[10] * oz);
+                return `matrix3d(${values.map(format).join(', ')})`;
+            }
+        }
+
+        return transform;
     },
 
     _primeExitAnimation(el, visualState) {
@@ -129,6 +236,28 @@ const TaskView = {
         el.style.transform = visualState.transform;
         el.style.opacity = visualState.opacity;
         el.offsetHeight;
+    },
+
+    _freezeExitVisualStates(stateEntries) {
+        const visualStates = new Map();
+
+        // Capture every window before removing the task-view state. Otherwise
+        // the foreground window can briefly resolve its normal window styles
+        // and jump to full size when Task View is closed during its enter
+        // transition.
+        (stateEntries || []).forEach(([windowId]) => {
+            const windowData = (WindowManager.windows || []).find((w) => w && w.id === windowId);
+            if (!windowData || !windowData.element) return;
+            visualStates.set(windowId, this._captureVisualState(windowData.element));
+        });
+
+        visualStates.forEach((visualState, windowId) => {
+            const windowData = (WindowManager.windows || []).find((w) => w && w.id === windowId);
+            if (!windowData || !windowData.element) return;
+            this._primeExitAnimation(windowData.element, visualState);
+        });
+
+        return visualStates;
     },
 
     _runExitAnimation(el, cycleId, transition, endTransform, endOpacity) {
@@ -197,6 +326,16 @@ const TaskView = {
         delete el.dataset.taskviewOrigPointerEvents;
     },
 
+    _captureInterruptedVisualStates() {
+        const visualStates = new Map();
+        (WindowManager.windows || []).forEach((windowData) => {
+            const el = windowData && windowData.element;
+            if (!el || el.dataset.taskviewManaged !== '1') return;
+            visualStates.set(windowData.id, this._captureVisualState(el));
+        });
+        return visualStates;
+    },
+
     _restoreInterruptedManagedWindows() {
         const windows = (WindowManager.windows || []).filter((w) => w && w.element);
         windows.forEach((windowData) => {
@@ -204,8 +343,9 @@ const TaskView = {
             if (!el || el.dataset.taskviewManaged !== '1') return;
 
             const origDisplay = el.dataset.taskviewOrigDisplay || '';
+            const origTransition = el.dataset.taskviewOrigTransition || '';
             el.classList.remove('taskview-window-active', 'taskview-window-frozen');
-            el.style.transition = el.dataset.taskviewOrigTransition || '';
+            el.style.transition = 'none';
             el.style.transform = el.dataset.taskviewOrigTransform || '';
             el.style.transformOrigin = el.dataset.taskviewOrigTransformOrigin || '';
             el.style.opacity = el.dataset.taskviewOrigOpacity || '';
@@ -217,6 +357,8 @@ const TaskView = {
                 el.style.display = origDisplay || '';
             }
 
+            el.offsetHeight;
+            el.style.transition = origTransition;
             this._clearTaskViewManaged(el);
         });
     },
@@ -267,6 +409,11 @@ const TaskView = {
 
     _captureWindowState(windowData) {
         const el = windowData.element;
+        const computed = getComputedStyle(el);
+        const normalTransform = computed.transform && computed.transform !== 'none'
+            ? computed.transform
+            : '';
+        const normalTransformOrigin = computed.transformOrigin || el.style.transformOrigin || '0px 0px';
         return {
             origPos: { left: el.style.left, top: el.style.top },
             origSize: { width: el.style.width, height: el.style.height },
@@ -277,6 +424,7 @@ const TaskView = {
             origTransformOrigin: el.style.transformOrigin || '',
             origOpacity: el.style.opacity || '',
             origPointerEvents: el.style.pointerEvents || '',
+            returnTransform: this._rebaseTransformToTopLeft(normalTransform, normalTransformOrigin),
             wasMinimized: windowData.isMinimized === true,
             wasFrozen: windowData.isFrozen === true,
             bounds: this._resolveWindowBounds(windowData, el),
@@ -333,10 +481,20 @@ const TaskView = {
         this.init();
         const cycleId = this._nextCycleToken();
         this._clearRuntimeTimers();
+        const interruptedVisualStates = this._captureInterruptedVisualStates();
         this._restoreInterruptedManagedWindows();
+        this._restoreForegroundWindowState();
         this.overlay.style.pointerEvents = 'auto';
 
         const windows = (WindowManager.windows || []).filter((w) => w && w.element);
+        const entryVisualStates = new Map();
+        windows.forEach((windowData) => {
+            entryVisualStates.set(
+                windowData.id,
+                interruptedVisualStates.get(windowData.id) || this._captureVisualState(windowData.element)
+            );
+        });
+        windows.forEach((windowData) => this._cancelConflictingWindowMotion(windowData));
         if (windows.length === 0) {
             this.overlay.classList.remove('hidden');
             this.isOpen = true;
@@ -344,10 +502,12 @@ const TaskView = {
             if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
                 WindowManager.updateMaximizedWallpaperEffect();
             }
-            this.autoTimer = setTimeout(() => {
-                if (cycleId !== this.cycleToken || !this.isOpen) return;
+            const autoTimer = setTimeout(() => {
+                if (this.autoTimer !== autoTimer || cycleId !== this.cycleToken || !this.isOpen) return;
+                this.autoTimer = null;
                 this.close();
             }, 200);
+            this.autoTimer = autoTimer;
             return;
         }
 
@@ -357,6 +517,8 @@ const TaskView = {
             this.windowStates.set(windowData.id, state);
             return { windowData, state };
         });
+
+        this._suspendForegroundWindowState();
 
         const layout = this.calculateLayout(entries);
 
@@ -370,6 +532,7 @@ const TaskView = {
             const wasMinimized = state.wasMinimized || state.origDisplay === 'none';
             const minimizeScale = this._getMinimizeScale();
             const enterTransition = this._buildEnterTransition();
+            const resumesInterruptedTransition = interruptedVisualStates.has(windowData.id);
 
             this._markTaskViewManaged(el, state);
             el.style.transformOrigin = 'top left';
@@ -382,12 +545,20 @@ const TaskView = {
             );
 
             if (wasMinimized) {
-                const dockPoint = this._getDockPoint(windowData);
-                const dockTransform = this._buildDockTransform(state.bounds, dockPoint, minimizeScale);
                 el.style.display = 'flex';
-                el.style.transition = 'none';
-                el.style.transform = dockTransform;
-                el.style.opacity = '0';
+                if (resumesInterruptedTransition) {
+                    const entryVisualState = entryVisualStates.get(windowData.id);
+                    el.style.transition = 'none';
+                    el.style.transform = entryVisualState
+                        ? (this._rebaseTransformToTopLeft(entryVisualState.transform, entryVisualState.transformOrigin) || 'none')
+                        : 'none';
+                    el.style.opacity = entryVisualState ? entryVisualState.opacity : '0';
+                } else {
+                    const dockPoint = this._getDockPoint(windowData);
+                    el.style.transition = 'none';
+                    el.style.transform = this._buildDockTransform(state.bounds, dockPoint, minimizeScale);
+                    el.style.opacity = '0';
+                }
                 el.offsetHeight;
                 requestAnimationFrame(() => {
                     if (cycleId !== this.cycleToken || !this.isOpen) return;
@@ -396,9 +567,20 @@ const TaskView = {
                     el.style.opacity = '1';
                 });
             } else {
-                el.style.transition = enterTransition;
-                el.style.transform = finalTransform;
-                el.style.opacity = '1';
+                const entryVisualState = entryVisualStates.get(windowData.id);
+                const entryTransform = entryVisualState
+                    ? this._rebaseTransformToTopLeft(entryVisualState.transform, entryVisualState.transformOrigin)
+                    : (state.returnTransform || '');
+                el.style.transition = 'none';
+                el.style.transform = entryTransform || 'none';
+                el.style.opacity = entryVisualState ? entryVisualState.opacity : '1';
+                el.offsetHeight;
+                requestAnimationFrame(() => {
+                    if (cycleId !== this.cycleToken || !this.isOpen) return;
+                    el.style.transition = enterTransition;
+                    el.style.transform = finalTransform;
+                    el.style.opacity = '1';
+                });
             }
 
             state.clickHandler = null;
@@ -418,6 +600,8 @@ const TaskView = {
         this._clearRuntimeTimers();
         const stateEntries = Array.from(this.windowStates.entries());
         this.windowStates.clear();
+
+        this._freezeExitVisualStates(stateEntries);
 
         this.isOpen = false;
         document.body.classList.remove('in-taskview');
@@ -448,8 +632,6 @@ const TaskView = {
 
             el.classList.remove('taskview-window-active', 'taskview-window-frozen');
             el.style.pointerEvents = 'none';
-            const visualState = this._captureVisualState(el);
-            this._primeExitAnimation(el, visualState);
             if (state.wasMinimized && windowId !== targetId) {
                 const dockPoint = this._getDockPoint(targetWindow);
                 this._runExitAnimation(
@@ -471,7 +653,7 @@ const TaskView = {
                     el,
                     cycleId,
                     this._buildReturnTransition(restoreDuration),
-                    state.origTransform || '',
+                    windowId === targetId ? (state.origTransform || 'none') : (state.returnTransform || 'none'),
                     state.origOpacity || ''
                 );
             }
@@ -480,11 +662,20 @@ const TaskView = {
             }
         });
 
-        this.settleTimer = setTimeout(() => {
-            if (cycleId !== this.cycleToken) {
-                this.settleTimer = null;
-                return;
+        const settleTimer = setTimeout(() => {
+            if (this.settleTimer !== settleTimer || cycleId !== this.cycleToken) return;
+
+            const selectedEntry = stateEntries.find(([windowId]) => windowId === targetId);
+            const selectedWindow = (WindowManager.windows || []).find((windowData) => windowData && windowData.id === targetId);
+            if (selectedEntry && selectedWindow && selectedWindow.element && selectedEntry[1].wasMinimized) {
+                selectedWindow.isMinimized = false;
+                selectedWindow.minimizedAt = null;
+                if (typeof WindowManager !== 'undefined' && typeof WindowManager._restoreWindowFromTombstone === 'function') {
+                    WindowManager._restoreWindowFromTombstone(selectedWindow);
+                }
+                selectedWindow.element.style.display = 'flex';
             }
+            this._restoreForegroundWindowState(targetId);
 
             stateEntries.forEach(([windowId, state]) => {
                 const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
@@ -494,11 +685,6 @@ const TaskView = {
 
                 if (state.wasMinimized) {
                     if (windowId === targetId) {
-                        targetWindow.isMinimized = false;
-                        targetWindow.minimizedAt = null;
-                        if (typeof WindowManager !== 'undefined' && typeof WindowManager._restoreWindowFromTombstone === 'function') {
-                            WindowManager._restoreWindowFromTombstone(targetWindow);
-                        }
                         el.style.display = 'flex';
                     } else {
                         el.style.display = state.origDisplay || 'none';
@@ -528,19 +714,22 @@ const TaskView = {
 
             this.overlay.classList.add('hidden');
             this.overlay.style.pointerEvents = 'none';
-            this.settleTimer = null;
+            if (this.settleTimer === settleTimer) this.settleTimer = null;
             if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
                 WindowManager.updateMaximizedWallpaperEffect();
             }
         }, restoreDuration);
+        this.settleTimer = settleTimer;
     },
 
-    close() {
-        if (!this.isOpen) return;
+    close(onSettled = null) {
+        if (!this.isOpen) return false;
         const cycleId = this._nextCycleToken();
         this._clearRuntimeTimers();
         const stateEntries = Array.from(this.windowStates.entries());
         this.windowStates.clear();
+
+        this._freezeExitVisualStates(stateEntries);
 
         this.isOpen = false;
         document.body.classList.remove('in-taskview');
@@ -560,8 +749,6 @@ const TaskView = {
 
             el.classList.remove('taskview-window-active', 'taskview-window-frozen');
             el.style.pointerEvents = 'none';
-            const visualState = this._captureVisualState(el);
-            this._primeExitAnimation(el, visualState);
             if (state.wasMinimized) {
                 const dockPoint = this._getDockPoint(targetWindow);
                 this._runExitAnimation(
@@ -583,18 +770,17 @@ const TaskView = {
                     el,
                     cycleId,
                     this._buildReturnTransition(restoreDuration),
-                    state.origTransform || '',
+                    state.returnTransform || 'none',
                     state.origOpacity || ''
                 );
             }
             el.style.zIndex = state.origZ;
         });
 
-        this.settleTimer = setTimeout(() => {
-            if (cycleId !== this.cycleToken) {
-                this.settleTimer = null;
-                return;
-            }
+        const settleTimer = setTimeout(() => {
+            if (this.settleTimer !== settleTimer || cycleId !== this.cycleToken) return;
+
+            this._restoreForegroundWindowState();
 
             stateEntries.forEach(([windowId, state]) => {
                 const targetWindow = (WindowManager.windows || []).find((w) => w.id === windowId);
@@ -618,11 +804,20 @@ const TaskView = {
 
             this.overlay.classList.add('hidden');
             this.overlay.style.pointerEvents = 'none';
-            this.settleTimer = null;
+            if (this.settleTimer === settleTimer) this.settleTimer = null;
             if (typeof WindowManager !== 'undefined' && typeof WindowManager.updateMaximizedWallpaperEffect === 'function') {
                 WindowManager.updateMaximizedWallpaperEffect();
             }
+            if (typeof onSettled === 'function') {
+                try {
+                    onSettled();
+                } catch (error) {
+                    console.error('[TaskView] close completion failed:', error);
+                }
+            }
         }, restoreDuration);
+        this.settleTimer = settleTimer;
+        return true;
     },
 
     calculateLayout(entries) {

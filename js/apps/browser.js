@@ -7,7 +7,6 @@ const BrowserApp = {
     tabs: [],
     activeTabId: null,
     tabIdCounter: 0,
-    SEARCH_PAGE_PREFIX: 'fluent-search://results/',
 
     init(windowId) {
         const contentContainer = document.querySelector(`#${windowId}-content`);
@@ -31,6 +30,33 @@ const BrowserApp = {
             };
             window.addEventListener('fluent-favorite-sites-change', this._favoriteSitesChangeHandler);
         }
+    },
+
+    beforeClose() {
+        clearTimeout(this._startPageClockTimer);
+        this._startPageClockTimer = null;
+        this._addressHistoryBinding?.destroy?.();
+        this._addressHistoryBinding = null;
+        this._startPageHistoryBinding?.destroy?.();
+        this._startPageHistoryBinding = null;
+        if (this._favoriteContextDismissHandler) {
+            document.removeEventListener('pointerdown', this._favoriteContextDismissHandler);
+            this._favoriteContextDismissHandler = null;
+        }
+        this._favoriteContextMenu?.remove();
+        this._favoriteContextMenu = null;
+        this.container?.querySelectorAll('iframe').forEach((frame) => {
+            try { frame.src = 'about:blank'; } catch (_) {}
+            frame.remove();
+        });
+        if (this._favoriteSitesChangeHandler) {
+            window.removeEventListener('fluent-favorite-sites-change', this._favoriteSitesChangeHandler);
+            this._favoriteSitesChangeHandler = null;
+        }
+        this.tabs = [];
+        this.activeTabId = null;
+        this.container = null;
+        return true;
     },
 
     render() {
@@ -144,7 +170,8 @@ const BrowserApp = {
         });
 
         if (window.SearchHistory && addressBar) {
-            SearchHistory.bindPopover(addressBar, {
+            this._addressHistoryBinding?.destroy?.();
+            this._addressHistoryBinding = SearchHistory.bindPopover(addressBar, {
                 anchor: addressBar.closest('.browser-address-bar'),
                 className: 'browser-search-history',
                 minWidth: 360,
@@ -184,19 +211,6 @@ const BrowserApp = {
 
     buildSearchResultsUrl(query) {
         return `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-    },
-
-    isSearchResultsUrl(url) {
-        return typeof url === 'string' && url.startsWith(this.SEARCH_PAGE_PREFIX);
-    },
-
-    getSearchQueryFromUrl(url) {
-        if (!this.isSearchResultsUrl(url)) return '';
-        return decodeURIComponent(url.slice(this.SEARCH_PAGE_PREFIX.length));
-    },
-
-    getSearchResultsTitle(query) {
-        return `Search: ${query}`;
     },
 
     createNewTab(url = null) {
@@ -329,12 +343,8 @@ const BrowserApp = {
         tab.url = url;
 
         try {
-            if (this.isSearchResultsUrl(url)) {
-                tab.title = this.getSearchResultsTitle(this.getSearchQueryFromUrl(url));
-            } else {
-                const urlObj = new URL(url);
-                tab.title = urlObj.hostname.replace('www.', '') || t('browser.new-tab');
-            }
+            const urlObj = new URL(url);
+            tab.title = urlObj.hostname.replace('www.', '') || t('browser.new-tab');
         } catch (error) {
             tab.title = t('browser.new-tab');
         }
@@ -380,7 +390,8 @@ const BrowserApp = {
             }
         });
         if (window.SearchHistory && startSearch) {
-            SearchHistory.bindPopover(startSearch, {
+            this._startPageHistoryBinding?.destroy?.();
+            this._startPageHistoryBinding = SearchHistory.bindPopover(startSearch, {
                 anchor: startSearch.closest('.start-page-search'),
                 className: 'browser-search-history start-page-search-history',
                 minWidth: 360,
@@ -462,6 +473,10 @@ const BrowserApp = {
     },
 
     showFavoriteContextMenu(site, x, y) {
+        if (this._favoriteContextDismissHandler) {
+            document.removeEventListener('pointerdown', this._favoriteContextDismissHandler);
+            this._favoriteContextDismissHandler = null;
+        }
         this._favoriteContextMenu?.remove();
         if (!window.FluentUI?.ContextMenu) return;
         const menu = FluentUI.ContextMenu({
@@ -485,37 +500,14 @@ const BrowserApp = {
                 menu.remove();
                 if (this._favoriteContextMenu === menu) this._favoriteContextMenu = null;
             }
+            if (this._favoriteContextDismissHandler === dismiss) this._favoriteContextDismissHandler = null;
         };
-        setTimeout(() => document.addEventListener('pointerdown', dismiss, { once: true }), 0);
-    },
-
-    renderSearchResultsPage(query) {
-        const contentContainer = this.container.querySelector('#browser-content');
-        const escapedQuery = this.escapeHtml(query);
-        const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}`;
-
-        contentContainer.innerHTML = `
-            <div class="browser-search-results-page">
-                <div class="browser-search-results-hero">
-                    <span class="browser-search-results-badge">Bing</span>
-                    <h2>${escapedQuery}</h2>
-                    <p>Search opens in Bing by default.</p>
-                </div>
-                <div class="browser-search-results-grid">
-                    <a class="browser-search-card" href="${bingUrl}" data-open-in-tab="true" rel="noopener noreferrer">
-                        <strong>Bing Search</strong>
-                        <span>${escapedQuery}</span>
-                    </a>
-                </div>
-            </div>
-        `;
-
-        contentContainer.querySelectorAll('[data-open-in-tab="true"]').forEach((link) => {
-            link.addEventListener('click', (event) => {
-                event.preventDefault();
-                this.createNewTab(link.href);
-            });
-        });
+        this._favoriteContextDismissHandler = dismiss;
+        setTimeout(() => {
+            if (this._favoriteContextDismissHandler === dismiss && menu.isConnected) {
+                document.addEventListener('pointerdown', dismiss, { once: true });
+            }
+        }, 0);
     },
 
     attachIframeLinkInterception(iframe) {
@@ -581,20 +573,11 @@ const BrowserApp = {
 
         this.stopStartPageClock();
 
-        if (this.isSearchResultsUrl(tab.url)) {
-            this.renderSearchResultsPage(this.getSearchQueryFromUrl(tab.url));
-            return;
-        }
-
-        contentContainer.innerHTML = `
-            <iframe
-                src="${tab.url}"
-                class="browser-iframe"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-            ></iframe>
-        `;
-
-        const iframe = contentContainer.querySelector('iframe');
+        const iframe = document.createElement('iframe');
+        iframe.src = tab.url;
+        iframe.className = 'browser-iframe';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
+        contentContainer.replaceChildren(iframe);
         iframe?.addEventListener('load', () => {
             try {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
@@ -613,9 +596,6 @@ const BrowserApp = {
 
         tab.historyIndex -= 1;
         tab.url = tab.history[tab.historyIndex];
-        if (this.isSearchResultsUrl(tab.url)) {
-            tab.title = this.getSearchResultsTitle(this.getSearchQueryFromUrl(tab.url));
-        }
         this.renderTabs();
         this.renderContent();
         this.updateNavButtons();
@@ -628,9 +608,6 @@ const BrowserApp = {
 
         tab.historyIndex += 1;
         tab.url = tab.history[tab.historyIndex];
-        if (this.isSearchResultsUrl(tab.url)) {
-            tab.title = this.getSearchResultsTitle(this.getSearchQueryFromUrl(tab.url));
-        }
         this.renderTabs();
         this.renderContent();
         this.updateNavButtons();
@@ -677,11 +654,6 @@ const BrowserApp = {
 
         if (!tab || tab.url === 'about:blank') {
             addressBar.value = '';
-            return;
-        }
-
-        if (this.isSearchResultsUrl(tab.url)) {
-            addressBar.value = this.getSearchQueryFromUrl(tab.url);
             return;
         }
 
@@ -960,100 +932,6 @@ const BrowserApp = {
                 background: transparent;
                 border-radius: 0 0 var(--browser-float-radius) var(--browser-float-radius);
                 overflow: hidden;
-            }
-
-            .browser-search-results-page {
-                height: 100%;
-                padding: 32px;
-                overflow-y: auto;
-                background:
-                    radial-gradient(circle at top left, rgba(0, 120, 212, 0.12), transparent 32%),
-                    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.76));
-            }
-
-            .dark-mode .browser-search-results-page {
-                background:
-                    radial-gradient(circle at top left, rgba(0, 120, 212, 0.2), transparent 32%),
-                    linear-gradient(180deg, rgba(28, 28, 30, 0.96), rgba(28, 28, 30, 0.88));
-            }
-
-            .browser-search-results-hero {
-                max-width: 760px;
-                margin: 0 auto 28px;
-            }
-
-            .browser-search-results-badge {
-                display: inline-flex;
-                align-items: center;
-                padding: 6px 12px;
-                border-radius: 999px;
-                font-size: 12px;
-                font-weight: 600;
-                background: rgba(0, 120, 212, 0.12);
-                color: var(--accent);
-            }
-
-            .browser-search-results-hero h2 {
-                margin: 16px 0 10px;
-                font-size: 34px;
-                line-height: 1.1;
-                color: var(--text-primary);
-            }
-
-            .browser-search-results-hero p {
-                margin: 0;
-                font-size: 14px;
-                line-height: 1.6;
-                color: var(--text-secondary);
-            }
-
-            .browser-search-results-grid {
-                max-width: 760px;
-                margin: 0 auto;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-                gap: 14px;
-            }
-
-            .browser-search-card {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                padding: 18px;
-                border-radius: 18px;
-                text-decoration: none;
-                color: inherit;
-                background: rgba(255, 255, 255, 0.68);
-                border: 1px solid rgba(255, 255, 255, 0.55);
-                box-shadow: 0 18px 40px rgba(16, 24, 40, 0.08);
-                transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-            }
-
-            .browser-search-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 24px 48px rgba(16, 24, 40, 0.14);
-                background: rgba(255, 255, 255, 0.82);
-            }
-
-            .dark-mode .browser-search-card {
-                background: rgba(255, 255, 255, 0.06);
-                border-color: rgba(255, 255, 255, 0.08);
-                box-shadow: none;
-            }
-
-            .dark-mode .browser-search-card:hover {
-                background: rgba(255, 255, 255, 0.1);
-            }
-
-            .browser-search-card strong {
-                font-size: 16px;
-                color: var(--text-primary);
-            }
-
-            .browser-search-card span {
-                font-size: 13px;
-                color: var(--text-secondary);
-                word-break: break-word;
             }
 
             .browser-start-page {

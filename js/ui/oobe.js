@@ -61,8 +61,6 @@ const OOBE = {
     preloadCompleted: false,
     preloadFailed: false,
 
-    clockTimer: null,
-
     fingoMessagesEl: null,
     fingoInputEl: null,
     fingoPreviewContentEl: null,
@@ -335,7 +333,6 @@ const OOBE = {
         if (!this.element) return;
 
         this._resetCompletionScene();
-        this._stopPreviewClockTimer();
         this._stopWelcomeAnimation();
         this._resetTiltEffect();
         if (this.welcomeLogoEl) {
@@ -1654,21 +1651,6 @@ const OOBE = {
             fingoPreview.style.setProperty('--oobe-preview-bg', `url('${previewWallpaper}')`);
             fingoPreview.querySelector('.oobe-live-wallpaper')?.style.setProperty('background-image', `url('${previewWallpaper}')`);
         }
-    },
-
-    _tickPreviewClock() {
-        // Kept for compatibility with older integrations; previews no longer show a clock.
-    },
-
-    _startPreviewClockTimer() {
-        this._stopPreviewClockTimer();
-        this.clockTimer = setInterval(() => this._tickPreviewClock(), 1000 * 30);
-    },
-
-    _stopPreviewClockTimer() {
-        if (!this.clockTimer) return;
-        clearInterval(this.clockTimer);
-        this.clockTimer = null;
     },
 
     _startPreloadInBackground() {

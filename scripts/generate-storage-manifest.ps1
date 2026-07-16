@@ -1,3 +1,5 @@
+param([switch]$Check)
+
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $output = Join-Path $root 'js/core/storage-manifest.js'
@@ -29,4 +31,16 @@ for ($i = 0; $i -lt 10; $i++) {
     $size = $next
 }
 $content = Build $size
+if ($Check) {
+    if (-not (Test-Path -LiteralPath $output -PathType Leaf)) {
+        throw 'Storage manifest is missing. Run scripts/generate-storage-manifest.ps1.'
+    }
+    $actual = [IO.File]::ReadAllText($output)
+    if ($actual -cne $content) {
+        throw 'Storage manifest is stale. Run scripts/generate-storage-manifest.ps1.'
+    }
+    Write-Host "Storage manifest is current ($($entries.Count + 1) files)."
+    return
+}
 [IO.File]::WriteAllText($output, $content, [Text.UTF8Encoding]::new($false))
+Write-Host "Generated $output with $($entries.Count + 1) files."

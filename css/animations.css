@@ -372,12 +372,12 @@ body.animations-enabled .window.opening {
 }
 
 body.animations-enabled .window.window-focus-enter {
-    animation: windowFocusEnter 100ms ease-out both;
+    animation: windowFocusEnter 80ms ease-out both;
     transform-origin: center center;
 }
 
 body.animations-enabled .window.window-focus-leave {
-    animation: windowFocusLeave 100ms ease-in both;
+    animation: windowFocusLeave 80ms ease-in both;
     transform-origin: center center;
 }
 

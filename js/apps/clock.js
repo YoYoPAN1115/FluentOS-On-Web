@@ -51,8 +51,10 @@ const ClockApp = {
         this.render();
 
         // 监听语言切换
-        this._langHandler = () => { this.render(); };
-        State.on('languageChange', this._langHandler);
+        this._unsubscribeLanguage?.();
+        this._unsubscribeLanguage = State.on('languageChange', () => {
+            if (this.container?.isConnected) this.render();
+        });
     },
 
     openData(data = null) {
@@ -85,6 +87,7 @@ const ClockApp = {
     },
 
     render() {
+        if (!this.container) return;
         this.container.innerHTML = '';
 
         if (this.frame && typeof this.frame.destroy === 'function') {
@@ -117,6 +120,20 @@ const ClockApp = {
             this.frame.destroy();
             this.frame = null;
         }
+        if (this.worldClockInterval) {
+            clearInterval(this.worldClockInterval);
+            this.worldClockInterval = null;
+        }
+        if (this.stopwatchInterval) {
+            clearInterval(this.stopwatchInterval);
+            this.stopwatchInterval = null;
+            this.stopwatchTime = Math.max(0, Date.now() - (this.stopwatchStartedAt || Date.now()));
+            this.stopwatchStartedAt = null;
+        }
+        this._unsubscribeLanguage?.();
+        this._unsubscribeLanguage = null;
+        this.container = null;
+        this.windowId = null;
         return true;
     },
 
@@ -582,12 +599,17 @@ const ClockApp = {
         });
         
         // 世界时钟自动更新
+        if (this.worldClockInterval) {
+            clearInterval(this.worldClockInterval);
+            this.worldClockInterval = null;
+        }
         if (this.currentTab === 'worldclock') {
             this.worldClockInterval = setInterval(() => {
                 if (this.currentTab === 'worldclock') {
                     this.updateWorldClock();
                 } else {
                     clearInterval(this.worldClockInterval);
+                    this.worldClockInterval = null;
                 }
             }, 1000);
         }
@@ -623,7 +645,7 @@ const ClockApp = {
                 clearInterval(this.timerInterval);
                 this.timerInterval = null;
                 this.timerEndTime = null;
-                this.render();
+                if (this.container?.isConnected) this.render();
                 this.timerCompleted();
             }
         }, 250);
@@ -762,53 +784,6 @@ const ClockApp = {
         }
         this.selectedDate.setMonth(this.selectedDate.getMonth() + delta);
         this.renderKeepingClockScroll(scrollTop);
-    },
-
-    addEvent() {
-        FluentUI.InputDialog({
-            title: t('clock.add-event-title'),
-            placeholder: t('clock.event-placeholder'),
-            validateFn: (value) => value ? true : t('clock.title-required'),
-            onConfirm: (title) => {
-                // 获取时间
-                FluentUI.InputDialog({
-                    title: t('clock.set-time'),
-                    placeholder: t('clock.time-placeholder'),
-                    defaultValue: '09:00',
-                    validateFn: (value) => {
-                        if (!value) return t('clock.time-required');
-                        if (!/^\d{1,2}:\d{2}$/.test(value)) return t('clock.time-format');
-                        return true;
-                    },
-                    onConfirm: (time) => {
-                        const event = {
-                            id: `event-${Date.now()}`,
-                            date: this.selectedDate.toISOString(),
-                            time: time,
-                            title: title,
-                            completed: false,
-                            reminderEnabled: true
-                        };
-
-                        this.calendarEvents.push(event);
-                        this.saveData();
-                        this.render();
-
-                        FluentUI.Toast({
-                            title: t('clock.event-added'),
-                            message: `${title}- ${time}`,
-                            type: 'success'
-                        });
-                    }
-                });
-            }
-        });
-    },
-
-    deleteEvent(id) {
-        this.calendarEvents = this.calendarEvents.filter(e => e.id !== id);
-        this.saveData();
-        this.render();
     },
 
     // 工具方法

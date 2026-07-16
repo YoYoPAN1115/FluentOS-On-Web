@@ -19,7 +19,7 @@ Because I wanted to create my “dream OS”: nearly bug-free and extremely fast
 - 📱 Responsive design, with the best experience at widths of 1024 px or above
 - ⚡ Vanilla implementation with no framework dependencies
 
-Current system version: `2.3.260715` (see `js/core/resource-manifest.js`).
+Current system version: `2.3.260716A` (see `js/core/resource-manifest.js`).
 
 > FluentOS-On-Web is a web desktop simulation, not an operating system. Files, settings, and “installed apps” are primarily stored in the current browser. It cannot access or manage the host system's real accounts, processes, or complete file system.
 
@@ -42,6 +42,9 @@ Current system version: `2.3.260715` (see `js/core/resource-manifest.js`).
 | --- | --- |
 | Files | Virtual folders, search, breadcrumb navigation, Recycle Bin, external file import, and cross-app file opening |
 | Settings | Accounts, network, personalization, apps, multitasking, time and language, privacy, Fingo, Labs, and developer options |
+| Process Manager | Inspect application resource usage and manage running applications |
+| Terminal | Work with FluentOS virtual files and system features through a controlled command environment |
+| Tips | Browse FluentOS feature introductions and usage tips |
 | Calculator | Standard and scientific calculations, history, and keyboard input |
 | Notes | Tabbed rich-text editing, virtual file access, external text import, HTML export, and teleprompter mode |
 | Browser | Tabs, address/search input, history, and favorite sites; pages are loaded through iframes |
@@ -51,6 +54,8 @@ Current system version: `2.3.260715` (see `js/core/resource-manifest.js`).
 | Photos | Bing, local, and favorite galleries; viewing, zooming, rotating, flipping, adjustments, downloads, and wallpaper controls |
 | Media | Local media library, play queue, playlists, Media Session integration, and playback-state restoration |
 | App Shop | Built-in app management and a third-party web app catalog |
+
+These are the 14 native apps shown in the desktop app list by default. Developer Center (BETA) is also built in, but hidden by default; turn off “Hide Developer Center” under Settings → Labs to show it.
 
 ## Quick Start
 
@@ -110,7 +115,7 @@ FluentOS-On-Web 2.0/
 ├─ js/
 │  ├─ core/                  # Storage, state, i18n, components, Fingo, Lingyi, and more
 │  ├─ ui/                    # System screens, desktop, taskbar, windows, and widgets
-│  ├─ apps/                  # Eleven built-in applications
+│  ├─ apps/                  # 14 default desktop native apps, plus the hidden-by-default Developer Center
 │  ├─ third_parts_apps/      # PWA loader and third-party app catalog
 │  └─ main.js                # Initialization, global shortcuts, public API, and debug tools
 ├─ Theme/
@@ -157,6 +162,21 @@ FluentOS.debug.resources.stop();
 
 System controls include `FluentOS.restart()`, `shutdown()`, `logout()`, and `closeAllWindows()`. `FluentOS.debug.clearStorage()` asks for confirmation before clearing all local data for the current site.
 
+### Resource Manifests and Unified Validation
+
+After changing runtime resources under `index.html`, `js/`, `css/`, or `Theme/`, generate the content-hash resource manifest first, then the storage manifest that records the former's file size. Do not edit either generated file by hand:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-resource-manifest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-storage-manifest.ps1
+```
+
+Pass `-Check` to either generator when you only want to verify that its output is current. Before committing, run the unified validator; it invokes both manifest checks with `-Check` and also validates entries, resource references, and JavaScript syntax when Node.js is available:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-project.ps1
+```
+
 Further documentation:
 
 - [Developer Guide](docs/DEVELOPER_GUIDE_EN.md)
@@ -167,7 +187,7 @@ Further documentation:
 1. Make changes on a feature branch and preserve the dependency order of scripts in `index.html`.
 2. Reuse `FluentUI`, `FluentWindow`, theme variables, and existing icons for new interfaces.
 3. Add both Chinese and English entries to `js/core/i18n.js` for user-facing text.
-4. Keep the resource manifest synchronized through the release workflow after changing assets. `js/core/resource-manifest.js` is marked as generated and its hashes should not be edited manually.
+4. After changing runtime resources, generate manifests in resource → storage order and run the unified project validation.
 5. Test at least light/dark themes, window resizing, persistence after refresh, and offline behavior.
 
 ## License

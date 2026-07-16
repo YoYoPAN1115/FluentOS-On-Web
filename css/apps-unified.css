@@ -63,41 +63,6 @@ body.dark-mode.window-blur-enabled .window {
     background: rgba(45, 45, 45, 0.6) !important;
 }
 
-.notes-toolbar {
-    background: rgba(249, 249, 249, 0.7) !important;
-    backdrop-filter: blur(40px) saturate(180%) !important;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
-}
-
-.dark-mode .notes-toolbar {
-    background: rgba(45, 45, 45, 0.7) !important;
-    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-.notes-editor-container {
-    background: transparent !important;
-}
-
-.notes-editor {
-    background: rgba(255, 255, 255, 0.4) !important;
-    backdrop-filter: blur(30px) !important;
-}
-
-.dark-mode .notes-editor {
-    background: rgba(255, 255, 255, 0.02) !important;
-}
-
-.notes-statusbar {
-    background: rgba(249, 249, 249, 0.7) !important;
-    backdrop-filter: blur(40px) saturate(180%) !important;
-    border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
-}
-
-.dark-mode .notes-statusbar {
-    background: rgba(45, 45, 45, 0.7) !important;
-    border-top-color: rgba(255, 255, 255, 0.08) !important;
-}
-
 /* 浏览器 */
 .browser-app {
     background: transparent !important;
@@ -195,15 +160,12 @@ body.window-blur-disabled .window {
 }
 
 body.window-blur-disabled .settings-section,
-body.window-blur-disabled .notes-editor,
 body.window-blur-disabled .browser-address-bar,
 body.window-blur-disabled .calculator-display {
     background: var(--bg-tertiary) !important;
     backdrop-filter: none !important;
 }
 
-body.window-blur-disabled .notes-toolbar,
-body.window-blur-disabled .notes-statusbar,
 body.window-blur-disabled .browser-header,
 body.window-blur-disabled .files-toolbar {
     background: var(--bg-secondary) !important;

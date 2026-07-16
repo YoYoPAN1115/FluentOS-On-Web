@@ -3,6 +3,26 @@ const SearchHistory = {
     STORAGE_KEY: 'fluentos.searchHistory',
     DISPLAY_LIMIT: 8,
     STORAGE_LIMIT: 50,
+    _bindings: new Set(),
+    _bindingObserver: null,
+
+    _trackBinding(controller) {
+        this._bindings.add(controller);
+        if (this._bindingObserver || typeof MutationObserver === 'undefined' || !document.documentElement) return;
+        this._bindingObserver = new MutationObserver(() => {
+            [...this._bindings].forEach((binding) => {
+                if (!binding.input.isConnected) binding.destroy();
+            });
+        });
+        this._bindingObserver.observe(document.documentElement, { childList: true, subtree: true });
+    },
+
+    _untrackBinding(controller) {
+        this._bindings.delete(controller);
+        if (this._bindings.size || !this._bindingObserver) return;
+        this._bindingObserver.disconnect();
+        this._bindingObserver = null;
+    },
 
     getAll() {
         try {
@@ -50,6 +70,7 @@ const SearchHistory = {
         let popover = null;
         let closeTimer = null;
         let resizeHandler = null;
+        let destroyed = false;
 
         const close = (immediate = false) => {
             clearTimeout(closeTimer);
@@ -131,6 +152,7 @@ const SearchHistory = {
         };
 
         const open = (filterByInput = false) => {
+            if (destroyed || !input.isConnected) return;
             clearTimeout(closeTimer);
             if (!this.getRecent(filterByInput ? input.value : '').length) {
                 close(true);
@@ -151,20 +173,42 @@ const SearchHistory = {
             requestAnimationFrame(() => popover?.classList.add('visible'));
         };
 
-        input.addEventListener('focus', () => open(false));
-        input.addEventListener('click', () => open(false));
-        input.addEventListener('input', () => {
+        const onFocus = () => open(false);
+        const onClick = () => open(false);
+        const onInput = () => {
             if (!popover) open(true);
             else render(true);
-        });
-        input.addEventListener('blur', () => {
+        };
+        const onBlur = () => {
             closeTimer = setTimeout(() => close(), 100);
-        });
-        input.addEventListener('keydown', event => {
+        };
+        const onKeydown = event => {
             if (event.key === 'Escape') close();
-        });
+        };
 
-        return { open, close };
+        input.addEventListener('focus', onFocus);
+        input.addEventListener('click', onClick);
+        input.addEventListener('input', onInput);
+        input.addEventListener('blur', onBlur);
+        input.addEventListener('keydown', onKeydown);
+
+        let controller = null;
+        const destroy = () => {
+            if (destroyed) return;
+            destroyed = true;
+            clearTimeout(closeTimer);
+            close(true);
+            input.removeEventListener('focus', onFocus);
+            input.removeEventListener('click', onClick);
+            input.removeEventListener('input', onInput);
+            input.removeEventListener('blur', onBlur);
+            input.removeEventListener('keydown', onKeydown);
+            this._untrackBinding(controller);
+        };
+
+        controller = { input, open, close, destroy };
+        this._trackBinding(controller);
+        return controller;
     },
 
     escapeHtml(value) {

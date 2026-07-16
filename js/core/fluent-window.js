@@ -44,6 +44,7 @@ const FluentWindow = {
     _globalScrollbarScanTimer: null,
     _globalScrollbarObserver: null,
     _globalScrollUseTranslate: null,
+    _globalScrollbarUpdater: null,
 
     // ============ 全局可调参数 ============
     defaults: {
@@ -341,6 +342,7 @@ const FluentWindow = {
                 transform: `translateY(${Math.round(thumbTop)}px)`
             });
         };
+        this._globalScrollbarUpdater = updateScrollbar;
 
         const showScrollbar = (el) => {
             const state = markScrollableActive(el);
@@ -492,6 +494,14 @@ const FluentWindow = {
         this._globalScrollbarObserver.observe(document.body, { childList: true, subtree: true });
 
         scheduleScan();
+    },
+
+    refreshGlobalScrollbars(scope = null) {
+        if (typeof this._globalScrollbarUpdater !== 'function') return;
+        Array.from(this._globalScrollbars.keys()).forEach((el) => {
+            if (scope && el !== scope && !scope.contains?.(el)) return;
+            this._globalScrollbarUpdater(el);
+        });
     },
 
     /**
@@ -1050,9 +1060,8 @@ const FluentWindow = {
         };
 
         instance.navigate = (id, navOptions = {}) => {
-            if (id == null || id === instance.activeId || instance._switching) {
-                if (id === instance.activeId) return;
-            }
+            if (id == null || instance._switching) return;
+            if (id === instance.activeId && navOptions.force !== true) return;
             saveScrollPosition();
             instance._suppressScrollSave = true;
             instance.activeId = id;

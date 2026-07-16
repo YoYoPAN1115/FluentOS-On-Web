@@ -11,8 +11,12 @@ const SettingsApp = {
     _developerModeVisible: false,
     // 与当前仓库 git log 同步；同一天的提交共同组成一个日期版本。
     aboutChangelog: [
+        { date: '2026-07-16', version: '2.3.260716A', commits: [
+            { hash: 'local', title: '彻底清理了老旧僵尸代码以及残留无用的 FluentOS 1.0 调用模块。大幅度提升了系统稳定性，修复设置 App 显示应用大小不显示总大小的 BUG；修复了新版窗口动画与多任务视图进入退出动画冲突的问题；修复了渲染滚动条不会实时跟随窗口的 BUG；修复了开发者中心自建 App 开启强制 FluentUI 导致的部分视觉 BUG；修复了多任务视图模式下 Alt+D 导致的动画冲突 BUG；增强了开发者中心 App 的稳定性和优化了部分页面下的动画视觉效果；修复了第三方自建专业App调用系统通知和弹窗API失败的BUG；修复了桌面上App图标删除逻辑的BUG。' }
+        ] },
         { date: '2026-07-15', version: '2.3.260715', commits: [
-            { hash: 'local', title: '调整了窗口动画和逻辑，修复大量开发中心(BETA)App的BUG，修复了一个严重安全漏洞：第三方自建App可能存在不规范的云端请求问题，现已支持沙箱拦截。' },
+            { hash: 'd22d04a', title: '修复了图片请求白名单仍会被拦截的 BUG' },
+            { hash: '7c3479b', title: '调整了窗口动画和逻辑，修复大量开发中心(BETA)App的BUG，修复了一个严重安全漏洞：第三方自建App可能存在不规范的云端请求问题，现已支持沙箱拦截。' },
             { hash: '31b5189', title: '修复大量已知BUG，新增全新开发者中心(BETA)App，需要在实验室中启用。注意：当前App仍然处于开发中，可能存在大量未知问题，请谨慎使用。' }
         ] },
         { date: '2026-07-13', version: '2.2.260713', commits: [
@@ -141,6 +145,7 @@ const SettingsApp = {
     _avatarThumbBuildPromise: null,
     _avatarThumbStorageKey: 'fluentos.avatarThumbs.v1',
     _avatarPlaceholderSrc: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
+    _stateUnsubscribers: [],
     
     // 获取应用包大小（字节）。静态文件数据由构建期清单提供。
     getAppSize(appId, isPWA = false) {
@@ -178,21 +183,27 @@ const SettingsApp = {
         }
         this.render();
         
-        State.on('languageChange', () => {
+        this._stateUnsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
+        this._stateUnsubscribers.push(State.on('languageChange', () => {
             if (this._isMounted()) this.render();
-        }, { key: 'SettingsApp.languageChange' });
+        }, { key: 'SettingsApp.languageChange' }));
 
-        State.on('settingsChange', () => {
-            if (this._isMounted() && this.currentPage === 'applications') {
-                this.render();
+        this._stateUnsubscribers.push(State.on('settingsChange', (updates) => {
+            if (
+                this._isMounted()
+                && this.currentPage === 'applications'
+                && updates
+                && Object.prototype.hasOwnProperty.call(updates, 'installedApps')
+            ) {
+                this.refreshCurrentPage();
             }
-        }, { key: 'SettingsApp.settingsChange' });
+        }, { key: 'SettingsApp.settingsChange' }));
 
-        State.on('appUsageChange', () => {
+        this._stateUnsubscribers.push(State.on('appUsageChange', () => {
             if (this._isMounted() && this.currentPage === 'applications') {
-                this.render();
+                this.refreshCurrentPage();
             }
-        }, { key: 'SettingsApp.appUsageChange' });
+        }, { key: 'SettingsApp.appUsageChange' }));
 
         if (this._storageChangeHandler) window.removeEventListener('fluentos-storage-change', this._storageChangeHandler);
         this._storageChangeHandler = () => {
@@ -201,11 +212,11 @@ const SettingsApp = {
         };
         window.addEventListener('fluentos-storage-change', this._storageChangeHandler);
 
-        State.on('fingoApiKeyReady', () => {
+        this._stateUnsubscribers.push(State.on('fingoApiKeyReady', () => {
             if (this._isMounted() && this.currentPage === 'fingo') {
                 this.render();
             }
-        }, { key: 'SettingsApp.fingoApiKeyReady' });
+        }, { key: 'SettingsApp.fingoApiKeyReady' }));
 
         return initialDataHandled;
     },
@@ -284,6 +295,7 @@ const SettingsApp = {
     },
 
     beforeClose() {
+        this._stateUnsubscribers.splice(0).forEach((unsubscribe) => unsubscribe());
         if (this._storageChangeHandler) {
             window.removeEventListener('fluentos-storage-change', this._storageChangeHandler);
             this._storageChangeHandler = null;
@@ -4264,15 +4276,9 @@ const SettingsApp = {
         const lingyiNotice = document.createElement('div');
         lingyiNotice.className = 'lab-notice lingyi-notice';
         lingyiNotice.innerHTML = `
-            <img src="Theme/Icon/Symbol_icon/stroke/Hand.svg" alt="" style="width: 20px; height: 20px; opacity: 0.7;">
+            <img src="Theme/Icon/Symbol_icon/stroke/Stars A.svg" alt="" style="width: 20px; height: 20px; opacity: 0.7;">
             <span style="font-size: 13px; color: var(--text-secondary);">${t('settings.lingyi-notice')}</span>
         `;
-        const lingyiNoticeIcon = lingyiNotice.querySelector('img');
-        if (lingyiNoticeIcon) {
-            lingyiNoticeIcon.addEventListener('error', () => {
-                lingyiNoticeIcon.src = 'Theme/Icon/Symbol_icon/stroke/Stars A.svg';
-            }, { once: true });
-        }
         lingyiNotice.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(100, 180, 255, 0.1); border-radius: var(--radius-md); margin-bottom: 16px;';
         lingyiSection.appendChild(lingyiNotice);
         
@@ -4674,14 +4680,22 @@ const SettingsApp = {
     },
 
     renderAppsListContent(container, apps, snapshot) {
-        const allApps = apps.map((app) => ({
-            ...app,
-            sizeBytes: snapshot?.apps?.[app.id]?.appSizeBytes ?? (globalThis.FluentOSStorage ? FluentOSStorage.getAppSize(app) : 0),
-            dataSizeBytes: snapshot?.apps?.[app.id]?.dataSizeBytes ?? 0
-        }));
+        const allApps = apps.map((app) => {
+            const sizeBytes = snapshot?.apps?.[app.id]?.appSizeBytes
+                ?? (globalThis.FluentOSStorage ? FluentOSStorage.getAppSize(app) : 0);
+            const dataSizeBytes = snapshot?.apps?.[app.id]?.dataSizeBytes ?? 0;
+            return {
+                ...app,
+                sizeBytes,
+                dataSizeBytes,
+                totalSizeBytes: sizeBytes + dataSizeBytes
+            };
+        });
         
         // 排序
-        allApps.sort((a, b) => this.appSortOrder === 'desc' ? b.sizeBytes - a.sizeBytes : a.sizeBytes - b.sizeBytes);
+        allApps.sort((a, b) => this.appSortOrder === 'desc'
+            ? b.totalSizeBytes - a.totalSizeBytes
+            : a.totalSizeBytes - b.totalSizeBytes);
         
         container.innerHTML = allApps.map(app => `
             <div class="app-list-item" data-app-id="${app.id}" data-is-pwa="${app.isPWA}">
@@ -4692,7 +4706,7 @@ const SettingsApp = {
                     <div class="app-name">${app.name}</div>
                     <div class="app-meta">${t('settings.last-used', { time: this.formatAppLastUsed(app.id) })}</div>
                 </div>
-                <div class="app-size">${globalThis.FluentOSStorage ? FluentOSStorage.formatBytes(app.sizeBytes) : '0 B'}</div>
+                <div class="app-size">${globalThis.FluentOSStorage ? FluentOSStorage.formatBytes(app.totalSizeBytes) : '0 B'}</div>
                 <div class="app-arrow">
                     <img src="Theme/Icon/Symbol_icon/stroke/Chevron Right.svg" alt="">
                 </div>

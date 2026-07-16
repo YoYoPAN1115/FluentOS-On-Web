@@ -16,6 +16,7 @@ const BootScreen = {
     _firstBootTimers: [],
     _assetCache: null,
     _backgroundWarmPromise: null,
+    _oobeEssentialLoadPromise: null,
     _hintRotateTimer: null,
     _hintSwitchTimer: null,
     _projectRootUrl: null,
@@ -24,10 +25,6 @@ const BootScreen = {
     init() {
         this.element = document.getElementById('boot-screen');
         this._ensureFirstHint();
-    },
-
-    isFirstBoot() {
-        return !localStorage.getItem(this.CACHE_KEY);
     },
 
     show() {
@@ -115,56 +112,15 @@ const BootScreen = {
         }, this.FIRST_DURATION));
 
         let essentialLoadOk = false;
-        try {
+        this._oobeEssentialLoadPromise = (async () => {
             const cacheOk = await this._preloadOobeEssentialResources();
             const renderOk = await this._warmRenderOobeEssentialResources();
-            essentialLoadOk = cacheOk && renderOk;
+            return cacheOk && renderOk;
+        })();
+        try {
+            essentialLoadOk = await this._oobeEssentialLoadPromise;
         } finally {
             essentialsReady = essentialLoadOk;
-            tryEnterEarly();
-            // Non-blocking OOBE icons, app icons and the dark logo follow the critical set.
-            this._preloadOobeSupplementalResources().catch(() => {});
-        }
-    },
-
-    async _firstBoot() {
-        let minWaitReached = false;
-        let assetsReady = false;
-
-        const done = () => {
-            if (this._firstBootDone) return;
-            this._firstBootDone = true;
-            this._clearFirstBootTimers();
-            this._hideFirstHint();
-            localStorage.setItem(this.CACHE_KEY, Date.now().toString());
-            this.fadeToLock();
-        };
-
-        const tryEnterEarly = () => {
-            // 资源下载完并且至少等待了 6s，才允许提前进入锁屏
-            if (assetsReady && minWaitReached) {
-                done();
-            }
-        };
-
-        this._firstBootTimers.push(setTimeout(() => {
-            minWaitReached = true;
-            tryEnterEarly();
-        }, this.MIN_FIRST_WAIT));
-
-        this._firstBootTimers.push(setTimeout(() => {
-            this._showFirstHint('首次使用需加载资源包，请耐心等待。');
-        }, this.FIRST_HINT_AT));
-
-        this._firstBootTimers.push(setTimeout(() => {
-            // 超过 20s 强制进入锁屏
-            done();
-        }, this.FIRST_DURATION));
-
-        try {
-            await this._preloadResourcePackByPriority();
-        } finally {
-            assetsReady = true;
             tryEnterEarly();
         }
     },
@@ -402,29 +358,6 @@ const BootScreen = {
         return src;
     },
 
-    _buildTipsImageAssets() {
-        return this._uniqAssets([
-            'Theme/Preload/Tips/wallpaper.png',
-            'Theme/Preload/Tips/theme.png',
-            'Theme/Preload/Tips/accent.png',
-            'Theme/Preload/Tips/profile.png',
-            'Theme/Preload/Tips/password.png',
-            'Theme/Preload/Tips/snap.png',
-            'Theme/Preload/Tips/new_features/widgets.png',
-            'Theme/Preload/Tips/new_features/new_icons.png',
-            'Theme/Preload/Tips/new_features/design.png',
-            'Theme/Preload/Tips/new_features/app_shop.png',
-            'Theme/Preload/Tips/new_features/productivity.png',
-            'Theme/Preload/Tips/new_features/weather.png',
-            'Theme/Preload/Tips/new_features/quick_note.png',
-            'Theme/Preload/Tips/new_features/notes_example.png',
-            'Theme/Preload/Tips/new_features/camera.png',
-            'Theme/Preload/Tips/new_features/photo.png',
-            'Theme/Preload/Tips/new_features/music.png',
-            'Theme/Preload/Tips/new_features/playing_music.png'
-        ]);
-    },
-
     _buildOobeDeferredAssets() {
         const pack = this._buildPriorityAssets();
         const essential = this._buildOobeEssentialAssets();
@@ -434,10 +367,8 @@ const BootScreen = {
             'js/core/fingo.js'
         ]);
         return {
-            desktopWallpapers: pack.desktopWallpapers,
             icons: pack.icons.filter((src) => !essentialIcons.has(src)),
-            aiScripts,
-            tipsImages: this._buildTipsImageAssets()
+            aiScripts
         };
     },
     async _getResourceCache() {
@@ -783,16 +714,31 @@ const BootScreen = {
         await this._warmRenderGroup(icons, 6);
     },
 
+    async _preloadTipsGettingStartedImages() {
+        const images = typeof TipsApp !== 'undefined' && typeof TipsApp.getGettingStartedImageSources === 'function'
+            ? this._uniqAssets(TipsApp.getGettingStartedImageSources())
+            : [];
+        await this._preloadGroup(images, 3);
+        await this._warmRenderGroup(images, 3);
+    },
+
     async _preloadOobeDeferredResources() {
         const pack = this._buildOobeDeferredAssets();
+        // A timeout may reveal OOBE before its entry-gating fetch finishes. Keep
+        // the post-essential order deterministic even on a very slow connection.
+        if (this._oobeEssentialLoadPromise) {
+            try {
+                await this._oobeEssentialLoadPromise;
+            } catch (_) {
+                // A failed essential fetch must not prevent the remaining cache
+                // groups from being attempted.
+            }
+        }
+        // Warm the first Tips experience before continuing with optional assets.
+        await this._preloadTipsGettingStartedImages();
         await this._preloadOobeSupplementalResources();
         await this._preloadGroup(pack.icons, 8);             // OOBE 中继续加载其余图标
         await this._preloadGroup(pack.aiScripts, 2);         // OOBE 中缓存 AI 组件脚本
-
-        // Tips follows every higher-priority OOBE resource immediately. Cache and
-        // decode the images now so opening Tips never waits for its first render.
-        await this._preloadGroup(pack.tipsImages, 6);
-        await this._warmRenderGroup(pack.tipsImages, 3);
     },
     fadeToLock() {
         const shouldGoOobe = typeof OOBE !== 'undefined'

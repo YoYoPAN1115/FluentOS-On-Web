@@ -1433,35 +1433,11 @@ body.dark-mode .fluent-widget-body.w-news .w-news-rank:not(.r1):not(.r2):not(.r3
     color: #e81123;
 }
 
-/* 鈥斺€?澶╂皵 鈥斺€?*/
-.w-weather-head {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.w-weather-city {
-    font-size: 13px;
-    font-weight: 600;
-    opacity: 0.95;
-}
-
-.w-weather-temp-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
+/* Weather */
 .w-weather-temp {
     font-size: 38px;
     font-weight: 700;
     line-height: 1.1;
-}
-
-.w-weather-desc {
-    font-size: 12px;
-    opacity: 0.9;
 }
 
 .w-weather-range {
@@ -1469,72 +1445,15 @@ body.dark-mode .fluent-widget-body.w-news .w-news-rank:not(.r1):not(.r2):not(.r3
     opacity: 0.8;
 }
 
-/* 鏂扮増澶╂皵鍥炬爣锛堥粦鑹叉弿杈?SVG锛屽湪娣辫壊娓愬彉涓婂弽鐧斤級 */
+/* Weather icons */
 .w-weather-icon {
     filter: invert(1);
     flex-shrink: 0;
 }
 
-.w-weather-cur-icon {
-    width: 30px;
-    height: 30px;
-}
-
 .w-wd-icon {
     width: 20px;
     height: 20px;
-}
-
-.w-wl-icon {
-    width: 18px;
-    height: 18px;
-}
-
-.w-weather-row {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 0;
-}
-
-.w-weather-days {
-    display: flex;
-    gap: 12px;
-}
-
-.w-weather-day {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    font-size: 11px;
-}
-
-.w-wd-label {
-    opacity: 0.8;
-}
-
-.w-wd-temp.lo {
-    opacity: 0.7;
-}
-
-.w-weather-list {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: 5px;
-    margin-top: 8px;
-}
-
-.w-weather-list-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 12px;
-    opacity: 0.92;
 }
 
 /* Weather widget redesign */
@@ -2345,99 +2264,6 @@ body.button-glow-enabled .favorite-add-close.button-glow-target {
     font-variant-numeric: tabular-nums;
 }
 
-/* 鈥斺€?鏃ュ巻 鈥斺€?*/
-.w-cal-date {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-}
-
-.w-cal-week {
-    font-size: 12px;
-    font-weight: 700;
-    color: #e74856;
-}
-
-.w-cal-day {
-    font-size: 46px;
-    font-weight: 700;
-    line-height: 1.05;
-}
-
-.w-cal-month {
-    font-size: 11px;
-    color: var(--text-tertiary);
-}
-
-.w-cal-count {
-    margin-top: auto;
-    font-size: 11px;
-    color: var(--text-secondary);
-}
-
-.w-cal-split {
-    flex: 1;
-    display: flex;
-    gap: 16px;
-    min-height: 0;
-}
-
-.w-cal-split.vertical {
-    flex-direction: column;
-    gap: 8px;
-}
-
-.w-cal-list {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    overflow: hidden;
-}
-
-.w-cal-list-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-tertiary);
-}
-
-.w-cal-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    background: rgba(var(--accent-rgb, 0, 120, 212), 0.1);
-    border-left: 3px solid var(--accent);
-    border-radius: 6px;
-    padding: 3px 8px;
-    min-width: 0;
-}
-
-.w-cal-item-time {
-    color: var(--accent);
-    font-weight: 600;
-    flex-shrink: 0;
-}
-
-.w-cal-item-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.w-cal-empty {
-    font-size: 12px;
-    color: var(--text-tertiary);
-    padding: 4px 0;
-}
-
-.w-cal-more {
-    font-size: 11px;
-    color: var(--text-tertiary);
-}
-
-/* 鈥斺€?鐓х墖 鈥斺€?*/
 /* Calendar widget redesign */
 .fluent-widget-body.w-calendar {
     padding: 0;

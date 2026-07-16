@@ -18,11 +18,20 @@ npx http-server . -p 8000
 
 打开 <http://localhost:8000/>，并使用浏览器开发者工具调试。不要以 `file://` 作为开发基线：资源预载、远程请求、摄像头、剪贴板和文件选择器会表现不同。
 
-项目当前没有自动化测试或 lint 配置。提交前至少执行 JavaScript 语法检查并进行浏览器冒烟测试：
+项目没有 npm 测试运行器或 lint 配置，但提供统一的静态校验脚本。它检查 HTML 入口、重复 ID、本地资源引用、无入口的 JavaScript/CSS、两份生成清单，以及 Node.js 可用时的 JavaScript 语法：
 
 ```powershell
-Get-ChildItem js -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-project.ps1
 ```
+
+修改 `index.html`、`js/`、`css/` 或 `Theme/` 下的运行时资源后，先生成包含内容哈希的 resource manifest，再生成会记录前者文件大小的 storage manifest：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-resource-manifest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-storage-manifest.ps1
+```
+
+两个生成脚本都支持 `-Check`，用于只验证现有输出而不写文件；统一校验脚本会自动以该模式检查两份清单。两份清单均为生成文件，不应手工编辑。
 
 ## 2. 架构总览
 
@@ -30,7 +39,7 @@ Get-ChildItem js -Recurse -Filter *.js | ForEach-Object { node --check $_.FullNa
 index.html
   ├─ core: CSP → Storage → State → I18n → 通用服务/组件
   ├─ ui: Boot/OOBE → 锁屏/登录 → 桌面/面板 → WindowManager → Widgets
-  ├─ apps: 文件、设置、计算器、记事本、浏览器、时钟、天气、相机、照片、媒体
+  ├─ apps: 14 个默认桌面原生应用；另含默认隐藏的 Developer Center
   ├─ third_parts_apps: PWALoader 与目录
   ├─ AppShop / Fingo
   └─ main.js: 初始化、视图切换、快捷键、FluentOS API
@@ -343,6 +352,8 @@ PWALoader.register({
 
 目录项维护在 `js/third_parts_apps/pwa-catalog.js`。注册后还需通过 App Shop 安装流程加入窗口、桌面和固定列表。
 
+只有与源码目录中的 ID 和 URL 精确匹配的条目会在 iframe sandbox 中获得 `allow-same-origin`，以兼容需要登录态的受信目录应用。其他调用方以及 Developer Center 创建的 PWA 使用不含 `allow-same-origin` 的不透明来源；直接调用 `PWALoader.register()` 也不能扩大该权限。
+
 限制必须在产品设计中明确：跨域 iframe 的 DOM 不可读取；站点可能拒绝嵌入；登录 Cookie、弹窗、下载、媒体自动播放和权限均受浏览器策略控制。后台冻结会向 iframe 发送：
 
 ```javascript
@@ -355,7 +366,21 @@ PWALoader.register({
 
 可控的 Web 应用可监听该消息暂停/恢复耗时任务。
 
-## 10. 网络、权限与安全
+## 10. Developer Center 创建的 App
+
+Developer Center 封装的 App 在 sandbox iframe 中运行，只能通过注入的异步 `FluentOS` bridge 请求宿主能力，不能直接读取宿主页面或普通浏览器存储。需要剪贴板能力时，必须在项目权限中显式声明 `clipboard.read`、`clipboard.write` 或两者；调用时仍受浏览器安全上下文、用户手势与浏览器授权策略约束。
+
+预览窗口始终使用只读能力配置：不会继承项目声明的任何权限或网络白名单，只允许读取系统主题/状态/语言、窗口信息和预览自己的 App 存储。通知、写存储、修改窗口或主题、文件、桌面、剪贴板及网络调用都会被拒绝。要测试这些能力，应先通过安全检查和用户授权封装 App，再在正式窗口中运行。
+
+每个 App 的私有 `FluentOS.storage` 使用独立命名空间，并按 UTF-8 大小执行以下配额：
+
+- 总数据最多 512 KiB。
+- 最多 128 个键。
+- 单个 JSON 序列化值最多 100 KiB。
+
+bridge 使用一次性带令牌的窗口握手建立专用 `MessageChannel`，后续 API 请求和宿主状态都只经过传递给该 iframe 的端口。挂载窗口时，运行时会创建不可变的授权快照，其中固定 App 标识、名称、只读状态、已批准权限和网络域名白名单。之后修改项目或重新注册 App 不会扩大已打开 iframe 的权限；关闭并重新打开后才会应用新的已批准配置。
+
+## 11. 网络、权限与安全
 
 - 所有远程数据都应有加载、失败、超时或本地回退状态。
 - 将第三方返回文本写入 `innerHTML` 前必须转义；优先用 `textContent`。
@@ -365,7 +390,7 @@ PWALoader.register({
 - 严格 CSP 在 `js/core/csp.js` 中定义。新增远程源时先判断是否必要，再同步策略和无网络回退。
 - `localStorage` 和客户端加密不能抵御同源恶意脚本；它们只是持久化手段，不是可信密钥库。
 
-## 11. 调试接口
+## 12. 调试接口
 
 ```javascript
 FluentOS.version;
@@ -393,11 +418,27 @@ State.addNotification({ title: '完成', message: '任务已结束', type: 'succ
 FluentUI.Toast({ title: '已保存', message: '设置已更新', type: 'success' });
 ```
 
-`notify(title, message, type)` 是通知中心的便捷包装。
+自建专业 App 可通过异步桥接调用通知与系统弹窗：
 
-## 12. 提交前检查
+```javascript
+await FluentOS.notify('任务完成', '文件已经保存。', 'success');
+await FluentOS.alert('提示', '这是由系统渲染的弹窗。');
+const confirmed = await FluentOS.confirm('删除项目', '此操作无法撤销。');
+const result = await FluentOS.dialog({
+    title: '选择操作',
+    message: '请选择下一步操作。',
+    buttons: [
+        { text: '取消', value: 'cancel', variant: 'secondary' },
+        { text: '继续', value: 'continue', variant: 'primary' }
+    ]
+});
+```
 
-- JavaScript 文件均通过 `node --check`。
+`notify()` 会同时写入通知中心并显示即时 Toast；`alert()`、`confirm()` 和 `dialog()` 由宿主系统渲染，标题、正文与按钮均按纯文本处理。
+
+## 13. 提交前检查
+
+- `scripts/validate-project.ps1` 通过；若修改了运行时资源，清单已按 resource → storage 的顺序重新生成。
 - 从清空站点数据开始完成 OOBE、锁屏、登录和桌面流程。
 - 浅色/深色主题、不同强调色和关闭动画/模糊时均可用。
 - 应用可打开、最小化、最大化、贴靠、关闭并再次打开。

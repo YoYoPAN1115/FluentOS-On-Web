@@ -19,13 +19,15 @@ const PWALoader = {
     },
 
     registerFromCatalog(appOrId) {
-        const catalogApp = typeof appOrId === 'string' ? this.getCatalogApp(appOrId) : appOrId;
+        const catalogId = typeof appOrId === 'string' ? appOrId : appOrId?.id;
+        const catalogApp = this.getCatalogApp(catalogId);
         if (!catalogApp) return false;
 
         this.register({
             width: 1100,
             height: 760,
             ...catalogApp,
+            trustedCatalog: true,
             icon: this.normalizeIcon(catalogApp.icon)
         });
         return true;
@@ -37,11 +39,21 @@ const PWALoader = {
      */
     register(config) {
         const { id, name, icon, url, width = 1024, height = 700 } = config;
+        const catalogApp = this.getCatalogApp(id);
+        const isExactCatalogUrl = (() => {
+            if (!catalogApp || config.trustedCatalog !== true) return false;
+            try { return new URL(catalogApp.url, location.href).href === new URL(url, location.href).href; }
+            catch (_) { return false; }
+        })();
         const normalizedConfig = {
             ...config,
             icon: this.normalizeIcon(icon),
             width,
-            height
+            height,
+            // Only the source-controlled catalog may keep its real origin.
+            // Developer-created PWAs stay on an opaque sandbox origin so a
+            // same-origin URL or redirect cannot reach the FluentOS parent.
+            trustedCatalog: isExactCatalogUrl
         };
         
         this.apps[id] = normalizedConfig;
@@ -147,35 +159,55 @@ const PWALoader = {
                     this.resumeSameOriginMedia(frame);
                 }
             },
+
+            beforeClose() {
+                const frame = this.getFrame();
+                if (frame) {
+                    try { frame.src = 'about:blank'; } catch (_) {}
+                    frame.remove();
+                }
+                this._tombstonePausedMedia = [];
+                this.container = null;
+                this.windowId = null;
+                return true;
+            },
             
             render() {
                 if (this.config.openMode === 'external') {
                     window.open(this.config.url, '_blank', 'noopener,noreferrer');
-                    this.container.innerHTML = `
-                        <div class="pwa-app pwa-external-app">
-                            <a href="${this.config.url}" target="_blank" rel="noopener noreferrer">
-                                ${this.config.name}
-                            </a>
-                        </div>
-                    `;
+                    const external = document.createElement('div');
+                    external.className = 'pwa-app pwa-external-app';
+                    const link = document.createElement('a');
+                    link.href = this.config.url;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = this.config.name;
+                    external.appendChild(link);
+                    this.container.replaceChildren(external);
                     return;
                 }
 
-                this.container.innerHTML = `
-                    <div class="pwa-app">
-                        <div class="pwa-frozen-surface" aria-hidden="true">
-                            <img src="${this.config.icon}" alt="">
-                            <span>${this.config.name}</span>
-                        </div>
-                        <iframe 
-                            class="pwa-iframe" 
-                            src="${this.config.url}"
-                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        ></iframe>
-                    </div>
-                `;
-                const frame = this.getFrame();
+                const app = document.createElement('div');
+                app.className = 'pwa-app';
+                const frozenSurface = document.createElement('div');
+                frozenSurface.className = 'pwa-frozen-surface';
+                frozenSurface.setAttribute('aria-hidden', 'true');
+                const icon = document.createElement('img');
+                icon.src = this.config.icon;
+                icon.alt = '';
+                const label = document.createElement('span');
+                label.textContent = this.config.name;
+                frozenSurface.append(icon, label);
+
+                const frame = document.createElement('iframe');
+                frame.className = 'pwa-iframe';
+                frame.src = this.config.url;
+                const sandbox = ['allow-scripts', 'allow-popups', 'allow-forms', 'allow-modals'];
+                if (this.config.trustedCatalog) sandbox.unshift('allow-same-origin');
+                frame.setAttribute('sandbox', sandbox.join(' '));
+                frame.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+                app.append(frozenSurface, frame);
+                this.container.replaceChildren(app);
                 WindowManager.bindEmbeddedFrameFocus?.(frame, this.windowId);
             }
         };

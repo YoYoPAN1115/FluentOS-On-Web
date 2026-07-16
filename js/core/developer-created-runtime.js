@@ -2,6 +2,15 @@
 const DeveloperCreatedRuntime = {
     apps: new Map(),
     frames: new Map(),
+    MAX_BRIDGE_IN_FLIGHT: 32,
+    MAX_DIALOGS_PER_FRAME: 3,
+    MAX_STORAGE_KEYS: 128,
+    MAX_STORAGE_BYTES: 512 * 1024,
+    MAX_STORAGE_VALUE_BYTES: 100 * 1024,
+    READONLY_METHODS: Object.freeze([
+        'system.theme', 'system.themeMode', 'system.accentColor', 'system.state',
+        'system.language', 'system.windowBlurEnabled', 'storage.get', 'window.info'
+    ]),
     _bound: false,
 
     init() {
@@ -69,33 +78,107 @@ const DeveloperCreatedRuntime = {
                 return true;
             },
             beforeClose() {
-                if (this.frame?.contentWindow) runtime.frames.delete(this.frame.contentWindow);
+                if (this.frame?.contentWindow) runtime._releaseFrame(this.frame.contentWindow);
                 this.frame = null;
                 return true;
             }
         };
     },
 
-    mountAppFrame(container, app, appId, windowId) {
+    _createHandshakeToken() {
+        if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+        if (!globalThis.crypto?.getRandomValues) throw new Error('Secure randomness is unavailable');
+        const bytes = new Uint8Array(24);
+        globalThis.crypto.getRandomValues(bytes);
+        return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
+    },
+
+    _createCapabilityProfile(app, appId, options = {}) {
+        const readOnly = options.readOnly === true;
+        let network = { connect: [], image: [] };
+        if (!readOnly) {
+            try { network = DeveloperCenterStore.normalizeNetworkConfig(app?.network); }
+            catch (_) { network = { connect: [], image: [] }; }
+        }
+        const permissions = readOnly ? [] : [...new Set(Array.isArray(app?.permissions) ? app.permissions.map(String) : [])]
+            .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
+        return Object.freeze({
+            id: String(appId || app?.id || ''),
+            name: String(app?.name || 'Created App'),
+            title: String(app?.title || app?.name || 'Created App'),
+            readOnly,
+            permissions: Object.freeze(permissions),
+            network: Object.freeze({
+                connect: Object.freeze([...network.connect]),
+                image: Object.freeze([...network.image])
+            })
+        });
+    },
+
+    _releaseFrame(targetOrRegistration) {
+        const registration = this.frames.get(targetOrRegistration) ||
+            ([...this.frames.values()].includes(targetOrRegistration) ? targetOrRegistration : null);
+        if (!registration || registration.active === false) return false;
+        registration.active = false;
+        registration.dialogs?.forEach((dialog) => {
+            try { dialog.close(null); } catch (_) {}
+        });
+        registration.dialogs?.clear();
+        if (registration.port) {
+            try { registration.port.postMessage({ type: 'fluentos:bridge-closed' }); } catch (_) {}
+            registration.port.onmessage = null;
+            registration.port.onmessageerror = null;
+            try { registration.port.close(); } catch (_) {}
+            registration.port = null;
+        }
+        if (this.frames.get(registration.target) === registration) this.frames.delete(registration.target);
+        return true;
+    },
+
+    mountAppFrame(container, app, appId, windowId, options = {}) {
         container.style.padding = '0';
         container.style.overflow = 'hidden';
         container.classList.add('created-app-window-content');
         const frame = document.createElement('iframe');
+        const handshakeToken = this._createHandshakeToken();
+        const profile = this._createCapabilityProfile(app, appId, options);
         frame.className = 'created-app-frame';
         frame.sandbox = 'allow-scripts allow-forms allow-modals allow-downloads';
         frame.setAttribute('referrerpolicy', 'no-referrer');
         frame.setAttribute('title', app.title || app.name || 'Created App');
+        frame.srcdoc = this.buildDocument(app, { capabilityProfile: profile, handshakeToken });
         container.replaceChildren(frame);
         WindowManager.bindEmbeddedFrameFocus?.(frame, windowId);
 
-        // Register the WindowProxy before assigning srcdoc. User code may call
-        // FluentOS APIs while the document is still parsing, before `load`.
-        this.frames.set(frame.contentWindow, { frame, appId, windowId });
-        frame.addEventListener('load', () => {
-            this.frames.set(frame.contentWindow, { frame, appId, windowId });
-            this._send(frame.contentWindow, { type: 'fluentos:host-state', payload: this.getHostState(windowId) });
+        // Appending an iframe does not run its document until the current task
+        // returns, so registration still precedes any bridge message while also
+        // avoiding an observable, separately loading about:blank document.
+        const target = frame.contentWindow;
+        const registration = {
+            active: true, handshakeComplete: false, loadSeen: false,
+            port: null, inFlight: 0, pendingIds: new Set(),
+            dialogs: new Set(),
+            onRuntimeError: typeof options.onRuntimeError === 'function' ? options.onRuntimeError : null
+        };
+        Object.defineProperties(registration, {
+            frame: { value: frame, enumerable: true },
+            target: { value: target, enumerable: true },
+            appId: { value: appId, enumerable: true },
+            windowId: { value: windowId, enumerable: true },
+            profile: { value: profile, enumerable: true },
+            handshakeToken: { value: handshakeToken }
         });
-        frame.srcdoc = this.buildDocument(app);
+        this.frames.set(target, registration);
+        frame.addEventListener('load', () => {
+            if (this.frames.get(target) !== registration) return;
+            if (registration.loadSeen) {
+                // A navigated document never receives another capability port.
+                this._releaseFrame(registration);
+                return;
+            }
+            registration.loadSeen = true;
+            this._sendPort(registration, { type: 'fluentos:host-state', payload: this.getHostState(windowId) });
+        });
         return frame;
     },
 
@@ -106,7 +189,9 @@ const DeveloperCreatedRuntime = {
         catch (_) { return ''; }
     },
 
-    buildDocument(app) {
+    buildDocument(app, options = {}) {
+        const capabilityProfile = options.capabilityProfile || this._createCapabilityProfile(app, app?.id, options);
+        const handshakeToken = String(options.handshakeToken || this._createHandshakeToken());
         const baseCss = `
             :root{
                 color-scheme:light;--fluent-accent:#0078d4;--fluent-bg:#f3f3f3;--fluent-control:#fff;--fluent-control-hover:#f9f9f9;
@@ -146,6 +231,12 @@ const DeveloperCreatedRuntime = {
             }
             body.fluent-v2 button.fluent-btn:hover,body.fluent-v2 button.fluent-btn:focus-visible{
                 color:var(--accent-hover)!important;-webkit-text-fill-color:var(--accent-hover)!important;
+            }
+            body.fluent-v2 button.fluent-btn-secondary{
+                background-color:var(--fluent-control)!important;border-color:var(--fluent-border)!important;
+            }
+            body.fluent-v2 button.fluent-btn-secondary:hover,body.fluent-v2 button.fluent-btn-secondary:focus-visible{
+                background-color:var(--fluent-control-hover)!important;
             }
             body.fluent-v2 button.fluent-btn-primary{
                 color:var(--accent-contrast)!important;-webkit-text-fill-color:var(--accent-contrast)!important;background:var(--accent)!important;
@@ -192,15 +283,29 @@ const DeveloperCreatedRuntime = {
             const apply=root=>{if(root.nodeType===1)decorate(root);root.querySelectorAll?.('button,input,select,textarea').forEach(decorate)};apply(document);new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(apply))).observe(document.documentElement,{childList:true,subtree:true})})();
         ` : '';
         const bridge = `
-            (()=>{let seq=0;const pending=new Map();const forceUI=${app.forceFluentUI === true};let hostState={theme:'light',isDark:false,accentColor:'#0078d4',language:'zh',windowBlurEnabled:false,buttonGlowEnabled:true};
+            (()=>{
+            let seq=0,port=null;
+            const pending=new Map(),queuedSignals=[],maxPending=64,handshakeToken=${JSON.stringify(handshakeToken)},forceUI=${app.forceFluentUI === true};
+            let hostState={theme:'light',isDark:false,accentColor:'#0078d4',language:'zh',windowBlurEnabled:false,buttonGlowEnabled:true};
             const resolveTargets=target=>typeof target==='string'?[...document.querySelectorAll(target)]:(target instanceof Element?[target]:(target&&typeof target.length==='number'?[...target].filter(item=>item instanceof Element):[]));
             const highlightButton=(target,enabled=true)=>{const items=resolveTargets(target).filter(item=>item.matches('button,[role="button"]'));items.forEach(item=>{item.classList.add('fluent-btn','fluent-btn-medium');item.classList.toggle('fluent-btn-primary',enabled);item.classList.toggle('fluent-btn-secondary',!enabled)});return items.length};
             const enableButtonGlow=(target,enabled=true)=>{const items=resolveTargets(target).filter(item=>item.matches('button,[role="button"],a[href]'));items.forEach(item=>{item.classList.toggle('button-glow-disabled',!enabled);if(!enabled||item.dataset.fluentGlowReady==='true')return;item.dataset.fluentGlowReady='true';item.classList.add('button-glow-target');const edge=document.createElement('span');edge.className='button-edge-glow';edge.setAttribute('aria-hidden','true');item.appendChild(edge);item.addEventListener('pointermove',event=>{const rect=item.getBoundingClientRect();item.style.setProperty('--button-glow-x',event.clientX-rect.left+'px');item.style.setProperty('--button-glow-y',event.clientY-rect.top+'px');item.classList.add('button-glow-hover')});item.addEventListener('pointerleave',()=>item.classList.remove('button-glow-hover'));item.addEventListener('pointerdown',event=>{if(event.button!==0)return;const rect=item.getBoundingClientRect(),size=Math.max(rect.width,rect.height)*2.25,ripple=document.createElement('span');ripple.className='button-glow-ripple';ripple.style.cssText='width:'+size+'px;height:'+size+'px;left:'+(event.clientX-rect.left)+'px;top:'+(event.clientY-rect.top)+'px';item.appendChild(ripple);ripple.addEventListener('animationend',()=>ripple.remove(),{once:true})})});return items.length};
-            window.FluentOS={call(method,args={}){return new Promise((resolve,reject)=>{const id='api-'+(++seq),timeout=String(method).startsWith('network.')?20000:5000;pending.set(id,{resolve,reject});parent.postMessage({type:'fluentos:api',id,method,args},'*');setTimeout(()=>{if(pending.has(id)){pending.delete(id);reject(new Error('API request timed out'))}},timeout)})},
-            notify(title,message,type='info'){return this.call('notification.show',{title,message,type})},
+            const settle=(id,ok,value)=>{const item=pending.get(id);if(!item)return;pending.delete(id);clearTimeout(item.timer);ok?item.resolve(value):item.reject(value instanceof Error?value:new Error(String(value||'API failed')))};
+            const rejectPending=message=>[...pending.keys()].forEach(id=>settle(id,false,new Error(message)));
+            const send=message=>{if(!port)return false;port.postMessage(message);return true};
+            const emit=message=>{if(port){try{return send(message)}catch(_){return false}}if(queuedSignals.length<8)queuedSignals.push(message);return false};
+            const applyHostState=payload=>{hostState={...hostState,...payload};const root=document.documentElement,body=document.body,dark=hostState.isDark===true,blur=Math.max(10,Math.min(70,Number(hostState.blurIntensity)||40)),accent=hostState.accentColor||'#0078d4';root.dataset.fluentTheme=hostState.theme||'light';root.style.setProperty('--fluent-accent',accent);root.style.setProperty('--accent',accent);root.style.setProperty('--accent-hover',hostState.accentHover||accent);root.style.setProperty('--accent-rgb',(hostState.accentRgb||[0,120,212]).join(','));root.style.setProperty('--accent-contrast',hostState.accentContrast||'#fff');root.style.setProperty('--fluent-bg',dark?'#202020':'#f3f3f3');root.style.setProperty('--fluent-control',dark?'#2d2d2d':'#fff');root.style.setProperty('--fluent-control-hover',dark?'#353535':'#f9f9f9');root.style.setProperty('--fluent-text',dark?'#fff':'#1b1b1b');root.style.setProperty('--fluent-subtle',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--bg-primary',dark?'#202020':'#f3f3f3');root.style.setProperty('--bg-secondary',dark?'rgba(32,32,32,.72)':'rgba(255,255,255,.72)');root.style.setProperty('--bg-tertiary',dark?'rgba(32,32,32,.5)':'rgba(255,255,255,.5)');root.style.setProperty('--text-primary',dark?'#fff':'#1b1b1b');root.style.setProperty('--text-secondary',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--text-tertiary',dark?'#9d9d9d':'#767676');root.style.setProperty('--border-color',dark?'rgba(255,255,255,.12)':'rgba(0,0,0,.12)');root.style.setProperty('--radius-sm','8px');root.style.setProperty('--transition-fast','.15s ease-out');root.style.setProperty('--v2-blur',blur+'px');root.style.setProperty('--v2-blur-light',Math.max(8,Math.round(blur*.5))+'px');root.lang=hostState.language||'zh';body.classList.toggle('dark-mode',dark);body.classList.toggle('fluent-v2',forceUI&&hostState.fluentV2!==false);body.classList.toggle('blur-disabled',hostState.blurEnabled===false);body.classList.toggle('window-blur-enabled',hostState.windowBlurEnabled===true);body.classList.toggle('window-blur-disabled',hostState.windowBlurEnabled!==true);body.classList.toggle('button-glow-enabled',hostState.buttonGlowEnabled!==false);body.classList.toggle('material-mica',hostState.material==='mica');body.classList.toggle('material-gaussian',hostState.material!=='mica');dispatchEvent(new CustomEvent('fluentosstatechange',{detail:{...hostState}}))};
+            const onPortMessage=event=>{const message=event.data||{};if(message.type==='fluentos:api-result')settle(message.id,message.ok===true,message.ok===true?message.value:(message.error||'API failed'));else if(message.type==='fluentos:host-state')applyHostState(message.payload||{});else if(message.type==='fluentos:bridge-closed'){rejectPending('FluentOS bridge closed');try{port&&port.close()}catch(_){}port=null}};
+            const onConnect=event=>{const message=event.data||{},nextPort=event.ports&&event.ports[0];if(event.source!==parent||message.type!=='fluentos:connect'||message.token!==handshakeToken||!nextPort||port)return;removeEventListener('message',onConnect);port=nextPort;port.onmessage=onPortMessage;port.onmessageerror=()=>rejectPending('FluentOS bridge message failed');port.start&&port.start();pending.forEach((item,id)=>{if(item.sent)return;try{item.sent=send(item.packet)}catch(error){settle(id,false,error)}});queuedSignals.splice(0).forEach(emit)};
+            addEventListener('message',onConnect);
+            window.FluentOS={call(method,args={}){return new Promise((resolve,reject)=>{if(pending.size>=maxPending){reject(new Error('Too many pending API requests'));return}const methodName=String(method||''),id='api-'+(++seq),timeout=methodName.startsWith('network.')?20000:(methodName==='dialog.show'?300000:5000),packet={type:'fluentos:api',id,method:methodName,args};const item={resolve,reject,packet,sent:false,timer:null};item.timer=setTimeout(()=>settle(id,false,new Error('API request timed out')),timeout);pending.set(id,item);if(port){try{item.sent=send(packet)}catch(error){settle(id,false,error)}}})},
+            notify(title,message,type='info'){const args=title&&typeof title==='object'?title:{title,message,type};return this.call('notification.show',args)},
+            dialog(options={},message='',type='info'){const args=options&&typeof options==='object'?{...options}:{title:options,message,type};return this.call('dialog.show',args)},
+            alert(title,message='',type='info'){const args=title&&typeof title==='object'?{...title}:{title,message,type};args.mode='alert';return this.call('dialog.show',args)},
+            confirm(title,message='',options={}){const args=title&&typeof title==='object'?{...title}:{...(options&&typeof options==='object'?options:{}),title,message};args.mode='confirm';return this.call('dialog.show',args)},
             get state(){return {...hostState}},getTheme(){return this.call('system.theme')},getThemeMode(){return this.call('system.themeMode')},getAccentColor(){return this.call('system.accentColor')},getSystemState(){return this.call('system.state')},getLanguage(){return this.call('system.language')},isWindowBlurEnabled(){return this.call('system.windowBlurEnabled')},
             storage:{get:key=>FluentOS.call('storage.get',{key}),set:(key,value)=>FluentOS.call('storage.set',{key,value}),remove:key=>FluentOS.call('storage.remove',{key})},
-            openApp:id=>this.call('shell.openApp',{id}),openExternal:url=>this.call('shell.openExternal',{url}),
+            openApp:id=>FluentOS.call('shell.openApp',{id}),openExternal:url=>FluentOS.call('shell.openExternal',{url}),
             clipboard:{read:()=>FluentOS.call('clipboard.read'),write:text=>FluentOS.call('clipboard.write',{text})},
             getWindowInfo(){return this.call('window.info')},
             system:{setTheme:mode=>FluentOS.call('system.setTheme',{mode}),toggleTheme:()=>FluentOS.call('system.toggleTheme'),isWindowBlurEnabled:()=>FluentOS.call('system.windowBlurEnabled')},
@@ -208,22 +313,22 @@ const DeveloperCreatedRuntime = {
             files:{listText:(folder='documents')=>FluentOS.call('files.listText',{folder}),readText:id=>FluentOS.call('files.readText',{id}),writeText:(id,content)=>FluentOS.call('files.writeText',{id,content}),createText:(name,content='')=>FluentOS.call('files.createText',{name,content})},
             desktop:{addShortcut:()=>FluentOS.call('desktop.addShortcut'),removeShortcut:()=>FluentOS.call('desktop.removeShortcut')},
             network:{request:(url,options={})=>FluentOS.call('network.request',{url,options}),loadImage:url=>FluentOS.call('network.loadImage',{url})},
-            ui:{highlightButton,enableButtonGlow}};
-            addEventListener('message',e=>{const m=e.data||{};if(m.type==='fluentos:api-result'&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.ok?p.resolve(m.value):p.reject(new Error(m.error||'API failed'))}if(m.type==='fluentos:host-state'){hostState={...hostState,...m.payload};const root=document.documentElement,body=document.body,dark=hostState.isDark===true,blur=Math.max(10,Math.min(70,Number(hostState.blurIntensity)||40)),accent=hostState.accentColor||'#0078d4';root.dataset.fluentTheme=hostState.theme||'light';root.style.setProperty('--fluent-accent',accent);root.style.setProperty('--accent',accent);root.style.setProperty('--accent-hover',hostState.accentHover||accent);root.style.setProperty('--accent-rgb',(hostState.accentRgb||[0,120,212]).join(','));root.style.setProperty('--accent-contrast',hostState.accentContrast||'#fff');root.style.setProperty('--fluent-bg',dark?'#202020':'#f3f3f3');root.style.setProperty('--fluent-control',dark?'#2d2d2d':'#fff');root.style.setProperty('--fluent-control-hover',dark?'#353535':'#f9f9f9');root.style.setProperty('--fluent-text',dark?'#fff':'#1b1b1b');root.style.setProperty('--fluent-subtle',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--bg-primary',dark?'#202020':'#f3f3f3');root.style.setProperty('--bg-secondary',dark?'rgba(32,32,32,.72)':'rgba(255,255,255,.72)');root.style.setProperty('--bg-tertiary',dark?'rgba(32,32,32,.5)':'rgba(255,255,255,.5)');root.style.setProperty('--text-primary',dark?'#fff':'#1b1b1b');root.style.setProperty('--text-secondary',dark?'#c8c8c8':'#5d5d5d');root.style.setProperty('--text-tertiary',dark?'#9d9d9d':'#767676');root.style.setProperty('--border-color',dark?'rgba(255,255,255,.12)':'rgba(0,0,0,.12)');root.style.setProperty('--radius-sm','8px');root.style.setProperty('--transition-fast','.15s ease-out');root.style.setProperty('--v2-blur',blur+'px');root.style.setProperty('--v2-blur-light',Math.max(8,Math.round(blur*.5))+'px');root.lang=hostState.language||'zh';body.classList.toggle('dark-mode',dark);body.classList.toggle('fluent-v2',forceUI&&hostState.fluentV2!==false);body.classList.toggle('blur-disabled',hostState.blurEnabled===false);body.classList.toggle('window-blur-enabled',hostState.windowBlurEnabled===true);body.classList.toggle('window-blur-disabled',hostState.windowBlurEnabled!==true);body.classList.toggle('button-glow-enabled',hostState.buttonGlowEnabled!==false);body.classList.toggle('material-mica',hostState.material==='mica');body.classList.toggle('material-gaussian',hostState.material!=='mica');dispatchEvent(new CustomEvent('fluentosstatechange',{detail:{...hostState}}))}});
-            addEventListener('error',e=>parent.postMessage({type:'fluentos:runtime-error',message:e.message},'*'));
-            addEventListener('unhandledrejection',e=>parent.postMessage({type:'fluentos:runtime-error',message:String(e.reason||'Unhandled promise rejection')},'*'));
-            addEventListener('pointerdown',()=>parent.postMessage({type:'fluentos:focus-request'},'*'),true);
-            parent.postMessage({type:'fluentos:ready'},'*');
+            ui:{highlightButton,enableButtonGlow,dialog:(...args)=>FluentOS.dialog(...args),alert:(...args)=>FluentOS.alert(...args),confirm:(...args)=>FluentOS.confirm(...args)}};
+            addEventListener('error',event=>emit({type:'fluentos:runtime-error',message:event.message}));
+            addEventListener('unhandledrejection',event=>emit({type:'fluentos:runtime-error',message:String(event.reason||'Unhandled promise rejection')}));
+            addEventListener('pointerdown',()=>emit({type:'fluentos:focus-request'}),true);
+            addEventListener('pagehide',()=>{emit({type:'fluentos:disconnect'});try{port&&port.close()}catch(_){}port=null;rejectPending('FluentOS bridge closed')},{once:true,capture:true});
+            parent.postMessage({type:'fluentos:ready',token:handshakeToken},'*');
             })();
         `;
         const fluentStylesheet = app.forceFluentUI ? `<style>${this._getFluentUiCss().replace(/<\/style/gi, '<\\/style')}</style>` : '';
         let allowedImageSources = '';
         try {
-            allowedImageSources = DeveloperCenterStore.normalizeNetworkConfig(app.network).image
+            allowedImageSources = capabilityProfile.network.image
                 .map((hostname) => ` https://${hostname}`)
                 .join('');
         } catch (_) {}
-        const csp = `default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:${allowedImageSources}; font-src 'self' data:; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'`;
+        const csp = `default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:${allowedImageSources}; font-src 'self' data:; connect-src 'none'; frame-src 'none'; media-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; navigate-to 'none'`;
         const safeJs = String(app.js || '').replace(/<\/script/gi, '<\\/script');
         const safeCss = String(app.css || '').replace(/<\/style/gi, '<\\/style');
         const html = String(app.html || '<main><h1>Hello, FluentOS!</h1></main>');
@@ -264,48 +369,95 @@ const DeveloperCreatedRuntime = {
         };
     },
 
-    _send(target, message) {
-        try { target?.postMessage(message, '*'); } catch (_) {}
+    _sendWindow(target, message, transfer = []) {
+        try {
+            target?.postMessage(message, '*', transfer);
+            return true;
+        } catch (_) { return false; }
+    },
+
+    _sendPort(registration, message) {
+        if (!registration?.active || !registration.port) return false;
+        try {
+            registration.port.postMessage(message);
+            return true;
+        } catch (_) { return false; }
     },
 
     broadcastHostState() {
-        this.frames.forEach((registration, target) => this._send(target, { type: 'fluentos:host-state', payload: this.getHostState(registration.windowId) }));
+        this.frames.forEach((registration) => this._sendPort(registration, { type: 'fluentos:host-state', payload: this.getHostState(registration.windowId) }));
     },
 
-    async _onMessage(event) {
+    _onMessage(event) {
         const registration = this.frames.get(event.source);
-        if (!registration) return;
+        if (!registration?.active || registration.frame.contentWindow !== event.source) return;
         const message = event.data || {};
-        if (message.type === 'fluentos:ready') {
-            this._send(event.source, { type: 'fluentos:host-state', payload: this.getHostState(registration.windowId) });
+        // The ambient window channel is deliberately single-use. Every message
+        // after this bootstrap travels over the transferred, unforgeable port.
+        if (message.type !== 'fluentos:ready' || registration.handshakeComplete || message.token !== registration.handshakeToken) return;
+        registration.handshakeComplete = true;
+        const channel = new MessageChannel();
+        registration.port = channel.port1;
+        channel.port1.onmessage = (portEvent) => this._onPortMessage(registration, portEvent.data || {});
+        channel.port1.onmessageerror = () => this._releaseFrame(registration);
+        channel.port1.start?.();
+        if (!this._sendWindow(event.source, { type: 'fluentos:connect', token: registration.handshakeToken }, [channel.port2])) {
+            try { channel.port2.close(); } catch (_) {}
+            this._releaseFrame(registration);
             return;
         }
+        this._sendPort(registration, { type: 'fluentos:host-state', payload: this.getHostState(registration.windowId) });
+    },
+
+    async _onPortMessage(registration, message) {
+        if (!registration?.active || this.frames.get(registration.target) !== registration) return;
         if (message.type === 'fluentos:focus-request') {
             WindowManager.focusWindow?.(registration.windowId);
             return;
         }
         if (message.type === 'fluentos:runtime-error') {
             console.warn(`[CreatedApp:${registration.appId}]`, message.message);
+            try { registration.onRuntimeError?.(String(message.message || 'Severe runtime error')); }
+            catch (error) { console.warn('[CreatedApp] Runtime error observer failed', error); }
             return;
         }
-        if (message.type !== 'fluentos:api' || typeof message.id !== 'string') return;
+        if (message.type === 'fluentos:disconnect') {
+            this._releaseFrame(registration);
+            return;
+        }
+        if (message.type !== 'fluentos:api' || typeof message.id !== 'string' || !/^api-\d{1,16}$/.test(message.id)) return;
+        if (registration.pendingIds.has(message.id)) {
+            this._sendPort(registration, { type: 'fluentos:api-result', id: message.id, ok: false, error: 'Duplicate API request ID' });
+            return;
+        }
+        if (registration.inFlight >= this.MAX_BRIDGE_IN_FLIGHT) {
+            this._sendPort(registration, { type: 'fluentos:api-result', id: message.id, ok: false, error: 'Too many in-flight API requests' });
+            return;
+        }
+        const method = typeof message.method === 'string' && message.method.length <= 80 ? message.method : '';
+        const args = message.args && typeof message.args === 'object' && !Array.isArray(message.args) ? message.args : {};
+        registration.inFlight += 1;
+        registration.pendingIds.add(message.id);
         let ok = true;
         let value = null;
         let error = '';
-        try { value = await this._invokeApi(registration, message.method, message.args || {}); }
+        try { value = await this._invokeApi(registration, method, args); }
         catch (reason) { ok = false; error = reason?.message || String(reason); }
-        this._send(event.source, { type: 'fluentos:api-result', id: message.id, ok, value, error });
+        finally {
+            registration.inFlight = Math.max(0, registration.inFlight - 1);
+            registration.pendingIds.delete(message.id);
+        }
+        this._sendPort(registration, { type: 'fluentos:api-result', id: message.id, ok, value, error });
     },
 
-    _networkUrl(app, group, value) {
+    _networkUrl(profile, group, value) {
         let url;
         try { url = new URL(String(value || '')); }
         catch (_) { throw new Error('A valid HTTPS URL is required'); }
         if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) {
             throw new Error('Only credential-free HTTPS URLs on the default port are allowed');
         }
-        const network = DeveloperCenterStore.normalizeNetworkConfig(app.network);
-        const allowed = group === 'image' ? network.image : network.connect;
+        const allowed = group === 'image' ? profile.network.image : profile.network.connect;
         if (!allowed.includes(url.hostname.toLowerCase().replace(/\.$/, ''))) {
             throw new Error(`Domain is not in this App's ${group} allowlist`);
         }
@@ -350,28 +502,8 @@ const DeveloperCreatedRuntime = {
         });
     },
 
-    _probeImageUrl(href) {
-        return new Promise((resolve, reject) => {
-            const image = new Image();
-            let settled = false;
-            const finish = (error) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timeout);
-                image.onload = null;
-                image.onerror = null;
-                error ? reject(error) : resolve(true);
-            };
-            const timeout = setTimeout(() => finish(new Error('Image request timed out')), 4000);
-            image.referrerPolicy = 'no-referrer';
-            image.onload = () => finish();
-            image.onerror = () => finish(new Error('Image could not be loaded'));
-            image.src = href;
-        });
-    },
-
-    async _networkRequest(app, args) {
-        const url = this._networkUrl(app, 'connect', args.url);
+    async _networkRequest(profile, args) {
+        const url = this._networkUrl(profile, 'connect', args.url);
         const input = args.options && typeof args.options === 'object' ? args.options : {};
         const method = String(input.method || 'GET').toUpperCase();
         if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) throw new Error('Unsupported network method');
@@ -398,7 +530,7 @@ const DeveloperCreatedRuntime = {
                 redirect: 'error', referrerPolicy: 'no-referrer', signal: controller.signal
             });
             // Redirects are disabled; this is a second invariant check for browser differences.
-            this._networkUrl(app, 'connect', response.url || url.href);
+            this._networkUrl(profile, 'connect', response.url || url.href);
             const bytes = method === 'HEAD' ? new Uint8Array() : await this._readLimitedResponse(response, 2 * 1024 * 1024);
             return {
                 ok: response.ok,
@@ -411,8 +543,8 @@ const DeveloperCreatedRuntime = {
         } finally { clearTimeout(timeout); }
     },
 
-    async _networkImage(app, args) {
-        const url = this._networkUrl(app, 'image', args.url);
+    async _networkImage(profile, args) {
+        const url = this._networkUrl(profile, 'image', args.url);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
         let response;
@@ -424,13 +556,12 @@ const DeveloperCreatedRuntime = {
             });
         } catch (error) {
             if (controller.signal.aborted) throw new Error('Image request timed out');
-            // A normal <img> request does not require the server to opt into
-            // CORS. The frame CSP still restricts this fallback to the exact
-            // allowlisted HTTPS hosts and prevents cross-domain redirects.
-            await this._probeImageUrl(url.href);
+            // CORS opt-in is not required by <img>. Return only the already
+            // validated URL and let the iframe's exact-host CSP enforce it;
+            // the privileged host must not probe a cross-origin resource.
             return url.href;
         } finally { clearTimeout(timeout); }
-        this._networkUrl(app, 'image', response.url || url.href);
+        this._networkUrl(profile, 'image', response.url || url.href);
         if (!response.ok) throw new Error(`Image request failed with status ${response.status}`);
         const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
         if (!/^image\/(?:png|jpeg|gif|webp|avif|bmp|x-icon)$/.test(mime)) throw new Error('The response is not a supported raster image');
@@ -438,18 +569,39 @@ const DeveloperCreatedRuntime = {
     },
 
     async _invokeApi(registration, method, args) {
-        const app = this.apps.get(registration.appId);
-        if (!app) throw new Error('App is no longer registered');
+        if (!registration?.active) throw new Error('App frame is no longer active');
+        const profile = registration.profile;
+        if (!profile) throw new Error('App capability profile is unavailable');
+        if (profile.readOnly && !this.READONLY_METHODS.includes(method)) {
+            throw new Error('This validation session permits read-only FluentOS APIs only');
+        }
         const requirePermission = (permission) => {
-            if (!Array.isArray(app.permissions) || !app.permissions.includes(permission)) {
+            if (!profile.permissions.includes(permission)) {
                 throw new Error(`Permission is required: ${permission}`);
             }
         };
         const key = (value) => {
-            const output = String(value || '').trim();
+            const output = String(value ?? '').trim();
             if (!output || output.length > 80 || !/^[\w.-]+$/.test(output)) throw new Error('Invalid storage key');
             return output;
         };
+        const storagePrefix = `fluentos.created.${profile.id}.`;
+        const storageEntries = () => Object.keys(localStorage)
+            .filter((itemKey) => itemKey.startsWith(storagePrefix))
+            .map((itemKey) => ({ key: itemKey, value: localStorage.getItem(itemKey) ?? '' }));
+        const utf8Bytes = (value) => new TextEncoder().encode(String(value)).byteLength;
+        const displayText = (value, fallback = '', maxLength = 300) => {
+            let output;
+            if (value === undefined || value === null || value === '') output = fallback;
+            else if (typeof value === 'string') output = value;
+            else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') output = String(value);
+            else {
+                try { output = JSON.stringify(value, null, 2); }
+                catch (_) { output = String(value); }
+            }
+            return String(output ?? fallback).replace(/\u0000/g, '').slice(0, maxLength);
+        };
+        const entryBytes = (itemKey, value) => utf8Bytes(itemKey.slice(storagePrefix.length)) + utf8Bytes(value);
         const isInUserTextFolder = (node) => {
             const allowedRoots = new Set(['documents', 'downloads', 'desktop']);
             let current = node;
@@ -464,9 +616,65 @@ const DeveloperCreatedRuntime = {
         };
         switch (method) {
             case 'notification.show': {
-                const type = ['info', 'success', 'warning', 'error'].includes(args.type) ? args.type : 'info';
-                State.addNotification({ title: String(args.title || app.name).slice(0, 80), message: String(args.message || '').slice(0, 300), type });
+                const typeValue = String(args.type || 'info').toLowerCase();
+                const type = ['info', 'success', 'warning', 'error'].includes(typeValue) ? typeValue : 'info';
+                const title = displayText(args.title, profile.name, 80);
+                const message = displayText(args.message ?? args.content, '', 300);
+                State.addNotification({ title, message, type, sourceAppId: profile.id });
+                if (typeof FluentUI !== 'undefined' && typeof FluentUI.Toast === 'function') {
+                    const toast = FluentUI.Toast({ title, message, type, duration: 5000 });
+                    const messageElement = toast?.element?.querySelector?.('.fluent-toast-message');
+                    if (messageElement) messageElement.style.whiteSpace = 'pre-wrap';
+                }
                 return true;
+            }
+            case 'dialog.show': {
+                if (typeof FluentUI === 'undefined' || typeof FluentUI.Dialog !== 'function') throw new Error('System dialogs are unavailable');
+                if (registration.dialogs.size >= this.MAX_DIALOGS_PER_FRAME) throw new Error('Too many open dialogs');
+                const mode = ['alert', 'confirm'].includes(String(args.mode || '').toLowerCase())
+                    ? String(args.mode).toLowerCase()
+                    : 'dialog';
+                const typeValue = String(args.type || 'info').toLowerCase();
+                const type = ['info', 'warning', 'error'].includes(typeValue) ? typeValue : 'info';
+                const title = displayText(args.title, profile.name, 80);
+                const content = displayText(args.message ?? args.content, '', 1000);
+                const language = typeof I18n !== 'undefined' ? I18n.currentLang : 'zh';
+                const confirmText = displayText(args.confirmText, language === 'en' ? 'OK' : '确定', 30);
+                const cancelText = displayText(args.cancelText, language === 'en' ? 'Cancel' : '取消', 30);
+                const variants = new Set(['primary', 'secondary', 'danger']);
+                let buttons = Array.isArray(args.buttons) ? args.buttons.slice(0, 3).map((button, index) => ({
+                    text: this.escapeHtml(displayText(button?.text ?? button?.label, index === 0 ? confirmText : `${language === 'en' ? 'Option' : '选项'} ${index + 1}`, 30)),
+                    variant: variants.has(String(button?.variant || '')) ? String(button.variant) : (index === 0 ? 'primary' : 'secondary'),
+                    value: button && Object.prototype.hasOwnProperty.call(button, 'value') ? button.value : index
+                })) : [];
+                if (!buttons.length && mode === 'confirm') {
+                    buttons = [
+                        { text: this.escapeHtml(cancelText), variant: 'secondary', value: false },
+                        { text: this.escapeHtml(confirmText), variant: 'primary', value: true }
+                    ];
+                } else if (!buttons.length) {
+                    buttons = [{ text: this.escapeHtml(confirmText), variant: 'primary', value: true }];
+                }
+                WindowManager.focusWindow?.(registration.windowId);
+                return new Promise((resolve) => {
+                    let dialogRef = null;
+                    let settled = false;
+                    const finish = (value) => {
+                        if (settled) return;
+                        settled = true;
+                        if (dialogRef) registration.dialogs.delete(dialogRef);
+                        resolve(value ?? null);
+                    };
+                    dialogRef = FluentUI.Dialog({
+                        type,
+                        title: this.escapeHtml(title),
+                        content: this.escapeHtml(content).replace(/\r?\n/g, '<br>'),
+                        buttons,
+                        closeOnOverlay: args.closeOnOverlay !== false,
+                        onClose: finish
+                    });
+                    registration.dialogs.add(dialogRef);
+                });
             }
             case 'system.theme': return this.getHostState(registration.windowId);
             case 'system.themeMode': return this.getHostState(registration.windowId).theme;
@@ -474,14 +682,24 @@ const DeveloperCreatedRuntime = {
             case 'system.state': return this.getHostState(registration.windowId);
             case 'system.language': return this.getHostState().language;
             case 'system.windowBlurEnabled': return this.getHostState(registration.windowId).windowBlurEnabled;
-            case 'storage.get': return JSON.parse(localStorage.getItem(`fluentos.created.${app.id}.${key(args.key)}`) || 'null');
+            case 'storage.get': return JSON.parse(localStorage.getItem(`${storagePrefix}${key(args.key)}`) || 'null');
             case 'storage.set': {
+                if (args.value === undefined) throw new Error('Storage value cannot be undefined');
                 const serialized = JSON.stringify(args.value);
-                if (serialized.length > 100000) throw new Error('Value is too large');
-                localStorage.setItem(`fluentos.created.${app.id}.${key(args.key)}`, serialized);
+                if (serialized === undefined) throw new Error('Storage value is not JSON-serializable');
+                const serializedBytes = utf8Bytes(serialized);
+                if (serializedBytes > this.MAX_STORAGE_VALUE_BYTES) throw new Error('Storage value is too large');
+                const itemKey = `${storagePrefix}${key(args.key)}`;
+                const entries = storageEntries();
+                const existing = entries.find((entry) => entry.key === itemKey);
+                if (!existing && entries.length >= this.MAX_STORAGE_KEYS) throw new Error(`Storage is limited to ${this.MAX_STORAGE_KEYS} keys per App`);
+                const usedBytes = entries.reduce((total, entry) => total + entryBytes(entry.key, entry.value), 0);
+                const nextBytes = usedBytes - (existing ? entryBytes(existing.key, existing.value) : 0) + entryBytes(itemKey, serialized);
+                if (nextBytes > this.MAX_STORAGE_BYTES) throw new Error('App storage quota exceeded');
+                localStorage.setItem(itemKey, serialized);
                 return true;
             }
-            case 'storage.remove': localStorage.removeItem(`fluentos.created.${app.id}.${key(args.key)}`); return true;
+            case 'storage.remove': localStorage.removeItem(`${storagePrefix}${key(args.key)}`); return true;
             case 'shell.openApp': {
                 const id = String(args.id || '');
                 const target = Desktop.apps.find((item) => item.id === id);
@@ -493,11 +711,15 @@ const DeveloperCreatedRuntime = {
                 if (url.protocol !== 'https:') throw new Error('Only HTTPS links are allowed');
                 window.open(url.href, '_blank', 'noopener,noreferrer'); return true;
             }
-            case 'clipboard.read': return navigator.clipboard?.readText ? navigator.clipboard.readText() : Promise.reject(new Error('Clipboard is unavailable'));
-            case 'clipboard.write': return navigator.clipboard?.writeText ? navigator.clipboard.writeText(String(args.text || '').slice(0, 100000)).then(() => true) : Promise.reject(new Error('Clipboard is unavailable'));
+            case 'clipboard.read':
+                requirePermission('clipboard.read');
+                return navigator.clipboard?.readText ? navigator.clipboard.readText() : Promise.reject(new Error('Clipboard is unavailable'));
+            case 'clipboard.write':
+                requirePermission('clipboard.write');
+                return navigator.clipboard?.writeText ? navigator.clipboard.writeText(String(args.text ?? '').slice(0, 100000)).then(() => true) : Promise.reject(new Error('Clipboard is unavailable'));
             case 'window.info': {
                 const win = WindowManager.windows.find((item) => item.id === registration.windowId);
-                return { appId: app.id, title: app.title || app.name, maximized: win?.isMaximized === true, width: win?.element?.offsetWidth || 0, height: win?.element?.offsetHeight || 0 };
+                return { appId: profile.id, title: profile.title, maximized: win?.isMaximized === true, width: win?.element?.offsetWidth || 0, height: win?.element?.offsetHeight || 0 };
             }
             case 'system.setTheme': {
                 requirePermission('system.theme.write');
@@ -589,17 +811,17 @@ const DeveloperCreatedRuntime = {
             }
             case 'desktop.addShortcut':
                 requirePermission('desktop.manage');
-                return Desktop.addAppShortcut(app.id);
+                return Desktop.addAppShortcut(profile.id);
             case 'desktop.removeShortcut':
                 requirePermission('desktop.manage');
-                Desktop.removeAppShortcut(app.id);
+                Desktop.removeAppShortcut(profile.id);
                 return true;
             case 'network.request':
                 requirePermission('network.request');
-                return this._networkRequest(app, args);
+                return this._networkRequest(profile, args);
             case 'network.loadImage':
                 requirePermission('network.image');
-                return this._networkImage(app, args);
+                return this._networkImage(profile, args);
             default: throw new Error('API is not permitted');
         }
     },
@@ -620,6 +842,9 @@ const DeveloperCreatedRuntime = {
         if (options.closeWindows !== false && typeof WindowManager !== 'undefined') {
             WindowManager.windows.filter((win) => win.appId === appId).forEach((win) => WindowManager.closeWindow(win.id));
         }
+        [...this.frames.values()]
+            .filter((registration) => registration.appId === appId)
+            .forEach((registration) => this._releaseFrame(registration));
         if (app?.type === 'pwa' && typeof PWALoader !== 'undefined') PWALoader.unregister(appId);
         const config = typeof WindowManager !== 'undefined' ? WindowManager.appConfigs[appId] : null;
         if (config?.component && String(config.component).startsWith('CreatedApp_')) delete globalThis[config.component];
@@ -685,13 +910,13 @@ const DeveloperCenterPreviewApp = {
 
     render() {
         if (!this.container || !this.app) return;
-        if (this.frame?.contentWindow) DeveloperCreatedRuntime.frames.delete(this.frame.contentWindow);
+        if (this.frame?.contentWindow) DeveloperCreatedRuntime._releaseFrame(this.frame.contentWindow);
         DeveloperCreatedRuntime.apps.set(this.app.id, this.app);
-        this.frame = DeveloperCreatedRuntime.mountAppFrame(this.container, this.app, this.app.id, this.windowId);
+        this.frame = DeveloperCreatedRuntime.mountAppFrame(this.container, this.app, this.app.id, this.windowId, { preview: true });
     },
 
     beforeClose() {
-        if (this.frame?.contentWindow) DeveloperCreatedRuntime.frames.delete(this.frame.contentWindow);
+        if (this.frame?.contentWindow) DeveloperCreatedRuntime._releaseFrame(this.frame.contentWindow);
         DeveloperCreatedRuntime.apps.delete('developer-center-preview');
         this.frame = null;
         this.container = null;

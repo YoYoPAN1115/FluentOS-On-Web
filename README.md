@@ -18,7 +18,7 @@
 - 📱 响应式设计（最佳体验 ≥1024px）
 - ⚡ 纯原生实现，无任何框架依赖
 
-当前系统版本：`2.3.260715`（以 `js/core/resource-manifest.js` 为准）。
+当前系统版本：`2.3.260716A`（以 `js/core/resource-manifest.js` 为准）。
 
 > FluentOS-On-Web 是 Web 桌面模拟项目，不是真正的操作系统。文件、设置与“安装的应用”主要保存在当前浏览器中，不能访问或管理宿主系统的真实账户、进程和完整文件系统。
 
@@ -41,6 +41,9 @@
 | --- | --- |
 | 文件 | 虚拟目录、搜索、面包屑导航、回收站、外部文件导入与应用间文件打开 |
 | 设置 | 账户、网络、个性化、应用、多任务、时间与语言、隐私、Fingo、实验室及开发者选项 |
+| 进程管理 | 查看应用资源使用情况并管理正在运行的应用 |
+| 终端 | 在受控命令环境中操作 FluentOS 的虚拟文件和系统功能 |
+| 提示 | 浏览 FluentOS 功能介绍与使用提示 |
 | 计算器 | 标准/专业计算、历史记录和键盘输入 |
 | 记事本 | 多标签富文本编辑、虚拟文件读写、外部文本导入、HTML 导出和大字报模式 |
 | 浏览器 | 多标签页、地址搜索、历史记录与收藏站点；页面实际由 iframe 加载 |
@@ -50,6 +53,8 @@
 | 照片 | Bing/本地/收藏图库、查看、缩放、旋转、翻转、调整、下载与设置壁纸 |
 | 媒体 | 本地媒体库、播放队列、播放列表、Media Session 与播放状态恢复 |
 | App Shop | 内置应用管理及第三方 Web 应用目录 |
+
+以上为默认显示在桌面应用清单中的 14 个原生应用。系统还内置 Developer Center（BETA）；它默认隐藏，可在“设置 → 实验室”中关闭“隐藏开发者中心”后显示。
 
 ## 快速开始
 
@@ -109,7 +114,7 @@ FluentOS-On-Web 2.0/
 ├─ js/
 │  ├─ core/                  # 存储、状态、国际化、组件、Fingo、灵翼等
 │  ├─ ui/                    # 系统屏幕、桌面、任务栏、窗口与小组件
-│  ├─ apps/                  # 11 个内置应用
+│  ├─ apps/                  # 14 个默认桌面原生应用；另含默认隐藏的 Developer Center
 │  ├─ third_parts_apps/      # PWA 加载器与第三方应用目录
 │  └─ main.js                # 初始化、全局快捷键、公开 API 与调试工具
 ├─ Theme/
@@ -156,6 +161,21 @@ FluentOS.debug.resources.stop();
 
 系统控制接口包括 `FluentOS.restart()`、`shutdown()`、`logout()` 和 `closeAllWindows()`。`FluentOS.debug.clearStorage()` 会在确认后清空当前站点的全部本地数据。
 
+### 资源清单与统一校验
+
+修改 `index.html`、`js/`、`css/` 或 `Theme/` 下的运行时资源后，必须先生成包含内容哈希的 resource manifest，再生成会记录前者文件大小的 storage manifest；不要手工编辑这两个生成文件：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-resource-manifest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-storage-manifest.ps1
+```
+
+只检查清单是否为最新状态时，可分别给两个生成脚本传入 `-Check`。提交前运行统一校验；它会自动以 `-Check` 模式校验两个清单，并检查入口、资源引用与可用时的 JavaScript 语法：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-project.ps1
+```
+
 进一步开发请阅读：
 
 - [开发者指南](docs/DEVELOPER_GUIDE.md)
@@ -166,7 +186,7 @@ FluentOS.debug.resources.stop();
 1. 从功能分支修改代码，不要改变 `index.html` 中脚本的依赖顺序。
 2. 新界面优先复用 `FluentUI`、`FluentWindow`、主题变量和现有图标。
 3. 用户可见文本同时补充 `js/core/i18n.js` 的中文与英文翻译。
-4. 修改资源后同步发布流程中的资源清单；`js/core/resource-manifest.js` 标明为生成文件，不应手工维护哈希。
+4. 修改运行时资源后按“resource → storage”的顺序生成清单，并运行统一项目校验。
 5. 至少在浅/深主题、窗口缩放、刷新后持久化和无网络状态下检查改动。
 
 ## License

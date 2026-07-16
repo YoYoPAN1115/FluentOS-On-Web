@@ -858,6 +858,38 @@ const Widgets = {
         State.updateSettings({ widgetsLayout: layout });
     },
 
+    _updateInstanceSettings(surface, instance, patch) {
+        if (!instance || !patch || typeof patch !== 'object') return false;
+
+        const nextSettings = Object.assign({}, instance.settings, patch);
+        if (surface !== 'desktop' && surface !== 'lock') {
+            instance.settings = nextSettings;
+            return false;
+        }
+
+        const layout = this.getLayout();
+        let changed = false;
+        const nextLayout = {
+            desktop: layout.desktop.map((item) => {
+                if (surface !== 'desktop' || item.id !== instance.id) return item;
+                changed = true;
+                return { ...item, settings: nextSettings };
+            }),
+            lock: layout.lock.map((item) => {
+                if (surface !== 'lock' || item.id !== instance.id) return item;
+                changed = true;
+                return { ...item, settings: nextSettings };
+            })
+        };
+
+        if (!changed) return false;
+        this.saveLayout(nextLayout);
+        // Editor/render callbacks may keep the old instance object alive. Keep it
+        // in sync without mutating the State object before persistence comparison.
+        instance.settings = nextSettings;
+        return true;
+    },
+
     /** Add the five-widget starter arrangement to an empty desktop once. */
     _ensureDefaultDesktopWidgets() {
         const layout = this.getLayout();
@@ -1198,8 +1230,7 @@ const Widgets = {
             isPreview: surface === 'preview',
             setSettings: (patch, opts = {}) => {
                 if (!instance) return;
-                instance.settings = Object.assign({}, instance.settings, patch);
-                this.saveLayout(this.getLayout());
+                this._updateInstanceSettings(surface, instance, patch);
                 if (!opts.silent) this.renderSurface(surface);
             }
         };
@@ -1385,8 +1416,7 @@ const Widgets = {
             isPreview: false,
             setSettings: (patch, opts = {}) => {
                 if (!instance) return;
-                instance.settings = Object.assign({}, instance.settings, patch);
-                this.saveLayout(this.getLayout());
+                this._updateInstanceSettings(surface, instance, patch);
                 if (!opts.silent) this.renderSurface(surface);
             },
             closeEditor: () => this.closeWidgetEditor()

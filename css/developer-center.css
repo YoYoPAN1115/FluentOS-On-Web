@@ -5,6 +5,13 @@
 .created-app-frame { position: absolute; inset: 0; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; margin: 0; border: 0; background: var(--bg-primary); }
 .dc-page { height: 100%; min-height: 0; overflow: auto; box-sizing: border-box; padding: 28px 30px 132px; }
 .dc-page.dc-page-simple { padding-bottom: 32px; }
+.dc-secondary-page { animation: dcSecondaryPageEnter 420ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.dc-secondary-page.dc-secondary-page-exit { animation: dcSecondaryPageExit 260ms cubic-bezier(0.4, 0, 1, 1) both; pointer-events: none; }
+@keyframes dcSecondaryPageEnter { from { opacity: 0; transform: translateX(34px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes dcSecondaryPageExit { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(34px); } }
+@media (prefers-reduced-motion: reduce) {
+    .dc-secondary-page, .dc-secondary-page.dc-secondary-page-exit { animation-duration: 0ms; }
+}
 .dc-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
 .dc-heading h1 { margin: 0 0 6px; font-size: 28px; font-weight: 600; color: var(--text-primary); }
 .dc-heading p { margin: 0; color: var(--text-secondary); font-size: 13px; }

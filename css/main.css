@@ -973,9 +973,9 @@ html,
     background: var(--bg-secondary);
     backdrop-filter: blur(var(--blur-lg)) saturate(150%);
     border-radius: var(--radius-md);
-    padding: 6px;
+    padding: 8px;
     min-width: 200px;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-xl);
     border: 1px solid var(--border-color);
     z-index: 10000;
 }
@@ -984,10 +984,11 @@ html,
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     transition: background var(--transition-fast);
+    font-size: 14px;
 }
 
 .context-menu-item:hover {
@@ -1493,13 +1494,6 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     color: var(--text-tertiary);
 }
 
-.start-apps-label {
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 16px;
-    color: var(--text-secondary);
-}
-
 /* 开始菜单分区 */
 .start-section {
     margin-bottom: 20px;
@@ -1777,35 +1771,6 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
     justify-content: space-between;
     padding-top: 16px;
     border-top: 1px solid var(--border-color);
-}
-
-.start-user {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-.start-user:hover {
-    background: rgba(0, 0, 0, 0.05);
-}
-
-.dark-mode .start-user:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.start-user img {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-}
-
-.start-user span {
-    font-size: 14px;
-    font-weight: 500;
 }
 
 .start-power-btn {
@@ -2337,7 +2302,7 @@ body.button-glow-disabled .taskbar-app.taskbar-app-minimized::after {
 
 .window.window-inactive {
     filter: saturate(0.78);
-    transition: filter 180ms ease;
+    transition: filter 120ms ease;
 }
 
 .window-controls {
@@ -2701,53 +2666,6 @@ body.window-blur-disabled .window-titlebar {
 }
 
 .dark-mode.blur-disabled .login-card {
-    background: rgba(32, 32, 32, 0.95);
-}
-
-/* ============ 右键菜单 ============ */
-.context-menu {
-    position: fixed;
-    background: var(--bg-secondary);
-    backdrop-filter: blur(var(--blur-lg)) saturate(150%);
-    border-radius: var(--radius-md);
-    padding: 8px;
-    box-shadow: var(--shadow-xl);
-    border: 1px solid var(--border-color);
-    z-index: 10000;
-    min-width: 200px;
-}
-
-.context-menu-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-    font-size: 14px;
-}
-
-.context-menu-item:hover {
-    background: rgba(0, 0, 0, 0.05);
-}
-
-.dark-mode .context-menu-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.context-menu-item img {
-    width: 16px;
-    height: 16px;
-}
-
-.blur-disabled .context-menu {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgba(255, 255, 255, 0.95);
-}
-
-.dark-mode.blur-disabled .context-menu {
     background: rgba(32, 32, 32, 0.95);
 }
 

@@ -234,11 +234,6 @@ function initModules() {
         });
     }
 
-    // 日历组件在NotificationCenter中初始化
-    if (typeof CalendarWidget !== 'undefined') {
-        CalendarWidget.init();
-    }
-
     console.log('✓ 所有模块已初始化');
     
     // 调试：检查所有应用组件是否加载
@@ -383,8 +378,16 @@ function minimizeAllDesktopWindows() {
     return true;
 }
 
+function showDesktop() {
+    if (typeof TaskView !== 'undefined' && TaskView.isOpen && typeof TaskView.close === 'function') {
+        TaskView.close(() => minimizeAllDesktopWindows());
+        return true;
+    }
+    return minimizeAllDesktopWindows();
+}
+
 // Public shell action used by the Start button quick menu and Alt+D.
-globalThis.FluentOSShowDesktop = minimizeAllDesktopWindows;
+globalThis.FluentOSShowDesktop = showDesktop;
 
 function minimizeTopDesktopWindow() {
     const top = getDesktopWindowsSortedByZ()[0];
@@ -710,7 +713,7 @@ function initGlobalShortcuts() {
                 }
                 break;
             case 'd':
-                handled = minimizeAllDesktopWindows();
+                handled = showDesktop();
                 break;
             case 'm':
                 handled = minimizeTopDesktopWindow();
@@ -1508,7 +1511,7 @@ const ResourceMonitor = {
 };
 
 window.FluentOS = {
-    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.3.260715',
+    version: globalThis.FluentOSResourceManifest?.systemVersion || '2.3.260716A',
     State,
     Storage,
     notify,

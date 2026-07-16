@@ -18,11 +18,20 @@ npx http-server . -p 8000
 
 Open <http://localhost:8000/> and use the browser developer tools. Do not use `file://` as the development baseline because preloading, remote requests, camera, clipboard, and file-picker behavior will differ.
 
-There is currently no automated test or lint configuration. If Node.js is available, run a syntax check before committing:
+The project has no npm test runner or lint configuration, but it includes a unified static validator. It checks HTML entries, duplicate IDs, local resource references, JavaScript/CSS files without runtime entries, both generated manifests, and JavaScript syntax when Node.js is available:
 
 ```powershell
-Get-ChildItem js -Recurse -Filter *.js | ForEach-Object { node --check $_.FullName }
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate-project.ps1
 ```
+
+After changing runtime resources under `index.html`, `js/`, `css/`, or `Theme/`, generate the content-hash resource manifest first, then the storage manifest that records the former's file size:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-resource-manifest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\generate-storage-manifest.ps1
+```
+
+Both generators accept `-Check` to verify existing output without writing files; the unified validator invokes both in that mode. Both manifests are generated files and must not be edited by hand.
 
 ## 2. Architecture
 
@@ -30,8 +39,7 @@ Get-ChildItem js -Recurse -Filter *.js | ForEach-Object { node --check $_.FullNa
 index.html
   ├─ core: CSP → Storage → State → I18n → shared services/components
   ├─ ui: Boot/OOBE → lock/login → desktop/panels → WindowManager → Widgets
-  ├─ apps: Files, Settings, Calculator, Notes, Browser, Clock,
-  │        Weather, Camera, Photos, and Media
+  ├─ apps: 14 default desktop native apps, plus the hidden-by-default Developer Center
   ├─ third_parts_apps: PWALoader and catalog
   ├─ AppShop / Fingo
   └─ main.js: initialization, view changes, shortcuts, and FluentOS API
@@ -256,7 +264,23 @@ PWALoader.register({
 
 Catalog entries are stored in `js/third_parts_apps/pwa-catalog.js`. Cross-origin iframe DOM cannot be read, and sites may reject embedding, cookies, popups, downloads, autoplay, or permissions. Cooperative apps can listen for `fluentos:tombstone` messages with `freeze` and `restore` actions.
 
-## 10. Network, Permissions, and Security
+Only entries whose ID and URL exactly match the source-controlled catalog receive `allow-same-origin` in the iframe sandbox, preserving sign-in compatibility for trusted catalog apps. Other callers and PWAs created in Developer Center remain on an opaque origin without `allow-same-origin`; direct calls to `PWALoader.register()` cannot expand that authority.
+
+## 10. Apps Created in Developer Center
+
+Apps packaged by Developer Center run in sandboxed iframes and can request host capabilities only through the injected asynchronous `FluentOS` bridge. They cannot directly access the host document or ordinary browser storage. A project that needs clipboard access must explicitly declare `clipboard.read`, `clipboard.write`, or both; calls remain subject to secure-context, user-gesture, and browser permission policies.
+
+Preview windows always receive a read-only capability profile. They inherit none of the project's declared permissions or network allowlists and may only read system theme/state/language, window information, and the preview App's private storage. Notifications, storage writes, window or theme mutation, files, desktop, clipboard, and network calls are rejected. Test those capabilities only after the App passes safety validation, receives user approval, and runs in a normal window.
+
+Each App has a separate namespace for `FluentOS.storage`, with these UTF-8 quotas:
+
+- 512 KiB total data.
+- At most 128 keys.
+- At most 100 KiB for one JSON-serialized value.
+
+The bridge uses a one-time, token-bound window handshake to establish a dedicated `MessageChannel`; subsequent API requests and host-state updates travel only over the port transferred to that iframe. When a window is mounted, the runtime creates an immutable authorization snapshot containing the App identity, name, read-only state, approved permissions, and network-domain allowlists. Editing or re-registering the project cannot expand the authority of an already-open iframe; close and reopen it to apply a newly approved configuration.
+
+## 11. Network, Permissions, and Security
 
 - Provide loading, failure, timeout, and offline fallback states for remote data.
 - Prefer `textContent`; escape third-party text before writing it to `innerHTML`.
@@ -266,7 +290,7 @@ Catalog entries are stored in `js/third_parts_apps/pwa-catalog.js`. Cross-origin
 - Keep strict CSP sources minimal and provide a no-network fallback.
 - Client storage and browser-side encryption are not trusted secret stores.
 
-## 11. Debugging
+## 12. Debugging
 
 ```javascript
 FluentOS.version;
@@ -280,11 +304,27 @@ FluentOS.debug.resources.summary();
 FluentOS.debug.resources.stop();
 ```
 
-Use `State.addNotification()` for persistent Notification Center entries and `FluentUI.Toast()` for transient feedback. `notify(title, message, type)` is the notification convenience wrapper.
+Developer-created professional Apps can call notifications and host-rendered system dialogs through the asynchronous bridge:
 
-## 12. Pre-commit Checklist
+```javascript
+await FluentOS.notify('Task complete', 'The file was saved.', 'success');
+await FluentOS.alert('Notice', 'This dialog is rendered by the host system.');
+const confirmed = await FluentOS.confirm('Delete project', 'This action cannot be undone.');
+const result = await FluentOS.dialog({
+    title: 'Choose an action',
+    message: 'Select what to do next.',
+    buttons: [
+        { text: 'Cancel', value: 'cancel', variant: 'secondary' },
+        { text: 'Continue', value: 'continue', variant: 'primary' }
+    ]
+});
+```
 
-- JavaScript passes syntax checks.
+`notify()` writes to Notification Center and shows an immediate Toast. `alert()`, `confirm()`, and `dialog()` are rendered by the host, with titles, messages, and button labels treated as plain text.
+
+## 13. Pre-commit Checklist
+
+- `scripts/validate-project.ps1` passes; if runtime resources changed, manifests were regenerated in resource → storage order.
 - OOBE, lock, login, and desktop work from cleared site data.
 - Light/dark themes, accent colors, disabled animation, and disabled blur remain usable.
 - Apps open, resize, snap, minimize, maximize, close, and reopen correctly.

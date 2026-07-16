@@ -638,7 +638,15 @@ const TerminalApp = {
         const fn = actions[arg]; if (!fn || typeof MediaApp[fn] !== 'function') return this.print('Usage: media <play|pause|next|previous>', 'error');
         MediaApp[fn](); this.print(`Media command completed: ${arg}`, 'success');
     },
-    beforeClose() { this.pendingPower = null; this.cancelProfileClear(false); return true; }
+    beforeClose() {
+        this.pendingPower = null;
+        this.cancelProfileClear(false);
+        this.input = null;
+        this.output = null;
+        this.container = null;
+        this.windowId = null;
+        return true;
+    }
 };
 
 globalThis.TerminalApp = TerminalApp;
