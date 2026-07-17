@@ -88,14 +88,44 @@ body:not(.dark-mode) .dc-token-function { color: #795e26; }
 .dc-action-footer { position: absolute; z-index: 8; inset: auto 0 0; display: flex; align-items: flex-end; justify-content: flex-end; gap: 9px; height: 122px; padding: 0 28px 14px; box-sizing: border-box; pointer-events: none; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg-primary) 82%, transparent) 38%, var(--bg-primary) 68%); }
 .dc-action-footer > * { pointer-events: auto; }
 .dc-validation-list { display: grid; gap: 9px; max-width: 720px; margin-top: 20px; }
-.dc-validation-row { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 11px; align-items: center; padding: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-secondary); }
-.dc-validation-dot { width: 12px; height: 12px; margin: auto; border-radius: 50%; background: #8a8886; box-shadow: 0 0 0 4px color-mix(in srgb, #8a8886 15%, transparent); }
-.dc-validation-row.is-running .dc-validation-dot { background: var(--accent); animation: dcPulse .8s infinite alternate; }
-.dc-validation-row.is-pass .dc-validation-dot { background: #107c10; box-shadow: 0 0 0 4px color-mix(in srgb, #107c10 15%, transparent); }
-.dc-validation-row.is-fail .dc-validation-dot { background: #c42b1c; box-shadow: 0 0 0 4px color-mix(in srgb, #c42b1c 15%, transparent); }
+.dc-validation-item { overflow: hidden; border: 1px solid var(--border-color); border-radius: var(--radius-md); background-color: var(--bg-secondary) !important; transition: border-color .2s ease, box-shadow .2s ease; }
+.dc-validation-item.is-pass { border-color: color-mix(in srgb, #107c10 34%, var(--border-color)); }
+.dc-validation-item.is-fail { border-color: color-mix(in srgb, #d13438 42%, var(--border-color)); }
+.dc-validation-item.is-expanded { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.dc-validation-row { appearance: none; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 11px; align-items: center; box-sizing: border-box; width: 100%; margin: 0; padding: 14px; border: 0; border-radius: 0; outline: none; color: var(--text-primary); background-color: transparent !important; font: inherit; text-align: left; cursor: default; transition: background-color .16s ease; }
+.dc-validation-item.has-details .dc-validation-row { cursor: pointer; }
+.dc-validation-item.has-details .dc-validation-row:hover { background-color: color-mix(in srgb, var(--text-primary) 5%, transparent) !important; }
+.dc-validation-item.has-details .dc-validation-row:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.dc-validation-dot { box-sizing: border-box; width: 14px; height: 14px; margin: auto; border: 2px solid color-mix(in srgb, #8a8886 78%, var(--text-primary)); border-radius: 50%; background-color: #8a8886 !important; box-shadow: 0 0 0 3px color-mix(in srgb, #8a8886 32%, transparent); }
+.dc-validation-item.is-running .dc-validation-dot { border-color: color-mix(in srgb, var(--accent) 68%, white); background-color: var(--accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 10px color-mix(in srgb, var(--accent) 34%, transparent); animation: dcPulse .8s infinite alternate; }
+.dc-validation-item.is-pass .dc-validation-dot { border-color: #58b44b; background-color: #107c10 !important; box-shadow: 0 0 0 3px color-mix(in srgb, #107c10 42%, transparent), 0 0 11px color-mix(in srgb, #107c10 38%, transparent); }
+.dc-validation-item.is-fail .dc-validation-dot { border-color: #ef7772; background-color: #d13438 !important; box-shadow: 0 0 0 3px color-mix(in srgb, #d13438 45%, transparent), 0 0 11px color-mix(in srgb, #d13438 42%, transparent); }
 .dc-validation-copy strong { display: block; font-size: 13px; }
 .dc-validation-copy span { display: block; margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
+.dc-validation-arrow { width: 0; height: 16px; opacity: 0; transform: rotate(0); transition: width .18s ease, opacity .18s ease, transform .24s cubic-bezier(.16, 1, .3, 1); }
+.dc-validation-item.has-details .dc-validation-arrow { width: 16px; opacity: .62; }
+.dc-validation-item.is-expanded .dc-validation-arrow { transform: rotate(90deg); }
+.dark-mode .dc-validation-arrow { filter: invert(1); }
+.dc-validation-details { display: grid; grid-template-rows: 0fr; opacity: 0; border-top: 1px solid transparent; background-color: var(--bg-tertiary) !important; transition: grid-template-rows .22s cubic-bezier(.16, 1, .3, 1), opacity .16s ease, border-color .16s ease; }
+.dc-validation-item.is-expanded .dc-validation-details { grid-template-rows: 1fr; opacity: 1; border-top-color: var(--border-color); }
+.dc-validation-details-content { min-height: 0; overflow: hidden; padding: 0 18px 0 49px; transition: padding .22s cubic-bezier(.16, 1, .3, 1); }
+.dc-validation-item.is-expanded .dc-validation-details-content { padding-top: 14px; padding-bottom: 16px; }
+.dc-validation-details-heading { display: block; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
+.dc-validation-diagnostic { padding: 11px 12px; border: 1px solid color-mix(in srgb, #d13438 32%, var(--border-color)); border-radius: 8px; background-color: color-mix(in srgb, #d13438 5%, var(--bg-secondary)) !important; }
+.dc-validation-diagnostic + .dc-validation-diagnostic { margin-top: 8px; }
+.dc-validation-diagnostic-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 12px; }
+.dc-validation-diagnostic-head > strong { font-size: 12px; }
+.dc-validation-location { padding: 2px 7px; border-radius: 999px; color: var(--text-secondary); background-color: color-mix(in srgb, var(--text-primary) 7%, transparent) !important; font-size: 10px; font-variant-numeric: tabular-nums; }
+.dc-validation-diagnostic p { margin: 7px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
+.dc-validation-api { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.dc-validation-api span { color: var(--text-tertiary); font-size: 10px; font-weight: 600; }
+.dc-validation-api code { color: #d13438; font: 600 11px/1.4 var(--dc-code-font, 'Cascadia Code', Consolas, monospace); }
+.dc-validation-diagnostic pre { margin: 8px 0 0; padding: 8px 10px; overflow: auto; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-primary) !important; }
+.dc-validation-diagnostic pre code { color: var(--text-primary); white-space: pre; font: 11px/1.5 var(--dc-code-font, 'Cascadia Code', Consolas, monospace); }
 @keyframes dcPulse { to { opacity: .35; transform: scale(.82); } }
+@media (prefers-reduced-motion: reduce) {
+    .dc-validation-arrow, .dc-validation-details, .dc-validation-details-content { transition-duration: 0ms; }
+}
 .dc-tool-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 .dc-tool-panel { min-width: 0; padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 .dc-tool-panel h3 { margin: 0 0 12px; font-size: 14px; }
@@ -106,7 +136,8 @@ body:not(.dark-mode) .dc-token-function { color: #795e26; }
 .dc-app-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .dc-api-docs { display: grid; gap: 12px; }
 .dc-api-window-page { box-sizing: border-box; height: 100%; padding: 28px 30px 40px; overflow: auto; overscroll-behavior: contain; }
-.dc-api-docs, .dc-api-docs *:not(button) { user-select: text !important; -webkit-user-select: text !important; }
+.dc-api-window-content, .dc-api-window-page, .dc-api-window-page * { cursor: text; user-select: text !important; -webkit-user-select: text !important; -moz-user-select: text !important; -ms-user-select: text !important; }
+.dc-api-window-page button, .dc-api-window-page button * { cursor: pointer; user-select: none !important; -webkit-user-select: none !important; -moz-user-select: none !important; -ms-user-select: none !important; }
 .dc-api-row { position: relative; padding: 12px 70px 12px 12px; border-radius: var(--radius-md); background: var(--bg-tertiary); }
 .dc-api-row.dc-api-privileged { border: 1px solid color-mix(in srgb, #f2c811 55%, var(--border-color)); }
 .dc-api-row code { display: block; margin-bottom: 5px; color: var(--accent); font-size: 12px; }

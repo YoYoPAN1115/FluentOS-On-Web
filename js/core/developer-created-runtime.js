@@ -314,7 +314,7 @@ const DeveloperCreatedRuntime = {
             desktop:{addShortcut:()=>FluentOS.call('desktop.addShortcut'),removeShortcut:()=>FluentOS.call('desktop.removeShortcut')},
             network:{request:(url,options={})=>FluentOS.call('network.request',{url,options}),loadImage:url=>FluentOS.call('network.loadImage',{url})},
             ui:{highlightButton,enableButtonGlow,dialog:(...args)=>FluentOS.dialog(...args),alert:(...args)=>FluentOS.alert(...args),confirm:(...args)=>FluentOS.confirm(...args)}};
-            addEventListener('error',event=>emit({type:'fluentos:runtime-error',message:event.message}));
+            addEventListener('error',event=>emit({type:'fluentos:runtime-error',message:event.message,filename:event.filename||'app.js',line:Math.max(0,(Number(event.lineno)||0)-__APP_LINE_OFFSET__),column:Number(event.colno)||0}));
             addEventListener('unhandledrejection',event=>emit({type:'fluentos:runtime-error',message:String(event.reason||'Unhandled promise rejection')}));
             addEventListener('pointerdown',()=>emit({type:'fluentos:focus-request'}),true);
             addEventListener('pagehide',()=>{emit({type:'fluentos:disconnect'});try{port&&port.close()}catch(_){}port=null;rejectPending('FluentOS bridge closed')},{once:true,capture:true});
@@ -332,7 +332,10 @@ const DeveloperCreatedRuntime = {
         const safeJs = String(app.js || '').replace(/<\/script/gi, '<\\/script');
         const safeCss = String(app.css || '').replace(/<\/style/gi, '<\\/style');
         const html = String(app.html || '<main><h1>Hello, FluentOS!</h1></main>');
-        return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${baseCss}</style><style>${safeCss}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>${safeJs}<\/script></body></html>`;
+        let documentPrefix = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${baseCss}</style><style>${safeCss}</style>${fluentStylesheet}<style>${forceCss}</style></head><body>${html}<script>${bridge}<\/script><script>${fluentRuntime}<\/script><script>`;
+        const appLineOffset = documentPrefix.split('\n').length - 1;
+        documentPrefix = documentPrefix.replace('__APP_LINE_OFFSET__', String(appLineOffset));
+        return `${documentPrefix}${safeJs}<\/script></body></html>`;
     },
 
     escapeHtml(value) {
@@ -417,7 +420,7 @@ const DeveloperCreatedRuntime = {
         }
         if (message.type === 'fluentos:runtime-error') {
             console.warn(`[CreatedApp:${registration.appId}]`, message.message);
-            try { registration.onRuntimeError?.(String(message.message || 'Severe runtime error')); }
+            try { registration.onRuntimeError?.(String(message.message || 'Severe runtime error'), message); }
             catch (error) { console.warn('[CreatedApp] Runtime error observer failed', error); }
             return;
         }

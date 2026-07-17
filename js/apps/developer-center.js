@@ -464,7 +464,7 @@ const DeveloperCenterApp = {
         form.innerHTML = `
             <div class="dc-field"><label>${this.text('appName')}</label><input class="dc-input" data-field="name" maxlength="60" value="${this.esc(project.name)}"></div>
             <div class="dc-field"><label>${this.text('url')}</label><input class="dc-input" data-field="url" type="url" value="${this.esc(project.url || 'https://')}" placeholder="https://"></div>
-            <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary" data-action="upload-icon">${this.text('upload')}</button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>`;
+            <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary fluent-btn-medium" data-action="upload-icon"><span class="fluent-btn-text">${this.text('upload')}</span></button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>`;
         page.appendChild(form);
         this.bindIconPicker(form, project);
         this.appendFooter(page, [
@@ -485,7 +485,7 @@ const DeveloperCenterApp = {
             <div class="dc-editor-meta">
                 <div class="dc-field"><label>${this.text('appName')}</label><input class="dc-input" data-field="name" maxlength="60" value="${this.esc(project.name)}"></div>
                 <div class="dc-field"><label>${this.text('windowTitle')}</label><input class="dc-input" data-field="title" maxlength="80" value="${this.esc(project.title || project.name)}"></div>
-                <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary" data-action="upload-icon">${this.text('upload')}</button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>
+                <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary fluent-btn-medium" data-action="upload-icon"><span class="fluent-btn-text">${this.text('upload')}</span></button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>
                 <div class="dc-toggle-host" data-toggle="force"></div>
                 <div class="dc-permission-picker" data-permission-picker></div>
                 <div class="dc-field"><label>${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Allowed API domains' : '允许请求的 API 域名'}</label><input class="dc-input" data-network="connect" placeholder="api.example.com, api2.example.com" value="${this.esc((project.network?.connect || []).join(', '))}"><span class="dc-note">${typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Used only by network.request; exact HTTPS hostnames, separated by commas.' : '仅供 network.request 使用；填写精确 HTTPS 主机名，用逗号分隔。'}</span></div>
@@ -747,11 +747,26 @@ const DeveloperCenterApp = {
         const list = document.createElement('div');
         list.className = 'dc-validation-list';
         checks.forEach((check) => {
-            const row = document.createElement('div');
+            const item = document.createElement('div');
+            const row = document.createElement('button');
+            const panelId = `dc-validation-${runId}-${check.id}-details`;
+            item.className = 'dc-validation-item';
+            item.dataset.check = check.id;
+            row.type = 'button';
             row.className = 'dc-validation-row';
-            row.dataset.check = check.id;
-            row.innerHTML = `<span class="dc-validation-dot"></span><span class="dc-validation-copy"><strong>${this.esc(check.label)}</strong><span>${this.esc(check.desc)}</span></span>`;
-            list.appendChild(row);
+            row.tabIndex = -1;
+            row.setAttribute('aria-disabled', 'true');
+            row.setAttribute('aria-expanded', 'false');
+            row.setAttribute('aria-controls', panelId);
+            row.innerHTML = `<span class="dc-validation-dot" aria-hidden="true"></span><span class="dc-validation-copy"><strong>${this.esc(check.label)}</strong><span>${this.esc(check.desc)}</span></span><img class="dc-validation-arrow" src="${this.icon('Arrow Right')}" alt="" aria-hidden="true">`;
+            const panel = document.createElement('div');
+            panel.id = panelId;
+            panel.className = 'dc-validation-details';
+            panel.hidden = true;
+            panel.setAttribute('aria-hidden', 'true');
+            row.addEventListener('click', () => this.toggleValidationDetails(item));
+            item.append(row, panel);
+            list.appendChild(item);
         });
         page.appendChild(list);
         if (project.type === 'pwa') {
@@ -764,8 +779,8 @@ const DeveloperCenterApp = {
 
         const started = performance.now();
         const results = project.type === 'pwa'
-            ? await this.validatePwa(project, (id, status, detail) => this.setCheck(list, id, status, detail), runId)
-            : await this.validateProfessional(project, (id, status, detail) => this.setCheck(list, id, status, detail), runId);
+            ? await this.validatePwa(project, (id, status, detail, diagnostics) => this.setCheck(list, id, status, detail, diagnostics), runId)
+            : await this.validateProfessional(project, (id, status, detail, diagnostics) => this.setCheck(list, id, status, detail, diagnostics), runId);
         const rest = Math.max(0, 1500 - (performance.now() - started));
         await new Promise((resolve) => setTimeout(resolve, rest));
         if (runId !== this._validationRun || !page.isConnected) return;
@@ -785,20 +800,168 @@ const DeveloperCenterApp = {
         this.appendFooter(page, buttons);
     },
 
-    setCheck(list, id, status, detail = '') {
-        const row = list.querySelector(`[data-check="${id}"]`);
-        if (!row) return;
-        row.classList.remove('is-running', 'is-pass', 'is-fail');
-        if (status) row.classList.add(`is-${status}`);
-        if (detail) row.querySelector('.dc-validation-copy span').textContent = detail;
+    setCheck(list, id, status, detail = '', diagnostics = []) {
+        const item = list.querySelector(`[data-check="${id}"]`);
+        if (!item) return;
+        const row = item.querySelector('.dc-validation-row');
+        const panel = item.querySelector('.dc-validation-details');
+        item.classList.remove('is-running', 'is-pass', 'is-fail');
+        if (status) item.classList.add(`is-${status}`);
+        if (detail) item.querySelector('.dc-validation-copy span').textContent = detail;
+
+        const entries = Array.isArray(diagnostics) ? diagnostics.filter(Boolean) : [];
+        item.classList.toggle('has-details', entries.length > 0);
+        row.tabIndex = entries.length ? 0 : -1;
+        row.setAttribute('aria-disabled', entries.length ? 'false' : 'true');
+        if (!entries.length) {
+            item.classList.remove('is-expanded');
+            row.setAttribute('aria-expanded', 'false');
+            panel.hidden = true;
+            panel.setAttribute('aria-hidden', 'true');
+            panel.replaceChildren();
+            return;
+        }
+
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const content = document.createElement('div');
+        content.className = 'dc-validation-details-content';
+        const heading = document.createElement('strong');
+        heading.className = 'dc-validation-details-heading';
+        heading.textContent = english ? 'Rejection details' : '拒绝详细信息';
+        content.appendChild(heading);
+        entries.forEach((diagnostic) => content.appendChild(this.renderValidationDiagnostic(diagnostic)));
+        panel.replaceChildren(content);
+    },
+
+    toggleValidationDetails(item) {
+        if (!item?.classList.contains('has-details')) return;
+        const row = item.querySelector('.dc-validation-row');
+        const panel = item.querySelector('.dc-validation-details');
+        const expanded = !item.classList.contains('is-expanded');
+        if (expanded) panel.hidden = false;
+        requestAnimationFrame(() => {
+            item.classList.toggle('is-expanded', expanded);
+            row.setAttribute('aria-expanded', String(expanded));
+            panel.setAttribute('aria-hidden', String(!expanded));
+        });
+        if (!expanded) {
+            setTimeout(() => {
+                if (!item.classList.contains('is-expanded')) panel.hidden = true;
+            }, 240);
+        }
+    },
+
+    renderValidationDiagnostic(diagnostic) {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const entry = document.createElement('div');
+        entry.className = 'dc-validation-diagnostic';
+        const head = document.createElement('div');
+        head.className = 'dc-validation-diagnostic-head';
+        const title = document.createElement('strong');
+        title.textContent = diagnostic.title || (english ? 'Blocked item' : '被拒绝的项目');
+        head.appendChild(title);
+        if (diagnostic.file) {
+            const location = document.createElement('span');
+            location.className = 'dc-validation-location';
+            location.textContent = diagnostic.line
+                ? `${diagnostic.file} · ${english ? 'Line' : '第'} ${diagnostic.line}${english ? '' : ' 行'}${diagnostic.column ? `:${diagnostic.column}` : ''}`
+                : diagnostic.file;
+            head.appendChild(location);
+        }
+        entry.appendChild(head);
+        if (diagnostic.message) {
+            const message = document.createElement('p');
+            message.textContent = diagnostic.message;
+            entry.appendChild(message);
+        }
+        if (diagnostic.api) {
+            const api = document.createElement('div');
+            api.className = 'dc-validation-api';
+            const label = document.createElement('span');
+            label.textContent = 'API';
+            const value = document.createElement('code');
+            value.textContent = diagnostic.api;
+            api.append(label, value);
+            entry.appendChild(api);
+        }
+        if (diagnostic.code) {
+            const code = document.createElement('pre');
+            const value = document.createElement('code');
+            value.textContent = diagnostic.line ? `${diagnostic.line}  ${diagnostic.code}` : diagnostic.code;
+            code.appendChild(value);
+            entry.appendChild(code);
+        }
+        return entry;
+    },
+
+    validationSources(project) {
+        return [
+            { file: 'index.html', code: String(project.html || '') },
+            { file: 'styles.css', code: String(project.css || '') },
+            { file: 'app.js', code: String(project.js || '') }
+        ];
+    },
+
+    findValidationMatches(sources, rules, limit = 20) {
+        const results = [];
+        for (const rule of rules) {
+            for (const source of sources) {
+                const flags = rule.regex.flags.replace(/y/g, '').includes('g')
+                    ? rule.regex.flags.replace(/y/g, '')
+                    : `${rule.regex.flags.replace(/y/g, '')}g`;
+                const regex = new RegExp(rule.regex.source, flags);
+                let match;
+                while ((match = regex.exec(source.code)) && results.length < limit) {
+                    const before = source.code.slice(0, match.index);
+                    const line = before.split(/\r?\n/).length;
+                    const lastBreak = Math.max(before.lastIndexOf('\n'), before.lastIndexOf('\r'));
+                    const column = match.index - lastBreak;
+                    const code = source.code.split(/\r?\n/)[line - 1]?.trim() || match[0];
+                    results.push({ ...rule, file: source.file, line, column, code, match: match[0] });
+                    if (!match[0]) regex.lastIndex += 1;
+                }
+                if (results.length >= limit) return results;
+            }
+        }
+        return results;
+    },
+
+    validationErrorLocation(error, source, generatedOffset = 0) {
+        let line = Number(error?.lineNumber) || 0;
+        let column = Number(error?.columnNumber) || 0;
+        const stackLocation = String(error?.stack || '').match(/<anonymous>:(\d+):(\d+)/);
+        if (!line && stackLocation) {
+            line = Math.max(1, Number(stackLocation[1]) - generatedOffset);
+            column = Number(stackLocation[2]) || 0;
+        }
+        return {
+            file: source?.file || '',
+            line,
+            column,
+            code: line ? source?.code.split(/\r?\n/)[line - 1]?.trim() || '' : ''
+        };
+    },
+
+    validationDiagnostic(match, title, message, api = '') {
+        return {
+            title,
+            message,
+            api,
+            file: match?.file || '',
+            line: match?.line || 0,
+            column: match?.column || 0,
+            code: match?.code || ''
+        };
     },
 
     async validatePwa(project, update, runId) {
         let url = null;
+        const urlCode = String(project.url || '');
+        const detailFor = (title, message) => [{ title, message, file: 'App URL', code: urlCode }];
         update('https', 'running');
         try { url = new URL(project.url); } catch (_) {}
         const https = url?.protocol === 'https:';
-        update('https', https ? 'pass' : 'fail', https ? 'HTTPS transport enabled' : 'Only HTTPS websites can be packaged');
+        update('https', https ? 'pass' : 'fail', https ? 'HTTPS transport enabled' : 'Only HTTPS websites can be packaged', https ? [] : detailFor('HTTPS is required', 'Change the App URL to a valid https:// address.'));
 
         update('safe-url', 'running');
         const hostname = String(url?.hostname || '').toLowerCase();
@@ -806,7 +969,7 @@ const DeveloperCenterApp = {
             /^172\.(?:1[6-9]|2\d|3[01])\./.test(hostname) ||
             ['localhost', '::1', '[::1]', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local');
         const safe = !!url && !url.username && !url.password && !privateHost;
-        update('safe-url', safe ? 'pass' : 'fail', safe ? 'URL passed local safety rules' : 'Local, credential-bearing, or unsafe URLs are blocked');
+        update('safe-url', safe ? 'pass' : 'fail', safe ? 'URL passed local safety rules' : 'Local, credential-bearing, or unsafe URLs are blocked', safe ? [] : detailFor('URL was rejected', 'Remove credentials and use a public, non-local HTTPS host.'));
 
         update('tls', 'running');
         let tls = false;
@@ -821,11 +984,11 @@ const DeveloperCenterApp = {
                 tls = false;
             } finally { clearTimeout(timeout); }
         }
-        update('tls', tls ? 'pass' : 'fail', tls ? 'Secure connection initiated successfully' : 'The browser could not establish the secure connection');
+        update('tls', tls ? 'pass' : 'fail', tls ? 'Secure connection initiated successfully' : 'The browser could not establish the secure connection', tls ? [] : detailFor('Secure connection failed', 'The browser could not verify a TLS connection to this URL.'));
 
         update('iframe', 'running');
         const iframe = https && safe ? await this.probeIframe(url.href, runId) : false;
-        update('iframe', iframe ? 'pass' : 'fail', iframe ? 'The isolated frame reported a load event' : 'The page did not load before the validation timeout');
+        update('iframe', iframe ? 'pass' : 'fail', iframe ? 'The isolated frame reported a load event' : 'The page did not load before the validation timeout', iframe ? [] : detailFor('Embedded loading failed', 'The site may block iframe embedding, or it did not load before the timeout.'));
         return [https, safe, tls, iframe];
     },
 
@@ -852,29 +1015,46 @@ const DeveloperCenterApp = {
     },
 
     async validateProfessional(project, update, runId) {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const sources = this.validationSources(project);
         update('syntax', 'running');
         let syntax = true;
         let syntaxDetail = 'HTML, CSS, and JavaScript parsed successfully';
+        let syntaxSource = sources[2];
+        let syntaxDiagnostic = [];
         try {
             new Function(`"use strict";\n${project.js || ''}`);
+            syntaxSource = sources[1];
             const sheet = new CSSStyleSheet();
             sheet.replaceSync(project.css || '');
+            syntaxSource = sources[0];
             const template = document.createElement('template');
             template.innerHTML = project.html || '';
-        } catch (error) { syntax = false; syntaxDetail = error.message || 'Source contains a syntax error'; }
-        update('syntax', syntax ? 'pass' : 'fail', syntaxDetail);
+        } catch (error) {
+            syntax = false;
+            syntaxDetail = error.message || 'Source contains a syntax error';
+            const location = this.validationErrorLocation(error, syntaxSource, syntaxSource.file === 'app.js' ? 2 : 0);
+            syntaxDiagnostic = [this.validationDiagnostic(location, english ? 'Syntax error' : '语法错误', syntaxDetail)];
+        }
+        update('syntax', syntax ? 'pass' : 'fail', syntaxDetail, syntaxDiagnostic);
 
         update('malicious', 'running');
-        const source = `${project.html || ''}\n${project.css || ''}\n${project.js || ''}`;
         const dangerousRules = [
             { regex: /\beval\s*\(/, name: 'eval()' }, { regex: /\bFunction\s*\(/, name: 'Function()' },
             { regex: /document\s*\.\s*cookie/i, name: 'document.cookie' },
-            { regex: /\b(?:parent|top|opener)\s*\./, name: 'host-window access' },
+            { regex: /(?:\bwindow\s*\.\s*(?:parent|top|opener)\b|\b(?:parent|top|opener)\s*\.\s*(?:document|location|frames|window|parent|top|opener|postMessage)\b)/i, name: 'host-window access' },
             { regex: /<script[^>]+src\s*=\s*["']?https?:/i, name: 'remote script' },
             { regex: /javascript\s*:/i, name: 'javascript URL' }
         ];
-        const dangerous = dangerousRules.find((rule) => rule.regex.test(source));
-        update('malicious', dangerous ? 'fail' : 'pass', dangerous ? `Blocked pattern: ${dangerous.name}` : 'No blocked code pattern was found');
+        const dangerousMatches = this.findValidationMatches(sources, dangerousRules);
+        const dangerous = dangerousMatches[0];
+        const dangerousDiagnostics = dangerousMatches.map((match) => this.validationDiagnostic(
+            match,
+            english ? 'Blocked code pattern' : '被阻止的代码模式',
+            english ? `${match.name} is not allowed in the App sandbox.` : `App 沙盒不允许使用 ${match.name}。`,
+            match.name
+        ));
+        update('malicious', dangerous ? 'fail' : 'pass', dangerous ? `Blocked pattern: ${dangerous.name}` : 'No blocked code pattern was found', dangerousDiagnostics);
 
         update('apis', 'running');
         const apiRules = [
@@ -905,8 +1085,11 @@ const DeveloperCenterApp = {
             { regex: /FluentOS\s*\.\s*network\s*\.\s*request\s*\(/, permission: 'network.request' },
             { regex: /FluentOS\s*\.\s*network\s*\.\s*loadImage\s*\(/, permission: 'network.image' }
         ];
-        const missingPermission = permissionRules.find((rule) => rule.regex.test(source) && !declaredPermissions.has(rule.permission));
-        const unsupported = apiRules.find((rule) => rule.regex.test(source));
+        const missingPermissionMatches = this.findValidationMatches(
+            sources,
+            permissionRules.filter((rule) => !declaredPermissions.has(rule.permission))
+        );
+        const unsupportedMatches = this.findValidationMatches(sources, apiRules);
         let networkProblem = '';
         try {
             const network = DeveloperCenterStore.normalizeNetworkConfig(project.network);
@@ -916,20 +1099,60 @@ const DeveloperCenterApp = {
             else if (declaredPermissions.has('network.request') && network.connect.length === 0) networkProblem = 'network.request requires at least one network.connect domain';
             else if (declaredPermissions.has('network.image') && network.image.length === 0) networkProblem = 'network.image requires at least one network.image domain';
         } catch (error) { networkProblem = error.message || 'Invalid network allowlist'; }
-        const apiProblem = invalidPermission
-            ? `Unknown requested permission: ${invalidPermission}`
-            : networkProblem
-                ? networkProblem
-                : missingPermission
-                ? `Declare permission before using this API: ${missingPermission.permission}`
-                : unsupported
-                    ? `Use the FluentOS API instead of ${unsupported.name}`
-                    : '';
-        update('apis', apiProblem ? 'fail' : 'pass', apiProblem || 'Only declared sandbox and FluentOS APIs are referenced');
+        const apiProblems = [];
+        const apiDiagnostics = [];
+        if (invalidPermission) {
+            const message = `Unknown requested permission: ${invalidPermission}`;
+            apiProblems.push(message);
+            apiDiagnostics.push({
+                title: english ? 'Unknown permission' : '未知权限', message,
+                file: english ? 'App manifest' : 'App 清单', api: invalidPermission
+            });
+        }
+        if (networkProblem) {
+            apiProblems.push(networkProblem);
+            apiDiagnostics.push({
+                title: english ? 'Network permission configuration' : '网络权限配置',
+                message: networkProblem,
+                file: english ? 'App manifest' : 'App 清单',
+                api: networkProblem.includes('network.image') ? 'network.image' : 'network.request'
+            });
+        }
+        missingPermissionMatches.forEach((match) => {
+            const message = `Declare permission before using this API: ${match.permission}`;
+            apiProblems.push(message);
+            apiDiagnostics.push(this.validationDiagnostic(
+                match,
+                english ? 'Permission required' : '需要声明权限',
+                message,
+                match.permission
+            ));
+        });
+        unsupportedMatches.forEach((match) => {
+            const message = `Use the FluentOS API instead of ${match.name}`;
+            apiProblems.push(message);
+            apiDiagnostics.push(this.validationDiagnostic(
+                match,
+                english ? 'Browser API rejected' : '浏览器 API 被拒绝',
+                message,
+                match.name
+            ));
+        });
+        const apiProblem = apiProblems[0] || '';
+        const apiSummary = apiProblem && apiProblems.length > 1 ? `${apiProblem} (+${apiProblems.length - 1} more)` : apiProblem;
+        update('apis', apiProblem ? 'fail' : 'pass', apiSummary || 'Only declared sandbox and FluentOS APIs are referenced', apiDiagnostics);
 
         update('runtime', 'running');
         const runtime = syntax && !dangerous && !apiProblem ? await this.probeProfessional(project, runId) : { ok: false, detail: 'Runtime check skipped until source issues are fixed' };
-        update('runtime', runtime.ok ? 'pass' : 'fail', runtime.detail);
+        const runtimeDiagnostics = runtime.ok ? [] : [{
+            title: english ? 'Sandbox startup was rejected' : '沙盒启动被拒绝',
+            message: runtime.detail,
+            file: runtime.file || '',
+            line: runtime.line || 0,
+            column: runtime.column || 0,
+            code: runtime.code || ''
+        }];
+        update('runtime', runtime.ok ? 'pass' : 'fail', runtime.detail, runtimeDiagnostics);
         return [syntax, !dangerous, !apiProblem, runtime.ok];
     },
 
@@ -940,13 +1163,13 @@ const DeveloperCenterApp = {
             let frame = null;
             let timer = null;
             let done = false;
-            const finish = (ok, detail) => {
+            const finish = (ok, detail, diagnostic = {}) => {
                 if (done) return;
                 done = true;
                 clearTimeout(timer);
                 if (frame?.contentWindow) DeveloperCreatedRuntime._releaseFrame(frame.contentWindow);
                 container.remove();
-                resolve({ ok: runId === this._validationRun && ok, detail });
+                resolve({ ok: runId === this._validationRun && ok, detail, ...diagnostic });
             };
             document.body.appendChild(container);
             try {
@@ -957,8 +1180,16 @@ const DeveloperCenterApp = {
                     this.windowId,
                     {
                         readOnly: true,
-                        onRuntimeError: (message) => {
-                            if (!String(message).includes('This validation session permits read-only FluentOS APIs only')) finish(false, message);
+                        onRuntimeError: (message, metadata = {}) => {
+                            if (!String(message).includes('This validation session permits read-only FluentOS APIs only')) {
+                                const line = Math.max(0, Number(metadata.line) || 0);
+                                finish(false, message, {
+                                    file: line ? 'app.js' : '',
+                                    line,
+                                    column: Math.max(0, Number(metadata.column) || 0),
+                                    code: line ? String(project.js || '').split(/\r?\n/)[line - 1]?.trim() || '' : ''
+                                });
+                            }
                         }
                     }
                 );
@@ -1605,12 +1836,26 @@ const DeveloperCenterApp = {
 const DeveloperCenterApiDocsApp = {
     windowId: null,
     container: null,
+    _selectionKeyHandler: null,
 
     init(windowId) {
         this.windowId = windowId;
         this.container = document.getElementById(windowId)?.querySelector('.window-content') || null;
         if (!this.container) return false;
         this.container.classList.add('dc-api-window-content');
+        this._selectionKeyHandler = (event) => {
+            const selectAll = (event.ctrlKey || event.metaKey) && !event.altKey && String(event.key || '').toLowerCase() === 'a';
+            if (!selectAll || WindowManager.activeWindowId !== this.windowId) return;
+            const page = this.container?.querySelector('.dc-api-window-page');
+            const selection = window.getSelection?.();
+            if (!page || !selection) return;
+            event.preventDefault();
+            const range = document.createRange();
+            range.selectNodeContents(page);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        };
+        document.addEventListener('keydown', this._selectionKeyHandler);
         this.render();
         State.on('languageChange', () => this.render(), { key: 'DeveloperCenterApiDocsApp.language' });
         return true;
@@ -1629,6 +1874,8 @@ const DeveloperCenterApiDocsApp = {
 
     beforeClose() {
         State.off?.('languageChange', 'DeveloperCenterApiDocsApp.language');
+        if (this._selectionKeyHandler) document.removeEventListener('keydown', this._selectionKeyHandler);
+        this._selectionKeyHandler = null;
         this.container?.classList.remove('dc-api-window-content');
         this.container = null;
         this.windowId = null;
