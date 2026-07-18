@@ -5,6 +5,7 @@
 const WindowManager = {
     container: null,
     windows: [],
+    focusHistory: [],
     zIndexCounter: 1000,
     WINDOW_BOUNDS_KEY: 'windowBoundsMemory',
     SNAP_MENU_HIDE_DELAY: 130,
@@ -17,6 +18,8 @@ const WindowManager = {
     MINIMIZE_DURATION_MS: 460,
     RESTORE_DURATION_MS: 520,
     MAXIMIZE_TOGGLE_DURATION_MS: 550,
+    UNMAXIMIZE_DURATION_MS: 440,
+    OPEN_DURATION_MS: 250,
     CLOSE_DURATION_MS: 250,
     TOMBSTONE_FREEZE_DELAY_MS: 60 * 1000,
     TOMBSTONE_FREEZE_MIN_MS: 3 * 1000,
@@ -596,6 +599,50 @@ const WindowManager = {
         });
     },
 
+    _recordWindowFocus(windowId) {
+        if (!windowId) return;
+        this.focusHistory = this.focusHistory.filter((id) => id !== windowId);
+        this.focusHistory.push(windowId);
+    },
+
+    _removeWindowFromFocusHistory(windowId) {
+        this.focusHistory = this.focusHistory.filter((id) => id !== windowId);
+    },
+
+    _getMostRecentVisibleWindow(excludedWindowId = null) {
+        for (let index = this.focusHistory.length - 1; index >= 0; index -= 1) {
+            const id = this.focusHistory[index];
+            if (id === excludedWindowId) continue;
+            const windowData = this.windows.find((item) => item && item.id === id);
+            if (
+                windowData &&
+                windowData.element &&
+                !windowData.isMinimized &&
+                !windowData.isMinimizing &&
+                windowData.element.style.display !== 'none' &&
+                !windowData.element.classList.contains('closing')
+            ) {
+                return windowData;
+            }
+        }
+
+        return this.windows
+            .filter((item) =>
+                item &&
+                item.id !== excludedWindowId &&
+                item.element &&
+                !item.isMinimized &&
+                !item.isMinimizing &&
+                item.element.style.display !== 'none' &&
+                !item.element.classList.contains('closing')
+            )
+            .sort((a, b) => {
+                const aZ = Number.parseInt(a.element.style.zIndex, 10) || 0;
+                const bZ = Number.parseInt(b.element.style.zIndex, 10) || 0;
+                return bZ - aZ;
+            })[0] || null;
+    },
+
     _playWindowFocusMotion(windowData, motionClass) {
         if (!windowData || !windowData.element || !this._isAnimationEnabled()) return;
         const el = windowData.element;
@@ -606,15 +653,18 @@ const WindowManager = {
         windowData._focusMotionTimer = setTimeout(() => {
             el.classList.remove('window-focus-enter', 'window-focus-leave');
             windowData._focusMotionTimer = null;
-        }, 120);
+        }, 220);
     },
 
     _playFocusTransitionMotion(nextWindowData, previousWindowData, forceMotion = false) {
         if (!this._isAnimationEnabled()) return;
+        const nextIsOpening = nextWindowData?.element?.classList.contains('opening') === true;
         if (previousWindowData && previousWindowData !== nextWindowData) {
             this._playWindowFocusMotion(previousWindowData, 'window-focus-leave');
         }
-        if (forceMotion || (previousWindowData && previousWindowData !== nextWindowData)) {
+        // Opening owns the animation shorthand until its normal launch motion
+        // completes. Focus-enter is only for switching existing windows.
+        if (!nextIsOpening && (forceMotion || (previousWindowData && previousWindowData !== nextWindowData))) {
             this._playWindowFocusMotion(nextWindowData, 'window-focus-enter');
         }
     },
@@ -626,6 +676,20 @@ const WindowManager = {
             const target = event.target instanceof Element ? event.target : null;
             if (target && target.closest('.window')) return;
             if (target && target.closest('.taskbar')) return;
+            // App-owned menus and dialogs are commonly portaled to <body> so
+            // they are not clipped by a window. They still belong to the active
+            // window and must not be mistaken for a click on the desktop.
+            if (target && target.closest([
+                '.context-menu',
+                '.fluent-context-menu',
+                '.fluent-select-dropdown',
+                '.fluent-modal-overlay',
+                '.fluent-dialog-overlay',
+                '[role="menu"]',
+                '[role="dialog"]',
+                '[aria-modal="true"]',
+                '#app-switcher-overlay'
+            ].join(','))) return;
             const previousWindowData = this.activeWindowId
                 ? this.windows.find((windowData) => windowData && windowData.id === this.activeWindowId)
                 : null;
@@ -1345,11 +1409,19 @@ const WindowManager = {
         this.windows.push(windowData);
 
         this.container.appendChild(windowElement);
+        const openingDuration = this._effectiveDuration(this.OPEN_DURATION_MS);
+        requestAnimationFrame(() => {
+            if (openingDuration <= 0) {
+                windowElement.classList.remove('opening');
+                return;
+            }
+            setTimeout(() => windowElement.classList.remove('opening'), openingDuration);
+        });
         
         State.addRunningApp(appId);
         this._syncTaskbarAppState(appId);
         // 小组件退避过渡与窗口打开动画（250ms）同步
-        this._syncWidgetDimState(this._effectiveDuration(250), 'cubic-bezier(0.4, 0, 0.2, 1)');
+        this._syncWidgetDimState(openingDuration, 'cubic-bezier(0.4, 0, 0.2, 1)');
 
         
         if (component) {
@@ -1418,11 +1490,6 @@ const WindowManager = {
 
         // 绑定窗口事件 - Bind window events
         this.bindWindowEvents(windowElement);
-
-        // 延迟移除opening类 - Remove opening class after animation
-        setTimeout(() => {
-            windowElement.classList.remove('opening');
-        }, 200);
 
         return windowElement;
     },
@@ -1869,6 +1936,7 @@ const WindowManager = {
             windowData.element.style.zIndex = ++this.zIndexCounter;
         }
         this._setActiveWindow(windowId);
+        this._recordWindowFocus(windowId);
         this._syncAllTaskbarAppStates();
         this._syncWidgetDimState();
         this._setTaskbarIndicatorForWindow(windowData, true);
@@ -1920,7 +1988,7 @@ const WindowManager = {
         this._hideDragSnapHint(true);
 
         if (windowData.isMaximized) {
-            const unmaximizeDuration = this._effectiveDuration(this.MAXIMIZE_TOGGLE_DURATION_MS);
+            const unmaximizeDuration = this._effectiveDuration(this.UNMAXIMIZE_DURATION_MS);
             // 取消最大化动画 - Unmaximize animation
             windowData.element.classList.add('unmaximizing');
             windowData.element.classList.remove('maximized');
@@ -1944,10 +2012,9 @@ const WindowManager = {
             windowData.snapLayout = null;
             this._setFullscreenUnmaximizeSync(unmaximizeDuration > 0, unmaximizeDuration);
             
-            // 应用最大化样式 - Apply maximized styles
-            requestAnimationFrame(() => {
-                this.updateMaximizedWallpaperEffect();
-            });
+            // Start wallpaper depth recovery in the same rendering frame as
+            // the window geometry transition.
+            this.updateMaximizedWallpaperEffect();
             this._persistWindowBounds(windowData);
         } else {
             const maximizeDuration = this._effectiveDuration(this.MAXIMIZE_TOGGLE_DURATION_MS);
@@ -2109,13 +2176,14 @@ const WindowManager = {
             setTimeout(() => {
                 windowData.element.remove();
                 this.windows = this.windows.filter(w => w.id !== windowId);
+                this._removeWindowFromFocusHistory(windowId);
                 const hasOtherWindows = this.windows.some(w => w.appId === windowData.appId);
                 if (!hasOtherWindows) {
                     State.removeRunningApp(windowData.appId);
                 }
                 if (this.activeWindowId === windowId) {
                     this.activeWindowId = null;
-                    const nextWindow = this.windows.slice().reverse().find((w) => w.element && !w.isMinimized && !w.element.classList.contains('closing'));
+                    const nextWindow = this._getMostRecentVisibleWindow(windowId);
                     if (nextWindow) {
                         this.focusWindow(nextWindow.id);
                     } else {

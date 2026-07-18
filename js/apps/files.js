@@ -583,7 +583,9 @@ const FilesApp = {
             if (item) {
                 const id = item.dataset.id;
                 const node = State.findNode(id);
-                if (node && node.type === 'folder') {
+                if (node && node.type === 'app') {
+                    WindowManager.openApp(node.appId);
+                } else if (node && node.type === 'folder') {
                     this.navigateTo(node);
                 } else if (node && node.type === 'file') {
                     this.openFile(node);
@@ -745,7 +747,9 @@ const FilesApp = {
                 if (this.contextTargetId) {
                     const node = State.findNode(this.contextTargetId);
                     if (node) {
-                        if (node.type === 'folder') {
+                        if (node.type === 'app') {
+                            WindowManager.openApp(node.appId);
+                        } else if (node.type === 'folder') {
                             this.navigateTo(node);
                         } else if (node.type === 'file') {
                             this.openFile(node);
@@ -1433,6 +1437,13 @@ const FilesApp = {
                 return `<img class="file-item-image-preview" src="${preview}" alt="${node.name}">`;
             }
         }
+        if (node.type === 'app') {
+            const desktopIcon = typeof Desktop !== 'undefined' && typeof Desktop.getDesktopIcon === 'function'
+                ? Desktop.getDesktopIcon(node)
+                : '';
+            const appIcon = desktopIcon || WindowManager.getAppConfig?.(node.appId)?.icon || 'Theme/Icon/App_icon/app_error.png';
+            return `<img src="${appIcon}" alt="${node.name}">`;
+        }
         const icon = node.type === 'folder'
             ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
             : 'Theme/Icon/Symbol_icon/stroke/File.svg';
@@ -1554,27 +1565,52 @@ const FilesApp = {
                 draggingIds = [node.id];
             }, listenerOptions);
 
-            // Lab: allow dropping external OS files onto a folder item
+            // Allow both FluentOS nodes and external OS files to target a folder item.
             if (node.type === 'folder') {
                 const externalEnabled = () => !!(window.FileImport && typeof FileImport.enabled === 'function' && FileImport.enabled());
+                const hasInternalPayload = (dataTransfer) => Array.from(dataTransfer?.types || [])
+                    .map((value) => String(value || ''))
+                    .includes('application/fluent-file');
+                const parseInternalPayload = (dataTransfer) => {
+                    const raw = dataTransfer?.getData('application/fluent-file');
+                    if (raw) {
+                        try {
+                            return JSON.parse(raw);
+                        } catch (error) {
+                            console.error('[FilesApp] Failed to parse internal drag data:', error);
+                            return null;
+                        }
+                    }
+                    const id = String(dataTransfer?.getData('text/plain') || '').trim();
+                    const draggedNode = id ? State.findNode(id) : null;
+                    return draggedNode ? { id: draggedNode.id, type: draggedNode.type, source: 'fallback' } : null;
+                };
                 item.addEventListener('dragover', (e) => {
-                    if (!externalEnabled()) return;
-                    if (!hasExternalFiles(e.dataTransfer)) return;
+                    const internal = hasInternalPayload(e.dataTransfer);
+                    const external = externalEnabled() && hasExternalFiles(e.dataTransfer);
+                    if (!internal && !external) return;
                     e.preventDefault();
                     e.stopPropagation();
-                    e.dataTransfer.dropEffect = 'copy';
+                    e.dataTransfer.dropEffect = internal ? 'move' : 'copy';
                     item.classList.add('drag-over');
                 }, listenerOptions);
                 item.addEventListener('dragleave', (e) => {
                     if (!item.contains(e.relatedTarget)) item.classList.remove('drag-over');
                 }, listenerOptions);
                 item.addEventListener('drop', (e) => {
-                    if (!externalEnabled()) return;
-                    const files = getExternalFiles(e.dataTransfer);
-                    if (!files || files.length === 0) return;
+                    const internal = hasInternalPayload(e.dataTransfer);
+                    const external = externalEnabled() && hasExternalFiles(e.dataTransfer);
+                    if (!internal && !external) return;
                     e.preventDefault();
                     e.stopPropagation();
                     item.classList.remove('drag-over');
+                    if (internal) {
+                        const data = parseInternalPayload(e.dataTransfer);
+                        if (data) this.handleFileDrop(data, node);
+                        return;
+                    }
+                    const files = getExternalFiles(e.dataTransfer);
+                    if (!files || files.length === 0) return;
                     try {
                         FileImport.importToFolder(node.id, files);
                     } catch (err) {
@@ -1906,25 +1942,25 @@ const FilesApp = {
         }, listenerOptions);
     },
     
-    handleFileDrop(data) {
+    handleFileDrop(data, destinationNode = this.currentNode) {
         const ids = Array.isArray(data?.ids) ? data.ids : [data?.id];
         const dragIds = [...new Set(ids.filter(id => typeof id === 'string' && id))];
-        if (dragIds.length === 0) return;
+        if (dragIds.length === 0 || !destinationNode || destinationNode.type !== 'folder') return;
 
         let movedCount = 0;
         let firstMovedName = '';
         let hasMoveError = false;
-        this.currentNode.children = this.currentNode.children || [];
+        destinationNode.children = destinationNode.children || [];
 
         dragIds.forEach((id) => {
             const node = State.findNode(id);
             if (!node) return;
             
             // 不能移动到当前目录自身
-            if (this.currentNode.id === id) return;
+            if (destinationNode.id === id) return;
             
             // 不能移动到自己的子目录
-            if (node.type === 'folder' && this.isDescendant(node, this.currentNode)) {
+            if (node.type === 'folder' && this.isDescendant(node, destinationNode)) {
                 hasMoveError = true;
                 return;
             }
@@ -1934,7 +1970,7 @@ const FilesApp = {
             if (!parent) return;
             
             // 如果已经在当前目录，不需要移动
-            if (parent.id === this.currentNode.id) return;
+            if (parent.id === destinationNode.id) return;
             
             // 从原位置移除
             const idx = parent.children ? parent.children.findIndex(c => c.id === id) : -1;
@@ -1942,7 +1978,7 @@ const FilesApp = {
             parent.children.splice(idx, 1);
             
             // 添加到当前目录
-            this.currentNode.children.push(node);
+            destinationNode.children.push(node);
             movedCount++;
             if (!firstMovedName) firstMovedName = node.name;
         });

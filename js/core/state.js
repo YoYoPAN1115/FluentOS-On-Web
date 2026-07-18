@@ -120,6 +120,7 @@ const State = {
             this._resolvedWallpapers[id] = value;
             if (typeof WallpaperStore !== 'undefined') await WallpaperStore.clearSlot(id);
             this.updateSettings({ [key]: value });
+            this.emit('wallpaperChange', { slot: id, key, reference: value, url: value });
             return value;
         }
         const reference = await WallpaperStore.saveForSlot(id, source, meta);
@@ -127,6 +128,9 @@ const State = {
         if (!url) throw new Error('wallpaper_cache_unavailable');
         this._resolvedWallpapers[id] = url;
         this.updateSettings({ [key]: reference });
+        // The reference is stable (wallpaper-cache:<slot>) even when its image
+        // bytes change, so settingsChange alone cannot represent every update.
+        this.emit('wallpaperChange', { slot: id, key, reference, url });
         return reference;
     },
 

@@ -372,12 +372,12 @@ body.animations-enabled .window.opening {
 }
 
 body.animations-enabled .window.window-focus-enter {
-    animation: windowFocusEnter 80ms ease-out both;
+    animation: windowFocusEnter 180ms cubic-bezier(0.2, 0, 0, 1) both;
     transform-origin: center center;
 }
 
 body.animations-enabled .window.window-focus-leave {
-    animation: windowFocusLeave 80ms ease-in both;
+    animation: windowFocusLeave 180ms cubic-bezier(0.4, 0, 1, 1) both;
     transform-origin: center center;
 }
 
@@ -391,26 +391,25 @@ body.animations-enabled .window.closing {
     animation: windowClose 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
-/* 窗口最大化动画 - 非线性放大（调慢速率） */
+/* 窗口几何过渡统一使用无超调曲线，避免快速弹性回摆。 */
 body.animations-enabled .window.maximizing {
-    transition: all 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 窗口从最大化还原动画 - 非线性缩小（调慢速率） */
+/* 窗口从最大化还原动画 */
 body.animations-enabled .window.unmaximizing {
-    transition: all 0.55s cubic-bezier(0.36, 0, 0.66, -0.56);
+    transition: all 0.44s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 窗口还原动画 */
-/* 窗口恢复动画 - 从任务栏弹出（带明显弹簧效果） */
+/* 窗口恢复动画 - 从任务栏平滑还原 */
 body.animations-enabled .window.restoring {
-    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
                 opacity 0.3s ease-out;
 }
 
 /* 窗口最小化动画 - 缩小到任务栏 */
 body.animations-enabled .window.minimizing {
-    transition: transform 0.5s cubic-bezier(0.36, 0, 0.66, -0.56), 
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
                 opacity 0.3s ease-in;
 }
 

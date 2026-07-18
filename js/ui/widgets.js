@@ -225,6 +225,12 @@ const Widgets = {
             }
         }, { key: 'Widgets.staticBlur' });
 
+        State.on('wallpaperChange', () => {
+            // Custom wallpapers reuse the same persisted reference, so this
+            // content-level event is what invalidates the old blurred bitmap.
+            this._refreshStaticBlurTexture();
+        }, { key: 'Widgets.wallpaperStaticBlur' });
+
         const deferForOobe = typeof OOBE !== 'undefined'
             && typeof OOBE.shouldShowOnFirstLaunch === 'function'
             && OOBE.shouldShowOnFirstLaunch();
