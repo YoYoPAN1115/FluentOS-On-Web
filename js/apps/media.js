@@ -706,8 +706,8 @@ const MediaApp = {
                     <h1>${this.localText('emptyTitle')}</h1>
                     <p>${this.localText('emptyDesc')}</p>
                     <div class="media-import-actions">
-                        <button class="media-action-primary" data-action="open-files">${this.localText('openFiles')}</button>
-                        <button class="media-action-secondary" data-action="open-folder">${this.localText('openFolder')}</button>
+                        <button class="fluent-btn fluent-btn-primary fluent-btn-medium" type="button" data-action="open-files"><span class="fluent-btn-text">${this.localText('openFiles')}</span></button>
+                        <button class="fluent-btn fluent-btn-secondary fluent-btn-medium" type="button" data-action="open-folder"><span class="fluent-btn-text">${this.localText('openFolder')}</span></button>
                     </div>
                 </div>
             </section>
@@ -2618,24 +2618,23 @@ const MediaApp = {
                 justify-items: center;
                 text-align: center;
             }
-            .media-import-empty-card { max-width: 480px; }
-            .media-empty-icon { width: 52px; height: 52px; opacity: .72; }
+            .media-import-empty-card {
+                width: min(480px, 100%);
+                display: grid;
+                justify-items: center;
+            }
+            .media-empty-icon.media-symbol { width: 52px; height: 52px; opacity: .72; }
             .media-import-empty h1,
             .media-empty h3 { margin: 14px 0 6px; }
             .media-import-empty p,
             .media-empty p { margin: 0; color: var(--text-secondary); line-height: 1.6; }
-            .media-import-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
-            .media-action-primary,
-            .media-action-secondary {
-                min-height: 36px;
-                padding: 0 16px;
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                background: var(--bg-tertiary);
-                color: var(--text-primary);
-                cursor: pointer;
+            .media-import-actions {
+                width: min(360px, 100%);
+                display: grid;
+                gap: 10px;
+                margin-top: 20px;
             }
-            .media-action-primary { border-color: var(--media-accent); background: var(--media-accent); color: var(--accent-contrast, #fff); }
+            .media-import-actions .fluent-btn { width: 100%; }
             .media-library-loading { gap: 14px; color: var(--text-secondary); }
 
             .media-now-hero { display: flex; align-items: center; gap: 22px; padding: 20px; }

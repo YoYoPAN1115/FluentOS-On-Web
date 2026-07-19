@@ -23,7 +23,7 @@ globalThis.FluentOSResourceManifest = Object.freeze({
     "js/apps/clock.js":  "39b076fe8bd4c1d2b974bd8c8063a31d0c3181d98c79a0dbf9d4aa163866e3cc",
     "js/apps/developer-center.js":  "6c601bbfd865c6d58b785146230fdca9b5aab9b226fad0af5d6afc15da954672",
     "js/apps/files.js":  "6ca1e7665743546fdd2e945fc378b9574decd95fb99e3e16e3b615830414b1cf",
-    "js/apps/media.js":  "355b1c0ef2b70c030482ca477dc06d0306ae74bb14f561cfbaee16357cdd7b39",
+    "js/apps/media.js":  "24684a608b7bdcc07ec15081a76f162f457d5dd80eeb8725a0b855c8681ff56a",
     "js/apps/notes.js":  "7ad350c18ecab8248c92626cf8c3e9c413c5a0eb873ea5358c9e79a6c5d1c8c7",
     "js/apps/photos.js":  "1678a6ce0a5ebbe4bdf96bbe8d95a30561444152f11d64ed1b804b76dea0b9d6",
     "js/apps/process-manager.js":  "ca71d47d413598c7b2d723373dcf6d4f08ab35da6d51d7522a3068b7d10dcb44",
