@@ -9,7 +9,9 @@ const DeveloperCenterStore = {
     PACKAGE_VERSION: 2,
     PACKAGE_EXTENSION: '.fap',
     PACKAGE_MIME: 'application/vnd.fluent.app-package',
+    PWA_PERMISSIONS: Object.freeze(['storage.local']),
     SUPPORTED_PERMISSIONS: [
+        'storage.local',
         'system.theme.write',
         'window.manage',
         'files.readText',
@@ -21,6 +23,11 @@ const DeveloperCenterStore = {
         'network.image'
     ],
     PERMISSION_DETAILS: Object.freeze({
+        'storage.local': Object.freeze({
+            nameZh: '读写浏览器本地存储', nameEn: 'Read and write browser local storage',
+            descriptionZh: '允许此 App 在浏览器中持久保存和读取自己的本地数据。PWA 使用其网站来源的 localStorage，自建 App 使用隔离的 FluentOS.storage。',
+            descriptionEn: 'Allow this App to persist and read its own browser-local data. PWAs use localStorage for their site origin; created Apps use isolated FluentOS.storage.'
+        }),
         'system.theme.write': Object.freeze({
             nameZh: '修改系统主题', nameEn: 'Change system theme',
             descriptionZh: '允许此 App 切换 Fluent 的明暗模式和主题外观。',
@@ -566,7 +573,9 @@ const DeveloperCenterStore = {
         if (permissions.length > this.SUPPORTED_PERMISSIONS.length || permissions.some((permission) => !this.SUPPORTED_PERMISSIONS.includes(permission))) {
             throw new Error('The package requests an unknown permission');
         }
-        if (manifest.type === 'pwa' && permissions.length) throw new Error('PWA packages cannot request FluentOS bridge permissions');
+        if (manifest.type === 'pwa' && permissions.some((permission) => !this.PWA_PERMISSIONS.includes(permission))) {
+            throw new Error('PWA packages can only request supported PWA permissions');
+        }
         const network = this.normalizeNetworkConfig(manifest.network);
         if (network.connect.length > 0 && !permissions.includes('network.request')) throw new Error('network.request is required for network.connect domains');
         if (network.image.length > 0 && !permissions.includes('network.image')) throw new Error('network.image is required for network.image domains');
@@ -602,8 +611,15 @@ const DeveloperCenterStore = {
         const fail = (reason, detail) => ({ ok: false, reason, detail: String(detail || '') });
         if (!app || !['pwa', 'professional'].includes(app.type)) return fail('package', 'Invalid App manifest');
         if (!String(app.name || '').trim() || !String(app.developer || '').trim()) return fail('package', 'Required App metadata is missing');
+        const declaredPermissions = [...new Set(Array.isArray(app.permissions) ? app.permissions.map(String) : [])];
+        if (declaredPermissions.some((permission) => !this.SUPPORTED_PERMISSIONS.includes(permission))) {
+            return fail('api', 'The App requests an unknown permission');
+        }
 
         if (app.type === 'pwa') {
+            if (declaredPermissions.some((permission) => !this.PWA_PERMISSIONS.includes(permission))) {
+                return fail('api', 'The PWA requests a permission that is not available to PWAs');
+            }
             let url;
             try { url = new URL(String(app.url || '')); }
             catch (_) { return fail('code', 'The App URL is invalid'); }
@@ -665,8 +681,10 @@ const DeveloperCenterStore = {
         const apiMatch = apiRules.find((rule) => rule.regex.test(combined));
         if (apiMatch) return fail('api', `High-risk browser API: ${apiMatch.name}`);
 
-        const permissions = new Set(Array.isArray(app.permissions) ? app.permissions : []);
+        const permissions = new Set(declaredPermissions);
         const permissionRules = [
+            { regex: /FluentOS\s*\.\s*storage\s*\.\s*(?:get|set|remove)\s*\(/, permission: 'storage.local' },
+            { regex: /FluentOS\s*\.\s*call\s*\(\s*['"]storage\.(?:get|set|remove)['"]/, permission: 'storage.local' },
             { regex: /FluentOS\s*\.\s*system\s*\.\s*(?:setTheme|toggleTheme)\s*\(/, permission: 'system.theme.write' },
             { regex: /FluentOS\s*\.\s*window\s*\.\s*(?:setTitle|setSize)\s*\(/, permission: 'window.manage' },
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:listText|readText)\s*\(/, permission: 'files.readText' },

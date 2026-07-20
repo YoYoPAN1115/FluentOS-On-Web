@@ -1088,31 +1088,24 @@ function wRenderPhotos(body, ctx, size) {
         return;
     }
 
-    wAsync(body, async () => {
-        if (source !== 'bing' && window.PhotosDataStore && typeof PhotosDataStore.getWidgetImage === 'function') {
-            const data = PhotosDataStore.getWidgetImage(source);
-            if (!body.isConnected) return;
-            if (data && data.pending) {
-                body.innerHTML = `<div class="w-loading">${t('widgets.loading')}</div>`;
-                return;
-            }
-            if (!data || !data.url) {
-                const empty = source === 'favorites'
-                    ? wUiText('\u6682\u65e0\u6536\u85cf\u7167\u7247', 'No favorite photos')
-                    : wUiText('\u6682\u65e0\u672c\u673a\u7167\u7247', 'No local photos');
-                body.innerHTML = `<div class="w-loading">${empty}</div>`;
-                return;
-            }
-            body.innerHTML = `
-                <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
-                    <div class="w-photo-overlay">
-                        <div class="w-photo-tag">${wEsc(data.tag || wPhotoSourceLabel(source))}</div>
-                        ${size !== 's' ? `<div class="w-photo-title">${wEsc(data.title || '')}</div>` : ''}
-                    </div>
-                </div>`;
-            return;
-        }
-    });
+    const data = window.PhotosDataStore && typeof PhotosDataStore.getWidgetImage === 'function'
+        ? PhotosDataStore.getWidgetImage(source)
+        : null;
+    if (data && data.pending) {
+        body.innerHTML = `<div class="w-loading">${t('widgets.loading')}</div>`;
+        return;
+    }
+    if (!data || !data.url) {
+        body.innerHTML = `<div class="w-loading">${wUiText('\u6682\u65e0\u76f8\u5173\u7167\u7247', 'No related photos')}</div>`;
+        return;
+    }
+    body.innerHTML = `
+        <div class="w-photo" style="background-image:url('${wEsc(data.url)}')">
+            <div class="w-photo-overlay">
+                <div class="w-photo-tag">${wEsc(data.tag || wPhotoSourceLabel(source))}</div>
+                ${size !== 's' ? `<div class="w-photo-title">${wEsc(data.title || '')}</div>` : ''}
+            </div>
+        </div>`;
 }
 
 function wPhotoWidgetSource(ctx) {

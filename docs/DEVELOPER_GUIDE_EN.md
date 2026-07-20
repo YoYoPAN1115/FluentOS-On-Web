@@ -264,15 +264,15 @@ PWALoader.register({
 
 Catalog entries are stored in `js/third_parts_apps/pwa-catalog.js`. Cross-origin iframe DOM cannot be read, and sites may reject embedding, cookies, popups, downloads, autoplay, or permissions. Cooperative apps can listen for `fluentos:tombstone` messages with `freeze` and `restore` actions.
 
-Only entries whose ID and URL exactly match the source-controlled catalog receive `allow-same-origin` in the iframe sandbox, preserving sign-in compatibility for trusted catalog apps. Other callers and PWAs created in Developer Center remain on an opaque origin without `allow-same-origin`; direct calls to `PWALoader.register()` cannot expand that authority.
+Only entries whose ID and URL exactly match the source-controlled catalog, and Developer Center PWAs with a declared and approved `storage.local` permission, receive `allow-same-origin` in the iframe sandbox. This lets the PWA use `localStorage`, sign-in state, and other same-origin data belonging to its own site origin. Other PWAs remain on an opaque origin; direct calls to `PWALoader.register()` cannot expand that authority.
 
 ## 10. Apps Created in Developer Center
 
-Apps packaged by Developer Center run in sandboxed iframes and can request host capabilities only through the injected asynchronous `FluentOS` bridge. They cannot directly access the host document or ordinary browser storage. A project that needs clipboard access must explicitly declare `clipboard.read`, `clipboard.write`, or both; calls remain subject to secure-context, user-gesture, and browser permission policies.
+Apps packaged by Developer Center run in sandboxed iframes and can request host capabilities only through the injected asynchronous `FluentOS` bridge. They cannot directly access the host document or ordinary browser storage. A project must declare `storage.local` before using `FluentOS.storage`; clipboard access requires `clipboard.read`, `clipboard.write`, or both. Calls remain subject to the authorization snapshot and browser security policies.
 
-Preview windows always receive a read-only capability profile. They inherit none of the project's declared permissions or network allowlists and may only read system theme/state/language, window information, and the preview App's private storage. Notifications, storage writes, window or theme mutation, files, desktop, clipboard, and network calls are rejected. Test those capabilities only after the App passes safety validation, receives user approval, and runs in a normal window.
+Preview windows always receive a read-only capability profile. They inherit none of the project's declared permissions or network allowlists and may only read system theme/state/language and window information. Notifications, local storage, window or theme mutation, files, desktop, clipboard, and network calls are rejected. Test those capabilities only after the App passes safety validation, receives user approval, and runs in a normal window.
 
-Each App has a separate namespace for `FluentOS.storage`, with these UTF-8 quotas:
+After `storage.local` is granted, each created App has a separate namespace for `FluentOS.storage`, with these UTF-8 quotas:
 
 - 512 KiB total data.
 - At most 128 keys.

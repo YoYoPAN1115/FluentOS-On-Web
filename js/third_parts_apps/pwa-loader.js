@@ -45,15 +45,26 @@ const PWALoader = {
             try { return new URL(catalogApp.url, location.href).href === new URL(url, location.href).href; }
             catch (_) { return false; }
         })();
+        const isApprovedCreatedApp = (() => {
+            const runtime = window.DeveloperCreatedRuntime;
+            const app = runtime?.apps?.get?.(id);
+            if (!app || app.type !== 'pwa' || config.allowLocalStorage !== true) return false;
+            try {
+                const exactUrl = new URL(app.url, location.href).href === new URL(url, location.href).href;
+                return exactUrl && runtime._grantedPermissions(app).includes('storage.local');
+            } catch (_) {
+                return false;
+            }
+        })();
         const normalizedConfig = {
             ...config,
             icon: this.normalizeIcon(icon),
             width,
             height,
-            // Only the source-controlled catalog may keep its real origin.
-            // Developer-created PWAs stay on an opaque sandbox origin so a
-            // same-origin URL or redirect cannot reach the FluentOS parent.
-            trustedCatalog: isExactCatalogUrl
+            // Catalog PWAs and created PWAs with an approved storage permission
+            // keep their real origin. Every other created PWA remains opaque.
+            trustedCatalog: isExactCatalogUrl,
+            allowLocalStorage: isApprovedCreatedApp
         };
         
         this.apps[id] = normalizedConfig;
@@ -203,7 +214,7 @@ const PWALoader = {
                 frame.className = 'pwa-iframe';
                 frame.src = this.config.url;
                 const sandbox = ['allow-scripts', 'allow-popups', 'allow-forms', 'allow-modals'];
-                if (this.config.trustedCatalog) sandbox.unshift('allow-same-origin');
+                if (this.config.trustedCatalog || this.config.allowLocalStorage) sandbox.unshift('allow-same-origin');
                 frame.setAttribute('sandbox', sandbox.join(' '));
                 frame.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
                 app.append(frozenSurface, frame);

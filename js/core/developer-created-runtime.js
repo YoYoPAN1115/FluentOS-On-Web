@@ -10,7 +10,7 @@ const DeveloperCreatedRuntime = {
     PERMISSION_STORAGE_KEY: 'fluentos.appPermissions.v1',
     READONLY_METHODS: Object.freeze([
         'system.theme', 'system.themeMode', 'system.accentColor', 'system.state',
-        'system.language', 'system.windowBlurEnabled', 'storage.get', 'window.info'
+        'system.language', 'system.windowBlurEnabled', 'window.info'
     ]),
     _bound: false,
     _permissionState: null,
@@ -47,11 +47,7 @@ const DeveloperCreatedRuntime = {
         this.apps.set(app.id, app);
 
         if (app.type === 'pwa') {
-            if (typeof PWALoader === 'undefined') return false;
-            PWALoader.register({
-                id: app.id, name: app.name, icon: app.icon,
-                url: app.url, width: 1024, height: 700
-            });
+            if (!this._registerPwa(app)) return false;
         } else {
             const componentName = `CreatedApp_${String(app.id).replace(/[^A-Za-z0-9_]/g, '_')}`;
             globalThis[componentName] = this._createComponent(app.id);
@@ -63,6 +59,20 @@ const DeveloperCreatedRuntime = {
             };
         }
         this._addShellApp(app);
+        return true;
+    },
+
+    _registerPwa(app) {
+        if (!app?.id || app.type !== 'pwa' || typeof PWALoader === 'undefined') return false;
+        PWALoader.register({
+            id: app.id,
+            name: app.name,
+            icon: app.icon,
+            url: app.url,
+            width: 1024,
+            height: 700,
+            allowLocalStorage: this._grantedPermissions(app).includes('storage.local')
+        });
         return true;
     },
 
@@ -194,7 +204,9 @@ const DeveloperCreatedRuntime = {
             .finally(() => this._permissionLaunches.delete(appId));
         this._permissionLaunches.set(appId, launch);
         launch.then(() => {
-            if (this.apps.has(appId) && typeof WindowManager !== 'undefined') WindowManager.openApp(appId, data);
+            if (!this.apps.has(appId) || typeof WindowManager === 'undefined') return;
+            if (app.type === 'pwa') this._registerPwa(app);
+            WindowManager.openApp(appId, data);
         });
         return true;
     },
@@ -804,8 +816,11 @@ const DeveloperCreatedRuntime = {
             case 'system.state': return this.getHostState(registration.windowId);
             case 'system.language': return this.getHostState().language;
             case 'system.windowBlurEnabled': return this.getHostState(registration.windowId).windowBlurEnabled;
-            case 'storage.get': return JSON.parse(localStorage.getItem(`${storagePrefix}${key(args.key)}`) || 'null');
+            case 'storage.get':
+                requirePermission('storage.local');
+                return JSON.parse(localStorage.getItem(`${storagePrefix}${key(args.key)}`) || 'null');
             case 'storage.set': {
+                requirePermission('storage.local');
                 if (args.value === undefined) throw new Error('Storage value cannot be undefined');
                 const serialized = JSON.stringify(args.value);
                 if (serialized === undefined) throw new Error('Storage value is not JSON-serializable');
@@ -821,7 +836,10 @@ const DeveloperCreatedRuntime = {
                 localStorage.setItem(itemKey, serialized);
                 return true;
             }
-            case 'storage.remove': localStorage.removeItem(`${storagePrefix}${key(args.key)}`); return true;
+            case 'storage.remove':
+                requirePermission('storage.local');
+                localStorage.removeItem(`${storagePrefix}${key(args.key)}`);
+                return true;
             case 'shell.openApp': {
                 const id = String(args.id || '');
                 const target = Desktop.apps.find((item) => item.id === id);

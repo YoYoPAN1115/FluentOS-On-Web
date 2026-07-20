@@ -90,6 +90,7 @@ const DeveloperCenterApp = {
     ],
 
     PERMISSIONS: [
+        { id: 'storage.local', titleZh: '读写浏览器本地存储', titleEn: 'Read and write browser local storage', descZh: '允许持久保存和读取此 App 自己的本地数据。', descEn: 'Persist and read browser-local data owned by this App.' },
         { id: 'system.theme.write', titleZh: '修改系统主题', titleEn: 'Change system theme', descZh: '允许切换浅色、深色或自动主题。', descEn: 'Switch FluentOS between light, dark, and automatic themes.' },
         { id: 'window.manage', titleZh: '管理当前窗口', titleEn: 'Manage this window', descZh: '允许修改此 App 的窗口标题和尺寸。', descEn: 'Change this App window title and size.' },
         { id: 'files.readText', titleZh: '读取文本文件', titleEn: 'Read text files', descZh: '按文件 ID 读取不超过 512 KB 的本地文本文件。', descEn: 'Read local text files up to 512 KB by file ID.' },
@@ -464,9 +465,11 @@ const DeveloperCenterApp = {
         form.innerHTML = `
             <div class="dc-field"><label>${this.text('appName')}</label><input class="dc-input" data-field="name" maxlength="60" value="${this.esc(project.name)}"></div>
             <div class="dc-field"><label>${this.text('url')}</label><input class="dc-input" data-field="url" type="url" value="${this.esc(project.url || 'https://')}" placeholder="https://"></div>
-            <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary fluent-btn-medium" data-action="upload-icon"><span class="fluent-btn-text">${this.text('upload')}</span></button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>`;
+            <div class="dc-field"><span class="dc-field-label">${this.text('icon')}</span><div class="dc-icon-picker"><img class="dc-icon-preview" src="${this.esc(project.icon || 'Theme/Icon/App_icon/created_app.png')}" alt=""><button type="button" class="fluent-btn fluent-btn-secondary fluent-btn-medium" data-action="upload-icon"><span class="fluent-btn-text">${this.text('upload')}</span></button><input class="dc-hidden-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></div></div>
+            <div class="dc-permission-picker" data-permission-picker></div>`;
         page.appendChild(form);
         this.bindIconPicker(form, project);
+        this.renderPermissionPicker(form.querySelector('[data-permission-picker]'), project.permissions || [], DeveloperCenterStore.PWA_PERMISSIONS);
         this.appendFooter(page, [
             this.button(this.text('saveDraft'), 'secondary', () => this.saveEditorProject(page, project, false), 'Save Floppy'),
             this.button(typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Next' : '下一步', 'primary', () => this.saveEditorProject(page, project, true), 'Arrow Right')
@@ -601,11 +604,12 @@ const DeveloperCenterApp = {
         host.appendChild(FluentUI.Toggle({ checked, onChange }));
     },
 
-    renderPermissionPicker(host, selectedPermissions) {
+    renderPermissionPicker(host, selectedPermissions, allowedPermissions = DeveloperCenterStore.SUPPORTED_PERMISSIONS) {
         const selected = new Set(Array.isArray(selectedPermissions) ? selectedPermissions : []);
+        const allowed = new Set(Array.isArray(allowedPermissions) ? allowedPermissions : []);
         const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
         host.innerHTML = `<strong class="dc-permission-heading">${english ? 'Optional permissions' : '可选权限'}</strong><span class="dc-permission-help">${english ? 'Only select capabilities this App actually needs. The user must approve them after safety validation.' : '只选择 App 实际需要的能力；安全检查通过后仍需由用户确认授权。'}</span>`;
-        this.PERMISSIONS.forEach((permission) => {
+        this.PERMISSIONS.filter((permission) => allowed.has(permission.id)).forEach((permission) => {
             const info = this.permissionInfo(permission.id);
             const label = document.createElement('label');
             label.className = 'dc-permission-row';
@@ -723,7 +727,7 @@ const DeveloperCenterApp = {
             <div class="dc-api-row"><code>await FluentOS.getTheme()</code><span>Read mode, isDark, accentColor, accentRgb, FluentUI version mode, material, language, and window ID.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getThemeMode() / getAccentColor() / getLanguage()</code><span>Read individual theme values. FluentOS.state contains the latest synchronously cached system state.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.isWindowBlurEnabled()</code><span>Read whether window blur is currently effective. The same value is available as FluentOS.state.windowBlurEnabled.</span><button type="button" data-copy-api>Copy</button></div>
-            <div class="dc-api-row"><code>await FluentOS.storage.get(key) / set(key, value) / remove(key)</code><span>Use private storage for this App: 100 KiB per JSON value, 128 keys, and 512 KiB total UTF-8 data.</span><button type="button" data-copy-api>Copy</button></div>
+            <div class="dc-api-row dc-api-privileged"><code>await FluentOS.storage.get(key) / set(key, value) / remove(key)</code><span>Permission: storage.local. Use private browser-local storage for this App: 100 KiB per JSON value, 128 keys, and 512 KiB total UTF-8 data.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.openApp(id) / openExternal(httpsUrl)</code><span>Open an allowed system App or a secure external link.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row dc-api-privileged"><code>await FluentOS.clipboard.read() / write(text)</code><span>Permissions: clipboard.read / clipboard.write. Read or write text when browser permission also allows it.</span><button type="button" data-copy-api>Copy</button></div>
             <div class="dc-api-row"><code>await FluentOS.getWindowInfo()</code><span>Read this App window's title, size, and maximized state.</span><button type="button" data-copy-api>Copy</button></div>
@@ -785,7 +789,7 @@ const DeveloperCenterApp = {
                 { id: 'https', label: 'HTTPS', desc: 'URL uses encrypted HTTPS transport' },
                 { id: 'safe-url', label: 'URL safety', desc: 'No credentials, local host, or unsafe protocol' },
                 { id: 'metadata', label: 'App information', desc: 'Required package metadata is complete' },
-                { id: 'apis', label: 'PWA permissions', desc: 'No FluentOS bridge permission is requested' }
+                { id: 'apis', label: 'PWA permissions', desc: 'Only supported PWA capabilities are requested' }
             ]
             : [
                 { id: 'syntax', label: 'HTML / CSS / JavaScript syntax', desc: 'Source can be parsed and compiled' },
@@ -1021,8 +1025,12 @@ const DeveloperCenterApp = {
         update('apis', 'running');
         const permissions = Array.isArray(project.permissions) ? project.permissions : [];
         const network = DeveloperCenterStore.normalizeNetworkConfig(project.network);
-        const apis = permissions.length === 0 && network.connect.length === 0 && network.image.length === 0;
-        update('apis', apis ? 'pass' : 'fail', apis ? 'PWA package requests no FluentOS bridge permission' : 'PWA packages cannot request FluentOS bridge permissions', apis ? [] : [{ title: 'PWA permission rejected', message: 'Remove FluentOS permissions and network allowlists from this PWA package.', file: 'App manifest' }]);
+        const invalidPermissions = permissions.filter((permission) => !DeveloperCenterStore.PWA_PERMISSIONS.includes(permission));
+        const apis = invalidPermissions.length === 0 && network.connect.length === 0 && network.image.length === 0;
+        const permissionSummary = permissions.includes('storage.local')
+            ? 'PWA requests browser local storage access'
+            : 'PWA requests no optional capability';
+        update('apis', apis ? 'pass' : 'fail', apis ? permissionSummary : 'PWA requests an unsupported permission or network allowlist', apis ? [] : [{ title: 'PWA permission rejected', message: 'PWAs may only request storage.local and cannot use FluentOS network allowlists.', file: 'App manifest' }]);
         return [https, safe, metadata, apis];
     },
 
@@ -1107,6 +1115,8 @@ const DeveloperCenterApp = {
         const declaredPermissions = new Set(Array.isArray(project.permissions) ? project.permissions : []);
         const invalidPermission = [...declaredPermissions].find((permission) => !DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
         const permissionRules = [
+            { regex: /FluentOS\s*\.\s*storage\s*\.\s*(?:get|set|remove)\s*\(/, permission: 'storage.local' },
+            { regex: /FluentOS\s*\.\s*call\s*\(\s*['"]storage\.(?:get|set|remove)['"]/, permission: 'storage.local' },
             { regex: /FluentOS\s*\.\s*system\s*\.\s*(?:setTheme|toggleTheme)\s*\(/, permission: 'system.theme.write' },
             { regex: /FluentOS\s*\.\s*window\s*\.\s*(?:setTitle|setSize)\s*\(/, permission: 'window.manage' },
             { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:listText|readText)\s*\(/, permission: 'files.readText' },

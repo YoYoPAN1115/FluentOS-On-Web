@@ -576,7 +576,10 @@ const BrowserApp = {
         const iframe = document.createElement('iframe');
         iframe.src = tab.url;
         iframe.className = 'browser-iframe';
-        iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
+        // Browser tabs must keep the loaded page's real origin. Sandboxing the
+        // frame without allow-same-origin gives it an opaque origin and makes
+        // Web Storage (including localStorage) unavailable. Unlike isolated
+        // third-party Apps, Browser tabs intentionally use a regular iframe.
         contentContainer.replaceChildren(iframe);
         iframe?.addEventListener('load', () => {
             try {

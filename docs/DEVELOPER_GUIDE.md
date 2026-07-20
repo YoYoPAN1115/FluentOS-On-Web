@@ -352,7 +352,7 @@ PWALoader.register({
 
 目录项维护在 `js/third_parts_apps/pwa-catalog.js`。注册后还需通过 App Shop 安装流程加入窗口、桌面和固定列表。
 
-只有与源码目录中的 ID 和 URL 精确匹配的条目会在 iframe sandbox 中获得 `allow-same-origin`，以兼容需要登录态的受信目录应用。其他调用方以及 Developer Center 创建的 PWA 使用不含 `allow-same-origin` 的不透明来源；直接调用 `PWALoader.register()` 也不能扩大该权限。
+只有与源码目录中的 ID 和 URL 精确匹配的目录条目，以及在 Developer Center 中声明并获批 `storage.local` 权限的 PWA，才会在 iframe sandbox 中获得 `allow-same-origin`。这让 PWA 能使用其网站来源自己的 `localStorage`、登录态等同源数据。其他 PWA 使用不含 `allow-same-origin` 的不透明来源；直接调用 `PWALoader.register()` 不能扩大该权限。
 
 限制必须在产品设计中明确：跨域 iframe 的 DOM 不可读取；站点可能拒绝嵌入；登录 Cookie、弹窗、下载、媒体自动播放和权限均受浏览器策略控制。后台冻结会向 iframe 发送：
 
@@ -368,11 +368,11 @@ PWALoader.register({
 
 ## 10. Developer Center 创建的 App
 
-Developer Center 封装的 App 在 sandbox iframe 中运行，只能通过注入的异步 `FluentOS` bridge 请求宿主能力，不能直接读取宿主页面或普通浏览器存储。需要剪贴板能力时，必须在项目权限中显式声明 `clipboard.read`、`clipboard.write` 或两者；调用时仍受浏览器安全上下文、用户手势与浏览器授权策略约束。
+Developer Center 封装的 App 在 sandbox iframe 中运行，只能通过注入的异步 `FluentOS` bridge 请求宿主能力，不能直接读取宿主页面或普通浏览器存储。使用 `FluentOS.storage` 前必须声明 `storage.local`；需要剪贴板能力时，必须显式声明 `clipboard.read`、`clipboard.write` 或两者。调用仍受授权快照以及浏览器安全策略约束。
 
-预览窗口始终使用只读能力配置：不会继承项目声明的任何权限或网络白名单，只允许读取系统主题/状态/语言、窗口信息和预览自己的 App 存储。通知、写存储、修改窗口或主题、文件、桌面、剪贴板及网络调用都会被拒绝。要测试这些能力，应先通过安全检查和用户授权封装 App，再在正式窗口中运行。
+预览窗口始终使用只读能力配置：不会继承项目声明的任何权限或网络白名单，只允许读取系统主题/状态/语言和窗口信息。通知、本地存储、修改窗口或主题、文件、桌面、剪贴板及网络调用都会被拒绝。要测试这些能力，应先通过安全检查和用户授权封装 App，再在正式窗口中运行。
 
-每个 App 的私有 `FluentOS.storage` 使用独立命名空间，并按 UTF-8 大小执行以下配额：
+获得 `storage.local` 权限后，每个自建 App 的私有 `FluentOS.storage` 使用独立命名空间，并按 UTF-8 大小执行以下配额：
 
 - 总数据最多 512 KiB。
 - 最多 128 个键。
