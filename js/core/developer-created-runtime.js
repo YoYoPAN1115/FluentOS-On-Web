@@ -7,11 +7,14 @@ const DeveloperCreatedRuntime = {
     MAX_STORAGE_KEYS: 128,
     MAX_STORAGE_BYTES: 512 * 1024,
     MAX_STORAGE_VALUE_BYTES: 100 * 1024,
+    PERMISSION_STORAGE_KEY: 'fluentos.appPermissions.v1',
     READONLY_METHODS: Object.freeze([
         'system.theme', 'system.themeMode', 'system.accentColor', 'system.state',
         'system.language', 'system.windowBlurEnabled', 'storage.get', 'window.info'
     ]),
     _bound: false,
+    _permissionState: null,
+    _permissionLaunches: new Map(),
 
     init() {
         if (this._bound) return;
@@ -100,19 +103,135 @@ const DeveloperCreatedRuntime = {
             try { network = DeveloperCenterStore.normalizeNetworkConfig(app?.network); }
             catch (_) { network = { connect: [], image: [] }; }
         }
-        const permissions = readOnly ? [] : [...new Set(Array.isArray(app?.permissions) ? app.permissions.map(String) : [])]
-            .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
+        const declaredPermissions = readOnly ? [] : this._declaredPermissions(app);
+        const permissions = readOnly ? [] : this._grantedPermissions(app, declaredPermissions);
         return Object.freeze({
             id: String(appId || app?.id || ''),
             name: String(app?.name || 'Created App'),
             title: String(app?.title || app?.name || 'Created App'),
             readOnly,
+            declaredPermissions: Object.freeze(declaredPermissions),
             permissions: Object.freeze(permissions),
             network: Object.freeze({
                 connect: Object.freeze([...network.connect]),
                 image: Object.freeze([...network.image])
             })
         });
+    },
+
+    _declaredPermissions(app) {
+        return [...new Set(Array.isArray(app?.permissions) ? app.permissions.map(String) : [])]
+            .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
+    },
+
+    _requiresPermissionConsent(app) {
+        return app?.permissionConsentRequired === true || app?.importedFromFap === true || !!String(app?.sourcePackageId || '').trim();
+    },
+
+    _readPermissionState() {
+        if (this._permissionState) return this._permissionState;
+        let value = {};
+        try {
+            const parsed = JSON.parse(localStorage.getItem(this.PERMISSION_STORAGE_KEY) || '{}');
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) value = parsed;
+        } catch (_) {}
+        this._permissionState = value;
+        return value;
+    },
+
+    _writePermissionState() {
+        try { localStorage.setItem(this.PERMISSION_STORAGE_KEY, JSON.stringify(this._readPermissionState())); }
+        catch (error) { console.warn('[CreatedApp] Permission choices could not be persisted', error); }
+    },
+
+    getPermissionDecision(appId, permission) {
+        const value = this._readPermissionState()?.[String(appId || '')]?.[String(permission || '')];
+        return value === 'granted' || value === 'denied' ? value : null;
+    },
+
+    setPermissionDecision(appId, permission, decision) {
+        if (!['granted', 'denied'].includes(decision)) return false;
+        const id = String(appId || '');
+        if (!id || !DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission)) return false;
+        const state = this._readPermissionState();
+        if (!state[id] || typeof state[id] !== 'object' || Array.isArray(state[id])) state[id] = {};
+        state[id][permission] = decision;
+        this._writePermissionState();
+        return true;
+    },
+
+    clearPermissionDecisions(appId) {
+        const id = String(appId || '');
+        const state = this._readPermissionState();
+        if (!id || !Object.prototype.hasOwnProperty.call(state, id)) return false;
+        delete state[id];
+        this._writePermissionState();
+        return true;
+    },
+
+    _grantedPermissions(app, declaredPermissions = this._declaredPermissions(app)) {
+        if (!this._requiresPermissionConsent(app)) return [...declaredPermissions];
+        return declaredPermissions.filter((permission) => this.getPermissionDecision(app.id, permission) === 'granted');
+    },
+
+    _pendingPermissions(app) {
+        if (!this._requiresPermissionConsent(app)) return [];
+        return this._declaredPermissions(app).filter((permission) => !this.getPermissionDecision(app.id, permission));
+    },
+
+    interceptLaunch(appId, data = null) {
+        const app = this.apps.get(appId);
+        const pending = app ? this._pendingPermissions(app) : [];
+        if (!app || pending.length === 0) return false;
+        if (this._permissionLaunches.has(appId)) return true;
+        const launch = this._requestPermissionsSequentially(app, pending)
+            .catch((error) => {
+                console.warn('[CreatedApp] Permission request failed; unresolved permissions were denied', error);
+                pending.forEach((permission) => {
+                    if (!this.getPermissionDecision(app.id, permission)) this.setPermissionDecision(app.id, permission, 'denied');
+                });
+            })
+            .finally(() => this._permissionLaunches.delete(appId));
+        this._permissionLaunches.set(appId, launch);
+        launch.then(() => {
+            if (this.apps.has(appId) && typeof WindowManager !== 'undefined') WindowManager.openApp(appId, data);
+        });
+        return true;
+    },
+
+    async _requestPermissionsSequentially(app, permissions) {
+        for (let index = 0; index < permissions.length; index += 1) {
+            const permission = permissions[index];
+            const decision = await this._showPermissionDialog(app, permission, index + 1, permissions.length);
+            this.setPermissionDecision(app.id, permission, decision);
+        }
+    },
+
+    _showPermissionDialog(app, permission, position, total) {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const info = DeveloperCenterStore.permissionInfo(permission, english ? 'en' : 'zh');
+        const network = (() => {
+            try { return DeveloperCenterStore.normalizeNetworkConfig(app.network); }
+            catch (_) { return { connect: [], image: [] }; }
+        })();
+        const domains = permission === 'network.request' ? network.connect : (permission === 'network.image' ? network.image : []);
+        const domainHtml = domains.length
+            ? `<div class="app-permission-domains"><strong>${english ? 'Allowed sites' : '允许访问的网站'}</strong><span>${domains.map((domain) => this.escapeHtml(domain)).join('<br>')}</span></div>`
+            : '';
+        const appName = String(app.name || app.title || 'App');
+        const content = `<div class="app-permission-dialog"><p>${this.escapeHtml(info.description)}</p>${domainHtml}<small>${english ? `Permission ${position} of ${total}. You can still use the App if you deny it; only this feature will be unavailable.` : `权限 ${position}/${total}。拒绝后仍可使用此 App，但此项功能将不可用。`}</small></div>`;
+        if (typeof FluentUI === 'undefined' || typeof FluentUI.Dialog !== 'function') return Promise.resolve('denied');
+        return new Promise((resolve) => FluentUI.Dialog({
+            type: 'info',
+            title: english ? `“${this.escapeHtml(appName)}” requests: ${this.escapeHtml(info.name)}` : `“${this.escapeHtml(appName)}”请求${this.escapeHtml(info.name)}`,
+            content,
+            closeOnOverlay: false,
+            buttons: [
+                { text: english ? 'Deny' : '拒绝', variant: 'secondary', value: 'denied' },
+                { text: english ? 'Allow' : '允许', variant: 'primary', value: 'granted' }
+            ],
+            onClose: (decision) => resolve(decision === 'granted' ? 'granted' : 'denied')
+        }));
     },
 
     _releaseFrame(targetOrRegistration) {
@@ -579,9 +698,9 @@ const DeveloperCreatedRuntime = {
             throw new Error('This validation session permits read-only FluentOS APIs only');
         }
         const requirePermission = (permission) => {
-            if (!profile.permissions.includes(permission)) {
-                throw new Error(`Permission is required: ${permission}`);
-            }
+            const info = DeveloperCenterStore.permissionInfo(permission, 'en');
+            if (!profile.declaredPermissions.includes(permission)) throw new Error(`Permission is not declared: ${info.name}`);
+            if (!profile.permissions.includes(permission)) throw new Error(`Permission was denied: ${info.name}`);
         };
         const key = (value) => {
             const output = String(value ?? '').trim();
@@ -831,12 +950,22 @@ const DeveloperCreatedRuntime = {
 
     _addShellApp(app) {
         if (typeof Desktop === 'undefined') return;
-        const entry = { id: app.id, name: app.name, icon: app.icon || 'Theme/Icon/App_icon/created_app.png', isNative: app.type !== 'pwa', isPWA: app.type === 'pwa', developerCreated: true };
+        const entry = {
+            id: app.id,
+            name: app.name,
+            icon: app.icon || 'Theme/Icon/App_icon/created_app.png',
+            isNative: app.type !== 'pwa',
+            isPWA: app.type === 'pwa',
+            isSystem: false,
+            developerCreated: true
+        };
         const index = Desktop.apps.findIndex((item) => item.id === app.id);
         if (index >= 0) Desktop.apps[index] = entry;
         else Desktop.apps.push(entry);
-        if (typeof StartMenu !== 'undefined' && Array.isArray(StartMenu.systemApps) && !StartMenu.systemApps.includes(app.id)) {
-            StartMenu.systemApps.push(app.id);
+        // Imported and developer-created Apps are user Apps. Remove stale IDs
+        // added by older builds so the system uninstall entry stays available.
+        if (typeof StartMenu !== 'undefined' && Array.isArray(StartMenu.systemApps)) {
+            StartMenu.systemApps = StartMenu.systemApps.filter((id) => id !== app.id);
         }
     },
 
@@ -861,6 +990,7 @@ const DeveloperCreatedRuntime = {
             }
             const prefix = `fluentos.created.${appId}.`;
             Object.keys(localStorage).filter((key) => key.startsWith(prefix)).forEach((key) => localStorage.removeItem(key));
+            this.clearPermissionDecisions(appId);
         }
         this.refreshShell();
     },

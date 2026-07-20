@@ -2200,9 +2200,23 @@ const AppShop = {
     
     // 卸载应用（内部执行，不含弹窗）
     async _doUninstall(appId) {
-        const app = this.apps.find(a => a.id === appId);
+        const developerApp = typeof DeveloperCreatedRuntime !== 'undefined'
+            ? DeveloperCreatedRuntime.apps.get(appId)
+            : null;
+        const app = this.apps.find(a => a.id === appId) || developerApp;
         try {
             if (globalThis.FluentOSStorage) await FluentOSStorage.purgeAppData(appId);
+            if (developerApp) {
+                const projectId = String(developerApp.projectId || '');
+                if (typeof DeveloperCenterStore === 'undefined') throw new Error('Developer App storage is unavailable');
+                const removed = await DeveloperCenterStore.remove('apps', appId);
+                if (!removed) throw new Error('Developer App record could not be removed');
+                if (projectId) {
+                    const project = await DeveloperCenterStore.get('projects', projectId);
+                    if (project?.importedFromFap === true) await DeveloperCenterStore.remove('projects', projectId);
+                }
+                await DeveloperCreatedRuntime.unregister(appId);
+            }
         } catch (error) {
             console.error('[AppShop] Failed to remove application data', error);
             FluentUI.Toast({
@@ -2228,7 +2242,7 @@ const AppShop = {
         this.removeDesktopApp(appId);
 
         // 从 PWALoader 注销
-        if (!this.isNativeApp(app) && typeof PWALoader !== 'undefined') {
+        if (!developerApp && !this.isNativeApp(app) && typeof PWALoader !== 'undefined') {
             PWALoader.unregister(appId);
         }
 
@@ -2269,7 +2283,10 @@ const AppShop = {
 
     // 卸载应用（带确认弹窗 + 运行检测）
     uninstallApp(appId, options = {}) {
-        const app = this.apps.find(a => a.id === appId);
+        const developerApp = typeof DeveloperCreatedRuntime !== 'undefined'
+            ? DeveloperCreatedRuntime.apps.get(appId)
+            : null;
+        const app = this.apps.find(a => a.id === appId) || developerApp;
         if (!app) return;
         const appName = app.name || appId;
         const { skipConfirm = false, skipRunningCheck = false } = options;

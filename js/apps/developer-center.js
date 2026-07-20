@@ -193,7 +193,7 @@ const DeveloperCenterApp = {
                         if (!project || this.activeProjectId !== projectId) return;
                         if (this._pendingPackageProjectId === projectId) {
                             this._pendingPackageProjectId = null;
-                            this.startValidation(pageEl, project);
+                            this.renderPackageInfo(pageEl, project);
                         } else if (project.type === 'pwa') this.renderPwaEditor(pageEl, project);
                         else this.renderProfessionalEditor(pageEl, project);
                     });
@@ -469,7 +469,7 @@ const DeveloperCenterApp = {
         this.bindIconPicker(form, project);
         this.appendFooter(page, [
             this.button(this.text('saveDraft'), 'secondary', () => this.saveEditorProject(page, project, false), 'Save Floppy'),
-            this.button(this.text('package'), 'primary', () => this.saveEditorProject(page, project, true), 'Dashboard Check')
+            this.button(typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Next' : '下一步', 'primary', () => this.saveEditorProject(page, project, true), 'Arrow Right')
         ]);
     },
 
@@ -508,7 +508,7 @@ const DeveloperCenterApp = {
             this.button(this.text('apiDocs'), 'secondary', () => this.showApiDocs(), 'Book Text'),
             this.button(this.text('preview'), 'secondary', () => this.previewProfessional(page, project), 'Eye'),
             this.button(this.text('saveDraft'), 'secondary', () => this.saveEditorProject(page, project, false), 'Save Floppy'),
-            this.button(this.text('package'), 'primary', () => this.saveEditorProject(page, project, true), 'Dashboard Check')
+            this.button(typeof I18n !== 'undefined' && I18n.currentLang === 'en' ? 'Next' : '下一步', 'primary', () => this.saveEditorProject(page, project, true), 'Arrow Right')
         ]);
     },
 
@@ -659,6 +659,55 @@ const DeveloperCenterApp = {
         else { this.toast(this.text('saved')); this.activeProjectId = null; this.navigate('build'); }
     },
 
+    async renderPackageInfo(page, project) {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        page.innerHTML = '';
+        page.className = 'fw-page dc-page';
+        this._markSecondaryPage(page);
+        page.appendChild(this.heading(
+            english ? 'App information' : '填写 App 信息',
+            english ? 'Confirm the information shown to people before packaging.' : '确认安装前向用户展示的应用信息。'
+        ));
+        const identity = await DeveloperCenterStore.accountIdentity();
+        if (!page.isConnected || this.activeProjectId !== project.id) return;
+        const form = document.createElement('div');
+        form.className = 'dc-form dc-package-info-form';
+        form.innerHTML = `
+            <div class="dc-field"><label>${english ? 'App name' : 'App 名称'}</label><input class="dc-input" data-package-field="name" maxlength="60" value="${this.esc(project.name)}"></div>
+            <div class="dc-field"><label>${english ? 'App description' : 'App 简介'}</label><textarea class="dc-textarea dc-package-description" data-package-field="description" maxlength="600" placeholder="${english ? 'Describe what this App does' : '简要说明该 App 的用途'}">${this.esc(project.description || '')}</textarea><span class="dc-note">${english ? '1–600 characters; this text is displayed by the installer.' : '1–600 个字符；安装工具会向用户显示此内容。'}</span></div>
+            <div class="dc-field"><label>${english ? 'Developer' : '开发者'}</label><input class="dc-input" value="${this.esc(identity.displayName)}" readonly aria-readonly="true"><span class="dc-note">${english ? 'Generated from the current account and the last six characters of this device account hash.' : '由当前账户名称与本机账户 Hash 的最后 6 位自动生成。'}</span></div>`;
+        page.appendChild(form);
+        this.appendFooter(page, [
+            this.button(english ? 'Back' : '上一步', 'secondary', () => this.openProject(project.id), 'Arrow Left'),
+            this.button(this.text('package'), 'primary', () => this.savePackageInfo(page, project, identity), 'Dashboard Check')
+        ]);
+    },
+
+    async savePackageInfo(page, project, identity) {
+        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
+        const name = String(page.querySelector('[data-package-field="name"]')?.value || '').trim();
+        const description = String(page.querySelector('[data-package-field="description"]')?.value || '').trim();
+        if (!this.isValidName(name, 60) || await DeveloperCenterStore.nameExists(name, project.id)) {
+            this.toast(this.text('invalidName'), 'error');
+            return;
+        }
+        if (!description || description.length > 600) {
+            this.toast(english ? 'Enter an App description of no more than 600 characters.' : '请填写不超过 600 个字符的 App 简介。', 'error');
+            return;
+        }
+        const previousName = project.name;
+        const saved = await DeveloperCenterStore.saveProject({
+            ...project,
+            name,
+            title: project.title === previousName ? name : (project.title || name),
+            description,
+            developer: identity.displayName,
+            developerHash: identity.hash
+        });
+        Object.assign(project, saved);
+        this.startValidation(page, saved);
+    },
+
     previewProfessional(page, project) {
         let app;
         try { app = this.collectEditor(page, project); }
@@ -735,14 +784,14 @@ const DeveloperCenterApp = {
             ? [
                 { id: 'https', label: 'HTTPS', desc: 'URL uses encrypted HTTPS transport' },
                 { id: 'safe-url', label: 'URL safety', desc: 'No credentials, local host, or unsafe protocol' },
-                { id: 'tls', label: 'TLS connection', desc: 'The browser can initiate a secure connection' },
-                { id: 'iframe', label: 'iframe availability', desc: 'The page starts loading in an isolated frame' }
+                { id: 'metadata', label: 'App information', desc: 'Required package metadata is complete' },
+                { id: 'apis', label: 'PWA permissions', desc: 'No FluentOS bridge permission is requested' }
             ]
             : [
                 { id: 'syntax', label: 'HTML / CSS / JavaScript syntax', desc: 'Source can be parsed and compiled' },
                 { id: 'malicious', label: 'Dangerous code patterns', desc: 'No host escape or dynamic-code patterns' },
                 { id: 'apis', label: 'Permitted APIs', desc: 'Only the provided FluentOS bridge is used' },
-                { id: 'runtime', label: 'Sandbox startup', desc: 'App starts without a severe runtime error' }
+                { id: 'runtime', label: 'Static package integrity', desc: 'Package remains valid without running App code' }
             ];
         const list = document.createElement('div');
         list.className = 'dc-validation-list';
@@ -769,12 +818,6 @@ const DeveloperCenterApp = {
             list.appendChild(item);
         });
         page.appendChild(list);
-        if (project.type === 'pwa') {
-            const note = document.createElement('p');
-            note.className = 'dc-note';
-            note.textContent = this.text('browserLimit');
-            page.appendChild(note);
-        }
         this.appendFooter(page, []);
 
         const started = performance.now();
@@ -971,25 +1014,16 @@ const DeveloperCenterApp = {
         const safe = !!url && !url.username && !url.password && !privateHost;
         update('safe-url', safe ? 'pass' : 'fail', safe ? 'URL passed local safety rules' : 'Local, credential-bearing, or unsafe URLs are blocked', safe ? [] : detailFor('URL was rejected', 'Remove credentials and use a public, non-local HTTPS host.'));
 
-        update('tls', 'running');
-        let tls = false;
-        if (https && safe) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 4500);
-            try {
-                await fetch(url.href, { mode: 'no-cors', cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', signal: controller.signal });
-                tls = true;
-            } catch (_) {
-                // Cross-origin no-cors fetch still rejects on TLS and network failures.
-                tls = false;
-            } finally { clearTimeout(timeout); }
-        }
-        update('tls', tls ? 'pass' : 'fail', tls ? 'Secure connection initiated successfully' : 'The browser could not establish the secure connection', tls ? [] : detailFor('Secure connection failed', 'The browser could not verify a TLS connection to this URL.'));
+        update('metadata', 'running');
+        const metadata = !!String(project.description || '').trim() && !!String(project.developer || '').trim();
+        update('metadata', metadata ? 'pass' : 'fail', metadata ? 'Required App information is complete' : 'App description or developer information is missing', metadata ? [] : [{ title: 'Incomplete App information', message: 'Return to App information and complete every required field.', file: 'App manifest' }]);
 
-        update('iframe', 'running');
-        const iframe = https && safe ? await this.probeIframe(url.href, runId) : false;
-        update('iframe', iframe ? 'pass' : 'fail', iframe ? 'The isolated frame reported a load event' : 'The page did not load before the validation timeout', iframe ? [] : detailFor('Embedded loading failed', 'The site may block iframe embedding, or it did not load before the timeout.'));
-        return [https, safe, tls, iframe];
+        update('apis', 'running');
+        const permissions = Array.isArray(project.permissions) ? project.permissions : [];
+        const network = DeveloperCenterStore.normalizeNetworkConfig(project.network);
+        const apis = permissions.length === 0 && network.connect.length === 0 && network.image.length === 0;
+        update('apis', apis ? 'pass' : 'fail', apis ? 'PWA package requests no FluentOS bridge permission' : 'PWA packages cannot request FluentOS bridge permissions', apis ? [] : [{ title: 'PWA permission rejected', message: 'Remove FluentOS permissions and network allowlists from this PWA package.', file: 'App manifest' }]);
+        return [https, safe, metadata, apis];
     },
 
     probeIframe(url, runId) {
@@ -1143,17 +1177,16 @@ const DeveloperCenterApp = {
         update('apis', apiProblem ? 'fail' : 'pass', apiSummary || 'Only declared sandbox and FluentOS APIs are referenced', apiDiagnostics);
 
         update('runtime', 'running');
-        const runtime = syntax && !dangerous && !apiProblem ? await this.probeProfessional(project, runId) : { ok: false, detail: 'Runtime check skipped until source issues are fixed' };
-        const runtimeDiagnostics = runtime.ok ? [] : [{
-            title: english ? 'Sandbox startup was rejected' : '沙盒启动被拒绝',
-            message: runtime.detail,
-            file: runtime.file || '',
-            line: runtime.line || 0,
-            column: runtime.column || 0,
-            code: runtime.code || ''
+        const staticReport = syntax && !dangerous && !apiProblem
+            ? DeveloperCenterStore.inspectAppSafety(project)
+            : { ok: false, detail: 'Static package inspection skipped until source issues are fixed' };
+        const integrityDiagnostics = staticReport.ok ? [] : [{
+            title: english ? 'Static package inspection was rejected' : '静态安装包检查未通过',
+            message: staticReport.detail,
+            file: english ? 'App package' : 'App 安装包'
         }];
-        update('runtime', runtime.ok ? 'pass' : 'fail', runtime.detail, runtimeDiagnostics);
-        return [syntax, !dangerous, !apiProblem, runtime.ok];
+        update('runtime', staticReport.ok ? 'pass' : 'fail', staticReport.ok ? 'Static inspection passed without running App code' : staticReport.detail, integrityDiagnostics);
+        return [syntax, !dangerous, !apiProblem, staticReport.ok];
     },
 
     probeProfessional(project, runId) {
@@ -1203,14 +1236,15 @@ const DeveloperCenterApp = {
     },
 
     async finishPackaging(project, addDesktop) {
-        if (!await this.requestPermissions(project)) return;
         const existingApps = await DeveloperCenterStore.getAll('apps');
         const existing = existingApps.find((app) => app.projectId === project.id);
         const app = await DeveloperCenterStore.saveApp({
             ...existing,
             ...project,
             id: existing?.id || DeveloperCenterStore.createId('created-app'),
-            projectId: project.id
+            projectId: project.id,
+            importedFromFap: project.importedFromFap === true,
+            permissionConsentRequired: project.importedFromFap === true || project.permissionConsentRequired === true
         });
         DeveloperCreatedRuntime.register(app);
         if (addDesktop) Desktop.addAppShortcut(app.id);
@@ -1220,33 +1254,9 @@ const DeveloperCenterApp = {
         this.navigate('apps');
     },
 
-    requestPermissions(app) {
-        const permissions = [...new Set(Array.isArray(app.permissions) ? app.permissions : [])]
-            .filter((permission) => DeveloperCenterStore.SUPPORTED_PERMISSIONS.includes(permission));
-        app.permissions = permissions;
-        const network = DeveloperCenterStore.normalizeNetworkConfig(app.network);
-        app.network = network;
-        if (!permissions.length) return Promise.resolve(true);
-        const english = typeof I18n !== 'undefined' && I18n.currentLang === 'en';
-        const content = `<div class="dc-permission-request"><p>${english ? 'This App passed its safety checks and requests the following additional permissions:' : '此 App 已通过安全检查，并请求以下附加权限：'}</p>${permissions.map((permission) => {
-            const info = this.permissionInfo(permission);
-            return `<div class="dc-permission-request-row"><strong>${this.esc(info.title)}</strong><span>${this.esc(info.description)}</span><code>${this.esc(permission)}</code></div>`;
-        }).join('')}${network.connect.length ? `<div class="dc-permission-request-row"><strong>${english ? 'Allowed API request domains' : '允许请求 API'}</strong><code>${network.connect.map((domain) => this.esc(domain)).join('<br>')}</code></div>` : ''}${network.image.length ? `<div class="dc-permission-request-row"><strong>${english ? 'Allowed image domains' : '允许加载图片'}</strong><code>${network.image.map((domain) => this.esc(domain)).join('<br>')}</code></div>` : ''}${network.connect.length || network.image.length ? `<p class="dc-note">${english ? 'This App cannot access any other domain. Direct browser networking is blocked.' : '此 App 无法访问其他域名，且浏览器直接联网方式已被阻止。'}</p>` : ''}<p class="dc-note">${english ? 'Permissions are enforced again for every API call at runtime.' : '运行时会对每一次 API 调用再次校验权限。'}</p></div>`;
-        return new Promise((resolve) => FluentUI.Dialog({
-            type: 'warning',
-            title: english ? 'App permission request' : 'App 权限请求',
-            content,
-            closeOnOverlay: false,
-            buttons: [
-                { text: this.text('cancel'), variant: 'secondary', value: false },
-                { text: english ? 'Allow and continue' : '允许并继续', variant: 'primary', value: true }
-            ],
-            onClose: (allowed) => resolve(allowed === true)
-        }));
-    },
-
     async finishImportedApp(imported) {
-        if (!await this.requestPermissions(imported)) return;
+        imported.importedFromFap = true;
+        imported.permissionConsentRequired = true;
         const project = await DeveloperCenterStore.saveProject({
             id: imported.projectId,
             name: imported.name,
@@ -1259,7 +1269,10 @@ const DeveloperCenterApp = {
             js: imported.js,
             forceFluentUI: imported.forceFluentUI === true,
             permissions: imported.permissions || [],
-            network: DeveloperCenterStore.normalizeNetworkConfig(imported.network)
+            network: DeveloperCenterStore.normalizeNetworkConfig(imported.network),
+            importedFromFap: true,
+            permissionConsentRequired: true,
+            sourcePackageId: imported.sourcePackageId
         });
         imported.projectId = project.id;
         const app = await DeveloperCenterStore.saveApp(imported);
@@ -1276,7 +1289,7 @@ const DeveloperCenterApp = {
         page.appendChild(this.heading(this.text('myAppsTitle'), this.text('myAppsDesc'), importButton));
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.zip,.fluentapp.zip,application/zip';
+        input.accept = '.fap,application/vnd.fluent.app-package';
         input.className = 'dc-hidden-input dc-import-input';
         input.addEventListener('change', () => this.importPackage(input.files?.[0]));
         page.appendChild(input);
@@ -1319,32 +1332,36 @@ const DeveloperCenterApp = {
 
     async exportPackage(app) {
         try {
-            const blob = await DeveloperCenterStore.exportApp(app);
-            const safe = String(app.name || 'app').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80);
-            DeveloperCenterStore.download(blob, `${safe}.fluentapp.zip`);
+            const zipBlob = await DeveloperCenterStore.exportApp(app);
+            const blob = new Blob([zipBlob], { type: DeveloperCenterStore.PACKAGE_MIME });
+            const safe = String(app.name || 'app').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'app';
+            const filename = `${safe}.fap`;
+            let packageFile;
+            try { packageFile = new File([blob], filename, { type: DeveloperCenterStore.PACKAGE_MIME }); }
+            catch (_) {
+                packageFile = blob;
+                packageFile.name = filename;
+            }
+
+            // Never offer a package that the installer itself cannot read. This
+            // checks the exact bytes that will be downloaded without running App code.
+            const verified = await DeveloperCenterStore.importApp(packageFile);
+            if (verified.sourcePackageId !== String(app.id || '') || verified.name !== String(app.name || '').trim() || verified.type !== app.type) {
+                throw new Error('Exported package self-check failed');
+            }
+            DeveloperCenterStore.download(packageFile, filename);
             this.toast(this.text('exportSuccess'));
-        } catch (error) { this.toast(error.message || this.text('importFailed'), 'error'); }
+        } catch (error) {
+            console.warn('[DeveloperCenter] Package export failed self-check:', error);
+            this.toast(error.message || this.text('importFailed'), 'error');
+        }
     },
 
     async importPackage(file) {
         if (!file) return;
         try {
-            const imported = await DeveloperCenterStore.importApp(file);
-            if (!this.isValidName(imported.name, 60) || !this.isValidName(imported.title || imported.name, 80) || !this.isSafeIcon(imported.icon)) {
-                throw new Error('The package contains unsafe display metadata');
-            }
-            if (imported.type === 'pwa') imported.url = new URL(imported.url).href;
-            const originalName = imported.name;
-            let name = originalName;
-            let suffix = 2;
-            while (await DeveloperCenterStore.nameExists(name)) name = `${originalName} (${suffix++})`;
-            if (imported.title === originalName) imported.title = name;
-            imported.name = name;
-            imported.permissions = imported.permissions || [];
-            const page = this.frame?.pageEl;
-            if (!page) throw new Error('Developer Center page is unavailable');
-            this.activePage = 'apps';
-            await this.startValidation(page, imported, { importMode: true });
+            if (!String(file.name || '').toLowerCase().endsWith('.fap')) throw new Error('Only .fap packages are supported');
+            WindowManager.openApp('app-installer', { packageFile: file, source: 'developer-center' });
         } catch (error) { this.toast(`${this.text('importFailed')}: ${error.message}`, 'error'); }
     },
 

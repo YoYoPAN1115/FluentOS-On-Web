@@ -9,7 +9,7 @@ const FilesApp = {
         'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
         'html', 'htm', 'xhtml', 'svg', 'xml',
         'bat', 'cmd', 'ps1', 'sh', 'vbs', 'wsf',
-        'exe', 'dll', 'com', 'scr', 'msi', 'jar', 'reg'
+        'exe', 'dll', 'com', 'scr', 'msi', 'jar', 'reg', 'fap'
     ],
     windowId: null,
     container: null,
@@ -1444,6 +1444,9 @@ const FilesApp = {
             const appIcon = desktopIcon || WindowManager.getAppConfig?.(node.appId)?.icon || 'Theme/Icon/App_icon/app_error.png';
             return `<img src="${appIcon}" alt="${node.name}">`;
         }
+        if (node.type === 'file' && String(node.name || '').toLowerCase().endsWith('.fap')) {
+            return `<img src="Theme/Icon/App_icon/App_package.png" alt="${node.name}">`;
+        }
         const icon = node.type === 'folder'
             ? 'Theme/Icon/Symbol_icon/stroke/Folder.svg'
             : 'Theme/Icon/Symbol_icon/stroke/File.svg';
@@ -1756,6 +1759,10 @@ const FilesApp = {
 
         // Route imported file types to their system default Apps.
         const ext = String(node.name || '').split('.').pop().toLowerCase();
+        if (ext === 'fap') {
+            WindowManager.openApp('app-installer', { fileId: node.id });
+            return true;
+        }
         if (ext === 'mp3') {
             WindowManager.openApp('media', { fileId: node.id });
             return true;

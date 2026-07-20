@@ -433,6 +433,7 @@ const Desktop = {
         // 根据文件扩展名选择彩色图标（不再依赖已移除的 Word 应用）
         const ext = node.name.split('.').pop().toLowerCase();
         const colourIcons = {
+            'fap': 'Theme/Icon/App_icon/App_package.png',
             'txt': 'Theme/Icon/Symbol_icon/colour/txt.svg',
             'xls': 'Theme/Icon/Symbol_icon/colour/excel.svg',
             'xlsx': 'Theme/Icon/Symbol_icon/colour/excel.svg',

@@ -5,8 +5,10 @@
  */
 const DeveloperCenterStore = {
     DB_NAME: 'fluentos.developerCenter',
-    DB_VERSION: 1,
-    PACKAGE_VERSION: 1,
+    DB_VERSION: 3,
+    PACKAGE_VERSION: 2,
+    PACKAGE_EXTENSION: '.fap',
+    PACKAGE_MIME: 'application/vnd.fluent.app-package',
     SUPPORTED_PERMISSIONS: [
         'system.theme.write',
         'window.manage',
@@ -18,6 +20,53 @@ const DeveloperCenterStore = {
         'network.request',
         'network.image'
     ],
+    PERMISSION_DETAILS: Object.freeze({
+        'system.theme.write': Object.freeze({
+            nameZh: '修改系统主题', nameEn: 'Change system theme',
+            descriptionZh: '允许此 App 切换 Fluent 的明暗模式和主题外观。',
+            descriptionEn: "Allow this App to change Fluent's light, dark, and theme appearance."
+        }),
+        'window.manage': Object.freeze({
+            nameZh: '管理应用窗口', nameEn: 'Manage its App window',
+            descriptionZh: '允许此 App 修改自己的窗口标题和窗口大小。',
+            descriptionEn: 'Allow this App to change the title and size of its own window.'
+        }),
+        'files.readText': Object.freeze({
+            nameZh: '读取文本文件', nameEn: 'Read text files',
+            descriptionZh: '允许此 App 读取“文档”“下载”和“桌面”中的文本文件。',
+            descriptionEn: 'Allow this App to read text files in Documents, Downloads, and Desktop.'
+        }),
+        'files.writeText': Object.freeze({
+            nameZh: '写入文本文件', nameEn: 'Write text files',
+            descriptionZh: '允许此 App 修改文本文件，或在“文档”中创建新的文本文件。',
+            descriptionEn: 'Allow this App to edit text files or create new text files in Documents.'
+        }),
+        'desktop.manage': Object.freeze({
+            nameZh: '管理桌面快捷方式', nameEn: 'Manage desktop shortcuts',
+            descriptionZh: '允许此 App 添加或移除自己的桌面快捷方式。',
+            descriptionEn: 'Allow this App to add or remove its own desktop shortcut.'
+        }),
+        'clipboard.read': Object.freeze({
+            nameZh: '读取剪贴板', nameEn: 'Read clipboard',
+            descriptionZh: '允许此 App 读取您当前复制的文本。',
+            descriptionEn: 'Allow this App to read text you have copied.'
+        }),
+        'clipboard.write': Object.freeze({
+            nameZh: '写入剪贴板', nameEn: 'Write to clipboard',
+            descriptionZh: '允许此 App 将文本写入系统剪贴板。',
+            descriptionEn: 'Allow this App to place text on the system clipboard.'
+        }),
+        'network.request': Object.freeze({
+            nameZh: '访问网络', nameEn: 'Access the network',
+            descriptionZh: '允许此 App 连接安装包中声明的网站和在线服务。',
+            descriptionEn: 'Allow this App to connect to websites and online services declared by its package.'
+        }),
+        'network.image': Object.freeze({
+            nameZh: '加载网络图片', nameEn: 'Load online images',
+            descriptionZh: '允许此 App 从安装包中声明的网站加载图片。',
+            descriptionEn: 'Allow this App to load images from websites declared by its package.'
+        })
+    }),
     DEFAULT_FAVORITES: ['json', 'base64', 'url', 'timestamp', 'hash', 'qrcode'],
     DEFAULT_EDITOR_APPEARANCE: Object.freeze({ fontFamily: 'Cascadia Code, Consolas, monospace', fontSize: 13 }),
     db: null,
@@ -43,6 +92,9 @@ const DeveloperCenterStore = {
                 }
                 if (!db.objectStoreNames.contains('preferences')) {
                     db.createObjectStore('preferences', { keyPath: 'key' });
+                }
+                if (!db.objectStoreNames.contains('packages')) {
+                    db.createObjectStore('packages', { keyPath: 'id' });
                 }
             };
             request.onsuccess = () => {
@@ -143,6 +195,19 @@ const DeveloperCenterStore = {
         };
     },
 
+    permissionInfo(permission, language = null) {
+        const details = this.PERMISSION_DETAILS[String(permission || '')];
+        const english = String(language || (typeof I18n !== 'undefined' ? I18n.currentLang : 'zh')).toLowerCase().startsWith('en');
+        if (!details) {
+            const fallback = String(permission || 'Unknown permission');
+            return { name: fallback, description: fallback };
+        }
+        return {
+            name: english ? details.nameEn : details.nameZh,
+            description: english ? details.descriptionEn : details.descriptionZh
+        };
+    },
+
     async saveProject(project) {
         const now = new Date().toISOString();
         const existing = project.id ? await this.get('projects', project.id) : null;
@@ -220,6 +285,72 @@ const DeveloperCenterStore = {
         return new Blob([JSON.stringify({ projects, apps, preferences })]).size;
     },
 
+    async accountIdentity() {
+        const state = typeof State !== 'undefined' ? State : globalThis.State;
+        const settings = state?.settings || {};
+        const name = String(settings.userName || 'Owner').trim() || 'Owner';
+        const deviceName = String(settings.deviceName || 'FLUENTOS-PC').trim() || 'FLUENTOS-PC';
+        const email = String(settings.userEmail || '').trim().toLowerCase();
+        const source = `${deviceName}\u0000${name}\u0000${email}`;
+        let hash = '';
+        try {
+            const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+            hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+        } catch (_) {
+            hash = this.crc32(new TextEncoder().encode(source)).toString(16).padStart(8, '0');
+        }
+        const suffix = hash.slice(-6).toUpperCase();
+        return { name, hash: suffix, displayName: `${name} (${suffix})` };
+    },
+
+    async storePackageFile(id, file) {
+        const key = String(id || this.createId('package-file'));
+        const blob = file instanceof Blob ? file : new Blob([file], { type: this.PACKAGE_MIME });
+        const bytes = await blob.arrayBuffer();
+        const checksum = this.crc32(new Uint8Array(bytes));
+        await this.put('packages', {
+            id: key,
+            bytes,
+            checksum,
+            name: String(file?.name || `${key}${this.PACKAGE_EXTENSION}`),
+            size: bytes.byteLength,
+            mime: this.PACKAGE_MIME,
+            modifiedAt: new Date().toISOString()
+        });
+        return key;
+    },
+
+    async loadPackageFile(id, fallbackName = 'app.fap') {
+        const record = await this.get('packages', String(id || ''));
+        if (!record) return null;
+        let bytes = record.bytes;
+        if (ArrayBuffer.isView(bytes)) {
+            bytes = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        } else if (Object.prototype.toString.call(bytes) !== '[object ArrayBuffer]') {
+            // Backward compatibility for packages cached by database version 2.
+            if (!record.blob || typeof record.blob.arrayBuffer !== 'function') return null;
+            bytes = await record.blob.arrayBuffer();
+        }
+        if (Number.isFinite(record.size) && Number(record.size) !== bytes.byteLength) {
+            throw new Error('Cached package size check failed');
+        }
+        if (Number.isInteger(record.checksum) && this.crc32(new Uint8Array(bytes)) !== (record.checksum >>> 0)) {
+            throw new Error('Cached package integrity check failed');
+        }
+        const filename = String(record.name || fallbackName || 'app.fap');
+        try {
+            return new File([bytes], filename, { type: this.PACKAGE_MIME });
+        } catch (_) {
+            const blob = new Blob([bytes], { type: this.PACKAGE_MIME });
+            blob.name = filename;
+            return blob;
+        }
+    },
+
+    async removePackageFile(id) {
+        return this.remove('packages', String(id || ''));
+    },
+
     _crcTable: null,
     crc32(bytes) {
         if (!this._crcTable) {
@@ -287,35 +418,85 @@ const DeveloperCenterStore = {
         return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
     },
 
-    /** Read Store-mode packages produced by createZip. CRC and paths are validated. */
+    async _inflateZipEntry(data) {
+        if (typeof DecompressionStream === 'undefined') {
+            throw new Error('This browser cannot decompress Deflate ZIP entries');
+        }
+        let stream;
+        try { stream = new DecompressionStream('deflate-raw'); }
+        catch (_) { throw new Error('This browser cannot decompress Deflate ZIP entries'); }
+        try {
+            const output = new Blob([data]).stream().pipeThrough(stream);
+            return new Uint8Array(await new Response(output).arrayBuffer());
+        } catch (_) {
+            throw new Error('Deflate ZIP entry could not be decompressed');
+        }
+    },
+
+    /** Read a standard ZIP central directory. Paths, sizes and CRC are validated. */
     async readZip(file) {
         if (Number(file?.size || 0) > 12 * 1024 * 1024) throw new Error('Package is larger than 12 MB');
         const bytes = new Uint8Array(await file.arrayBuffer());
+        if (bytes.length < 22) throw new Error('ZIP end record is missing');
         const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         const decoder = new TextDecoder();
-        const entries = {};
-        let offset = 0;
-        while (offset + 4 <= bytes.length && this._readU32(view, offset) === 0x04034b50) {
-            if (offset + 30 > bytes.length) throw new Error('Truncated ZIP header');
-            const flags = this._readU16(view, offset + 6);
-            const method = this._readU16(view, offset + 8);
-            const expectedCrc = this._readU32(view, offset + 14);
-            const compressedSize = this._readU32(view, offset + 18);
-            const uncompressedSize = this._readU32(view, offset + 22);
-            const nameLength = this._readU16(view, offset + 26);
-            const extraLength = this._readU16(view, offset + 28);
-            if (flags & 0x08) throw new Error('Streaming ZIP entries are not supported');
-            if (method !== 0 || compressedSize !== uncompressedSize) throw new Error('Only Store-mode ZIP packages are supported');
-            const nameStart = offset + 30;
-            const dataStart = nameStart + nameLength + extraLength;
+        const entries = Object.create(null);
+
+        const minimumEocd = Math.max(0, bytes.length - 65557);
+        let endOffset = -1;
+        for (let offset = bytes.length - 22; offset >= minimumEocd; offset--) {
+            if (this._readU32(view, offset) === 0x06054b50) { endOffset = offset; break; }
+        }
+        if (endOffset < 0) throw new Error('ZIP end record is missing');
+        if (this._readU16(view, endOffset + 4) !== 0 || this._readU16(view, endOffset + 6) !== 0) {
+            throw new Error('Multi-disk ZIP packages are not supported');
+        }
+        const entryCount = this._readU16(view, endOffset + 10);
+        const centralSize = this._readU32(view, endOffset + 12);
+        const centralOffset = this._readU32(view, endOffset + 16);
+        if (!entryCount || entryCount > 128 || entryCount === 0xffff) throw new Error('Invalid ZIP entry count');
+        if (centralOffset + centralSize > endOffset || centralOffset + centralSize > bytes.length) throw new Error('Invalid ZIP central directory');
+
+        let offset = centralOffset;
+        let totalUncompressed = 0;
+        for (let index = 0; index < entryCount; index++) {
+            if (offset + 46 > bytes.length || this._readU32(view, offset) !== 0x02014b50) throw new Error('Invalid ZIP central directory entry');
+            const flags = this._readU16(view, offset + 8);
+            const method = this._readU16(view, offset + 10);
+            const expectedCrc = this._readU32(view, offset + 16);
+            const compressedSize = this._readU32(view, offset + 20);
+            const uncompressedSize = this._readU32(view, offset + 24);
+            const nameLength = this._readU16(view, offset + 28);
+            const extraLength = this._readU16(view, offset + 30);
+            const commentLength = this._readU16(view, offset + 32);
+            const localOffset = this._readU32(view, offset + 42);
+            const nextOffset = offset + 46 + nameLength + extraLength + commentLength;
+            if (!nameLength || nameLength > 512 || nextOffset > bytes.length) throw new Error('Invalid ZIP entry name');
+            if (flags & 0x01) throw new Error('Encrypted ZIP entries are not supported');
+            if (![0, 8].includes(method)) throw new Error(`Unsupported ZIP compression method: ${method}`);
+            const name = decoder.decode(bytes.slice(offset + 46, offset + 46 + nameLength)).replace(/\\/g, '/');
+            const segments = name.split('/');
+            if (!name || name.includes('\0') || name.startsWith('/') || /^[A-Za-z]:/.test(name) || segments.some((part) => part === '..')) {
+                throw new Error('Unsafe package path');
+            }
+            if (localOffset + 30 > bytes.length || this._readU32(view, localOffset) !== 0x04034b50) throw new Error(`ZIP entry header is missing: ${name}`);
+            const localNameLength = this._readU16(view, localOffset + 26);
+            const localExtraLength = this._readU16(view, localOffset + 28);
+            const dataStart = localOffset + 30 + localNameLength + localExtraLength;
             const dataEnd = dataStart + compressedSize;
-            if (dataEnd > bytes.length) throw new Error('Truncated ZIP entry');
-            const name = decoder.decode(bytes.slice(nameStart, nameStart + nameLength)).replace(/\\/g, '/');
-            if (!name || name.startsWith('/') || name.includes('../') || /^[A-Za-z]:/.test(name)) throw new Error('Unsafe package path');
-            const data = bytes.slice(dataStart, dataEnd);
-            if (this.crc32(data) !== expectedCrc) throw new Error(`CRC mismatch: ${name}`);
-            entries[name] = data;
-            offset = dataEnd;
+            if (dataEnd > bytes.length) throw new Error(`Truncated ZIP entry: ${name}`);
+            totalUncompressed += uncompressedSize;
+            if (totalUncompressed > 24 * 1024 * 1024) throw new Error('Uncompressed package content is larger than 24 MB');
+
+            if (!name.endsWith('/')) {
+                if (Object.prototype.hasOwnProperty.call(entries, name)) throw new Error(`Duplicate ZIP entry: ${name}`);
+                const compressed = bytes.slice(dataStart, dataEnd);
+                const data = method === 0 ? compressed : await this._inflateZipEntry(compressed);
+                if (data.length !== uncompressedSize) throw new Error(`ZIP entry size mismatch: ${name}`);
+                if (this.crc32(data) !== expectedCrc) throw new Error(`CRC mismatch: ${name}`);
+                entries[name] = data;
+            }
+            offset = nextOffset;
         }
         if (!Object.keys(entries).length) throw new Error('No readable files in package');
         return entries;
@@ -323,10 +504,19 @@ const DeveloperCenterStore = {
 
     async exportApp(app) {
         const icon = String(app.icon || 'Theme/Icon/App_icon/created_app.png');
+        const description = String(app.description || '').trim();
+        const developer = String(app.developer || '').trim();
+        const developerHash = String(app.developerHash || '').trim().toUpperCase();
+        if (!description || description.length > 600 || !developer || developer.length > 160 || !/^[A-F0-9]{6}$/.test(developerHash)) {
+            throw new Error('Complete the App information and package it again before exporting');
+        }
         const entries = {};
         const manifest = {
             format: 'fluentapp', version: this.PACKAGE_VERSION, id: app.id, projectId: app.projectId,
             name: app.name, type: app.type, title: app.title || app.name,
+            description,
+            developer,
+            developerHash,
             forceFluentUI: app.forceFluentUI === true,
             permissions: [...new Set(Array.isArray(app.permissions) ? app.permissions : [])]
                 .filter((permission) => this.SUPPORTED_PERMISSIONS.includes(permission)),
@@ -347,13 +537,31 @@ const DeveloperCenterStore = {
     },
 
     async importApp(file) {
-        const entries = await this.readZip(file);
+        const filename = String(file?.name || '');
+        if (!filename.toLowerCase().endsWith(this.PACKAGE_EXTENSION)) {
+            throw new Error('Only Fluent .fap packages can be opened');
+        }
+        // .fap is a versioned Fluent package whose payload remains ZIP. Give the
+        // decoder a temporary .zip view without mutating or executing the source.
+        const zipName = `${filename.slice(0, -this.PACKAGE_EXTENSION.length)}.zip`;
+        const packageBytes = await file.arrayBuffer();
+        let zipFile;
+        try { zipFile = new File([packageBytes], zipName, { type: 'application/zip' }); }
+        catch (_) {
+            zipFile = new Blob([packageBytes], { type: 'application/zip' });
+            zipFile.name = zipName;
+        }
+        const entries = await this.readZip(zipFile);
         if (!entries['manifest.json']) throw new Error('manifest.json is missing');
         let manifest;
         try { manifest = JSON.parse(new TextDecoder().decode(entries['manifest.json'])); }
         catch (_) { throw new Error('manifest.json is invalid'); }
         if (manifest.format !== 'fluentapp' || manifest.version !== this.PACKAGE_VERSION) throw new Error('Unsupported Fluent App package');
         if (!['pwa', 'professional'].includes(manifest.type) || !String(manifest.name || '').trim()) throw new Error('Invalid app manifest');
+        const description = String(manifest.description || '').trim();
+        const developer = String(manifest.developer || '').trim();
+        const developerHash = String(manifest.developerHash || '').trim().toUpperCase();
+        if (!description || description.length > 600 || !developer || developer.length > 160 || !/^[A-F0-9]{6}$/.test(developerHash)) throw new Error('App information is incomplete');
         const permissions = [...new Set(Array.isArray(manifest.permissions) ? manifest.permissions.map(String) : [])];
         if (permissions.length > this.SUPPORTED_PERMISSIONS.length || permissions.some((permission) => !this.SUPPORTED_PERMISSIONS.includes(permission))) {
             throw new Error('The package requests an unknown permission');
@@ -371,6 +579,10 @@ const DeveloperCenterStore = {
             id: this.createId('created-app'),
             projectId: this.createId('imported-project'),
             name: String(manifest.name).trim(), type: manifest.type, title: manifest.title || manifest.name,
+            description,
+            developer,
+            developerHash,
+            sourcePackageId: String(manifest.id || ''),
             icon, url: manifest.type === 'pwa' ? String(manifest.url || '') : '',
             html: entries['app/index.html'] ? new TextDecoder().decode(entries['app/index.html']) : '',
             css: entries['app/styles.css'] ? new TextDecoder().decode(entries['app/styles.css']) : '',
@@ -379,6 +591,104 @@ const DeveloperCenterStore = {
             permissions,
             network
         };
+    },
+
+    /**
+     * Static installation inspection. This function may parse/compile source for
+     * syntax diagnostics, but it never inserts App markup into the live document,
+     * creates an iframe, opens its URL, or invokes any App function.
+     */
+    inspectAppSafety(app) {
+        const fail = (reason, detail) => ({ ok: false, reason, detail: String(detail || '') });
+        if (!app || !['pwa', 'professional'].includes(app.type)) return fail('package', 'Invalid App manifest');
+        if (!String(app.name || '').trim() || !String(app.developer || '').trim()) return fail('package', 'Required App metadata is missing');
+
+        if (app.type === 'pwa') {
+            let url;
+            try { url = new URL(String(app.url || '')); }
+            catch (_) { return fail('code', 'The App URL is invalid'); }
+            const hostname = String(url.hostname || '').toLowerCase();
+            const privateHost = /^(?:0\.|10\.|127\.|169\.254\.|192\.168\.)/.test(hostname) ||
+                /^172\.(?:1[6-9]|2\d|3[01])\./.test(hostname) ||
+                ['localhost', '::1', '[::1]', '0.0.0.0'].includes(hostname) || hostname.endsWith('.local');
+            if (url.protocol !== 'https:' || url.username || url.password || privateHost) {
+                return fail('malicious', 'The PWA URL does not meet Fluent safety requirements');
+            }
+            return { ok: true, reason: '', detail: 'Static PWA manifest inspection passed' };
+        }
+
+        const html = String(app.html || '');
+        const css = String(app.css || '');
+        const js = String(app.js || '');
+        try {
+            // Function construction parses JavaScript but does not invoke it.
+            new Function(`"use strict";\n${js}`);
+            if (typeof document !== 'undefined') {
+                const template = document.createElement('template');
+                template.innerHTML = html;
+            }
+            if (typeof CSSStyleSheet !== 'undefined') {
+                const sheet = new CSSStyleSheet();
+                sheet.replaceSync(css);
+            }
+        } catch (error) {
+            return fail('code', error?.message || 'Source contains a syntax error');
+        }
+
+        const combined = `${html}\n${css}\n${js}`;
+        const maliciousRules = [
+            { regex: /\beval\s*\(/i, name: 'eval()' },
+            { regex: /\bFunction\s*\(/, name: 'Function()' },
+            { regex: /\bimport\s*\(/i, name: 'dynamic import' },
+            { regex: /document\s*\.\s*cookie/i, name: 'document.cookie' },
+            { regex: /(?:\bwindow\s*\.\s*(?:parent|top|opener)\b|\b(?:parent|top|opener)\s*\.\s*(?:document|location|frames|window|parent|top|opener|postMessage)\b)/i, name: 'host-window access' },
+            { regex: /<script[^>]+src\s*=\s*["']?https?:/i, name: 'remote script' },
+            { regex: /javascript\s*:/i, name: 'javascript URL' }
+        ];
+        const malicious = maliciousRules.find((rule) => rule.regex.test(combined));
+        if (malicious) return fail('malicious', `Blocked code pattern: ${malicious.name}`);
+
+        const apiRules = [
+            { regex: /\bfetch\s*\(/i, name: 'fetch' },
+            { regex: /\bXMLHttpRequest\b/i, name: 'XMLHttpRequest' },
+            { regex: /\bWebSocket\b/i, name: 'WebSocket' },
+            { regex: /\bEventSource\b/i, name: 'EventSource' },
+            { regex: /navigator\s*\.\s*sendBeacon\s*\(/i, name: 'navigator.sendBeacon' },
+            { regex: /\b(?:Worker|SharedWorker|WebAssembly)\b/i, name: 'worker or WebAssembly' },
+            { regex: /<\s*(?:img|iframe|script)\b[^>]*(?:src)\s*=\s*["']?\s*https?:\/\//i, name: 'remote embedded resource' },
+            { regex: /<\s*link\b[^>]*href\s*=\s*["']?\s*https?:\/\//i, name: 'remote stylesheet' },
+            { regex: /(?:url\s*\(\s*|@import\s+)["']?\s*https?:\/\//i, name: 'remote CSS URL' },
+            { regex: /\bindexedDB\b/i, name: 'indexedDB' },
+            { regex: /\blocalStorage\b|\bsessionStorage\b/i, name: 'direct browser storage' },
+            { regex: /navigator\s*\.\s*(?:clipboard|geolocation|mediaDevices|usb|serial|bluetooth)/i, name: 'privileged navigator API' }
+        ];
+        const apiMatch = apiRules.find((rule) => rule.regex.test(combined));
+        if (apiMatch) return fail('api', `High-risk browser API: ${apiMatch.name}`);
+
+        const permissions = new Set(Array.isArray(app.permissions) ? app.permissions : []);
+        const permissionRules = [
+            { regex: /FluentOS\s*\.\s*system\s*\.\s*(?:setTheme|toggleTheme)\s*\(/, permission: 'system.theme.write' },
+            { regex: /FluentOS\s*\.\s*window\s*\.\s*(?:setTitle|setSize)\s*\(/, permission: 'window.manage' },
+            { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:listText|readText)\s*\(/, permission: 'files.readText' },
+            { regex: /FluentOS\s*\.\s*files\s*\.\s*(?:writeText|createText)\s*\(/, permission: 'files.writeText' },
+            { regex: /FluentOS\s*\.\s*desktop\s*\.\s*(?:addShortcut|removeShortcut)\s*\(/, permission: 'desktop.manage' },
+            { regex: /FluentOS\s*\.\s*clipboard\s*\.\s*read\s*\(/, permission: 'clipboard.read' },
+            { regex: /FluentOS\s*\.\s*clipboard\s*\.\s*write\s*\(/, permission: 'clipboard.write' },
+            { regex: /FluentOS\s*\.\s*network\s*\.\s*request\s*\(/, permission: 'network.request' },
+            { regex: /FluentOS\s*\.\s*network\s*\.\s*loadImage\s*\(/, permission: 'network.image' }
+        ];
+        const missingPermission = permissionRules.find((rule) => rule.regex.test(combined) && !permissions.has(rule.permission));
+        if (missingPermission) return fail('api', `Undeclared Fluent API permission: ${missingPermission.permission}`);
+        try {
+            const network = this.normalizeNetworkConfig(app.network);
+            if (network.connect.length && !permissions.has('network.request')) return fail('api', 'network.request permission is missing');
+            if (network.image.length && !permissions.has('network.image')) return fail('api', 'network.image permission is missing');
+            if (permissions.has('network.request') && !network.connect.length) return fail('api', 'network.request has no allowed domain');
+            if (permissions.has('network.image') && !network.image.length) return fail('api', 'network.image has no allowed domain');
+        } catch (error) {
+            return fail('api', error?.message || 'Invalid network permission configuration');
+        }
+        return { ok: true, reason: '', detail: 'Static source and permission inspection passed' };
     },
 
     download(blob, filename) {

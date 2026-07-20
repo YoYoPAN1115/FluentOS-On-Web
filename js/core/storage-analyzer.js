@@ -273,6 +273,10 @@ const FluentOSStorage = {
             if (node.encoding === 'media-local-cache') {
                 return this._deleteMediaRecord(node.mediaRecordId || `fs-${node.id}`);
             }
+            if (node.encoding === 'fap-package-cache') {
+                if (!globalThis.DeveloperCenterStore?.removePackageFile) return false;
+                return DeveloperCenterStore.removePackageFile(node.packageCacheId || node.content || node.id);
+            }
             return true;
         }));
         if (results.some((result) => result === false)) throw new Error('physical_payload_delete_failed');

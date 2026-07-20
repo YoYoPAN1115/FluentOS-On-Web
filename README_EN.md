@@ -19,7 +19,7 @@ Because I wanted to create my “dream OS”: nearly bug-free and extremely fast
 - 📱 Responsive design, with the best experience at widths of 1024 px or above
 - ⚡ Vanilla implementation with no framework dependencies
 
-Current system version: `2.3.260718B` (see `js/core/resource-manifest.js`).
+Current system version: `2.3.260720C` (see `js/core/resource-manifest.js`).
 
 > FluentOS-On-Web is a web desktop simulation, not an operating system. Files, settings, and “installed apps” are primarily stored in the current browser. It cannot access or manage the host system's real accounts, processes, or complete file system.
 

@@ -47,6 +47,9 @@ button.dc-card:hover, button.dc-card:focus-visible, .dc-project-card:hover, .dc-
 .dc-empty h3 { margin: 0; color: var(--text-primary); font-size: 17px; }
 .dc-empty p { max-width: 520px; margin: 0 0 6px; line-height: 1.55; }
 .dc-form { display: grid; gap: 18px; }
+.dc-package-info-form { max-width: 720px; }
+.dc-textarea.dc-package-description { min-height: 132px; resize: vertical; }
+.dc-package-info-form .dc-input[readonly] { color: var(--text-secondary); background: var(--bg-tertiary); cursor: default; }
 .dc-field { display: grid; gap: 7px; }
 .dc-field > label, .dc-field-label { color: var(--text-primary); font-size: 13px; font-weight: 600; }
 .dc-field > .dc-note { display: block; margin-top: 0; }
@@ -163,6 +166,12 @@ body:not(.dark-mode) .dc-token-function { color: #795e26; }
 .dc-permission-request-row strong, .dc-permission-request-row span, .dc-permission-request-row code { display: block; }
 .dc-permission-request-row span { margin-top: 3px; color: var(--text-secondary); font-size: 11px; }
 .dc-permission-request-row code { margin-top: 5px; color: var(--accent); font-size: 10px; }
+.app-permission-dialog { display: grid; gap: 12px; text-align: left; }
+.app-permission-dialog p { margin: 0; color: var(--text-primary); line-height: 1.6; }
+.app-permission-dialog small { color: var(--text-secondary); line-height: 1.5; }
+.app-permission-domains { display: grid; gap: 5px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-tertiary); }
+.app-permission-domains strong { font-size: 11px; }
+.app-permission-domains span { color: var(--text-secondary); font-size: 11px; line-height: 1.5; word-break: break-all; }
 .dc-settings-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
 .dc-stat strong { display: block; font-size: 24px; }
 .dc-stat span { color: var(--text-secondary); font-size: 12px; }

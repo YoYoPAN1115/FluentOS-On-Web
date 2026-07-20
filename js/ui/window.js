@@ -51,6 +51,7 @@ const WindowManager = {
         settings: { titleKey: 'settings.title', icon: 'Theme/Icon/App_icon/settings.png', width: 950, height: 650, component: 'SettingsApp' },
         'process-manager': { titleKey: 'processManager.title', icon: 'Theme/Icon/App_icon/Taskmgr.png', width: 980, height: 660, minWidth: 680, minHeight: 480, component: 'ProcessManagerApp' },
         'developer-center': { titleKey: 'developerCenter.title', icon: 'Theme/Icon/App_icon/developer_center.png', width: 1120, height: 720, minWidth: 720, minHeight: 520, component: 'DeveloperCenterApp' },
+        'app-installer': { title: 'Fluent App安装工具', icon: 'Theme/Icon/App_icon/App_package.png', width: 720, height: 560, minWidth: 600, minHeight: 470, component: 'AppInstallerApp' },
         terminal: { titleKey: 'terminal.title', icon: 'Theme/Icon/App_icon/terminal.png', width: 900, height: 600, minWidth: 560, minHeight: 360, component: 'TerminalApp' },
         tips: { titleKey: 'tips.title', icon: 'Theme/Icon/App_icon/tips.png', width: 1120, height: 720, minWidth: 760, minHeight: 520, component: 'TipsApp' },
         calculator: { titleKey: 'calculator.title', icon: 'Theme/Icon/App_icon/calculator.png', width: 760, height: 620, minWidth: 520, minHeight: 500, component: 'CalculatorApp' },
@@ -1342,6 +1343,10 @@ const WindowManager = {
                 message: t('start.ctx.app-repairing-msg'),
                 type: 'warning'
             });
+            return false;
+        }
+
+        if (typeof DeveloperCreatedRuntime !== 'undefined' && DeveloperCreatedRuntime.interceptLaunch?.(appId, data)) {
             return false;
         }
 

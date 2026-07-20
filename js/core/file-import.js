@@ -13,8 +13,8 @@
     const rand = () => Math.random().toString(36).slice(2, 10);
 
     const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB soft limit to avoid blowing up localStorage
-    const ALLOWED_IMPORT_EXTENSIONS = new Set(['jpg', 'png', 'webp', 'mp3', 'txt', 'md']);
-    const ALLOWED_IMPORT_ACCEPT = '.jpg,.png,.webp,.mp3,.txt,.md';
+    const ALLOWED_IMPORT_EXTENSIONS = new Set(['jpg', 'png', 'webp', 'mp3', 'txt', 'md', 'fap']);
+    const ALLOWED_IMPORT_ACCEPT = '.jpg,.png,.webp,.mp3,.txt,.md,.fap';
 
     function isEnabledFlag(value) {
         if (value === true || value === 1) return true;
@@ -81,7 +81,7 @@
 
     function unsupportedTypeMessage(name) {
         const safeName = String(name || 'file');
-        const allowed = 'jpg/png/webp/mp3/txt/md';
+        const allowed = 'jpg/png/webp/mp3/txt/md/fap';
         return isZh()
             ? `不支持的文件类型，已跳过：${safeName}（仅支持 ${allowed}）`
             : `Unsupported file type skipped: ${safeName} (allowed: ${allowed})`;
@@ -106,6 +106,10 @@
 
     function isImageImportFile(file) {
         return ['png', 'jpg', 'webp'].includes(getFileExt(file?.name || ''));
+    }
+
+    function isPackageImportFile(file) {
+        return getFileExt(file?.name || '') === 'fap';
     }
 
     function imageMimeForFile(file) {
@@ -369,11 +373,34 @@
                         let result = null;
                         let cachedImage = null;
                         let cachedAudio = null;
+                        let cachedPackage = null;
                         const importNodeId = `file-${Date.now()}-${rand()}`;
+                        const shouldCachePackage = isPackageImportFile(task.file)
+                            && window.DeveloperCenterStore
+                            && typeof DeveloperCenterStore.storePackageFile === 'function';
                         const shouldCacheImage = isImageImportFile(task.file)
                             && window.PhotosDataStore
                             && typeof PhotosDataStore.storeLocalImage === 'function';
-                        if (shouldCacheImage) {
+                        if (shouldCachePackage) {
+                            try {
+                                const cacheKey = await DeveloperCenterStore.storePackageFile(importNodeId, task.file);
+                                cachedPackage = { nodeId: importNodeId, cacheKey };
+                            } catch (_) {
+                                result = await readFile(task.file, {
+                                    onReader: (reader) => { this._activeReader = reader; },
+                                    onProgress: (loaded, total) => {
+                                        task.bytesLoaded = loaded;
+                                        const pct = total > 0 ? Math.max(0, Math.min(100, (loaded / total) * 100)) : 0;
+                                        task.progressEl.setValue(pct);
+                                        this._refreshOverall();
+                                    }
+                                });
+                                this._activeReader = null;
+                            }
+                            task.bytesLoaded = task.bytesTotal;
+                            task.progressEl.setValue(100);
+                            this._refreshOverall();
+                        } else if (shouldCacheImage) {
                             const cacheKey = await PhotosDataStore.storeLocalImage(importNodeId, task.file, {
                                 mime: task.file.type || imageMimeForFile(task.file),
                                 name: task.file.name,
@@ -437,6 +464,9 @@
                             if (cachedAudio && typeof MediaApp !== 'undefined' && typeof MediaApp.withMediaStore === 'function') {
                                 MediaApp.withMediaStore('readwrite', (store) => store.delete(cachedAudio.mediaRecordId)).catch(() => {});
                             }
+                            if (cachedPackage && window.DeveloperCenterStore && typeof DeveloperCenterStore.removePackageFile === 'function') {
+                                DeveloperCenterStore.removePackageFile(cachedPackage.cacheKey).catch(() => {});
+                            }
                             this._setTaskStatus(task, 'cancelled');
                             this._refreshOverall();
                             continue;
@@ -453,17 +483,18 @@
 
                         const isText = isProbablyText(task.file);
                         const node = {
-                            id: cachedImage?.nodeId || cachedAudio?.nodeId || importNodeId,
+                            id: cachedImage?.nodeId || cachedAudio?.nodeId || cachedPackage?.nodeId || importNodeId,
                             name: finalName,
                             type: 'file',
-                            content: cachedImage ? cachedImage.cacheKey : (cachedAudio ? cachedAudio.mediaRecordId : (typeof result === 'string' ? result : '')),
+                            content: cachedImage ? cachedImage.cacheKey : (cachedAudio ? cachedAudio.mediaRecordId : (cachedPackage ? cachedPackage.cacheKey : (typeof result === 'string' ? result : ''))),
                             ...(cachedImage ? { cacheKey: cachedImage.cacheKey, cacheId: cachedImage.nodeId } : {}),
                             ...(cachedImage && cachedImage.thumb ? { thumb: cachedImage.thumb } : {}),
                             ...(cachedAudio ? { mediaRecordId: cachedAudio.mediaRecordId } : {}),
+                            ...(cachedPackage ? { packageCacheId: cachedPackage.cacheKey } : {}),
                             size: Number(task.file.size || 0),
-                            mime: String(task.file.type || (cachedImage ? imageMimeForFile(task.file) : (cachedAudio ? 'audio/mpeg' : (isText ? 'text/plain' : 'application/octet-stream')))),
-                            encoding: cachedImage ? 'photos-local-cache' : (cachedAudio ? 'media-local-cache' : (isText ? 'text' : 'dataurl')),
-                            source: (cachedImage || cachedAudio) ? 'external-import' : undefined,
+                            mime: String(isPackageImportFile(task.file) ? 'application/vnd.fluent.app-package' : (task.file.type || (cachedImage ? imageMimeForFile(task.file) : (cachedAudio ? 'audio/mpeg' : (isText ? 'text/plain' : 'application/octet-stream'))))),
+                            encoding: cachedImage ? 'photos-local-cache' : (cachedAudio ? 'media-local-cache' : (cachedPackage ? 'fap-package-cache' : (isText ? 'text' : 'dataurl'))),
+                            source: (cachedImage || cachedAudio || isPackageImportFile(task.file)) ? 'external-import' : undefined,
                             created: nowIso(),
                             modified: nowIso()
                         };
