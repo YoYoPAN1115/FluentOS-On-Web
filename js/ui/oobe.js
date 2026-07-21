@@ -1591,13 +1591,6 @@ const OOBE = {
         this._updatePreloadStatusText();
     },
 
-    _setChipGroupActive(selector, predicate) {
-        const buttons = Array.from(this.element.querySelectorAll(selector));
-        buttons.forEach((btn) => {
-            btn.classList.toggle('active', predicate(btn));
-        });
-    },
-
     _syncNextStep1State() {
         const next = document.getElementById('oobe-next-1');
         if (!next) return;
@@ -3108,14 +3101,6 @@ const OOBE = {
             this.welcomeBrandEl.classList.remove('is-revealing', 'is-transforming', 'is-finished');
         }
         this._clearWelcomeLogoBridge();
-    },
-
-    /* ===== Language preview text sync ===== */
-
-    _syncLangPreviewText() {
-        if (!this.langPreviewTextEl) return;
-        const lang = this.selectedLang || 'zh';
-        this.langPreviewTextEl.textContent = lang === 'zh' ? '简体' : 'Aa';
     }
 };
 

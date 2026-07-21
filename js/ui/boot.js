@@ -146,13 +146,6 @@ const BootScreen = {
         this.hintElement = hint;
     },
 
-    _showFirstHint(text) {
-        this._stopFirstHintRotation();
-        this._ensureFirstHint();
-        if (!this.hintElement) return;
-        this._setFirstHintText(text, { fadeIn: true });
-    },
-
     _setFirstHintText(text, options = {}) {
         if (!this.hintElement) return;
         const { fadeIn = false } = options;
@@ -602,22 +595,6 @@ const BootScreen = {
             }
         });
         await Promise.all(workers);
-    },
-
-    async _preloadGroupWithResult(assets, concurrency = 6) {
-        if (!assets.length) return true;
-        let index = 0;
-        let allOk = true;
-        const workerCount = Math.min(concurrency, assets.length);
-        const workers = Array.from({ length: workerCount }, async () => {
-            while (index < assets.length) {
-                const current = assets[index++];
-                const ok = await this._fetchAndCacheAsset(current);
-                if (!ok) allOk = false;
-            }
-        });
-        await Promise.all(workers);
-        return allOk;
     },
 
     async _warmRenderGroup(assets, concurrency = 6) {

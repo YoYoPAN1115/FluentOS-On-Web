@@ -772,10 +772,6 @@ body.dark-mode.blur-disabled .fw-card {
     grid-column: 1 / -1 !important;
 }
 
-.media-fw-search {
-    margin-bottom: 18px;
-}
-
 /* ---------- 页面切换动效 (淡出 / 淡入) ---------- */
 .fw-page {
     opacity: 1;
@@ -872,12 +868,6 @@ body.dark-mode.blur-disabled .fw-card {
     width: 6px;
     margin-left: 1px;
     background: rgba(var(--accent-rgb, 0, 120, 212), 0.62);
-}
-
-.browser-fw-page {
-    height: 100%;
-    min-height: 0;
-    padding: 0 !important;
 }
 
 /* 降低动效偏好时禁用过渡 */

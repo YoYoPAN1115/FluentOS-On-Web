@@ -811,26 +811,6 @@ const Widgets = {
         ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
     },
 
-    /** 「添加」按钮：放到当前编辑表面的第一个空位 */
-    _addToFirstFreeSlot(variant) {
-        const surface = this.lockEditMode ? 'lock' : 'desktop';
-        const m = this._metrics(surface);
-        for (let row = 0; row <= m.rows - variant.h; row++) {
-            for (let col = 0; col <= m.cols - variant.w; col++) {
-                if (!this._collides(surface, col, row, variant.w, variant.h, null)) {
-                    this.addWidget(surface, variant.id, col, row);
-                    // 短暂收起抽屉展示添加效果，再自动滑入
-                    this._hideDrawerTemp();
-                    this._showDrawerAgain(700);
-                    return;
-                }
-            }
-        }
-        if (window.FluentUI && FluentUI.Toast) {
-            FluentUI.Toast({ title: t('widgets.drawer.title'), message: t('widgets.drawer.no-space'), type: 'warning' });
-        }
-    },
-
     updateTexts() {
         if (!this.drawer) return;
         this.drawer.querySelector('.widgets-drawer-title-text').textContent = t('widgets.drawer.title');

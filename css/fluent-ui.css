@@ -1188,16 +1188,14 @@ body.fluent-v2 .browser-app {
     background: transparent;
 }
 
-body.fluent-v2 .browser-header,
-body.fluent-v2 .browser-tabs-bar {
+body.fluent-v2 .browser-header {
     background: transparent !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     border-bottom: none !important;
 }
 
-body.fluent-v2.dark-mode .browser-header,
-body.fluent-v2.dark-mode .browser-tabs-bar {
+body.fluent-v2.dark-mode .browser-header {
     background: transparent !important;
     border-bottom: none !important;
 }
@@ -1215,88 +1213,9 @@ body.fluent-v2.dark-mode .browser-address-bar {
     border-color: var(--v2-glass-border-dark) !important;
 }
 
-body.fluent-v2 .browser-tab {
-    background: transparent;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-}
-
-body.fluent-v2 .browser-tab.active {
-    background: rgba(255, 255, 255, 0.4) !important;
-    backdrop-filter: blur(10px);
-}
-
-body.fluent-v2.dark-mode .browser-tab.active {
-    background: rgba(255, 255, 255, 0.1) !important;
-}
-
 /* V2 记事本应用样式 */
 body.fluent-v2 .notes-app {
     background: transparent;
-}
-
-body.fluent-v2 .notes-tabs-bar,
-body.fluent-v2 .notes-toolbar {
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-bottom: none !important;
-}
-
-body.fluent-v2.dark-mode .notes-tabs-bar,
-body.fluent-v2.dark-mode .notes-toolbar {
-    background: transparent !important;
-    border-bottom: none !important;
-}
-
-body.fluent-v2 .notes-editor-container,
-body.fluent-v2 .notes-editor {
-    background: var(--v2-glass-bg) !important;
-    backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
-    -webkit-backdrop-filter: blur(var(--v2-blur-light)) saturate(150%) !important;
-}
-
-body.fluent-v2.dark-mode .notes-editor-container,
-body.fluent-v2.dark-mode .notes-editor {
-    background: var(--v2-glass-bg-dark) !important;
-}
-
-body.fluent-v2 .notes-statusbar {
-    background: var(--v2-glass-bg) !important;
-    backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(var(--v2-blur)) saturate(180%) !important;
-    border-top: 1px solid var(--v2-glass-border) !important;
-}
-
-body.fluent-v2.dark-mode .notes-statusbar {
-    background: var(--v2-glass-bg-dark) !important;
-    border-color: var(--v2-glass-border-dark) !important;
-}
-
-body.fluent-v2 .notes-tab {
-    background: transparent;
-    border-radius: 8px;
-}
-
-body.fluent-v2 .notes-tab.active {
-    background: rgba(255, 255, 255, 0.4) !important;
-    backdrop-filter: blur(10px);
-}
-
-body.fluent-v2.dark-mode .notes-tab.active {
-    background: rgba(255, 255, 255, 0.1) !important;
-}
-
-body.fluent-v2 .notes-btn {
-    background: var(--v2-glass-bg) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid var(--v2-glass-border) !important;
-    border-radius: 8px !important;
-}
-
-body.fluent-v2.dark-mode .notes-btn {
-    background: var(--v2-glass-bg-dark) !important;
-    border-color: var(--v2-glass-border-dark) !important;
 }
 
 /* V2 文件管理器样式 */
@@ -1853,13 +1772,11 @@ body.fluent-v2.material-mica:not(.blur-disabled) .fluent-select-dropdown,
 body.fluent-v2.material-mica:not(.blur-disabled) .fluent-dialog,
 body.fluent-v2.material-mica:not(.blur-disabled) .fluent-toast,
 body.fluent-v2.material-mica:not(.blur-disabled) .files-toolbar,
-body.fluent-v2.material-mica:not(.blur-disabled) .notes-toolbar,
 body.fluent-v2.material-mica:not(.blur-disabled) .browser-header,
 body.fluent-v2.material-mica:not(.blur-disabled) .photos-toolbar-v2,
 body.fluent-v2.material-mica:not(.blur-disabled) .photos-adjust-panel,
 body.fluent-v2.material-mica:not(.blur-disabled) .photos-info-panel,
 body.fluent-v2.material-mica:not(.blur-disabled) .appshop-app-card,
-body.fluent-v2.material-mica:not(.blur-disabled) .media-sidebar,
 body.fluent-v2.material-mica:not(.blur-disabled) .media-player-bar {
     background-color: rgba(248, 251, 255, 0.72) !important;
     background-image:
@@ -1885,13 +1802,11 @@ body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-select-dropdo
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-dialog,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .fluent-toast,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .files-toolbar,
-body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .notes-toolbar,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .browser-header,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-toolbar-v2,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-adjust-panel,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .photos-info-panel,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .appshop-app-card,
-body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .media-sidebar,
 body.fluent-v2.dark-mode.material-mica:not(.blur-disabled) .media-player-bar {
     background-color: rgba(24, 28, 36, 0.72) !important;
     background-image:
@@ -1914,13 +1829,11 @@ body.fluent-v2.material-mica.window-blur-disabled .fluent-select-dropdown,
 body.fluent-v2.material-mica.window-blur-disabled .fluent-dialog,
 body.fluent-v2.material-mica.window-blur-disabled .fluent-toast,
 body.fluent-v2.material-mica.window-blur-disabled .files-toolbar,
-body.fluent-v2.material-mica.window-blur-disabled .notes-toolbar,
 body.fluent-v2.material-mica.window-blur-disabled .browser-header,
 body.fluent-v2.material-mica.window-blur-disabled .photos-toolbar-v2,
 body.fluent-v2.material-mica.window-blur-disabled .photos-adjust-panel,
 body.fluent-v2.material-mica.window-blur-disabled .photos-info-panel,
 body.fluent-v2.material-mica.window-blur-disabled .appshop-app-card,
-body.fluent-v2.material-mica.window-blur-disabled .media-sidebar,
 body.fluent-v2.material-mica.window-blur-disabled .media-player-bar,
 body.fluent-v2.material-mica.blur-disabled .taskbar,
 body.fluent-v2.material-mica.blur-disabled .start-menu,
@@ -1942,13 +1855,11 @@ body.fluent-v2.dark-mode.material-mica.window-blur-disabled .fluent-select-dropd
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .fluent-dialog,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .fluent-toast,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .files-toolbar,
-body.fluent-v2.dark-mode.material-mica.window-blur-disabled .notes-toolbar,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .browser-header,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .photos-toolbar-v2,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .photos-adjust-panel,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .photos-info-panel,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .appshop-app-card,
-body.fluent-v2.dark-mode.material-mica.window-blur-disabled .media-sidebar,
 body.fluent-v2.dark-mode.material-mica.window-blur-disabled .media-player-bar,
 body.fluent-v2.dark-mode.material-mica.blur-disabled .taskbar,
 body.fluent-v2.dark-mode.material-mica.blur-disabled .start-menu,
@@ -1982,7 +1893,6 @@ body.fluent-v2.material-gaussian:not(.blur-disabled) .files-toolbar,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .browser-header,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .photos-toolbar-v2,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .appshop-app-card,
-body.fluent-v2.material-gaussian:not(.blur-disabled) .media-sidebar,
 body.fluent-v2.material-gaussian:not(.blur-disabled) .media-player-bar {
     backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
     -webkit-backdrop-filter: blur(var(--fluent-material-blur-light, 20px)) saturate(160%) !important;
@@ -1998,7 +1908,6 @@ body.fluent-v2 .network-expand-panel,
 body.fluent-v2 .app-list-item,
 body.fluent-v2 .appshop-app-card,
 body.fluent-v2 .appshop-category-card,
-body.fluent-v2 .appshop-featured-card:not(.large),
 body.fluent-v2 .worldclock-card {
     background-color: var(--fluent-card-bg-light) !important;
     background-image: none !important;
@@ -2013,7 +1922,6 @@ body.fluent-v2 .network-option-item:hover,
 body.fluent-v2 .app-list-item:hover,
 body.fluent-v2 .appshop-app-card:hover,
 body.fluent-v2 .appshop-category-card:hover,
-body.fluent-v2 .appshop-featured-card:not(.large):hover,
 body.fluent-v2 .worldclock-card:hover {
     background-color: var(--fluent-card-bg-light-hover) !important;
 }
@@ -2028,7 +1936,6 @@ body.fluent-v2.dark-mode .network-expand-panel,
 body.fluent-v2.dark-mode .app-list-item,
 body.fluent-v2.dark-mode .appshop-app-card,
 body.fluent-v2.dark-mode .appshop-category-card,
-body.fluent-v2.dark-mode .appshop-featured-card:not(.large),
 body.fluent-v2.dark-mode .worldclock-card {
     background-color: var(--fluent-card-bg-dark) !important;
     background-image: none !important;
@@ -2043,7 +1950,6 @@ body.fluent-v2.dark-mode .network-option-item:hover,
 body.fluent-v2.dark-mode .app-list-item:hover,
 body.fluent-v2.dark-mode .appshop-app-card:hover,
 body.fluent-v2.dark-mode .appshop-category-card:hover,
-body.fluent-v2.dark-mode .appshop-featured-card:not(.large):hover,
 body.fluent-v2.dark-mode .worldclock-card:hover {
     background-color: var(--fluent-card-bg-dark-hover) !important;
 }

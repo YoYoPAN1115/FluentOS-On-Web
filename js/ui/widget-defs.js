@@ -228,13 +228,6 @@ function wWeatherLocations() {
     return { beijing: { nameKey: 'weather.beijing', lat: 39.9042, lon: 116.4074 } };
 }
 
-function wWeatherDesc(code) {
-    if (window.WeatherApp && typeof WeatherApp.codeToDesc === 'function') {
-        return WeatherApp.codeToDesc(code);
-    }
-    return '';
-}
-
 /** Cache widget weather data for one hour. */
 const W_WEATHER_WIDGET_TTL = 60 * 60 * 1000;
 
@@ -630,20 +623,6 @@ function wCalendarDayCell(day, today) {
     return `<div class="${classes.join(' ')}">${day}</div>`;
 }
 
-function wCalendarLocation() {
-    const current = t('weather.current-location');
-    if (current && current !== 'weather.current-location') return current;
-    return wCalendarIsEn() ? 'Current location' : '\u5f53\u524d\u4f4d\u7f6e';
-}
-
-function wCalendarLocationMarkup() {
-    return `
-        <div class="w-calendar-location">
-            <span class="w-calendar-pin" aria-hidden="true"></span>
-            <span>${wEsc(wCalendarLocation())}</span>
-        </div>`;
-}
-
 function wCalendarNavButton(direction) {
     const label = direction < 0
         ? (wCalendarIsEn() ? 'Previous month' : '\u4e0a\u4e00\u6708')
@@ -696,13 +675,6 @@ function wCalendarEventsForDate(date, events = wCalendarClockEvents()) {
 
 function wCalendarReminderWeekday(date) {
     return wCalendarIsEn() ? W_CAL_WEEK_EN_FULL[date.getDay()].toUpperCase() : W_CAL_WEEK_ZH[date.getDay()];
-}
-
-function wCalendarReminderDateLabel(date) {
-    if (wCalendarIsEn()) {
-        return `${W_CAL_WEEK_EN_FULL[date.getDay()].toUpperCase()}, ${W_CAL_MONTHS_EN_SHORT[date.getMonth()].toUpperCase()} ${date.getDate()}`;
-    }
-    return `${W_CAL_WEEK_ZH[date.getDay()]} ${date.getMonth() + 1}\u6708${date.getDate()}\u65e5`;
 }
 
 function wCalendarNoEventsText(date, today) {
@@ -1761,10 +1733,6 @@ function wMediaState() {
     }
     if (!queue.length && track) queue.push(track);
     return { track, queue };
-}
-
-function wMediaTrack() {
-    return wMediaState().track;
 }
 
 /** Prefer cover theme colors; fall back to the preset gradient palette. */

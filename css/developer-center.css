@@ -53,9 +53,9 @@ button.dc-card:hover, button.dc-card:focus-visible, .dc-project-card:hover, .dc-
 .dc-field { display: grid; gap: 7px; }
 .dc-field > label, .dc-field-label { color: var(--text-primary); font-size: 13px; font-weight: 600; }
 .dc-field > .dc-note { display: block; margin-top: 0; }
-.dc-input, .dc-textarea, .dc-search { box-sizing: border-box; width: 100%; border: 1px solid var(--border-color); border-bottom-color: color-mix(in srgb, var(--text-secondary) 65%, var(--border-color)); border-radius: var(--radius-md); outline: none; color: var(--text-primary); background: var(--bg-primary); font: inherit; }
-.dc-input, .dc-search { min-height: 38px; padding: 8px 11px; }
-.dc-input:focus, .dc-textarea:focus, .dc-search:focus { border-bottom: 2px solid var(--accent); }
+.dc-input, .dc-textarea { box-sizing: border-box; width: 100%; border: 1px solid var(--border-color); border-bottom-color: color-mix(in srgb, var(--text-secondary) 65%, var(--border-color)); border-radius: var(--radius-md); outline: none; color: var(--text-primary); background: var(--bg-primary); font: inherit; }
+.dc-input { min-height: 38px; padding: 8px 11px; }
+.dc-input:focus, .dc-textarea:focus { border-bottom: 2px solid var(--accent); }
 .dc-icon-picker { display: flex; align-items: center; gap: 12px; }
 .dc-icon-preview { width: 58px; height: 58px; border-radius: 13px; object-fit: cover; background: var(--bg-tertiary); }
 .dc-editor-layout { display: grid; grid-template-columns: minmax(230px, .78fr) minmax(360px, 1.5fr); gap: 18px; align-items: start; }
@@ -160,12 +160,6 @@ body:not(.dark-mode) .dc-token-function { color: #795e26; }
 .dc-permission-row strong { font-size: 12px; }
 .dc-permission-row small { margin-top: 2px; color: var(--text-secondary); line-height: 1.4; }
 .dc-permission-row code { margin-top: 4px; color: var(--accent); font-size: 10px; }
-.dc-permission-request { display: grid; gap: 9px; text-align: left; }
-.dc-permission-request > p { margin: 0; }
-.dc-permission-request-row { padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-tertiary); }
-.dc-permission-request-row strong, .dc-permission-request-row span, .dc-permission-request-row code { display: block; }
-.dc-permission-request-row span { margin-top: 3px; color: var(--text-secondary); font-size: 11px; }
-.dc-permission-request-row code { margin-top: 5px; color: var(--accent); font-size: 10px; }
 .app-permission-dialog { display: grid; gap: 12px; text-align: left; }
 .app-permission-dialog p { margin: 0; color: var(--text-primary); line-height: 1.6; }
 .app-permission-dialog small { color: var(--text-secondary); line-height: 1.5; }

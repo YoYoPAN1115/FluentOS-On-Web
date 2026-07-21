@@ -119,40 +119,6 @@ body.dark-mode.window-blur-enabled .window {
     background: transparent !important;
 }
 
-.calculator-button {
-    background: rgba(255, 255, 255, 0.5) !important;
-    backdrop-filter: blur(20px) !important;
-}
-
-.dark-mode .calculator-button {
-    background: rgba(255, 255, 255, 0.05) !important;
-}
-
-.calculator-button:hover {
-    background: rgba(255, 255, 255, 0.7) !important;
-}
-
-.dark-mode .calculator-button:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
-}
-
-.calculator-button.operator {
-    background: rgba(var(--accent-rgb, 0, 120, 212), 0.2) !important;
-}
-
-.calculator-button.operator:hover {
-    background: rgba(var(--accent-rgb, 0, 120, 212), 0.3) !important;
-}
-
-.calculator-button.equals {
-    background: rgba(var(--accent-rgb, 0, 120, 212), 0.9) !important;
-    color: white !important;
-}
-
-.calculator-button.equals:hover {
-    background: var(--accent-hover) !important;
-}
-
 /* 模糊禁用时的纯色底 */
 body.window-blur-disabled .window {
     background: var(--bg-primary) !important;

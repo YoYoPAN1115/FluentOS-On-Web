@@ -170,7 +170,7 @@ const TipsApp = {
 
     openData(data) {
         if (data?.section === 'new-features') this.activeSection = 'new-features';
-        if (Number.isInteger(data?.step)) this.activeStep = Math.max(0, Math.min(5, data.step));
+        if (Number.isInteger(data?.step)) this.activeStep = Math.max(0, Math.min(this.text().tutorials.length - 1, data.step));
         if (Number.isInteger(data?.feature)) this.activeFeature = Math.max(0, Math.min(this.text().features.length - 1, data.feature));
         if (this.container?.isConnected) this.mount();
     },
